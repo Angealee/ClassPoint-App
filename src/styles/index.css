@@ -1,0 +1,125 @@
+@import 'tailwindcss';
+
+/* Dark mode driven by a `.dark` class on <html> (toggled by ThemeProvider). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ----------------------------------------------------------------------------
+   Design tokens — fixed brand scales (red + gold) usable in any theme.
+---------------------------------------------------------------------------- */
+@theme {
+  /* Brand red — scarlet/crimson */
+  --color-brand-50: #fff1f1;
+  --color-brand-100: #ffe0e1;
+  --color-brand-200: #ffc7c9;
+  --color-brand-300: #ffa0a4;
+  --color-brand-400: #f76a72;
+  --color-brand-500: #e11d2a;
+  --color-brand-600: #c40f1d;
+  --color-brand-700: #a30c18;
+  --color-brand-800: #7f0f17;
+  --color-brand-900: #561013;
+  --color-brand-950: #2f0608;
+
+  /* Gold / amber — XP, level-ups, rewards */
+  --color-gold-50: #fffaeb;
+  --color-gold-100: #fff0c6;
+  --color-gold-200: #ffe088;
+  --color-gold-300: #ffcd4a;
+  --color-gold-400: #ffba1f;
+  --color-gold-500: #f29e0a;
+  --color-gold-600: #d67c05;
+  --color-gold-700: #b15a08;
+  --color-gold-800: #90470e;
+  --color-gold-900: #763a0f;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ----------------------------------------------------------------------------
+   Semantic surface tokens — swap between light (academic) and dark (RPG).
+---------------------------------------------------------------------------- */
+:root {
+  --canvas: #f3f3f6;
+  --card: #ffffff;
+  --card-2: #fafafb;
+  --ink: #18181b;
+  --muted: #6b7280;
+  --line: #e7e7ec;
+  --ring: #e11d2a;
+}
+
+.dark {
+  --canvas: #0d0d10;
+  --card: #16161b;
+  --card-2: #1d1d24;
+  --ink: #f4f4f5;
+  --muted: #a1a1aa;
+  --line: #2a2a32;
+  --ring: #f76a72;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-card: var(--card);
+  --color-card-2: var(--card-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-ring: var(--ring);
+}
+
+/* ----------------------------------------------------------------------------
+   Base
+---------------------------------------------------------------------------- */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+  }
+
+  /* Smooth theme transitions on broad surfaces. */
+  body,
+  .theme-transition {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* XP bar shimmer — CSS-driven so it doesn't keep the JS render loop busy. */
+@keyframes cp-shimmer {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(360%); }
+}
+
+.cp-shimmer {
+  animation: cp-shimmer 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

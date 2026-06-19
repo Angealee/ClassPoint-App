@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cpm-red" x1="160" y1="150" x2="360" y2="380" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f04452" />
+      <stop offset="0.55" stop-color="#e11d2a" />
+      <stop offset="1" stop-color="#a30c18" />
+    </linearGradient>
+    <linearGradient id="cpm-gold" x1="206" y1="196" x2="306" y2="312" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffd770" />
+      <stop offset="1" stop-color="#e8a317" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#0d0d10" />
+  <path
+    d="M256 156l82 27v74c0 57-35 96-82 116-47-20-82-59-82-116v-74l82-27z"
+    fill="url(#cpm-red)"
+    stroke="#ffffff"
+    stroke-opacity="0.14"
+    stroke-width="4"
+  />
+  <path
+    d="M256 204l17.4 35.2 38.9 5.6-28.1 27.4 6.6 38.7L256 292.8l-34.8 18.3 6.6-38.7-28.1-27.4 38.9-5.6z"
+    fill="url(#cpm-gold)"
+  />
+</svg>
