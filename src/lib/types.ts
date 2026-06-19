@@ -34,3 +34,12 @@ export interface PointEvent {
   note: string | null
   created_at: string
 }
+
+/** The signed-in student's own profile + points record. */
+export interface StudentSelf {
+  id: string
+  section_id: string
+  full_name: string
+  display_name: string
+  lifetime_points: number
+}

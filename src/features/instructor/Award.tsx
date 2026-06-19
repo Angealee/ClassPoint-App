@@ -158,7 +158,7 @@ export function Award() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 120, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-            className="fixed inset-x-0 bottom-[4.75rem] z-30 mx-auto w-full max-w-2xl px-4"
+            className="fixed inset-x-0 bottom-[4.75rem] z-30 mx-auto w-full max-w-2xl px-4 md:bottom-6 md:left-60 md:right-0"
           >
             <Card className="space-y-3 p-4 shadow-xl">
               <div className="flex items-center justify-between">

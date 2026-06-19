@@ -38,8 +38,8 @@ export function Landing() {
             Turn class points into <span className="text-brand-500">XP</span>.
           </h1>
           <p className="mx-auto mt-3 max-w-md text-muted">
-            A leveling system for the classroom. Earn points, rank up, and climb the
-            leaderboard — built for IT students who like to grind.
+            A pointing/leveling system for the classroom. Earn points in class, level up, and climb the
+            leaderboard, built for DCT-CCS students who likes the grind.
           </p>
         </motion.div>
 

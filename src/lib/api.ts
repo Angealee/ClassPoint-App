@@ -5,6 +5,7 @@ import type {
   PointEvent,
   RosterStudent,
   Section,
+  StudentSelf,
 } from '@/lib/types'
 
 /** All sections, ordered by name (2A, 2B, …). */
@@ -85,6 +86,26 @@ export async function listLeaderboard(): Promise<LeaderboardRow[]> {
     .order('lifetime_points', { ascending: false })
   if (error) throw error
   return data ?? []
+}
+
+/** The signed-in student's own row, located by their auth user id. */
+export async function getMyStudent(userId: string): Promise<StudentSelf | null> {
+  const { data, error } = await supabase
+    .from('students')
+    .select('id, section_id, full_name, display_name, lifetime_points')
+    .eq('user_id', userId)
+    .maybeSingle<StudentSelf>()
+  if (error) throw error
+  return data ?? null
+}
+
+/** Student updates their own public display name (column-guarded by trigger). */
+export async function updateDisplayName(studentId: string, displayName: string): Promise<void> {
+  const { error } = await supabase
+    .from('students')
+    .update({ display_name: displayName })
+    .eq('id', studentId)
+  if (error) throw error
 }
 
 /** Recent point events for a student (their feed / instructor review). */
