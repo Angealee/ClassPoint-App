@@ -77,7 +77,7 @@ export function Profile() {
 
           <div className="mt-5 space-y-3">
             <Field label="Display name" value={me.display_name} />
-            <Field label="Roster name" value={me.full_name} />
+            <Field label="Full name" value={me.full_name} />
             <Field label="Section" value={sectionName(me.section_id)} />
             <Field label="Total points" value={String(me.lifetime_points)} />
           </div>
@@ -99,7 +99,7 @@ export function Profile() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="How you appear on the leaderboard"
-            hint="2–40 characters. Your roster name stays private."
+            hint="2–40 characters. Your full name stays private."
             autoFocus
             required
           />

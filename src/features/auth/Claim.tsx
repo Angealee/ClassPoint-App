@@ -84,7 +84,7 @@ export function Claim() {
           label="Display name (optional)"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          hint="Shown on the leaderboard. Leave blank to use your roster name."
+          hint="Shown on the leaderboard. Leave blank to use your full name."
           placeholder="e.g. Juan D."
         />
         <Input

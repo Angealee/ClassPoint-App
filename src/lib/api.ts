@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import type {
+  LeaderboardEntry,
   LeaderboardRow,
+  LeaderboardSnapshot,
   PointCategory,
   PointEvent,
   RosterStudent,
@@ -78,7 +80,7 @@ export async function awardPoints(args: {
   if (error) throw error
 }
 
-/** All students ranked by lifetime points (powers the leaderboard). */
+/** All students ranked by lifetime points (live; used by instructor tools). */
 export async function listLeaderboard(): Promise<LeaderboardRow[]> {
   const { data, error } = await supabase
     .from('students')
@@ -86,6 +88,26 @@ export async function listLeaderboard(): Promise<LeaderboardRow[]> {
     .order('lifetime_points', { ascending: false })
   if (error) throw error
   return data ?? []
+}
+
+/**
+ * The frozen leaderboard snapshot + when it was captured.
+ * Refreshed twice daily (7:30 AM / 7:30 PM PHT) by a pg_cron job, so the
+ * ranking only "settles" twice a day even though dashboards are live.
+ */
+export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot> {
+  const [snap, meta] = await Promise.all([
+    supabase
+      .from('leaderboard_snapshot')
+      .select('student_id, display_name, section_id, lifetime_points, rank')
+      .order('rank'),
+    supabase.from('leaderboard_meta').select('captured_at').maybeSingle(),
+  ])
+  if (snap.error) throw snap.error
+  return {
+    entries: (snap.data as LeaderboardEntry[]) ?? [],
+    capturedAt: meta.data?.captured_at ?? null,
+  }
 }
 
 /** The signed-in student's own row, located by their auth user id. */

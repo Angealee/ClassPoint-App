@@ -36,7 +36,7 @@ export function Roster() {
     try {
       setRoster(await listRoster(selectedSectionId))
     } catch {
-      setError('Could not load the roster.')
+      setError('Could not load students.')
     } finally {
       setLoading(false)
     }
@@ -133,7 +133,7 @@ export function Roster() {
       </div>
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-muted">Loading roster…</p>
+        <p className="py-10 text-center text-sm text-muted">Loading students…</p>
       ) : error ? (
         <Card className="p-6 text-center text-sm text-brand-500">{error}</Card>
       ) : roster.length === 0 ? (

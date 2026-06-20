@@ -23,7 +23,7 @@ export function useInstructor(): InstructorContextValue {
 }
 
 const nav: NavItem[] = [
-  { to: '/teach', label: 'Roster', Icon: UsersIcon, end: true },
+  { to: '/teach', label: 'Students', Icon: UsersIcon, end: true },
   { to: '/teach/award', label: 'Award', Icon: BoltIcon },
   { to: '/teach/leaderboard', label: 'Ranks', Icon: TrophyIcon },
 ]

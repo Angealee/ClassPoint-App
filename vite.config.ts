@@ -9,8 +9,8 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
+      registerType: 'prompt',
+      includeAssets: ['icon.svg', 'icon-maskable.svg'],
       manifest: {
         name: 'ClassPoint',
         short_name: 'ClassPoint',

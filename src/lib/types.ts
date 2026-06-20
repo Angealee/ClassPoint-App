@@ -26,6 +26,21 @@ export interface LeaderboardRow {
   lifetime_points: number
 }
 
+/** One row of the frozen (twice-daily) leaderboard snapshot. */
+export interface LeaderboardEntry {
+  student_id: string
+  display_name: string
+  section_id: string
+  lifetime_points: number
+  rank: number
+}
+
+/** The frozen leaderboard plus when it was captured. */
+export interface LeaderboardSnapshot {
+  entries: LeaderboardEntry[]
+  capturedAt: string | null
+}
+
 export interface PointEvent {
   id: string
   student_id: string

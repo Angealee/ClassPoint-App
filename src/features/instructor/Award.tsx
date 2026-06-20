@@ -119,7 +119,7 @@ export function Award() {
         <p className="py-10 text-center text-sm text-muted">Loading…</p>
       ) : students.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted">
-          No students in {sectionName} yet — add some in the Roster tab.
+          No students in {sectionName} yet — add some in the Students tab.
         </Card>
       ) : (
         <Card className="divide-y divide-line">

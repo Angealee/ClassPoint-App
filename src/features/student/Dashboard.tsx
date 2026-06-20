@@ -4,7 +4,7 @@ import { XpBar } from '@/components/ui/XpBar'
 import { Button } from '@/components/ui/Button'
 import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
 import { getLevelProgress } from '@/lib/leveling'
-import { timeAgo } from '@/lib/time'
+import { snapshotLabel, timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import { useStudentData } from './StudentData'
 
@@ -18,7 +18,7 @@ const item = {
 }
 
 export function Dashboard() {
-  const { loading, error, me, events, rank, sectionName, refresh } = useStudentData()
+  const { loading, error, me, events, rank, capturedAt, sectionName, refresh } = useStudentData()
 
   if (loading) return <DashboardSkeleton />
 
@@ -36,7 +36,7 @@ export function Dashboard() {
   if (!me) {
     return (
       <Card className="p-8 text-center text-sm text-muted">
-        We couldn't find your student record. Ask your instructor to check your roster entry.
+        We couldn't find your student record. Ask your instructor to check your class list entry.
       </Card>
     )
   }
@@ -90,6 +90,7 @@ export function Dashboard() {
           icon={<TrophyIcon className="h-5 w-5" />}
           label="Overall rank"
           value={rank ? `#${rank}` : '—'}
+          note={rank ? `as of ${snapshotLabel(capturedAt)}` : 'settles 7:30 AM/PM'}
           tone="brand"
         />
       </motion.div>
@@ -134,11 +135,13 @@ function StatTile({
   icon,
   label,
   value,
+  note,
   tone,
 }: {
   icon: React.ReactNode
   label: string
   value: React.ReactNode
+  note?: string
   tone: 'gold' | 'brand'
 }) {
   return (
@@ -155,6 +158,7 @@ function StatTile({
       </div>
       <p className="font-display text-2xl font-bold">{value}</p>
       <p className="text-xs text-muted">{label}</p>
+      {note && <p className="mt-0.5 text-[0.65rem] text-muted/80">{note}</p>}
     </Card>
   )
 }

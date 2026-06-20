@@ -45,7 +45,7 @@ export function SignIn() {
           autoCorrect="off"
           autoComplete="username"
           spellCheck={false}
-          placeholder="e.g. juan_dc"
+          placeholder="Your username"
           required
         />
         <Input
@@ -62,12 +62,6 @@ export function SignIn() {
           {busy ? 'Signing in…' : 'Sign in'}
         </Button>
       </form>
-
-      <div className="mt-6 border-t border-line pt-4 text-center">
-        <Link to="/instructor/signin" className="text-sm text-muted hover:text-ink">
-          Instructor sign in
-        </Link>
-      </div>
     </AuthShell>
   )
 }

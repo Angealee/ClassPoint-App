@@ -27,7 +27,7 @@ export function InstructorSignIn() {
   return (
     <AuthShell
       title="Instructor sign in"
-      subtitle="Manage sections, rosters, and points."
+      subtitle="Manage sections, students, and points."
       footer={
         <Link to="/signin" className="text-muted hover:text-ink">
           ← Student sign in
