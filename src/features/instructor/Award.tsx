@@ -7,9 +7,9 @@ import { Select } from '@/components/ui/Select'
 import { useToast } from '@/components/ui/Toast'
 import { CheckIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
-import { awardPoints, listRoster } from '@/lib/api'
+import { awardPoints, listStudents } from '@/lib/api'
 import { cn } from '@/lib/cn'
-import type { PointCategory, RosterStudent } from '@/lib/types'
+import type { PointCategory, SectionStudent } from '@/lib/types'
 
 const POINTS = [1, 2, 3, 4, 5]
 
@@ -17,7 +17,7 @@ export function Award() {
   const { sections, selectedSectionId, setSelectedSectionId } = useInstructor()
   const { toast } = useToast()
 
-  const [students, setStudents] = useState<RosterStudent[]>([])
+  const [students, setStudents] = useState<SectionStudent[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [points, setPoints] = useState<number | null>(null)
@@ -31,7 +31,7 @@ export function Award() {
     if (!selectedSectionId) return
     setLoading(true)
     try {
-      setStudents(await listRoster(selectedSectionId))
+      setStudents(await listStudents(selectedSectionId))
     } catch {
       toast('Could not load students.', 'error')
     } finally {

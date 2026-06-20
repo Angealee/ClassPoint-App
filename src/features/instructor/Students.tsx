@@ -7,15 +7,15 @@ import { Sheet } from '@/components/ui/Sheet'
 import { useToast } from '@/components/ui/Toast'
 import { CheckIcon, CopyIcon, PlusIcon, TrashIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
-import { createStudent, deleteStudent, listRoster } from '@/lib/api'
+import { createStudent, deleteStudent, listStudents } from '@/lib/api'
 import { getLevelProgress } from '@/lib/leveling'
-import type { RosterStudent } from '@/lib/types'
+import type { SectionStudent } from '@/lib/types'
 
-export function Roster() {
+export function Students() {
   const { sections, selectedSectionId, setSelectedSectionId } = useInstructor()
   const { toast } = useToast()
 
-  const [roster, setRoster] = useState<RosterStudent[]>([])
+  const [students, setStudents] = useState<SectionStudent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
 
@@ -24,7 +24,7 @@ export function Roster() {
   const [creating, setCreating] = useState(false)
   const [created, setCreated] = useState<{ name: string; token: string }>()
 
-  const [deleteTarget, setDeleteTarget] = useState<RosterStudent>()
+  const [deleteTarget, setDeleteTarget] = useState<SectionStudent>()
   const [deleting, setDeleting] = useState(false)
 
   const sectionName = sections.find((s) => s.id === selectedSectionId)?.name ?? ''
@@ -34,7 +34,7 @@ export function Roster() {
     setLoading(true)
     setError(undefined)
     try {
-      setRoster(await listRoster(selectedSectionId))
+      setStudents(await listStudents(selectedSectionId))
     } catch {
       setError('Could not load students.')
     } finally {
@@ -57,7 +57,7 @@ export function Roster() {
   }
 
   function copyAll() {
-    const unclaimed = roster.filter((s) => !s.claimed_at)
+    const unclaimed = students.filter((s) => !s.claimed_at)
     if (unclaimed.length === 0) {
       toast('Everyone has already claimed their account.', 'info')
       return
@@ -119,9 +119,9 @@ export function Roster() {
 
       <div className="flex items-center justify-between">
         <h1 className="font-display text-xl font-bold">
-          {sectionName} <span className="text-muted">· {roster.length}</span>
+          {sectionName} <span className="text-muted">· {students.length}</span>
         </h1>
-        {roster.length > 0 && (
+        {students.length > 0 && (
           <button
             type="button"
             onClick={copyAll}
@@ -136,7 +136,7 @@ export function Roster() {
         <p className="py-10 text-center text-sm text-muted">Loading students…</p>
       ) : error ? (
         <Card className="p-6 text-center text-sm text-brand-500">{error}</Card>
-      ) : roster.length === 0 ? (
+      ) : students.length === 0 ? (
         <Card className="p-8 text-center">
           <p className="text-sm text-muted">No students in {sectionName} yet.</p>
           <Button variant="outline" className="mt-4" onClick={() => setAddOpen(true)}>
@@ -145,7 +145,7 @@ export function Roster() {
         </Card>
       ) : (
         <Card className="divide-y divide-line">
-          {roster.map((s) => {
+          {students.map((s) => {
             const level = getLevelProgress(s.lifetime_points).level
             return (
               <div key={s.id} className="flex items-center gap-3 p-3.5">

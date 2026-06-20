@@ -23,7 +23,9 @@ const Profile = lazy(() => import('@/features/student/Profile').then((m) => ({ d
 const InstructorLayout = lazy(() =>
   import('@/features/instructor/InstructorLayout').then((m) => ({ default: m.InstructorLayout })),
 )
-const Roster = lazy(() => import('@/features/instructor/Roster').then((m) => ({ default: m.Roster })))
+const Students = lazy(() =>
+  import('@/features/instructor/Students').then((m) => ({ default: m.Students })),
+)
 const Award = lazy(() => import('@/features/instructor/Award').then((m) => ({ default: m.Award })))
 const InstructorLeaderboard = lazy(() =>
   import('@/features/instructor/InstructorLeaderboard').then((m) => ({
@@ -71,7 +73,7 @@ export const router = createBrowserRouter([
       {
         element: withSplash(<InstructorLayout />),
         children: [
-          { index: true, element: <Roster /> },
+          { index: true, element: <Students /> },
           { path: 'award', element: <Award /> },
           { path: 'leaderboard', element: <InstructorLeaderboard /> },
         ],

@@ -5,8 +5,8 @@ export interface Section {
   name: string
 }
 
-/** A roster entry as the instructor sees it (profile + secret token info). */
-export interface RosterStudent {
+/** A student as the instructor manages them (profile + secret token info). */
+export interface SectionStudent {
   id: string
   section_id: string
   full_name: string

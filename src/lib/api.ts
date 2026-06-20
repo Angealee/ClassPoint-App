@@ -5,8 +5,8 @@ import type {
   LeaderboardSnapshot,
   PointCategory,
   PointEvent,
-  RosterStudent,
   Section,
+  SectionStudent,
   StudentSelf,
 } from '@/lib/types'
 
@@ -20,8 +20,8 @@ export async function listSections(): Promise<Section[]> {
   return data ?? []
 }
 
-/** Roster for a section: student profiles merged with their secret/token info. */
-export async function listRoster(sectionId: string): Promise<RosterStudent[]> {
+/** Students in a section: profiles merged with their secret/token info. */
+export async function listStudents(sectionId: string): Promise<SectionStudent[]> {
   const [students, secrets] = await Promise.all([
     supabase
       .from('students')
@@ -41,7 +41,7 @@ export async function listRoster(sectionId: string): Promise<RosterStudent[]> {
         claim_token: secret?.claim_token ?? '',
         username: secret?.username ?? null,
         claimed_at: secret?.claimed_at ?? null,
-      } as RosterStudent
+      } as SectionStudent
     })
     .sort((a, b) => a.full_name.localeCompare(b.full_name))
 }

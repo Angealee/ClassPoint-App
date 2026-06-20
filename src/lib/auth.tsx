@@ -118,7 +118,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.functions.invoke('claim-token', {
         body: { token, username, pin, display_name: displayName ?? null },
       })
-      if (error) return { error: 'Network error. Please try again.' }
+      if (error) {
+        // Surface the real cause for debugging (usually: function not deployed,
+        // or JWT verification still ON so the unauthenticated caller is rejected).
+        // eslint-disable-next-line no-console
+        console.error('[claim-token] invoke failed:', error)
+        return { error: "Couldn't reach the claim service. Ask your instructor to check setup." }
+      }
       if (!data?.ok) return { error: (data?.error as string) ?? 'Something went wrong.' }
       // Auto sign-in with the freshly created credentials.
       return signInStudent(username, pin)

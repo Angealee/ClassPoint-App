@@ -113,3 +113,12 @@ export function LogOutIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+export function TicketIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H6a2 2 0 0 1-2-2 2 2 0 0 0 0-4Z" />
+      <path d="M14 6v2M14 11v2M14 16v2" />
+    </svg>
+  )
+}
