@@ -113,6 +113,16 @@
   animation: cp-shimmer 2.2s ease-in-out infinite;
 }
 
+/* Skeleton sweep — a soft highlight passing over placeholder blocks. */
+@keyframes cp-skel {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.cp-skel {
+  animation: cp-skel 1.5s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

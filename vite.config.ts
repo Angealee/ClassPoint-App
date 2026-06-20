@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['icon.svg', 'icon-maskable.svg'],
+      includeAssets: ['app-logo.svg', 'icon.svg', 'icon-maskable.svg'],
       manifest: {
         name: 'ClassPoint',
         short_name: 'ClassPoint',
@@ -22,13 +22,13 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'icon.svg',
+            src: 'app-logo.svg',
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'any',
           },
           {
-            src: 'icon-maskable.svg',
+            src: 'app-logo.svg',
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'maskable',

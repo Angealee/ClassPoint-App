@@ -150,6 +150,14 @@ export function GearIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function ArrowLeftIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M19 12H5M11 18l-6-6 6-6" />
+    </svg>
+  )
+}
+
 export function ClockIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>

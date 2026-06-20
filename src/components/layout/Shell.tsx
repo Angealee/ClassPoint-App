@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import type { ComponentType, ReactNode, SVGProps } from 'react'
 import { Logo } from '@/components/ui/Logo'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { RouteFallback } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 
 export interface NavItem {
@@ -88,9 +89,7 @@ export function Shell({
 
         <main className="flex-1 px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-8">
           <div className="mx-auto w-full max-w-2xl">
-            <Suspense
-              fallback={<div className="py-20 text-center text-sm text-muted">Loading…</div>}
-            >
+            <Suspense fallback={<RouteFallback />}>
               <Outlet />
             </Suspense>
           </div>

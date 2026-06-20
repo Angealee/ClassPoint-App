@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/ui/Logo'
 import { Button } from '@/components/ui/Button'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
-import { BoltIcon, ShieldIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
+import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
 
 const features = [
   { Icon: BoltIcon, title: 'Earn points', body: 'Recitation and activities — 1 to 5 points, awarded live in class.' },
@@ -51,9 +51,6 @@ export function Landing() {
         >
           <Button size="lg" onClick={() => navigate('/signin')}>
             <StarIcon className="h-5 w-5" /> Student sign in
-          </Button>
-          <Button size="lg" variant="outline" onClick={() => navigate('/instructor/signin')}>
-            <ShieldIcon className="h-5 w-5" /> Instructor sign in
           </Button>
           <button
             type="button"

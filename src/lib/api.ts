@@ -68,6 +68,33 @@ export async function getSectionCounts(): Promise<Record<string, number>> {
   return counts
 }
 
+export interface SectionStat {
+  total: number
+  claimed: number
+}
+
+/** Per-section roster stats (total students + how many have claimed). */
+export async function getSectionStats(): Promise<Record<string, SectionStat>> {
+  const [students, secrets] = await Promise.all([
+    supabase.from('students').select('id, section_id'),
+    supabase.from('student_secrets').select('student_id, claimed_at'),
+  ])
+  if (students.error) throw students.error
+  if (secrets.error) throw secrets.error
+
+  const claimedById = new Map(
+    (secrets.data ?? []).map((s) => [s.student_id as string, !!s.claimed_at]),
+  )
+  const stats: Record<string, SectionStat> = {}
+  for (const row of students.data ?? []) {
+    const id = row.section_id as string
+    const stat = (stats[id] ??= { total: 0, claimed: 0 })
+    stat.total += 1
+    if (claimedById.get(row.id as string)) stat.claimed += 1
+  }
+  return stats
+}
+
 /** Students in a section: profiles merged with their secret/token info. */
 export async function listStudents(sectionId: string): Promise<SectionStudent[]> {
   const [students, secrets] = await Promise.all([

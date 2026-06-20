@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { CheckIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
@@ -100,7 +101,7 @@ export function Award() {
         label="Section"
         value={selectedSectionId}
         onChange={(e) => setSelectedSectionId(e.target.value)}
-        className="max-w-[10rem]"
+        className="max-w-40"
       >
         {sections.map((s) => (
           <option key={s.id} value={s.id}>
@@ -123,7 +124,7 @@ export function Award() {
       </div>
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-muted">Loading…</p>
+        <ListSkeleton rows={6} />
       ) : students.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted">
           No students in {sectionName} yet — add some in the Students tab.
@@ -165,7 +166,7 @@ export function Award() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 120, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-            className="fixed inset-x-0 bottom-[4.75rem] z-30 mx-auto w-full max-w-2xl px-4 md:bottom-6 md:left-60 md:right-0"
+            className="fixed inset-x-0 bottom-19 z-30 mx-auto w-full max-w-2xl px-4 md:bottom-6 md:left-60 md:right-0"
           >
             <Card className="space-y-3 p-4 shadow-xl">
               <div className="flex items-center justify-between gap-2">

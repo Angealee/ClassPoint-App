@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Sheet } from '@/components/ui/Sheet'
+import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { TrashIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
@@ -61,7 +62,7 @@ export function AwardHistory() {
       </div>
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-muted">Loading…</p>
+        <ListSkeleton rows={6} />
       ) : error ? (
         <Card className="p-6 text-center">
           <p className="text-sm text-brand-500">Could not load activity.</p>

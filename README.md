@@ -50,8 +50,10 @@ ClassPoint has **two kinds of users**:
 ## 2. Feature list
 
 **Instructor**
+- **Section-card landing** — the Students tab opens on a grid of section cards (each showing student + claimed counts), plus a dashed "New section" card for quick creation. Tap a card to open that section's roster; a "← Sections" link returns to the grid.
+- **Install button** — an "Install app" button (on the section grid) with live states: installs via the native prompt where supported, shows "Installed ✓" once installed, and gives Add-to-Home-Screen steps on iOS. Shares the one-shot `beforeinstallprompt` event with the bottom install banner via a small `PwaInstallProvider`.
 - Roster management per section, add/remove students.
-- **Editable sections** — create, rename, and delete sections from the UI ("Sections" button on the roster). A section can only be deleted once it has no students (deleting would cascade-remove the whole roster).
+- **Editable sections** — create, rename, and delete sections from the UI ("Manage" on the section grid). A section can only be deleted once it has no students (deleting would cascade-remove the whole roster).
 - **Excel / CSV import** — upload an `.xlsx`/`.xls`/`.csv` of names to bulk-add students to the selected section; the parser auto-detects a "Name" column (falls back to the first column) and shows the generated tokens to copy.
 - **Roster export** — download the current section (names, usernames, claim status, level, points, tokens) as `.xlsx`.
 - One-time claim token generated per student; copy a single token or bulk-copy all unclaimed tokens.

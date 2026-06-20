@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { Avatar } from '@/components/ui/Avatar'
+import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotStamp } from '@/components/ui/SnapshotStamp'
 import { useInstructor } from './InstructorLayout'
 import { getLeaderboardSnapshot } from '@/lib/api'
@@ -54,7 +55,7 @@ export function InstructorLeaderboard() {
       </div>
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-muted">Loading…</p>
+        <ListSkeleton rows={8} />
       ) : visible.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted">
           {entries.length === 0

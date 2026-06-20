@@ -2,31 +2,34 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
 import { Sheet } from '@/components/ui/Sheet'
 import { Avatar } from '@/components/ui/Avatar'
+import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import {
+  ArrowLeftIcon,
   CheckIcon,
   CopyIcon,
   DownloadIcon,
-  GearIcon,
   PlusIcon,
   SearchIcon,
   TrashIcon,
   UploadIcon,
 } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
-import { ManageSections } from './ManageSections'
+import { SectionGrid } from './SectionGrid'
 import { createStudent, createStudentsBulk, deleteStudent, listStudents } from '@/lib/api'
 import { exportRoster, parseRosterNames } from '@/lib/roster-io'
 import { getLevelProgress } from '@/lib/leveling'
 import type { SectionStudent } from '@/lib/types'
 
 export function Students() {
-  const { sections, selectedSectionId, setSelectedSectionId } = useInstructor()
+  const { sections, setSelectedSectionId } = useInstructor()
   const { toast } = useToast()
   const importRef = useRef<HTMLInputElement>(null)
+
+  // Landing on the section grid; opening a card switches to that section's roster.
+  const [openId, setOpenId] = useState<string | null>(null)
 
   const [students, setStudents] = useState<SectionStudent[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,8 +41,6 @@ export function Students() {
   const [creating, setCreating] = useState(false)
   const [created, setCreated] = useState<{ name: string; token: string }>()
 
-  const [manageOpen, setManageOpen] = useState(false)
-
   const [importOpen, setImportOpen] = useState(false)
   const [importNames, setImportNames] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
@@ -48,18 +49,19 @@ export function Students() {
   const [deleteTarget, setDeleteTarget] = useState<SectionStudent>()
   const [deleting, setDeleting] = useState(false)
 
-  const sectionName = sections.find((s) => s.id === selectedSectionId)?.name ?? ''
+  const sectionName = sections.find((s) => s.id === openId)?.name ?? ''
+
+  // If the open section disappears (deleted elsewhere), fall back to the grid.
+  useEffect(() => {
+    if (openId && !sections.some((s) => s.id === openId)) setOpenId(null)
+  }, [sections, openId])
 
   async function refresh() {
-    if (!selectedSectionId) {
-      setStudents([])
-      setLoading(false)
-      return
-    }
+    if (!openId) return
     setLoading(true)
     setError(undefined)
     try {
-      setStudents(await listStudents(selectedSectionId))
+      setStudents(await listStudents(openId))
     } catch {
       setError('Could not load students.')
     } finally {
@@ -68,9 +70,15 @@ export function Students() {
   }
 
   useEffect(() => {
-    void refresh()
+    if (openId) void refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSectionId])
+  }, [openId])
+
+  function openSection(id: string) {
+    setSelectedSectionId(id) // keep Award/Leaderboard in sync
+    setQuery('')
+    setOpenId(id)
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -116,10 +124,10 @@ export function Students() {
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
-    if (!newName.trim()) return
+    if (!newName.trim() || !openId) return
     setCreating(true)
     try {
-      const { claimToken } = await createStudent(selectedSectionId, newName.trim())
+      const { claimToken } = await createStudent(openId, newName.trim())
       setCreated({ name: newName.trim(), token: claimToken })
       setNewName('')
       await refresh()
@@ -153,10 +161,10 @@ export function Students() {
   }
 
   async function onConfirmImport() {
-    if (importNames.length === 0) return
+    if (importNames.length === 0 || !openId) return
     setImporting(true)
     try {
-      const results = await createStudentsBulk(selectedSectionId, importNames)
+      const results = await createStudentsBulk(openId, importNames)
       setImportResults(results)
       await refresh()
     } catch {
@@ -187,147 +195,123 @@ export function Students() {
     }
   }
 
-  const noSections = sections.length === 0
+  // Landing view — section cards.
+  if (!openId) {
+    return <SectionGrid onOpen={openSection} />
+  }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-end gap-2">
-        <Select
-          label="Section"
-          value={selectedSectionId}
-          onChange={(e) => setSelectedSectionId(e.target.value)}
-          className="max-w-[9rem]"
-        >
-          {sections.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </Select>
-        <Button variant="outline" className="shrink-0" onClick={() => setManageOpen(true)}>
-          <GearIcon className="h-5 w-5" /> Sections
+      <button
+        type="button"
+        onClick={() => setOpenId(null)}
+        className="flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"
+      >
+        <ArrowLeftIcon className="h-4 w-4" /> Sections
+      </button>
+
+      <div className="flex items-center justify-between">
+        <h1 className="font-display text-xl font-bold">
+          {sectionName} <span className="text-muted">· {students.length}</span>
+        </h1>
+        <div className="flex items-center gap-3">
+          {students.length > 0 && (
+            <button
+              type="button"
+              onClick={copyAll}
+              className="text-sm font-medium text-brand-500 hover:underline"
+            >
+              Copy unclaimed tokens
+            </button>
+          )}
+          <Button onClick={() => setAddOpen(true)} size="sm">
+            <PlusIcon className="h-5 w-5" /> Add
+          </Button>
+        </div>
+      </div>
+
+      {/* Toolbar: search + import/export */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[10rem] flex-1">
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search name or @username"
+            className="pl-9"
+          />
+        </div>
+        <Button variant="outline" onClick={openImport} className="shrink-0">
+          <UploadIcon className="h-5 w-5" /> Import
         </Button>
-        <Button
-          onClick={() => setAddOpen(true)}
-          className="shrink-0"
-          disabled={noSections}
-        >
-          <PlusIcon className="h-5 w-5" /> Add
+        <Button variant="outline" onClick={onExport} className="shrink-0">
+          <DownloadIcon className="h-5 w-5" /> Export
         </Button>
       </div>
 
-      {noSections ? (
+      {loading ? (
+        <ListSkeleton rows={6} />
+      ) : error ? (
+        <Card className="p-6 text-center text-sm text-brand-500">{error}</Card>
+      ) : students.length === 0 ? (
         <Card className="p-8 text-center">
-          <p className="text-sm text-muted">No sections yet. Create one to start adding students.</p>
-          <Button variant="outline" className="mt-4" onClick={() => setManageOpen(true)}>
-            <GearIcon className="h-5 w-5" /> Manage sections
-          </Button>
+          <p className="text-sm text-muted">No students in {sectionName} yet.</p>
+          <div className="mt-4 flex justify-center gap-3">
+            <Button variant="outline" onClick={() => setAddOpen(true)}>
+              <PlusIcon className="h-5 w-5" /> Add one
+            </Button>
+            <Button variant="outline" onClick={openImport}>
+              <UploadIcon className="h-5 w-5" /> Import a list
+            </Button>
+          </div>
         </Card>
+      ) : filtered.length === 0 ? (
+        <Card className="p-8 text-center text-sm text-muted">No students match “{query}”.</Card>
       ) : (
-        <>
-          <div className="flex items-center justify-between">
-            <h1 className="font-display text-xl font-bold">
-              {sectionName} <span className="text-muted">· {students.length}</span>
-            </h1>
-            {students.length > 0 && (
-              <button
-                type="button"
-                onClick={copyAll}
-                className="text-sm font-medium text-brand-500 hover:underline"
-              >
-                Copy unclaimed tokens
-              </button>
-            )}
-          </div>
-
-          {/* Toolbar: search + import/export */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[10rem] flex-1">
-              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search name or @username"
-                className="pl-9"
-              />
-            </div>
-            <Button variant="outline" onClick={openImport} className="shrink-0">
-              <UploadIcon className="h-5 w-5" /> Import
-            </Button>
-            <Button variant="outline" onClick={onExport} className="shrink-0">
-              <DownloadIcon className="h-5 w-5" /> Export
-            </Button>
-          </div>
-
-          {loading ? (
-            <p className="py-10 text-center text-sm text-muted">Loading students…</p>
-          ) : error ? (
-            <Card className="p-6 text-center text-sm text-brand-500">{error}</Card>
-          ) : students.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-sm text-muted">No students in {sectionName} yet.</p>
-              <div className="mt-4 flex justify-center gap-3">
-                <Button variant="outline" onClick={() => setAddOpen(true)}>
-                  <PlusIcon className="h-5 w-5" /> Add one
-                </Button>
-                <Button variant="outline" onClick={openImport}>
-                  <UploadIcon className="h-5 w-5" /> Import a list
-                </Button>
-              </div>
-            </Card>
-          ) : filtered.length === 0 ? (
-            <Card className="p-8 text-center text-sm text-muted">
-              No students match “{query}”.
-            </Card>
-          ) : (
-            <Card className="divide-y divide-line">
-              {filtered.map((s) => {
-                const level = getLevelProgress(s.lifetime_points).level
-                return (
-                  <div key={s.id} className="flex items-center gap-3 p-3.5">
-                    <Avatar name={s.full_name} url={s.avatar_url} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{s.full_name}</p>
-                      <p className="flex items-center gap-1.5 text-xs text-muted">
-                        {s.claimed_at ? (
-                          <>
-                            <CheckIcon className="h-3.5 w-3.5 text-gold-500" />
-                            @{s.username} · Lv {level} · {s.lifetime_points} pts
-                          </>
-                        ) : (
-                          <>
-                            <span className="font-mono tracking-wider text-ink">
-                              {s.claim_token}
-                            </span>
-                            <span>· not claimed</span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                    {!s.claimed_at && (
-                      <button
-                        type="button"
-                        onClick={() => copy(s.claim_token, 'Token copied')}
-                        aria-label={`Copy ${s.full_name}'s token`}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-card-2 hover:text-ink"
-                      >
-                        <CopyIcon className="h-4.5 w-4.5" />
-                      </button>
+        <Card className="divide-y divide-line">
+          {filtered.map((s) => {
+            const level = getLevelProgress(s.lifetime_points).level
+            return (
+              <div key={s.id} className="flex items-center gap-3 p-3.5">
+                <Avatar name={s.full_name} url={s.avatar_url} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{s.full_name}</p>
+                  <p className="flex items-center gap-1.5 text-xs text-muted">
+                    {s.claimed_at ? (
+                      <>
+                        <CheckIcon className="h-3.5 w-3.5 text-gold-500" />
+                        @{s.username} · Lv {level} · {s.lifetime_points} pts
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-mono tracking-wider text-ink">{s.claim_token}</span>
+                        <span>· not claimed</span>
+                      </>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(s)}
-                      aria-label={`Remove ${s.full_name}`}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-brand-500/10 hover:text-brand-500"
-                    >
-                      <TrashIcon className="h-4.5 w-4.5" />
-                    </button>
-                  </div>
-                )
-              })}
-            </Card>
-          )}
-        </>
+                  </p>
+                </div>
+                {!s.claimed_at && (
+                  <button
+                    type="button"
+                    onClick={() => copy(s.claim_token, 'Token copied')}
+                    aria-label={`Copy ${s.full_name}'s token`}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-card-2 hover:text-ink"
+                  >
+                    <CopyIcon className="h-4.5 w-4.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(s)}
+                  aria-label={`Remove ${s.full_name}`}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-brand-500/10 hover:text-brand-500"
+                >
+                  <TrashIcon className="h-4.5 w-4.5" />
+                </button>
+              </div>
+            )
+          })}
+        </Card>
       )}
 
       {/* Add student / show token */}
@@ -449,12 +433,7 @@ export function Students() {
                     </p>
                   ))}
                 </div>
-                <Button
-                  size="lg"
-                  className="w-full"
-                  onClick={onConfirmImport}
-                  disabled={importing}
-                >
+                <Button size="lg" className="w-full" onClick={onConfirmImport} disabled={importing}>
                   {importing
                     ? 'Importing…'
                     : `Import ${importNames.length} student${importNames.length === 1 ? '' : 's'}`}
@@ -485,8 +464,6 @@ export function Students() {
           </Button>
         </div>
       </Sheet>
-
-      <ManageSections open={manageOpen} onClose={() => setManageOpen(false)} />
     </div>
   )
 }

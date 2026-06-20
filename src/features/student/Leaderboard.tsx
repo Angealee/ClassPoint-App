@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
+import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotStamp } from '@/components/ui/SnapshotStamp'
 import { getLevelProgress } from '@/lib/leveling'
 import { cn } from '@/lib/cn'
@@ -29,7 +30,7 @@ export function Leaderboard() {
       </div>
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-muted">Loading…</p>
+        <ListSkeleton rows={8} />
       ) : top.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted">
           No rankings yet — the board settles at 7:30 AM and 7:30 PM.

@@ -1,5 +1,5 @@
 import { Suspense, lazy, type ReactNode } from 'react'
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { RedirectIfAuthed, RequireRole } from '@/features/auth/guards'
 import { Splash } from '@/components/layout/Splash'
 
@@ -48,9 +48,15 @@ export const router = createBrowserRouter([
       { path: '/', element: withSplash(<Landing />) },
       { path: '/signin', element: withSplash(<SignIn />) },
       { path: '/claim', element: withSplash(<Claim />) },
-      { path: '/instructor/signin', element: withSplash(<InstructorSignIn />) },
+      // Instructor sign-in lives at a secret, unlinked path (not surfaced in any
+      // UI). Bookmark it to access. The old public path is retired below.
+      { path: '/macalesideauth', element: withSplash(<InstructorSignIn />) },
     ],
   },
+
+  // Retired public instructor path — dead-ends to the landing page so the login
+  // can't be reached (or fingerprinted) the obvious way.
+  { path: '/instructor/signin', element: <Navigate to="/" replace /> },
 
   // Student area. (Child screens lazy-load inside the Shell's own Suspense.)
   {

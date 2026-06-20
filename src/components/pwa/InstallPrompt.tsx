@@ -1,76 +1,37 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Logo } from '@/components/ui/Logo'
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
-}
+import { usePwaInstall } from '@/lib/pwa'
 
 const DISMISS_KEY = 'cp_install_dismissed'
 
-function isStandalone(): boolean {
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    // iOS Safari
-    (navigator as unknown as { standalone?: boolean }).standalone === true
-  )
-}
-
-function isIos(): boolean {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent)
-}
-
 /**
- * Custom "Install ClassPoint" banner. Uses the native beforeinstallprompt where
- * available; on iOS (which has no such event) it shows Add-to-Home-Screen steps.
+ * Custom "Install ClassPoint" banner. Reads the shared install state (captured
+ * once in PwaInstallProvider); on iOS it shows Add-to-Home-Screen steps. The
+ * explicit Install button in the instructor UI uses the same source of truth.
  */
 export function InstallPrompt() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null)
-  const [show, setShow] = useState(false)
-  const [iosHint, setIosHint] = useState(false)
+  const { state, promptInstall } = usePwaInstall()
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISS_KEY) === '1')
+  const [iosReady, setIosReady] = useState(false)
 
+  // iOS never fires beforeinstallprompt — wait a beat before nudging.
   useEffect(() => {
-    if (isStandalone() || localStorage.getItem(DISMISS_KEY) === '1') return
-
-    const onPrompt = (e: Event) => {
-      e.preventDefault()
-      setDeferred(e as BeforeInstallPromptEvent)
-      setShow(true)
-    }
-    window.addEventListener('beforeinstallprompt', onPrompt)
-
-    const onInstalled = () => {
-      setShow(false)
-      setDeferred(null)
-    }
-    window.addEventListener('appinstalled', onInstalled)
-
-    // iOS never fires beforeinstallprompt — offer manual instructions instead.
-    const iosTimer = isIos()
-      ? window.setTimeout(() => {
-          setIosHint(true)
-          setShow(true)
-        }, 2500)
-      : undefined
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onPrompt)
-      window.removeEventListener('appinstalled', onInstalled)
-      if (iosTimer) clearTimeout(iosTimer)
-    }
-  }, [])
+    if (state !== 'ios') return
+    const t = window.setTimeout(() => setIosReady(true), 2500)
+    return () => clearTimeout(t)
+  }, [state])
 
   function dismiss() {
-    setShow(false)
+    setDismissed(true)
     localStorage.setItem(DISMISS_KEY, '1')
   }
 
+  const iosHint = state === 'ios' && iosReady
+  const show = !dismissed && (state === 'installable' || iosHint)
+
   async function install() {
-    if (!deferred) return
-    await deferred.prompt()
-    await deferred.userChoice
-    setDeferred(null)
+    await promptInstall()
     dismiss()
   }
 
