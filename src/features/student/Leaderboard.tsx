@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
+import { Avatar } from '@/components/ui/Avatar'
 import { SnapshotStamp } from '@/components/ui/SnapshotStamp'
 import { getLevelProgress } from '@/lib/leveling'
 import { cn } from '@/lib/cn'
@@ -8,15 +9,6 @@ import { useStudentData } from './StudentData'
 
 const TOP_N = 10
 const rankStyles = ['text-gold-400', 'text-zinc-400', 'text-amber-700']
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((n) => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
-}
 
 export function Leaderboard() {
   const { loading, leaderboard, capturedAt, me, sectionName } = useStudentData()
@@ -106,9 +98,7 @@ function Row({
       >
         {entry.rank}
       </span>
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-card-2 font-display text-sm font-bold">
-        {initials(entry.display_name)}
-      </span>
+      <Avatar name={entry.display_name} url={entry.avatar_url} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold">
           {entry.display_name} {isMe && <span className="text-brand-500">(you)</span>}

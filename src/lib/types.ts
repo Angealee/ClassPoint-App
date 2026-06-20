@@ -1,4 +1,4 @@
-export type PointCategory = 'recitation' | 'activity'
+export type PointCategory = 'recitation' | 'activity' | 'penalty'
 
 export interface Section {
   id: string
@@ -11,6 +11,7 @@ export interface SectionStudent {
   section_id: string
   full_name: string
   display_name: string
+  avatar_url: string | null
   lifetime_points: number
   user_id: string | null
   claim_token: string
@@ -33,6 +34,20 @@ export interface LeaderboardEntry {
   section_id: string
   lifetime_points: number
   rank: number
+  /** Merged in live from `students` at read time (the snapshot doesn't store it). */
+  avatar_url: string | null
+}
+
+/** A recent point award/penalty as the instructor reviews it (for undo). */
+export interface AwardRecord {
+  id: string
+  student_id: string
+  student_name: string
+  section_id: string
+  points: number
+  category: PointCategory
+  note: string | null
+  created_at: string
 }
 
 /** The frozen leaderboard plus when it was captured. */
@@ -56,5 +71,6 @@ export interface StudentSelf {
   section_id: string
   full_name: string
   display_name: string
+  avatar_url: string | null
   lifetime_points: number
 }

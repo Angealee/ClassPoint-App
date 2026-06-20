@@ -13,6 +13,8 @@ import {
   getMyStudent,
   listSections,
   listStudentEvents,
+  removeAvatar,
+  updateAvatar,
   updateDisplayName,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
@@ -34,6 +36,10 @@ interface StudentDataValue {
   sectionName: (id: string) => string
   refresh: () => Promise<void>
   saveDisplayName: (name: string) => Promise<{ error?: string }>
+  /** Upload a new profile picture (≤5 MB image). */
+  saveAvatar: (file: File) => Promise<{ error?: string }>
+  /** Remove the current profile picture. */
+  clearAvatar: () => Promise<{ error?: string }>
   /** The level to celebrate with the burst, or null. */
   levelUp: number | null
   clearLevelUp: () => void
@@ -154,6 +160,35 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     [me],
   )
 
+  const MAX_AVATAR_BYTES = 5 * 1024 * 1024
+
+  const saveAvatar = useCallback(
+    async (file: File) => {
+      if (!me || !user) return { error: 'Still loading — try again in a moment.' }
+      if (!file.type.startsWith('image/')) return { error: 'Please choose an image file.' }
+      if (file.size > MAX_AVATAR_BYTES) return { error: 'Image is too large (max 5 MB).' }
+      try {
+        const url = await updateAvatar(me.id, user.id, file)
+        setMe((m) => (m ? { ...m, avatar_url: url } : m))
+        return {}
+      } catch {
+        return { error: 'Could not upload the picture. Please try again.' }
+      }
+    },
+    [me, user, MAX_AVATAR_BYTES],
+  )
+
+  const clearAvatar = useCallback(async () => {
+    if (!me) return { error: 'Still loading — try again in a moment.' }
+    try {
+      await removeAvatar(me.id)
+      setMe((m) => (m ? { ...m, avatar_url: null } : m))
+      return {}
+    } catch {
+      return { error: 'Could not remove the picture. Please try again.' }
+    }
+  }, [me])
+
   const clearLevelUp = useCallback(() => setLevelUp(null), [])
 
   return (
@@ -170,6 +205,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         sectionName,
         refresh: load,
         saveDisplayName,
+        saveAvatar,
+        clearAvatar,
         levelUp,
         clearLevelUp,
       }}

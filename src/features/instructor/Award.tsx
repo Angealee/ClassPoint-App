@@ -12,6 +12,7 @@ import { cn } from '@/lib/cn'
 import type { PointCategory, SectionStudent } from '@/lib/types'
 
 const POINTS = [1, 2, 3, 4, 5]
+type Mode = 'reward' | 'penalty'
 
 export function Award() {
   const { sections, selectedSectionId, setSelectedSectionId } = useInstructor()
@@ -20,6 +21,8 @@ export function Award() {
   const [students, setStudents] = useState<SectionStudent[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [mode, setMode] = useState<Mode>('reward')
+  // Magnitude (1–5); the sign is decided by `mode` at award time.
   const [points, setPoints] = useState<number | null>(null)
   const [category, setCategory] = useState<PointCategory>('recitation')
   const [note, setNote] = useState('')
@@ -62,24 +65,28 @@ export function Award() {
 
   const canAward = selected.size > 0 && points !== null && !submitting
 
+  const penalty = mode === 'penalty'
+
   async function onAward() {
     if (points === null || selected.size === 0) return
     setSubmitting(true)
     const count = selected.size
+    const signed = penalty ? -points : points
     try {
       await awardPoints({
         studentIds: [...selected],
-        points,
-        category,
+        points: signed,
+        category: penalty ? 'penalty' : category,
         note: note.trim() || undefined,
       })
-      toast(`+${points} to ${count} student${count > 1 ? 's' : ''}`, 'success')
+      const verb = penalty ? `−${points} from` : `+${points} to`
+      toast(`${verb} ${count} student${count > 1 ? 's' : ''}`, 'success')
       setSelected(new Set())
       setPoints(null)
       setNote('')
       await refresh()
     } catch {
-      toast('Could not award points.', 'error')
+      toast(penalty ? 'Could not deduct points.' : 'Could not award points.', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -161,8 +168,32 @@ export function Award() {
             className="fixed inset-x-0 bottom-[4.75rem] z-30 mx-auto w-full max-w-2xl px-4 md:bottom-6 md:left-60 md:right-0"
           >
             <Card className="space-y-3 p-4 shadow-xl">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-semibold">{selected.size} selected</span>
+                {/* Reward / Penalty mode */}
+                <div className="flex gap-1.5">
+                  {(['reward', 'penalty'] as Mode[]).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMode(m)}
+                      className={cn(
+                        'rounded-lg px-3 py-1 text-xs font-semibold capitalize transition-colors',
+                        mode === m
+                          ? m === 'penalty'
+                            ? 'bg-red-500 text-white'
+                            : 'bg-brand-500 text-white'
+                          : 'bg-card-2 text-muted hover:text-ink',
+                      )}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Category only applies to rewards; penalties are their own category. */}
+              {!penalty && (
                 <div className="flex gap-1.5">
                   {(['recitation', 'activity'] as PointCategory[]).map((c) => (
                     <button
@@ -180,7 +211,7 @@ export function Award() {
                     </button>
                   ))}
                 </div>
-              </div>
+              )}
 
               <div className="flex gap-2">
                 {POINTS.map((p) => (
@@ -191,11 +222,13 @@ export function Award() {
                     className={cn(
                       'flex h-11 flex-1 items-center justify-center rounded-xl font-display text-lg font-bold transition-all',
                       points === p
-                        ? 'bg-gold-400 text-brand-950 ring-2 ring-gold-500 ring-offset-2 ring-offset-card'
+                        ? penalty
+                          ? 'bg-red-500 text-white ring-2 ring-red-600 ring-offset-2 ring-offset-card'
+                          : 'bg-gold-400 text-brand-950 ring-2 ring-gold-500 ring-offset-2 ring-offset-card'
                         : 'bg-card-2 text-ink hover:bg-line',
                     )}
                   >
-                    +{p}
+                    {penalty ? `−${p}` : `+${p}`}
                   </button>
                 ))}
               </div>
@@ -203,15 +236,30 @@ export function Award() {
               <Input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Note (optional) — e.g. Quiz 2, recited Big-O"
+                placeholder={
+                  penalty
+                    ? 'Reason (optional) — e.g. late, disruptive'
+                    : 'Note (optional) — e.g. Quiz 2, recited Big-O'
+                }
               />
 
-              <Button size="lg" className="w-full" onClick={onAward} disabled={!canAward}>
+              <Button
+                size="lg"
+                className={cn('w-full', penalty && 'bg-red-500 hover:bg-red-600 active:bg-red-700')}
+                onClick={onAward}
+                disabled={!canAward}
+              >
                 {submitting
-                  ? 'Awarding…'
+                  ? penalty
+                    ? 'Deducting…'
+                    : 'Awarding…'
                   : points === null
-                    ? 'Pick points above'
-                    : `Award +${points} to ${selected.size}`}
+                    ? penalty
+                      ? 'Pick a deduction above'
+                      : 'Pick points above'
+                    : penalty
+                      ? `Deduct −${points} from ${selected.size}`
+                      : `Award +${points} to ${selected.size}`}
               </Button>
             </Card>
           </motion.div>

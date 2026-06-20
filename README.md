@@ -35,7 +35,7 @@ ClassPoint has **two kinds of users**:
 **The loop:** Instructor adds a student → hands them a token → student claims it and picks a username + PIN → instructor awards points in class → points become XP → students level up and rank up on the leaderboard.
 
 ### Leveling rules
-- **XP = cumulative lifetime points.** It never goes down.
+- **XP = cumulative lifetime points** = `SUM(point_events.points)`, clamped at 0. Awards raise it; **penalties** (negative events) lower it, but it never drops below 0 (so level math never breaks).
 - Clearing **Level 1 → 2 costs 50 XP.**
 - Each next level costs **1.5× the previous requirement, rounded**: `50 → 75 → 113 → 170 → 255 → …`
 - Leftover XP overflows naturally into the next level.
@@ -50,16 +50,23 @@ ClassPoint has **two kinds of users**:
 ## 2. Feature list
 
 **Instructor**
-- Roster management per section (sections `2A`–`2E`), add/remove students.
+- Roster management per section, add/remove students.
+- **Editable sections** — create, rename, and delete sections from the UI ("Sections" button on the roster). A section can only be deleted once it has no students (deleting would cascade-remove the whole roster).
+- **Excel / CSV import** — upload an `.xlsx`/`.xls`/`.csv` of names to bulk-add students to the selected section; the parser auto-detects a "Name" column (falls back to the first column) and shows the generated tokens to copy.
+- **Roster export** — download the current section (names, usernames, claim status, level, points, tokens) as `.xlsx`.
 - One-time claim token generated per student; copy a single token or bulk-copy all unclaimed tokens.
+- **Roster search** — filter the list by name or @username.
 - See claim status (claimed → @username, level, points; unclaimed → the token).
 - Award points: multi-select students (or "select all"), category (Recitation / Activity), +1…+5, optional note, batch-award.
-- Frozen leaderboard with a per-section filter, "as of 7:30" stamp, and animated reordering.
+- **Penalties (minus points)** — flip the award panel to "Penalty" to deduct −1…−5 for violations (a dedicated `penalty` category; a student's total never drops below 0).
+- **Activity log + undo** — a "Activity" tab lists the last 40 awards/penalties; revert any mistaken one (the total recomputes automatically).
+- Frozen leaderboard (with avatars) with a per-section filter, "as of 7:30" stamp, and animated reordering.
 
 **Student**
-- Dashboard: level + animated XP bar, total points (live), official rank (settles 7:30 AM/PM), live points feed.
+- Dashboard: level + animated XP bar, total points (live), official rank (settles 7:30 AM/PM), live points feed (deductions render in red).
+- **Profile picture** — upload your own avatar in Profile (JPG/PNG/WebP/GIF, max 5 MB); it appears on the dashboard, leaderboard, and the instructor's roster.
 - **Level-up burst**: a full-screen celebration fires when you level up — live if you're watching, or the next time you open the app after a missed level-up.
-- Leaderboard: global **Top 10** (your own row pinned if you're outside it), with the settle stamp + countdown.
+- Leaderboard: global **Top 10** (your own row pinned if you're outside it), with avatars + the settle stamp + countdown.
 - Profile: edit your public display name (roster name stays private).
 
 **Cross-cutting**
@@ -160,7 +167,8 @@ ClassPoint App/
    │  ├─ 0003_security.sql               # Row-Level Security policies + grants
    │  ├─ 0004_realtime.sql               # realtime on students / point_events
    │  ├─ 0005_seed.sql                   # instructor allowlist + sections 2A–2E
-   │  └─ 0006_leaderboard_snapshot.sql   # frozen board + pg_cron (7:30 AM/PM PHT)
+   │  ├─ 0006_leaderboard_snapshot.sql   # frozen board + pg_cron (7:30 AM/PM PHT)
+   │  └─ 0007_avatars_import_minus.sql   # avatars bucket + minus points + bulk import RPC
    └─ functions/claim-token/             # Deno Edge Function (account claim)
 ```
 
@@ -239,7 +247,7 @@ The fastest way to understand the app is to trace one feature from click to data
 - **`sections`** — `id, name`. Readable by all signed-in users.
 - **`students`** — roster + points. `full_name` (private), `display_name` (public, editable), `lifetime_points` (derived), `user_id` (links to `auth.users` once claimed). Broadly readable.
 - **`student_secrets`** — `claim_token, username, claimed_at`. **Instructor-only.**
-- **`point_events`** — history/feed. `points (1–5), category, note, created_at`.
+- **`point_events`** — history/feed. `points (−5…5, never 0), category (recitation/activity/penalty), note, created_at`.
 - **`instructors`** — email allowlist. No client access.
 - **`leaderboard_snapshot`** *(0006)* — frozen ranking: `student_id, display_name, section_id, lifetime_points, rank`. Read-only to clients.
 - **`leaderboard_meta`** *(0006)* — single row holding `captured_at` (when the snapshot last ran).
@@ -248,9 +256,10 @@ The fastest way to understand the app is to trace one feature from click to data
 - **`is_instructor()`** — `SECURITY DEFINER`; checks the allowlist. Used throughout RLS.
 - **`cp_level(total_points)`** — mirrors `leveling.ts` (50, ×1.5 rounded).
 - **`cp_generate_token()`** — 8-char uppercase hex token.
-- **`cp_recompute_points()`** — trigger keeping `students.lifetime_points` in sync.
-- **`cp_guard_student_update()`** — trigger blocking students from editing protected columns (bypasses for instructor + service role).
+- **`cp_recompute_points()`** — trigger keeping `students.lifetime_points` in sync (`SUM(points)`, clamped at 0 so penalties can't make it negative).
+- **`cp_guard_student_update()`** — trigger blocking students from editing protected columns (bypasses for instructor + service role). Students may edit `display_name` + `avatar_url`.
 - **`create_student(section_id, full_name)`** — instructor-only RPC: insert student + token.
+- **`create_students(section_id, full_names[])`** *(0007)* — instructor-only bulk RPC for Excel/CSV import; inserts many students + tokens in one call.
 - **`refresh_leaderboard_snapshot()`** *(0006)* — rebuilds the snapshot + stamps `captured_at`. Run by `pg_cron`.
 - **`force_leaderboard_refresh()`** *(0006)* — instructor-only RPC to settle the board early (optional; not surfaced in the UI).
 
@@ -259,6 +268,9 @@ The fastest way to understand the app is to trace one feature from click to data
 
 ### Realtime (0004)
 Realtime is enabled on `students` and `point_events` — this powers the live student dashboard.
+
+### Storage — avatars (0007)
+Migration `0007` creates a **public `avatars` Storage bucket** (5 MB cap, image MIME types only) and Storage RLS policies: everyone may read; a signed-in user may upload/replace/delete only within a folder named after their own `auth.uid()`. Uploads are pathed `…/<uid>/avatar-<ts>.<ext>`, and the public URL is saved to `students.avatar_url`. No manual dashboard step is needed — the SQL provisions the bucket.
 
 ---
 
@@ -295,7 +307,7 @@ Realtime is enabled on `students` and `point_events` — this powers the live st
    VITE_SUPABASE_URL=https://<your-project>.supabase.co
    VITE_SUPABASE_ANON_KEY=<your-publishable-anon-key>
    ```
-3. **Database** — in the Supabase **SQL Editor**, run the migrations **in order**: `0001` → `0002` → `0003` → `0004` → `0005` → `0006`. (For `0006`, enable the **pg_cron** extension first under Database → Extensions if `CREATE EXTENSION` is blocked.)
+3. **Database** — in the Supabase **SQL Editor**, run the migrations **in order**: `0001` → `0002` → `0003` → `0004` → `0005` → `0006` → `0007`. (For `0006`, enable the **pg_cron** extension first under Database → Extensions if `CREATE EXTENSION` is blocked. `0007` provisions the avatars Storage bucket, enables minus points, and adds the bulk-import RPC — it's idempotent and safe to re-run.)
 4. **Edge Function** — create a function named `claim-token`, paste `supabase/functions/claim-token/index.ts`, deploy, and **disable JWT verification**.
 5. **Instructor account** — create your instructor auth user in **Authentication → Users → Add user** (set a password). The email must match the one in `instructors` (`koby.macale@dct.edu.ph`).
 6. **Run**
@@ -332,6 +344,7 @@ Realtime is enabled on `students` and `point_events` — this powers the live st
 | **Responsive pass** | Shared `Shell` — sidebar (desktop) / bottom tabs (mobile). | ✅ Done |
 | **5 — Leaderboard + polish** | Realtime dashboard; frozen twice-daily leaderboard snapshot (`pg_cron`, 7:30 AM/PM PHT) with countdown; global Top 10 + pinned self; animated reorder; full-screen level-up burst (live + on next open). | ✅ Done |
 | **6 — PWA polish & QA** | Custom install banner (+ iOS hint), "update available" prompt, offline indicator, route-level code-splitting (initial bundle 668 → 496 KB), empty/error states across screens. | ✅ Done |
+| **7 — Profiles, import & penalties** | Student avatar upload (public `avatars` bucket, 5 MB cap) shown everywhere; Excel/CSV roster import + export (`xlsx`, lazy-loaded chunk); editable sections (create/rename/delete-when-empty); minus points / penalties with totals clamped at 0; instructor activity log + undo; roster search. | ✅ Done |
 
 ### Design system (`src/styles/index.css`)
 Tailwind v4 `@theme` tokens — red brand scale (`brand-50…950`), gold/amber XP scale (`gold-*`), and semantic CSS vars (`--canvas`, `--card`, `--ink`, `--muted`, `--line`, `--ring`) swapped by `.dark`. Fonts: **Inter** (body), **Space Grotesk** (display). The XP bar shimmer is a **CSS `@keyframes`** (not a JS animation) on purpose — a JS infinite loop blocks tooling.
@@ -363,13 +376,13 @@ Tailwind v4 `@theme` tokens — red brand scale (`brand-50…950`), gold/amber X
 
 ## 12. Roadmap (remaining work)
 
-All six build phases are complete. Possible next steps:
+Phases 0–7 are complete. Possible next steps:
 
-- **End-to-end walkthrough** — run the full instructor→student flow once against live Supabase (award points, watch the dashboard update live, settle the board, confirm the level-up burst).
+- **End-to-end walkthrough** — run the full instructor→student flow once against live Supabase (import a roster, award + penalize, upload an avatar, watch the dashboard update live, settle the board, confirm the level-up burst, undo an award).
 - **Future leaderboard views** (scaffolded, not yet surfaced) — own-section board, a chosen-section board, and a Top-N toggle. The snapshot already carries every student + section, so these are filters over existing data, no new queries needed.
-- **Avatars** — `students.avatar_url` exists and is student-editable but isn't surfaced in the UI yet.
-- **Further bundle trimming** — the initial chunk still includes `@supabase/supabase-js`; defer or slim if first-load size matters on slow connections.
+- **Avatar cleanup** — replacing a picture leaves the old object in the bucket. A periodic job (or an Edge Function on update) could prune stale `avatars/<uid>/…` files.
+- **Further bundle trimming** — the initial chunk still includes `@supabase/supabase-js`; defer or slim if first-load size matters on slow connections. (`xlsx` is already split into its own on-demand chunk.)
 
 ---
 
-*ClassPoint · early build. Instructor: `koby.macale@dct.edu.ph` · Sections: 2A–2E.*
+*ClassPoint · early build. Instructor: `koby.macale@dct.edu.ph` · Sections are editable (seeded 2A–2E).*

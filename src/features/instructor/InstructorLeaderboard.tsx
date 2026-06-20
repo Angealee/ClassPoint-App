@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
+import { Avatar } from '@/components/ui/Avatar'
 import { SnapshotStamp } from '@/components/ui/SnapshotStamp'
 import { useInstructor } from './InstructorLayout'
 import { getLeaderboardSnapshot } from '@/lib/api'
@@ -84,6 +85,7 @@ export function InstructorLeaderboard() {
                     >
                       {r.rank}
                     </span>
+                    <Avatar name={r.display_name} url={r.avatar_url} className="h-9 w-9" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">{r.display_name}</p>
                       <p className="text-xs text-muted">

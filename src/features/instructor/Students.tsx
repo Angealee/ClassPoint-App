@@ -1,28 +1,49 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Sheet } from '@/components/ui/Sheet'
+import { Avatar } from '@/components/ui/Avatar'
 import { useToast } from '@/components/ui/Toast'
-import { CheckIcon, CopyIcon, PlusIcon, TrashIcon } from '@/components/ui/icons'
+import {
+  CheckIcon,
+  CopyIcon,
+  DownloadIcon,
+  GearIcon,
+  PlusIcon,
+  SearchIcon,
+  TrashIcon,
+  UploadIcon,
+} from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
-import { createStudent, deleteStudent, listStudents } from '@/lib/api'
+import { ManageSections } from './ManageSections'
+import { createStudent, createStudentsBulk, deleteStudent, listStudents } from '@/lib/api'
+import { exportRoster, parseRosterNames } from '@/lib/roster-io'
 import { getLevelProgress } from '@/lib/leveling'
 import type { SectionStudent } from '@/lib/types'
 
 export function Students() {
   const { sections, selectedSectionId, setSelectedSectionId } = useInstructor()
   const { toast } = useToast()
+  const importRef = useRef<HTMLInputElement>(null)
 
   const [students, setStudents] = useState<SectionStudent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
+  const [query, setQuery] = useState('')
 
   const [addOpen, setAddOpen] = useState(false)
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
   const [created, setCreated] = useState<{ name: string; token: string }>()
+
+  const [manageOpen, setManageOpen] = useState(false)
+
+  const [importOpen, setImportOpen] = useState(false)
+  const [importNames, setImportNames] = useState<string[]>([])
+  const [importing, setImporting] = useState(false)
+  const [importResults, setImportResults] = useState<{ fullName: string; claimToken: string }[]>()
 
   const [deleteTarget, setDeleteTarget] = useState<SectionStudent>()
   const [deleting, setDeleting] = useState(false)
@@ -30,7 +51,11 @@ export function Students() {
   const sectionName = sections.find((s) => s.id === selectedSectionId)?.name ?? ''
 
   async function refresh() {
-    if (!selectedSectionId) return
+    if (!selectedSectionId) {
+      setStudents([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(undefined)
     try {
@@ -46,6 +71,17 @@ export function Students() {
     void refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSectionId])
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return students
+    return students.filter(
+      (s) =>
+        s.full_name.toLowerCase().includes(q) ||
+        s.display_name.toLowerCase().includes(q) ||
+        (s.username ?? '').toLowerCase().includes(q),
+    )
+  }, [students, query])
 
   async function copy(text: string, label: string) {
     try {
@@ -66,6 +102,18 @@ export function Students() {
     void copy(text, `Copied ${unclaimed.length} token(s)`)
   }
 
+  async function onExport() {
+    if (students.length === 0) {
+      toast('Nothing to export yet.', 'info')
+      return
+    }
+    try {
+      await exportRoster(sectionName, students)
+    } catch {
+      toast('Could not export the roster.', 'error')
+    }
+  }
+
   async function onCreate(e: FormEvent) {
     e.preventDefault()
     if (!newName.trim()) return
@@ -80,6 +128,48 @@ export function Students() {
     } finally {
       setCreating(false)
     }
+  }
+
+  function openImport() {
+    setImportNames([])
+    setImportResults(undefined)
+    setImportOpen(true)
+  }
+
+  async function onImportFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      const names = await parseRosterNames(file)
+      if (names.length === 0) {
+        toast('No names found in that file.', 'error')
+        return
+      }
+      setImportNames(names)
+    } catch {
+      toast('Could not read that file. Use .xlsx, .xls or .csv.', 'error')
+    }
+  }
+
+  async function onConfirmImport() {
+    if (importNames.length === 0) return
+    setImporting(true)
+    try {
+      const results = await createStudentsBulk(selectedSectionId, importNames)
+      setImportResults(results)
+      await refresh()
+    } catch {
+      toast('Could not import the students.', 'error')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  function copyImportTokens() {
+    if (!importResults) return
+    const text = importResults.map((r) => `${r.fullName} — ${r.claimToken}`).join('\n')
+    void copy(text, `Copied ${importResults.length} token(s)`)
   }
 
   async function onDelete() {
@@ -97,14 +187,16 @@ export function Students() {
     }
   }
 
+  const noSections = sections.length === 0
+
   return (
     <div className="space-y-4">
-      <div className="flex items-end gap-3">
+      <div className="flex items-end gap-2">
         <Select
           label="Section"
           value={selectedSectionId}
           onChange={(e) => setSelectedSectionId(e.target.value)}
-          className="max-w-[10rem]"
+          className="max-w-[9rem]"
         >
           {sections.map((s) => (
             <option key={s.id} value={s.id}>
@@ -112,84 +204,130 @@ export function Students() {
             </option>
           ))}
         </Select>
-        <Button onClick={() => setAddOpen(true)} className="shrink-0">
+        <Button variant="outline" className="shrink-0" onClick={() => setManageOpen(true)}>
+          <GearIcon className="h-5 w-5" /> Sections
+        </Button>
+        <Button
+          onClick={() => setAddOpen(true)}
+          className="shrink-0"
+          disabled={noSections}
+        >
           <PlusIcon className="h-5 w-5" /> Add
         </Button>
       </div>
 
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-xl font-bold">
-          {sectionName} <span className="text-muted">· {students.length}</span>
-        </h1>
-        {students.length > 0 && (
-          <button
-            type="button"
-            onClick={copyAll}
-            className="text-sm font-medium text-brand-500 hover:underline"
-          >
-            Copy unclaimed tokens
-          </button>
-        )}
-      </div>
-
-      {loading ? (
-        <p className="py-10 text-center text-sm text-muted">Loading students…</p>
-      ) : error ? (
-        <Card className="p-6 text-center text-sm text-brand-500">{error}</Card>
-      ) : students.length === 0 ? (
+      {noSections ? (
         <Card className="p-8 text-center">
-          <p className="text-sm text-muted">No students in {sectionName} yet.</p>
-          <Button variant="outline" className="mt-4" onClick={() => setAddOpen(true)}>
-            <PlusIcon className="h-5 w-5" /> Add your first student
+          <p className="text-sm text-muted">No sections yet. Create one to start adding students.</p>
+          <Button variant="outline" className="mt-4" onClick={() => setManageOpen(true)}>
+            <GearIcon className="h-5 w-5" /> Manage sections
           </Button>
         </Card>
       ) : (
-        <Card className="divide-y divide-line">
-          {students.map((s) => {
-            const level = getLevelProgress(s.lifetime_points).level
-            return (
-              <div key={s.id} className="flex items-center gap-3 p-3.5">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-card-2 font-display text-sm font-bold">
-                  {initials(s.full_name)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{s.full_name}</p>
-                  <p className="flex items-center gap-1.5 text-xs text-muted">
-                    {s.claimed_at ? (
-                      <>
-                        <CheckIcon className="h-3.5 w-3.5 text-gold-500" />
-                        @{s.username} · Lv {level} · {s.lifetime_points} pts
-                      </>
-                    ) : (
-                      <>
-                        <span className="font-mono tracking-wider text-ink">{s.claim_token}</span>
-                        <span>· not claimed</span>
-                      </>
-                    )}
-                  </p>
-                </div>
-                {!s.claimed_at && (
-                  <button
-                    type="button"
-                    onClick={() => copy(s.claim_token, 'Token copied')}
-                    aria-label={`Copy ${s.full_name}'s token`}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-card-2 hover:text-ink"
-                  >
-                    <CopyIcon className="h-4.5 w-4.5" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(s)}
-                  aria-label={`Remove ${s.full_name}`}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-brand-500/10 hover:text-brand-500"
-                >
-                  <TrashIcon className="h-4.5 w-4.5" />
-                </button>
+        <>
+          <div className="flex items-center justify-between">
+            <h1 className="font-display text-xl font-bold">
+              {sectionName} <span className="text-muted">· {students.length}</span>
+            </h1>
+            {students.length > 0 && (
+              <button
+                type="button"
+                onClick={copyAll}
+                className="text-sm font-medium text-brand-500 hover:underline"
+              >
+                Copy unclaimed tokens
+              </button>
+            )}
+          </div>
+
+          {/* Toolbar: search + import/export */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[10rem] flex-1">
+              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name or @username"
+                className="pl-9"
+              />
+            </div>
+            <Button variant="outline" onClick={openImport} className="shrink-0">
+              <UploadIcon className="h-5 w-5" /> Import
+            </Button>
+            <Button variant="outline" onClick={onExport} className="shrink-0">
+              <DownloadIcon className="h-5 w-5" /> Export
+            </Button>
+          </div>
+
+          {loading ? (
+            <p className="py-10 text-center text-sm text-muted">Loading students…</p>
+          ) : error ? (
+            <Card className="p-6 text-center text-sm text-brand-500">{error}</Card>
+          ) : students.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-sm text-muted">No students in {sectionName} yet.</p>
+              <div className="mt-4 flex justify-center gap-3">
+                <Button variant="outline" onClick={() => setAddOpen(true)}>
+                  <PlusIcon className="h-5 w-5" /> Add one
+                </Button>
+                <Button variant="outline" onClick={openImport}>
+                  <UploadIcon className="h-5 w-5" /> Import a list
+                </Button>
               </div>
-            )
-          })}
-        </Card>
+            </Card>
+          ) : filtered.length === 0 ? (
+            <Card className="p-8 text-center text-sm text-muted">
+              No students match “{query}”.
+            </Card>
+          ) : (
+            <Card className="divide-y divide-line">
+              {filtered.map((s) => {
+                const level = getLevelProgress(s.lifetime_points).level
+                return (
+                  <div key={s.id} className="flex items-center gap-3 p-3.5">
+                    <Avatar name={s.full_name} url={s.avatar_url} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{s.full_name}</p>
+                      <p className="flex items-center gap-1.5 text-xs text-muted">
+                        {s.claimed_at ? (
+                          <>
+                            <CheckIcon className="h-3.5 w-3.5 text-gold-500" />
+                            @{s.username} · Lv {level} · {s.lifetime_points} pts
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-mono tracking-wider text-ink">
+                              {s.claim_token}
+                            </span>
+                            <span>· not claimed</span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    {!s.claimed_at && (
+                      <button
+                        type="button"
+                        onClick={() => copy(s.claim_token, 'Token copied')}
+                        aria-label={`Copy ${s.full_name}'s token`}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-card-2 hover:text-ink"
+                      >
+                        <CopyIcon className="h-4.5 w-4.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(s)}
+                      aria-label={`Remove ${s.full_name}`}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-brand-500/10 hover:text-brand-500"
+                    >
+                      <TrashIcon className="h-4.5 w-4.5" />
+                    </button>
+                  </div>
+                )
+              })}
+            </Card>
+          )}
+        </>
       )}
 
       {/* Add student / show token */}
@@ -204,8 +342,9 @@ export function Students() {
         {created ? (
           <div className="space-y-4">
             <p className="text-sm text-muted">
-              Share this one-time token with <span className="font-semibold text-ink">{created.name}</span>.
-              They'll use it to claim their account.
+              Share this one-time token with{' '}
+              <span className="font-semibold text-ink">{created.name}</span>. They'll use it to
+              claim their account.
             </p>
             <div className="flex items-center justify-between rounded-xl border border-line bg-card-2 px-4 py-3">
               <span className="font-mono text-lg font-bold tracking-widest">{created.token}</span>
@@ -251,28 +390,103 @@ export function Students() {
         )}
       </Sheet>
 
+      {/* Import from Excel/CSV */}
+      <Sheet
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title={importResults ? 'Import complete' : `Import students to ${sectionName}`}
+      >
+        <input
+          ref={importRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+          onChange={onImportFile}
+        />
+
+        {importResults ? (
+          <div className="space-y-4">
+            <p className="text-sm text-muted">
+              Added <span className="font-semibold text-ink">{importResults.length}</span> student
+              {importResults.length === 1 ? '' : 's'}. Copy their one-time tokens to hand out.
+            </p>
+            <div className="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-line bg-card-2 p-3">
+              {importResults.map((r) => (
+                <div key={r.claimToken} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="truncate">{r.fullName}</span>
+                  <span className="font-mono font-semibold tracking-wider">{r.claimToken}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={copyImportTokens}>
+                <CopyIcon className="h-5 w-5" /> Copy all
+              </Button>
+              <Button className="flex-1" onClick={() => setImportOpen(false)}>
+                Done
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-muted">
+              Upload an <span className="font-medium text-ink">.xlsx</span>,{' '}
+              <span className="font-medium text-ink">.xls</span> or{' '}
+              <span className="font-medium text-ink">.csv</span> with one student name per row. If a
+              column is headed “Name”, it's used; otherwise the first column is.
+            </p>
+
+            <Button variant="outline" className="w-full" onClick={() => importRef.current?.click()}>
+              <UploadIcon className="h-5 w-5" /> Choose file
+            </Button>
+
+            {importNames.length > 0 && (
+              <>
+                <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-line bg-card-2 p-3 text-sm">
+                  {importNames.map((n, i) => (
+                    <p key={`${n}-${i}`} className="truncate">
+                      {n}
+                    </p>
+                  ))}
+                </div>
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={onConfirmImport}
+                  disabled={importing}
+                >
+                  {importing
+                    ? 'Importing…'
+                    : `Import ${importNames.length} student${importNames.length === 1 ? '' : 's'}`}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+      </Sheet>
+
       {/* Delete confirm */}
       <Sheet open={!!deleteTarget} onClose={() => setDeleteTarget(undefined)} title="Remove student?">
         <p className="text-sm text-muted">
-          This permanently removes <span className="font-semibold text-ink">{deleteTarget?.full_name}</span>{' '}
-          and all their points. This can't be undone.
+          This permanently removes{' '}
+          <span className="font-semibold text-ink">{deleteTarget?.full_name}</span> and all their
+          points. This can't be undone.
         </p>
         <div className="mt-5 flex gap-3">
           <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(undefined)}>
             Cancel
           </Button>
-          <Button className="flex-1 bg-brand-600 hover:bg-brand-700" onClick={onDelete} disabled={deleting}>
+          <Button
+            className="flex-1 bg-brand-600 hover:bg-brand-700"
+            onClick={onDelete}
+            disabled={deleting}
+          >
             {deleting ? 'Removing…' : 'Remove'}
           </Button>
         </div>
       </Sheet>
+
+      <ManageSections open={manageOpen} onClose={() => setManageOpen(false)} />
     </div>
   )
-}
-
-function initials(name: string): string {
-  // "Dela Cruz, Juan A." -> take first letters either side of the comma.
-  const parts = name.split(',').map((p) => p.trim()).filter(Boolean)
-  if (parts.length >= 2) return (parts[1][0] + parts[0][0]).toUpperCase()
-  return name.split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase()
 }

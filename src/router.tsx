@@ -27,6 +27,9 @@ const Students = lazy(() =>
   import('@/features/instructor/Students').then((m) => ({ default: m.Students })),
 )
 const Award = lazy(() => import('@/features/instructor/Award').then((m) => ({ default: m.Award })))
+const AwardHistory = lazy(() =>
+  import('@/features/instructor/AwardHistory').then((m) => ({ default: m.AwardHistory })),
+)
 const InstructorLeaderboard = lazy(() =>
   import('@/features/instructor/InstructorLeaderboard').then((m) => ({
     default: m.InstructorLeaderboard,
@@ -75,6 +78,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Students /> },
           { path: 'award', element: <Award /> },
+          { path: 'history', element: <AwardHistory /> },
           { path: 'leaderboard', element: <InstructorLeaderboard /> },
         ],
       },

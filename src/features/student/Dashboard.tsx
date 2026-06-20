@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { XpBar } from '@/components/ui/XpBar'
+import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
 import { getLevelProgress } from '@/lib/leveling'
@@ -45,10 +46,13 @@ export function Dashboard() {
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
-      <motion.p variants={item} className="text-sm text-muted">
-        Welcome back, <span className="font-semibold text-ink">{me.display_name}</span> ·{' '}
-        {sectionName(me.section_id)}
-      </motion.p>
+      <motion.div variants={item} className="flex items-center gap-3">
+        <Avatar name={me.display_name} url={me.avatar_url} className="h-11 w-11" />
+        <p className="text-sm text-muted">
+          Welcome back, <span className="font-semibold text-ink">{me.display_name}</span> ·{' '}
+          {sectionName(me.section_id)}
+        </p>
+      </motion.div>
 
       {/* Level / XP hero */}
       <motion.div variants={item}>
@@ -104,26 +108,33 @@ export function Dashboard() {
           </Card>
         ) : (
           <Card className="divide-y divide-line">
-            {events.map((e) => (
-              <div key={e.id} className="flex items-center gap-3 p-4">
-                <span
-                  className={cn(
-                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold',
-                    e.category === 'activity'
-                      ? 'bg-brand-500/10 text-brand-500'
-                      : 'bg-gold-400/15 text-gold-600 dark:text-gold-400',
-                  )}
-                >
-                  +{e.points}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{e.note ?? 'Class points'}</p>
-                  <p className="text-xs capitalize text-muted">
-                    {e.category} · {timeAgo(e.created_at)}
-                  </p>
+            {events.map((e) => {
+              const negative = e.points < 0
+              return (
+                <div key={e.id} className="flex items-center gap-3 p-4">
+                  <span
+                    className={cn(
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold',
+                      negative
+                        ? 'bg-red-500/10 text-red-500'
+                        : e.category === 'activity'
+                          ? 'bg-brand-500/10 text-brand-500'
+                          : 'bg-gold-400/15 text-gold-600 dark:text-gold-400',
+                    )}
+                  >
+                    {negative ? e.points : `+${e.points}`}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {e.note ?? (negative ? 'Deduction' : 'Class points')}
+                    </p>
+                    <p className="text-xs capitalize text-muted">
+                      {e.category} · {timeAgo(e.created_at)}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </Card>
         )}
       </motion.div>
