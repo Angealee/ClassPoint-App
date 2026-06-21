@@ -11,7 +11,6 @@ import type {
   StudentSelf,
 } from '@/lib/types'
 
-/** All sections, ordered by name (2A, 2B, …). */
 export async function listSections(): Promise<Section[]> {
   const { data, error } = await supabase
     .from('sections')
@@ -21,7 +20,6 @@ export async function listSections(): Promise<Section[]> {
   return data ?? []
 }
 
-/** Create a section (instructor-only via RLS). Returns the new row. */
 export async function createSection(name: string): Promise<Section> {
   const { data, error } = await supabase
     .from('sections')
@@ -38,11 +36,6 @@ export async function renameSection(id: string, name: string): Promise<void> {
   if (error) throw error
 }
 
-/**
- * Delete a section. The UI only offers this for empty sections, but we re-check
- * here so we never silently cascade-delete a roster (students FK is ON DELETE
- * CASCADE in the schema).
- */
 export async function deleteSection(id: string): Promise<void> {
   const { count, error: countError } = await supabase
     .from('students')
@@ -56,7 +49,6 @@ export async function deleteSection(id: string): Promise<void> {
   if (error) throw error
 }
 
-/** Number of students per section id (for "block delete if not empty"). */
 export async function getSectionCounts(): Promise<Record<string, number>> {
   const { data, error } = await supabase.from('students').select('section_id')
   if (error) throw error

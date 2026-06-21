@@ -37,12 +37,6 @@ function isIosDevice(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent)
 }
 
-/**
- * Captures the browser's one-shot `beforeinstallprompt` event once, at the app
- * root, so any number of UI affordances (the bottom banner, an explicit button)
- * can share it. The native event can only be consumed once, hence the single
- * owner here.
- */
 export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null)
   const [installed, setInstalled] = useState(() => isStandalone())

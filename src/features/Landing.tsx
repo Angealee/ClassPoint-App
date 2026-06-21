@@ -15,7 +15,7 @@ export function Landing() {
   const navigate = useNavigate()
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col px-5">
+    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-5">
       <header className="flex items-center justify-between py-4">
         <div className="flex items-center gap-2">
           <Logo className="h-7 w-7" />
