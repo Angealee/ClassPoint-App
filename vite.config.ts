@@ -10,7 +10,11 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['app-logo.svg', 'icon.svg', 'icon-maskable.svg'],
+      includeAssets: ['app-logo.svg', 'icon.svg', 'icon-maskable.svg', 'push-sw.js'],
+      workbox: {
+        // Pull the push/notificationclick handlers into the generated SW.
+        importScripts: ['push-sw.js'],
+      },
       manifest: {
         name: 'ClassPoint',
         short_name: 'ClassPoint',

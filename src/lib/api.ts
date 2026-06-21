@@ -291,6 +291,17 @@ export async function removeAvatar(studentId: string): Promise<void> {
   if (error) throw error
 }
 
+/** The student's current rank from the frozen snapshot, or null if not ranked. */
+export async function getMyRank(studentId: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('leaderboard_snapshot')
+    .select('rank')
+    .eq('student_id', studentId)
+    .maybeSingle<{ rank: number }>()
+  if (error) throw error
+  return data?.rank ?? null
+}
+
 /** Recent point events for a student (their feed / instructor review). */
 export async function listStudentEvents(studentId: string, limit = 20): Promise<PointEvent[]> {
   const { data, error } = await supabase

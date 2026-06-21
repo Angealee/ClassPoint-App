@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -7,6 +7,8 @@ import { Sheet } from '@/components/ui/Sheet'
 import { Avatar } from '@/components/ui/Avatar'
 import { useToast } from '@/components/ui/Toast'
 import { getLevelProgress } from '@/lib/leveling'
+import { getSoundMuted, setSoundMuted } from '@/lib/sound'
+import { disablePush, enablePush, getPushState, type PushState } from '@/lib/push'
 import { useAuth } from '@/lib/auth'
 import { useStudentData } from './StudentData'
 
@@ -21,6 +23,38 @@ export function Profile() {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+
+  const [pushState, setPushState] = useState<PushState>('default')
+  const [pushBusy, setPushBusy] = useState(false)
+  const [muted, setMuted] = useState(() => getSoundMuted())
+
+  useEffect(() => {
+    getPushState().then(setPushState)
+  }, [])
+
+  async function togglePush() {
+    if (!me) return
+    setPushBusy(true)
+    try {
+      const next = pushState === 'subscribed' ? await disablePush() : await enablePush(me.id)
+      setPushState(next)
+      if (next === 'subscribed') toast('Push notifications on.', 'success')
+      else if (next === 'denied')
+        toast('Notifications are blocked — enable them in your browser settings.', 'error')
+      else if (pushState === 'subscribed') toast('Push notifications off.', 'info')
+    } catch {
+      toast('Could not update notifications. Try again.', 'error')
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
+  function toggleMute() {
+    const next = !muted
+    setMuted(next)
+    setSoundMuted(next)
+    toast(next ? 'Sounds muted.' : 'Sounds on.', 'info')
+  }
 
   async function onSignOut() {
     await signOut()
@@ -145,6 +179,44 @@ export function Profile() {
         </Card>
       )}
 
+      <Card className="p-5">
+        <h2 className="font-display text-lg font-bold">Notifications</h2>
+        <p className="mt-0.5 text-xs text-muted">
+          Get alerted for points, level-ups, and rank changes.
+        </p>
+
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Sounds</p>
+            <p className="text-xs text-muted">Play a chime for in-app alerts.</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={toggleMute}>
+            {muted ? 'Off' : 'On'}
+          </Button>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Push to this device</p>
+            <p className="text-xs text-muted">{pushHint(pushState)}</p>
+          </div>
+          {pushState === 'unsupported' || pushState === 'unconfigured' ? (
+            <Button variant="outline" size="sm" disabled>
+              N/A
+            </Button>
+          ) : (
+            <Button
+              variant={pushState === 'subscribed' ? 'ghost' : 'outline'}
+              size="sm"
+              onClick={togglePush}
+              disabled={pushBusy || pushState === 'denied'}
+            >
+              {pushBusy ? '…' : pushState === 'subscribed' ? 'Turn off' : 'Turn on'}
+            </Button>
+          )}
+        </div>
+      </Card>
+
       <Button variant="ghost" className="w-full text-muted" onClick={onSignOut}>
         Sign out
       </Button>
@@ -167,6 +239,21 @@ export function Profile() {
       </Sheet>
     </div>
   )
+}
+
+function pushHint(state: PushState): string {
+  switch (state) {
+    case 'subscribed':
+      return 'On — alerts arrive even when the app is closed.'
+    case 'denied':
+      return 'Blocked. Allow notifications in your browser settings.'
+    case 'unsupported':
+      return 'Not supported on this device. On iPhone, add the app to your Home Screen first.'
+    case 'unconfigured':
+      return 'Not set up by your school yet.'
+    default:
+      return 'Off. Turn on to get alerts on your lock screen.'
+  }
 }
 
 function Field({ label, value }: { label: string; value: string }) {

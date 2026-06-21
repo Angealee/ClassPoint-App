@@ -1,9 +1,17 @@
+import { useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/ui/Logo'
 import { Button } from '@/components/ui/Button'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
+
+// Instructor sign-in is unlinked (router.tsx). Inside an installed PWA there's
+// no address bar to type it, so reveal it with a secret gesture: tap the footer
+// 5 times within 2 seconds.
+const INSTRUCTOR_PATH = '/macalesideauth'
+const SECRET_TAPS = 5
+const TAP_WINDOW_MS = 2000
 
 const features = [
   { Icon: BoltIcon, title: 'Earn points', body: 'Recitation and activities — 1 to 5 points, awarded live in class.' },
@@ -13,6 +21,23 @@ const features = [
 
 export function Landing() {
   const navigate = useNavigate()
+
+  // Secret tap counter for revealing the instructor sign-in inside the PWA.
+  const taps = useRef(0)
+  const firstTapAt = useRef(0)
+
+  function onSecretTap() {
+    const now = Date.now()
+    if (now - firstTapAt.current > TAP_WINDOW_MS) {
+      taps.current = 0
+      firstTapAt.current = now
+    }
+    taps.current += 1
+    if (taps.current >= SECRET_TAPS) {
+      taps.current = 0
+      navigate(INSTRUCTOR_PATH)
+    }
+  }
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-5">
@@ -81,7 +106,14 @@ export function Landing() {
       </main>
 
       <footer className="py-6 text-center text-xs text-muted">
-        ClassPoint · early build
+        <button
+          type="button"
+          onClick={onSecretTap}
+          aria-label="ClassPoint"
+          className="cursor-default select-none bg-transparent text-xs text-muted focus:outline-none"
+        >
+          ClassPoint · early build
+        </button>
       </footer>
     </div>
   )
