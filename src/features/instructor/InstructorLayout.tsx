@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shell, type NavItem } from '@/components/layout/Shell'
 import { Splash } from '@/components/layout/Splash'
+import { WhatsNew } from '@/features/WhatsNew'
 import { BoltIcon, ClockIcon, LogOutIcon, TrophyIcon, UsersIcon } from '@/components/ui/icons'
 import { listSections } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
@@ -77,6 +78,7 @@ export function InstructorLayout() {
           </button>
         }
       />
+      <WhatsNew />
     </InstructorContext.Provider>
   )
 }

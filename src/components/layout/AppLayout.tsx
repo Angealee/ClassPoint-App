@@ -1,6 +1,7 @@
 import { Shell, type NavItem } from '@/components/layout/Shell'
 import { StudentDataProvider, useStudentData } from '@/features/student/StudentData'
 import { LevelUpBurst } from '@/components/ui/LevelUpBurst'
+import { WhatsNew } from '@/features/WhatsNew'
 import { HomeIcon, TrophyIcon, UserIcon } from '@/components/ui/icons'
 
 const studentNav: NavItem[] = [
@@ -21,6 +22,7 @@ export function AppLayout() {
     <StudentDataProvider>
       <Shell nav={studentNav} />
       <LevelUpOverlay />
+      <WhatsNew />
     </StudentDataProvider>
   )
 }

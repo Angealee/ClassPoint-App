@@ -1,0 +1,63 @@
+import { useEffect, useState } from 'react'
+import { Sheet } from '@/components/ui/Sheet'
+import { Button } from '@/components/ui/Button'
+import { LATEST_VERSION, setSeenVersion, unseenEntries, type ChangelogEntry } from '@/lib/changelog'
+
+/**
+ * Shows a "What's new" sheet on app open whenever the user has unseen changelog
+ * entries. Dismissing marks the latest version as seen, so it won't reappear
+ * until the next release. Driven entirely by src/lib/changelog.ts.
+ */
+export function WhatsNew() {
+  const [entries, setEntries] = useState<ChangelogEntry[]>([])
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    const unseen = unseenEntries()
+    if (unseen.length > 0) {
+      setEntries(unseen)
+      setOpen(true)
+    }
+  }, [])
+
+  function dismiss() {
+    setSeenVersion(LATEST_VERSION)
+    setOpen(false)
+  }
+
+  return (
+    <Sheet open={open} onClose={dismiss} title="What's new">
+      <div className="max-h-[58vh] space-y-5 overflow-y-auto">
+        {entries.map((entry) => (
+          <section key={entry.version}>
+            <div className="flex items-baseline justify-between gap-2">
+              <h3 className="font-display text-base font-bold">{entry.title}</h3>
+              <span className="shrink-0 text-xs text-muted">v{entry.version}</span>
+            </div>
+            <p className="text-xs text-muted">{formatDate(entry.date)}</p>
+            <ul className="mt-2.5 space-y-2.5">
+              {entry.items.map((item, i) => (
+                <li key={i} className="flex gap-2.5 text-sm leading-relaxed">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+      <Button size="lg" className="mt-5 w-full" onClick={dismiss}>
+        Got it
+      </Button>
+    </Sheet>
+  )
+}
+
+/** "Jun 23, 2026" from an ISO date. */
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
