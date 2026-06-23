@@ -21,6 +21,16 @@ export interface ChangelogEntry {
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.0',
+    date: '2026-06-23',
+    title: 'Smoother on mobile',
+    items: [
+      'The winners’ podium is back on the leaderboard — and now you can tap any player (podium or list) to open their profile.',
+      'Pop-up panels feel snappier on phones: swipe them down to close, with smoother open/close animations.',
+      'Added this “What’s new” screen so you’ll always know what changed.',
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-06-23',
     title: 'Classmate profiles',

@@ -63,7 +63,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
   return (
     <Sheet open={open} onClose={onClose}>
       {target && (
-        <div className="max-h-[72vh] overflow-y-auto">
+        <div>
           {/* Header */}
           <div className="flex items-center gap-4">
             <Avatar

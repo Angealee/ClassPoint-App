@@ -27,7 +27,7 @@ export function WhatsNew() {
 
   return (
     <Sheet open={open} onClose={dismiss} title="What's new">
-      <div className="max-h-[58vh] space-y-5 overflow-y-auto">
+      <div className="space-y-5">
         {entries.map((entry) => (
           <section key={entry.version}>
             <div className="flex items-baseline justify-between gap-2">

@@ -18,6 +18,8 @@ interface PodiumBoardProps {
   showSection?: boolean
   /** A pinned "your standing" row for a viewer who sits outside `entries`. */
   pinnedSelf?: LeaderboardEntry | null
+  /** Tapping a card/row calls this (e.g. to open a profile preview). */
+  onSelect?: (entry: LeaderboardEntry) => void
 }
 
 type Place = 1 | 2 | 3
@@ -53,11 +55,13 @@ export function PodiumBoard({
   sectionName,
   showSection = false,
   pinnedSelf = null,
+  onSelect,
 }: PodiumBoardProps) {
   const reduced = useReducedMotion() ?? false
   if (entries.length === 0) return null
 
   const label = (id: string) => (showSection ? sectionName?.(id) ?? '' : '')
+  const pick = onSelect ? (entry: LeaderboardEntry) => () => onSelect(entry) : undefined
   const top3 = entries.slice(0, 3).map((entry, i) => ({ entry, place: (i + 1) as Place }))
   const rest = entries.slice(3)
 
@@ -75,6 +79,7 @@ export function PodiumBoard({
             isMe={meId === entry.student_id}
             sectionLabel={label(entry.section_id)}
             reduced={reduced}
+            onClick={pick?.(entry)}
           />
         ))}
       </div>
@@ -90,6 +95,7 @@ export function PodiumBoard({
               sectionLabel={label(entry.section_id)}
               index={i}
               reduced={reduced}
+              onClick={pick?.(entry)}
             />
           ))}
         </div>
@@ -107,6 +113,7 @@ export function PodiumBoard({
             sectionLabel={label(pinnedSelf.section_id)}
             index={0}
             reduced={reduced}
+            onClick={pick?.(pinnedSelf)}
           />
         </div>
       )}
@@ -120,12 +127,14 @@ function PodiumCard({
   isMe,
   sectionLabel,
   reduced,
+  onClick,
 }: {
   entry: LeaderboardEntry
   place: Place
   isMe: boolean
   sectionLabel: string
   reduced: boolean
+  onClick?: () => void
 }) {
   const tier = TIER[place]
   const level = getLevelProgress(entry.lifetime_points).level
@@ -136,7 +145,24 @@ function PodiumCard({
       initial={reduced ? false : { y: 44, opacity: 0, scale: 0.92 }}
       animate={{ y: 0, opacity: 1, scale: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 22, delay: 0.08 * place }}
-      className={cn('relative flex-1', champ ? 'max-w-[12rem]' : 'max-w-[10rem]')}
+      whileHover={onClick ? { y: -3 } : undefined}
+      whileTap={onClick ? { scale: 0.97 } : undefined}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `View ${entry.display_name}'s profile` : undefined}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      className={cn(
+        'relative flex-1',
+        champ ? 'max-w-[12rem]' : 'max-w-[10rem]',
+        onClick &&
+          'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50',
+      )}
     >
       {/* Crown floats above the champion. */}
       {champ && (
@@ -219,6 +245,7 @@ function RestRow({
   sectionLabel,
   index,
   reduced,
+  onClick,
 }: {
   entry: LeaderboardEntry
   place: number
@@ -226,6 +253,7 @@ function RestRow({
   sectionLabel: string
   index: number
   reduced: boolean
+  onClick?: () => void
 }) {
   const level = getLevelProgress(entry.lifetime_points).level
   return (
@@ -234,10 +262,26 @@ function RestRow({
       initial={reduced ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index * 0.03, 0.3) }}
+      whileTap={onClick ? { scale: 0.99 } : undefined}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `View ${entry.display_name}'s profile` : undefined}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      className={cn(
+        onClick &&
+          'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50',
+      )}
     >
       <Card
         className={cn(
-          'relative flex items-center gap-3 overflow-hidden p-3',
+          'relative flex items-center gap-3 overflow-hidden p-3 transition-colors',
+          onClick && 'hover:bg-card-2',
           isMe && 'ring-1 ring-brand-500/40',
         )}
       >
