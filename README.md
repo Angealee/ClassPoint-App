@@ -68,17 +68,21 @@ ClassPoint has **two kinds of users**:
 - Dashboard: level + animated XP bar, total points (live), official rank (settles 7:30 AM/PM), live points feed (deductions render in red).
 - **Profile picture** — upload your own avatar in Profile (JPG/PNG/WebP/GIF, max 5 MB); it appears on the dashboard, leaderboard, and the instructor's roster.
 - **Level-up burst**: a full-screen celebration fires when you level up — live if you're watching, or the next time you open the app after a missed level-up.
-- Leaderboard: global **Top 10** (your own row pinned if you're outside it), with avatars + the settle stamp + countdown.
-- Profile: edit your public display name (roster name stays private).
+- **Leaderboard podium** — the top 3 sit on an animated winners' podium (crown, gold glow, count-up); the rest follow as ranked rows. Global **Top 10** with your own row pinned if you're outside it, plus the settle stamp + countdown.
+- **Tap-to-preview profiles** — tap any player on the leaderboard to open a profile sheet: avatar, level + XP, rank, points, their bio/interests, and their recent points history (via the `public_point_events` SECURITY DEFINER function, since RLS otherwise hides other students' history).
+- Profile: edit your public **display name, bio, and interests** (roster name stays private); a **"Preview"** button shows exactly what classmates see.
+- **Notifications** — opt-in **push notifications** (points, level-ups, rank changes) delivered even when the app is closed (installed PWA; iOS 16.4+), plus in-app **sound + vibration** you can toggle in Profile.
 
 **Cross-cutting**
 - Installable **PWA** with a custom "Install ClassPoint" banner (native prompt where available; iOS Add-to-Home-Screen hint otherwise).
+- **Web Push** — a `send-push` Edge Function (VAPID) delivers OS-level notifications while the app is closed; a `public/push-sw.js` handler (imported into the Workbox service worker) shows them. Postgres triggers (`pg_net`) fire the function on point events and twice-daily rank changes.
+- **"What's new" release notes** — a sheet shown on app open when there are unseen updates, driven by a single appendable `src/lib/changelog.ts`.
 - **"New version available" prompt** — the service worker waits for the user to reload instead of refreshing mid-task.
 - **Offline indicator** — the cached app shell loads offline with a "You're offline" pill.
 - **Code-split routes** — each screen is a separate lazy-loaded chunk for a smaller first load.
 - **Light / dark theme** toggle.
-- Responsive: bottom tab bar on mobile, left sidebar on desktop.
-- Framer Motion animations (entrance staggers, spring XP bar, bottom sheets, toasts, level-up burst, leaderboard reorder).
+- **Mobile-first & responsive** — bottom tab bar on mobile, left sidebar on desktop; bottom sheets **swipe down to dismiss** and cap to the viewport with internal scroll.
+- Framer Motion animations (entrance staggers, spring XP bar, swipe-to-dismiss sheets, toasts, level-up burst, winners' podium, leaderboard reorder).
 - Role-based routing guards.
 
 ---
@@ -129,37 +133,48 @@ ClassPoint App/
 │  │  ├─ leveling.ts          # Level/XP math (mirrors the SQL cp_level())
 │  │  ├─ time.ts              # "2h ago" feed time + snapshot countdown helpers
 │  │  ├─ theme.tsx            # Light/dark provider
-│  │  └─ cn.ts                # className merge helper
+│  │  ├─ cn.ts                # className merge helper
+│  │  ├─ push.ts              # Web Push subscribe/unsubscribe + SW notifications
+│  │  ├─ sound.ts             # In-app sound effects (mutable)
+│  │  ├─ haptics.ts           # Vibration patterns (mutable)
+│  │  └─ changelog.ts         # "What's new" entries + seen-version tracking
 │  │
 │  ├─ components/
 │  │  ├─ layout/
 │  │  │  ├─ Shell.tsx         # Responsive shell: sidebar (desktop) / tabs (mobile)
 │  │  │  ├─ AppLayout.tsx     # Student shell: StudentDataProvider + level-up overlay
 │  │  │  └─ Splash.tsx        # Full-screen loading state
-│  │  └─ ui/                  # Reusable primitives
-│  │     ├─ Button, Card, Input, Select, Sheet, Toast
-│  │     ├─ XpBar.tsx         # Animated gold XP bar
-│  │     ├─ LevelUpBurst.tsx  # Full-screen level-up celebration
-│  │     ├─ SnapshotStamp.tsx # "Updated 7:30 AM · next in 5h 12m"
-│  │     ├─ Logo.tsx, ThemeToggle.tsx, icons.tsx
+│  │  ├─ ui/                  # Reusable primitives
+│  │  │  ├─ Button, Card, Input, Select, Sheet (swipe-to-dismiss), Toast
+│  │  │  ├─ Avatar.tsx        # Picture with initials fallback
+│  │  │  ├─ XpBar.tsx         # Animated gold XP bar
+│  │  │  ├─ LevelUpBurst.tsx  # Full-screen level-up celebration
+│  │  │  ├─ SnapshotStamp.tsx # "Updated 7:30 AM · next in 5h 12m"
+│  │  │  ├─ Logo.tsx, ThemeToggle.tsx, icons.tsx
+│  │  ├─ leaderboard/
+│  │  │  └─ PodiumBoard.tsx   # Animated top-3 podium + ranked rows (shared by both leaderboards)
+│  │  └─ pwa/                 # Install banner/button, update prompt, offline indicator
 │  │
 │  ├─ features/
 │  │  ├─ Landing.tsx          # Public landing page
+│  │  ├─ WhatsNew.tsx         # "What's new" sheet shown on app open
 │  │  ├─ auth/
 │  │  │  ├─ SignIn.tsx        # Student login (username + PIN)
 │  │  │  ├─ Claim.tsx         # Claim account with token
 │  │  │  ├─ InstructorSignIn.tsx
 │  │  │  └─ guards.tsx        # RequireRole, RedirectIfAuthed
 │  │  ├─ student/
-│  │  │  ├─ StudentData.tsx   # Context: loads "me" + snapshot + feed; realtime; level-up
-│  │  │  ├─ Dashboard.tsx     # Live level/XP/points + official rank + feed
-│  │  │  ├─ Leaderboard.tsx   # Global Top 10, self pinned, animated reorder
-│  │  │  └─ Profile.tsx       # Edit display name
+│  │  │  ├─ StudentData.tsx           # Context: loads "me" + snapshot + feed; realtime; level-up
+│  │  │  ├─ Dashboard.tsx             # Live level/XP/points + official rank + feed
+│  │  │  ├─ Leaderboard.tsx           # Podium Top 10, self pinned; tap → profile preview
+│  │  │  ├─ StudentProfilePreview.tsx # Tap-a-classmate profile sheet (bio, interests, recent points)
+│  │  │  └─ Profile.tsx               # Edit display name + bio + interests; preview public profile
 │  │  └─ instructor/
 │  │     ├─ InstructorLayout.tsx       # Context: sections + selected section
-│  │     ├─ Roster.tsx                 # Add/remove students, tokens
-│  │     ├─ Award.tsx                  # Award points
-│  │     └─ InstructorLeaderboard.tsx  # Frozen snapshot + section filter
+│  │     ├─ Students.tsx               # Section grid + roster (add/remove, tokens, import/export)
+│  │     ├─ Award.tsx                  # Award points / penalties
+│  │     ├─ AwardHistory.tsx           # Last 40 awards + undo
+│  │     └─ InstructorLeaderboard.tsx  # Frozen snapshot podium + section filter
 │  └─ styles/index.css        # Tailwind import + design tokens + theme vars
 │
 └─ supabase/
@@ -170,8 +185,13 @@ ClassPoint App/
    │  ├─ 0004_realtime.sql               # realtime on students / point_events
    │  ├─ 0005_seed.sql                   # instructor allowlist + sections 2A–2E
    │  ├─ 0006_leaderboard_snapshot.sql   # frozen board + pg_cron (7:30 AM/PM PHT)
-   │  └─ 0007_avatars_import_minus.sql   # avatars bucket + minus points + bulk import RPC
-   └─ functions/claim-token/             # Deno Edge Function (account claim)
+   │  ├─ 0007_avatars_import_minus.sql   # avatars bucket + minus points + bulk import RPC
+   │  ├─ 0008_push_notifications.sql     # push_subscriptions + pg_net triggers → send-push
+   │  ├─ 0009_public_profiles.sql        # students.bio/interests + public_point_events()
+   │  └─ 0010_push_vault.sql             # push config via Vault (replaces app.settings GUCs)
+   └─ functions/
+      ├─ claim-token/                    # Deno Edge Function (account claim)
+      └─ send-push/                      # Deno Edge Function (signs + delivers Web Push)
 ```
 
 ### The golden rule of this codebase
@@ -247,19 +267,22 @@ The fastest way to understand the app is to trace one feature from click to data
 
 ### Tables
 - **`sections`** — `id, name`. Readable by all signed-in users.
-- **`students`** — roster + points. `full_name` (private), `display_name` (public, editable), `lifetime_points` (derived), `user_id` (links to `auth.users` once claimed). Broadly readable.
+- **`students`** — roster + points. `full_name` (private), `display_name` (public, editable), `bio` + `interests` *(0009, public, editable, length-capped)*, `avatar_url`, `lifetime_points` (derived), `user_id` (links to `auth.users` once claimed). Broadly readable.
 - **`student_secrets`** — `claim_token, username, claimed_at`. **Instructor-only.**
 - **`point_events`** — history/feed. `points (−5…5, never 0), category (recitation/activity/penalty), note, created_at`.
 - **`instructors`** — email allowlist. No client access.
 - **`leaderboard_snapshot`** *(0006)* — frozen ranking: `student_id, display_name, section_id, lifetime_points, rank`. Read-only to clients.
 - **`leaderboard_meta`** *(0006)* — single row holding `captured_at` (when the snapshot last ran).
+- **`push_subscriptions`** *(0008)* — one row per browser/device a student enabled push on (`endpoint, p256dh, auth`). A student manages only their own; the `send-push` function reads them with the service role.
 
 ### Functions & triggers
 - **`is_instructor()`** — `SECURITY DEFINER`; checks the allowlist. Used throughout RLS.
 - **`cp_level(total_points)`** — mirrors `leveling.ts` (50, ×1.5 rounded).
 - **`cp_generate_token()`** — 8-char uppercase hex token.
 - **`cp_recompute_points()`** — trigger keeping `students.lifetime_points` in sync (`SUM(points)`, clamped at 0 so penalties can't make it negative).
-- **`cp_guard_student_update()`** — trigger blocking students from editing protected columns (bypasses for instructor + service role). Students may edit `display_name` + `avatar_url`.
+- **`cp_guard_student_update()`** — trigger blocking students from editing protected columns (bypasses for instructor + service role). Students may edit `display_name`, `avatar_url`, `bio`, `interests`.
+- **`public_point_events(student_id, limit)`** *(0009)* — `SECURITY DEFINER` reader returning a classmate's recent points for the profile preview (RLS otherwise restricts `point_events` reads to the owner + instructor).
+- **`cp_notify_point_event()` / `refresh_leaderboard_snapshot_notify()`** *(0008/0010)* — fire the `send-push` Edge Function via `pg_net` on awards and twice-daily rank changes. The service-role bearer is read from **Supabase Vault** (`edge_service_key`); the functions URL is hardcoded. *(0010 replaces 0008's `app.settings.*` GUC approach, which the hosted `postgres` role can't set.)*
 - **`create_student(section_id, full_name)`** — instructor-only RPC: insert student + token.
 - **`create_students(section_id, full_names[])`** *(0007)* — instructor-only bulk RPC for Excel/CSV import; inserts many students + tokens in one call.
 - **`refresh_leaderboard_snapshot()`** *(0006)* — rebuilds the snapshot + stamps `captured_at`. Run by `pg_cron`.
@@ -308,11 +331,20 @@ Migration `0007` creates a **public `avatars` Storage bucket** (5 MB cap, image 
    ```
    VITE_SUPABASE_URL=https://<your-project>.supabase.co
    VITE_SUPABASE_ANON_KEY=<your-publishable-anon-key>
+   VITE_VAPID_PUBLIC_KEY=<your-vapid-public-key>   # Web Push (optional)
    ```
-3. **Database** — in the Supabase **SQL Editor**, run the migrations **in order**: `0001` → `0002` → `0003` → `0004` → `0005` → `0006` → `0007`. (For `0006`, enable the **pg_cron** extension first under Database → Extensions if `CREATE EXTENSION` is blocked. `0007` provisions the avatars Storage bucket, enables minus points, and adds the bulk-import RPC — it's idempotent and safe to re-run.)
-4. **Edge Function** — create a function named `claim-token`, paste `supabase/functions/claim-token/index.ts`, deploy, and **disable JWT verification**.
-5. **Instructor account** — create your instructor auth user in **Authentication → Users → Add user** (set a password). The email must match the one in `instructors` (`koby.macale@dct.edu.ph`).
-6. **Run**
+3. **Database** — in the Supabase **SQL Editor**, run the migrations **in order**, `0001` → `0010`. Notes:
+   - `0006` — enable the **pg_cron** extension first (Database → Extensions) if `CREATE EXTENSION` is blocked.
+   - `0007` — provisions the avatars Storage bucket, enables minus points, adds the bulk-import RPC.
+   - `0008` — push plumbing (`pg_net`, `push_subscriptions`, triggers). Ignore its `app.settings.*` header note — the hosted `postgres` role can't set those; `0010` supersedes it with Vault.
+   - `0009` — adds `bio`/`interests` + `public_point_events`. **Apply before deploying the matching frontend** (the student load reads the new columns).
+   - `0010` — run **after** storing the Vault secret in step 5. All migrations are idempotent / safe to re-run.
+4. **Edge Functions** — deploy both Deno functions (`npx supabase functions deploy <name>`):
+   - `claim-token` — **disable JWT verification** (callers have no account yet).
+   - `send-push` — leave JWT verification **on** (the DB calls it with the service role).
+5. **Push notifications (optional)** — generate keys with `npx web-push generate-vapid-keys`, put the **public** key in `.env` / Vercel as `VITE_VAPID_PUBLIC_KEY`, and set the function secrets `VAPID_PUBLIC_KEY` (same value), `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. Store the **service-role key** in Vault as `edge_service_key` (`select vault.create_secret('<key>','edge_service_key','send-push bearer');`), then run migration `0010`. Push only reaches a device once the PWA is **installed** and the student enables it in Profile (iOS 16.4+).
+6. **Instructor account** — create your instructor auth user in **Authentication → Users → Add user** (set a password). The email must match the one in `instructors` (`koby.macale@dct.edu.ph`).
+7. **Run**
    ```bash
    npm run dev      # → http://localhost:5173
    ```
@@ -347,6 +379,8 @@ Migration `0007` creates a **public `avatars` Storage bucket** (5 MB cap, image 
 | **5 — Leaderboard + polish** | Realtime dashboard; frozen twice-daily leaderboard snapshot (`pg_cron`, 7:30 AM/PM PHT) with countdown; global Top 10 + pinned self; animated reorder; full-screen level-up burst (live + on next open). | ✅ Done |
 | **6 — PWA polish & QA** | Custom install banner (+ iOS hint), "update available" prompt, offline indicator, route-level code-splitting (initial bundle 668 → 496 KB), empty/error states across screens. | ✅ Done |
 | **7 — Profiles, import & penalties** | Student avatar upload (public `avatars` bucket, 5 MB cap) shown everywhere; Excel/CSV roster import + export (`xlsx`, lazy-loaded chunk); editable sections (create/rename/delete-when-empty); minus points / penalties with totals clamped at 0; instructor activity log + undo; roster search. | ✅ Done |
+| **8 — Notifications** | Web Push (VAPID `send-push` Edge Function + `pg_net` triggers; config via Vault), in-app sound + vibration toggles, and a "What's new" release-notes screen (`changelog.ts`). | ✅ Done |
+| **9 — Classmate profiles & mobile polish** | Tap-a-classmate profile preview (bio + interests + recent points via `public_point_events`); winners' podium on the student leaderboard (tap to preview); swipe-to-dismiss bottom sheets with viewport-aware scrolling. | ✅ Done |
 
 ### Design system (`src/styles/index.css`)
 Tailwind v4 `@theme` tokens — red brand scale (`brand-50…950`), gold/amber XP scale (`gold-*`), and semantic CSS vars (`--canvas`, `--card`, `--ink`, `--muted`, `--line`, `--ring`) swapped by `.dark`. Fonts: **Inter** (body), **Space Grotesk** (display). The XP bar shimmer is a **CSS `@keyframes`** (not a JS animation) on purpose — a JS infinite loop blocks tooling.
@@ -378,8 +412,9 @@ Tailwind v4 `@theme` tokens — red brand scale (`brand-50…950`), gold/amber X
 
 ## 12. Roadmap (remaining work)
 
-Phases 0–7 are complete. Possible next steps:
+Phases 0–9 are complete. Possible next steps:
 
+- **End-to-end push test** — on a physical phone with the installed PWA, enable push in Profile, fully close the app, award a point, and confirm the lock-screen notification arrives (requires `send-push` deployed, VAPID keys matched, and the Vault secret + `0010` applied).
 - **End-to-end walkthrough** — run the full instructor→student flow once against live Supabase (import a roster, award + penalize, upload an avatar, watch the dashboard update live, settle the board, confirm the level-up burst, undo an award).
 - **Future leaderboard views** (scaffolded, not yet surfaced) — own-section board, a chosen-section board, and a Top-N toggle. The snapshot already carries every student + section, so these are filters over existing data, no new queries needed.
 - **Avatar cleanup** — replacing a picture leaves the old object in the bucket. A periodic job (or an Edge Function on update) could prune stale `avatars/<uid>/…` files.
