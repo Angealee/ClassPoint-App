@@ -21,10 +21,13 @@ export function Award() {
 
   const [students, setStudents] = useState<SectionStudent[]>([])
   const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [mode, setMode] = useState<Mode>('reward')
-  // Magnitude (1–5); the sign is decided by `mode` at award time.
+  // Magnitude (1+); the sign is decided by `mode` at award time.
   const [points, setPoints] = useState<number | null>(null)
+  // Raw text of the custom-points field (empty unless a custom value is in use).
+  const [custom, setCustom] = useState('')
   const [category, setCategory] = useState<PointCategory>('recitation')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -45,11 +48,19 @@ export function Award() {
 
   useEffect(() => {
     setSelected(new Set())
+    setQuery('')
     void refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSectionId])
 
-  const allSelected = students.length > 0 && selected.size === students.length
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return students
+    return students.filter((s) => s.full_name.toLowerCase().includes(q))
+  }, [students, query])
+
+  // "Select all" acts on the currently visible (filtered) students.
+  const allSelected = filtered.length > 0 && filtered.every((s) => selected.has(s.id))
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -61,8 +72,27 @@ export function Award() {
   }
 
   function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(students.map((s) => s.id)))
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (allSelected) filtered.forEach((s) => next.delete(s.id))
+      else filtered.forEach((s) => next.add(s.id))
+      return next
+    })
   }
+
+  // Selecting a preset clears any custom value; typing a custom value clears presets.
+  function pickPreset(p: number) {
+    setCustom('')
+    setPoints(p)
+  }
+
+  function onCustom(v: string) {
+    setCustom(v)
+    const n = parseInt(v, 10)
+    setPoints(Number.isFinite(n) && n > 0 ? n : null)
+  }
+
+  const customActive = points !== null && !POINTS.includes(points)
 
   const canAward = selected.size > 0 && points !== null && !submitting
 
@@ -84,6 +114,7 @@ export function Award() {
       toast(`${verb} ${count} student${count > 1 ? 's' : ''}`, 'success')
       setSelected(new Set())
       setPoints(null)
+      setCustom('')
       setNote('')
       await refresh()
     } catch {
@@ -93,10 +124,8 @@ export function Award() {
     }
   }
 
-  const sorted = useMemo(() => students, [students])
-
   return (
-    <div className="space-y-4">
+    <div className={cn('space-y-4', selected.size > 0 && 'pb-80 md:pb-72')}>
       <Select
         label="Section"
         value={selectedSectionId}
@@ -123,15 +152,29 @@ export function Award() {
         )}
       </div>
 
+      {students.length > 0 && (
+        <Input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search students…"
+          aria-label="Search students"
+        />
+      )}
+
       {loading ? (
         <ListSkeleton rows={6} />
       ) : students.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted">
           No students in {sectionName} yet — add some in the Students tab.
         </Card>
+      ) : filtered.length === 0 ? (
+        <Card className="p-8 text-center text-sm text-muted">
+          No students match “{query.trim()}”.
+        </Card>
       ) : (
         <Card className="divide-y divide-line">
-          {sorted.map((s) => {
+          {filtered.map((s) => {
             const isSel = selected.has(s.id)
             return (
               <button
@@ -219,7 +262,7 @@ export function Award() {
                   <button
                     key={p}
                     type="button"
-                    onClick={() => setPoints(p)}
+                    onClick={() => pickPreset(p)}
                     className={cn(
                       'flex h-11 flex-1 items-center justify-center rounded-xl font-display text-lg font-bold transition-all',
                       points === p
@@ -232,6 +275,45 @@ export function Award() {
                     {penalty ? `−${p}` : `+${p}`}
                   </button>
                 ))}
+              </div>
+
+              {/* Custom amount for anything beyond the presets. */}
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-xs font-semibold text-muted">Custom</span>
+                <div className="relative flex-1">
+                  <span
+                    className={cn(
+                      'pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-display text-lg font-bold',
+                      customActive
+                        ? penalty
+                          ? 'text-red-500'
+                          : 'text-gold-600 dark:text-gold-400'
+                        : 'text-muted',
+                    )}
+                  >
+                    {penalty ? '−' : '+'}
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    value={custom}
+                    onChange={(e) => onCustom(e.target.value)}
+                    placeholder="e.g. 10"
+                    aria-label="Custom points"
+                    className={cn(
+                      'h-11 w-full rounded-xl border bg-card pl-8 pr-3.5 font-display text-lg font-bold text-ink',
+                      'placeholder:font-sans placeholder:text-base placeholder:font-normal placeholder:text-muted/70',
+                      'transition-colors focus:outline-none focus:ring-2',
+                      customActive
+                        ? penalty
+                          ? 'border-red-500 ring-2 ring-red-500/30'
+                          : 'border-gold-500 ring-2 ring-gold-500/30'
+                        : 'border-line focus:border-brand-500 focus:ring-brand-500/30',
+                    )}
+                  />
+                </div>
               </div>
 
               <Input

@@ -1,17 +1,13 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
-import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotStamp } from '@/components/ui/SnapshotStamp'
-import { getLevelProgress } from '@/lib/leveling'
-import { cn } from '@/lib/cn'
-import type { LeaderboardEntry } from '@/lib/types'
+import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
 import { useStudentData } from './StudentData'
 import { StudentProfilePreview } from './StudentProfilePreview'
 
 const TOP_N = 10
-const rankStyles = ['text-gold-400', 'text-zinc-400', 'text-amber-700']
 
 export function Leaderboard() {
   const { loading, leaderboard, capturedAt, me, sectionName } = useStudentData()
