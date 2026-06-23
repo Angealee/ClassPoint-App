@@ -113,6 +113,71 @@ export async function disablePush(): Promise<PushState> {
   return pushConfigured() ? 'default' : 'unconfigured'
 }
 
+/**
+ * If this browser already has a push subscription, make sure Supabase has the
+ * current keys (heals rotated subscriptions or a missing DB row after a
+ * reinstall). Safe no-op when push isn't supported/configured/permitted.
+ *
+ * Call this on app start so a returning student stays reachable without having
+ * to toggle push off and on again.
+ */
+export async function syncPushSubscription(studentId: string): Promise<void> {
+  try {
+    if (!pushSupported() || !pushConfigured()) return
+    if (Notification.permission !== 'granted') return
+    const reg = await getRegistration()
+    const sub = await reg?.pushManager.getSubscription()
+    if (sub) await saveSubscription(studentId, sub)
+  } catch {
+    /* best-effort — the toggle in Profile can always re-subscribe */
+  }
+}
+
+export interface LocalNotice {
+  title: string
+  body?: string
+  /** Collapses with same-tag notifications (incl. the server push). */
+  tag?: string
+  url?: string
+}
+
+/**
+ * Show a *system* notification from the page itself. Used when the app is open
+ * but backgrounded/unfocused (document hidden) so the student still sees a
+ * pop-up. No-ops unless notifications are permitted and a service worker is
+ * controlling the page. Uses the same tags as the server push (see
+ * supabase/functions/send-push) so the two never stack into duplicates.
+ *
+ * NOTE: this only fires while the page's JS is still alive. Once the OS fully
+ * suspends/kills the app, only real Web Push (the edge function) can reach the
+ * device — that's the "app completely closed" path.
+ */
+export async function showLocalNotification(n: LocalNotice): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+  if (!('Notification' in window) || Notification.permission !== 'granted') return false
+  if (!('serviceWorker' in navigator)) return false
+  try {
+    // Don't hang forever if the SW isn't ready yet.
+    const reg = await Promise.race<ServiceWorkerRegistration | null>([
+      navigator.serviceWorker.ready,
+      new Promise((resolve) => setTimeout(() => resolve(null), 3000)),
+    ])
+    if (!reg) return false
+    await reg.showNotification(n.title, {
+      body: n.body ?? '',
+      tag: n.tag ?? 'classpoint',
+      // renotify needs a tag; surfaces a repeat even when one is already shown.
+      renotify: true,
+      icon: '/app-logo.svg',
+      badge: '/icon.svg',
+      data: { url: n.url ?? '/app' },
+    } as NotificationOptions)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Upsert the browser subscription into Supabase (keyed by endpoint). */
 async function saveSubscription(studentId: string, sub: PushSubscription): Promise<void> {
   const json = sub.toJSON()

@@ -21,6 +21,8 @@ import { supabase } from '@/lib/supabase'
 import { getLevelProgress } from '@/lib/leveling'
 import { useToast } from '@/components/ui/Toast'
 import { initSound, playSound } from '@/lib/sound'
+import { vibrate } from '@/lib/haptics'
+import { showLocalNotification, syncPushSubscription } from '@/lib/push'
 import type { LeaderboardEntry, PointEvent, Section, StudentSelf } from '@/lib/types'
 
 interface StudentDataValue {
@@ -33,6 +35,8 @@ interface StudentDataValue {
   /** When the frozen leaderboard was captured (ISO), or null. */
   capturedAt: string | null
   events: PointEvent[]
+  /** True while the realtime channel is connected — scores update live. */
+  live: boolean
   /** Official (snapshot) rank — settles twice daily. Null if not ranked yet. */
   rank: number | null
   sectionName: (id: string) => string
@@ -63,10 +67,16 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const [capturedAt, setCapturedAt] = useState<string | null>(null)
   const [events, setEvents] = useState<PointEvent[]>([])
   const [levelUp, setLevelUp] = useState<number | null>(null)
+  const [live, setLive] = useState(false)
 
   // Tracks the level/rank we last reflected, to detect changes.
   const levelRef = useRef<number | null>(null)
   const rankRef = useRef<number | null>(null)
+  // Prevents overlapping loads (resync can race the initial/refresh load).
+  const inFlightRef = useRef(false)
+  // True once the realtime channel has subscribed at least once — a *second*
+  // SUBSCRIBED means we reconnected and may have missed awards while away.
+  const subscribedOnceRef = useRef(false)
 
   // Unlock audio playback on the first user gesture (browsers require this).
   useEffect(() => {
@@ -80,7 +90,17 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     const baseline = levelRef.current ?? (Number.isFinite(stored) && stored > 0 ? stored : null)
     if (baseline !== null && level > baseline) {
       setLevelUp(level)
-      playSound('levelup')
+      if (document.visibilityState === 'visible') {
+        playSound('levelup')
+        vibrate('levelup')
+      } else {
+        // App backgrounded but alive — let the OS pop + buzz it.
+        void showLocalNotification({
+          title: `Level ${level}! ⭐`,
+          body: 'You leveled up — well done!',
+          tag: 'cp-level',
+        })
+      }
     }
     levelRef.current = level
     localStorage.setItem(seenLevelKey(studentId), String(level))
@@ -94,11 +114,20 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       const baseline = rankRef.current ?? (Number.isFinite(stored) && stored > 0 ? stored : null)
       if (baseline !== null && newRank !== baseline) {
         const improved = newRank < baseline
-        playSound('rank')
-        toast(
-          improved ? `You climbed to #${newRank}! 📈` : `Your rank is now #${newRank}.`,
-          improved ? 'success' : 'info',
-        )
+        if (document.visibilityState === 'visible') {
+          playSound('rank')
+          vibrate('rank')
+          toast(
+            improved ? `You climbed to #${newRank}! 📈` : `Your rank is now #${newRank}.`,
+            improved ? 'success' : 'info',
+          )
+        } else {
+          void showLocalNotification({
+            title: improved ? `You climbed to #${newRank}! 📈` : 'Leaderboard update',
+            body: improved ? 'You moved up the ranks.' : `Your rank is now #${newRank}.`,
+            tag: 'cp-rank',
+          })
+        }
       }
       rankRef.current = newRank
       localStorage.setItem(seenRankKey(studentId), String(newRank))
@@ -107,7 +136,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   )
 
   const load = useCallback(async () => {
-    if (!user) return
+    if (!user || inFlightRef.current) return
+    inFlightRef.current = true
     setError(false)
     try {
       const [mine, secs, snap] = await Promise.all([
@@ -127,8 +157,17 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       }
     } catch {
       setError(true)
+    } finally {
+      inFlightRef.current = false
     }
   }, [user, considerLevelUp, considerRankChange])
+
+  // Always call the freshest `load` from listeners/callbacks without making the
+  // realtime channel re-subscribe when `load`'s identity changes.
+  const loadRef = useRef(load)
+  useEffect(() => {
+    loadRef.current = load
+  }, [load])
 
   useEffect(() => {
     setLoading(true)
@@ -136,18 +175,28 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   }, [load])
 
   // Live updates for the signed-in student's own dashboard.
+  //
+  // IMPORTANT: depend on the *stable* student id, never the whole `me` object.
+  // Each realtime UPDATE calls setMe, so depending on `me` would tear down and
+  // re-subscribe the same channel topic on every award — the async removeChannel
+  // collides with the new subscribe and the channel dies, so only a full page
+  // refresh would show new points. Keying on the id keeps one durable channel.
+  const studentId = me?.id
   useEffect(() => {
-    if (!me) return
+    if (!studentId) return
+    // Heal a rotated/missing push subscription for this device on each open.
+    void syncPushSubscription(studentId)
+    subscribedOnceRef.current = false
     const channel = supabase
-      .channel(`student-self-${me.id}`)
+      .channel(`student-self-${studentId}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'students', filter: `id=eq.${me.id}` },
+        { event: 'UPDATE', schema: 'public', table: 'students', filter: `id=eq.${studentId}` },
         (payload) => {
           const next = payload.new as Partial<StudentSelf>
           setMe((m) => (m ? { ...m, ...next } : m))
           if (typeof next.lifetime_points === 'number') {
-            considerLevelUp(me.id, next.lifetime_points)
+            considerLevelUp(studentId, next.lifetime_points)
           }
         },
       )
@@ -157,7 +206,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
           event: 'INSERT',
           schema: 'public',
           table: 'point_events',
-          filter: `student_id=eq.${me.id}`,
+          filter: `student_id=eq.${studentId}`,
         },
         (payload) => {
           const ev = payload.new as PointEvent
@@ -165,12 +214,22 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
             if (prev.some((e) => e.id === ev.id)) return prev
             // Announce only genuinely new awards (realtime fires post-subscribe).
             const positive = ev.points >= 0
-            playSound(positive ? 'point' : 'deduct')
             const amount = positive ? `+${ev.points}` : String(ev.points)
-            toast(
-              ev.note ? `${amount} · ${ev.note}` : `${amount} points`,
-              positive ? 'success' : 'error',
-            )
+            if (document.visibilityState === 'visible') {
+              playSound(positive ? 'point' : 'deduct')
+              vibrate(positive ? 'point' : 'deduct')
+              toast(
+                ev.note ? `${amount} · ${ev.note}` : `${amount} points`,
+                positive ? 'success' : 'error',
+              )
+            } else {
+              // App backgrounded but alive — surface an OS notification instead.
+              void showLocalNotification({
+                title: positive ? `${amount} points 🎉` : `${amount} points`,
+                body: ev.note?.trim() || (positive ? 'Nice work — keep it up!' : 'Points deducted.'),
+                tag: 'cp-points',
+              })
+            }
             return [ev, ...prev]
           })
         },
@@ -182,19 +241,42 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
           event: 'INSERT',
           schema: 'public',
           table: 'leaderboard_snapshot',
-          filter: `student_id=eq.${me.id}`,
+          filter: `student_id=eq.${studentId}`,
         },
         (payload) => {
           const row = payload.new as { rank?: number }
-          if (typeof row.rank === 'number') considerRankChange(me.id, row.rank)
+          if (typeof row.rank === 'number') considerRankChange(studentId, row.rank)
         },
       )
-      .subscribe()
+      .subscribe((status) => {
+        setLive(status === 'SUBSCRIBED')
+        if (status === 'SUBSCRIBED') {
+          // A *second* SUBSCRIBED means we reconnected — postgres_changes does
+          // not replay missed rows, so resync to catch awards earned while away.
+          if (subscribedOnceRef.current) void loadRef.current()
+          subscribedOnceRef.current = true
+        }
+        if (import.meta.env.DEV && status !== 'SUBSCRIBED') {
+          // eslint-disable-next-line no-console
+          console.warn('[ClassPoint] realtime channel status:', status)
+        }
+      })
 
     return () => {
+      setLive(false)
       void supabase.removeChannel(channel)
     }
-  }, [me, considerLevelUp, considerRankChange, toast])
+  }, [studentId, considerLevelUp, considerRankChange, toast])
+
+  // Returning to the tab/app: realtime may have been suspended in the
+  // background, so pull fresh data to guarantee the score is current.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void loadRef.current()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
 
   const rank = me
     ? leaderboard.find((e) => e.student_id === me.id)?.rank ?? null
@@ -263,6 +345,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         leaderboard,
         capturedAt,
         events,
+        live,
         rank,
         sectionName,
         refresh: load,

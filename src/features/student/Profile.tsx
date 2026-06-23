@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -8,6 +8,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { useToast } from '@/components/ui/Toast'
 import { getLevelProgress } from '@/lib/leveling'
 import { getSoundMuted, setSoundMuted } from '@/lib/sound'
+import { getHapticsMuted, hapticsSupported, setHapticsMuted, vibrateOnce } from '@/lib/haptics'
 import { disablePush, enablePush, getPushState, type PushState } from '@/lib/push'
 import { useAuth } from '@/lib/auth'
 import { useStudentData } from './StudentData'
@@ -27,6 +28,8 @@ export function Profile() {
   const [pushState, setPushState] = useState<PushState>('default')
   const [pushBusy, setPushBusy] = useState(false)
   const [muted, setMuted] = useState(() => getSoundMuted())
+  const vibeSupported = useMemo(() => hapticsSupported(), [])
+  const [vibeMuted, setVibeMuted] = useState(() => getHapticsMuted())
 
   useEffect(() => {
     getPushState().then(setPushState)
@@ -54,6 +57,14 @@ export function Profile() {
     setMuted(next)
     setSoundMuted(next)
     toast(next ? 'Sounds muted.' : 'Sounds on.', 'info')
+  }
+
+  function toggleVibe() {
+    const nextMuted = !vibeMuted
+    setVibeMuted(nextMuted)
+    setHapticsMuted(nextMuted)
+    if (!nextMuted) vibrateOnce() // confirm with a quick buzz when turning on
+    toast(nextMuted ? 'Vibration off.' : 'Vibration on.', 'info')
   }
 
   async function onSignOut() {
@@ -194,6 +205,18 @@ export function Profile() {
             {muted ? 'Off' : 'On'}
           </Button>
         </div>
+
+        {vibeSupported && (
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Vibration</p>
+              <p className="text-xs text-muted">Buzz this phone for in-app alerts.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={toggleVibe}>
+              {vibeMuted ? 'Off' : 'On'}
+            </Button>
+          </div>
+        )}
 
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
           <div className="min-w-0">

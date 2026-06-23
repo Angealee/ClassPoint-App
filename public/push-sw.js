@@ -8,6 +8,13 @@
  *   { title, body, tag, url, icon }
  */
 
+// Distinct buzz per event type, mirroring the in-app haptics (lib/haptics.ts).
+const VIBRATION_BY_TAG = {
+  'cp-points': [60],
+  'cp-level': [50, 40, 90],
+  'cp-rank': [30, 30, 30],
+}
+
 self.addEventListener('push', (event) => {
   let data = {}
   try {
@@ -17,14 +24,15 @@ self.addEventListener('push', (event) => {
   }
 
   const title = data.title || 'ClassPoint'
+  const tag = data.tag || 'classpoint'
   const options = {
     body: data.body || '',
     icon: data.icon || '/app-logo.svg',
     badge: '/icon.svg',
-    tag: data.tag || 'classpoint',
+    tag,
     renotify: true,
     data: { url: data.url || '/app' },
-    vibrate: [80, 40, 80],
+    vibrate: VIBRATION_BY_TAG[tag] || [80, 40, 80],
   }
 
   event.waitUntil(self.registration.showNotification(title, options))

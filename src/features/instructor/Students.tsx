@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 import { Sheet } from '@/components/ui/Sheet'
 import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
@@ -210,10 +211,22 @@ export function Students() {
         <ArrowLeftIcon className="h-4 w-4" /> Sections
       </button>
 
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-xl font-bold">
-          {sectionName} <span className="text-muted">· {students.length}</span>
-        </h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Select
+            aria-label="Section"
+            value={openId}
+            onChange={(e) => openSection(e.target.value)}
+            className="max-w-40 font-display font-bold"
+          >
+            {sections.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </Select>
+          <span className="whitespace-nowrap text-muted">· {students.length}</span>
+        </div>
         <div className="flex items-center gap-3">
           {students.length > 0 && (
             <button

@@ -19,7 +19,8 @@ const item = {
 }
 
 export function Dashboard() {
-  const { loading, error, me, events, rank, capturedAt, sectionName, refresh } = useStudentData()
+  const { loading, error, me, events, live, rank, capturedAt, sectionName, refresh } =
+    useStudentData()
 
   if (loading) return <DashboardSkeleton />
 
@@ -48,10 +49,11 @@ export function Dashboard() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
       <motion.div variants={item} className="flex items-center gap-3">
         <Avatar name={me.display_name} url={me.avatar_url} className="h-11 w-11" />
-        <p className="text-sm text-muted">
+        <p className="min-w-0 flex-1 text-sm text-muted">
           Welcome back, <span className="font-semibold text-ink">{me.display_name}</span> ·{' '}
           {sectionName(me.section_id)}
         </p>
+        <LiveBadge live={live} />
       </motion.div>
 
       {/* Level / XP hero */}
@@ -87,7 +89,17 @@ export function Dashboard() {
         <StatTile
           icon={<BoltIcon className="h-5 w-5" />}
           label="Total points"
-          value={me.lifetime_points}
+          value={
+            <motion.span
+              key={me.lifetime_points}
+              initial={{ scale: 1.35, color: 'var(--color-gold-500)' }}
+              animate={{ scale: 1, color: 'var(--color-ink)' }}
+              transition={{ type: 'spring', stiffness: 500, damping: 18 }}
+              className="inline-block"
+            >
+              {me.lifetime_points}
+            </motion.span>
+          }
           tone="gold"
         />
         <StatTile
@@ -139,6 +151,36 @@ export function Dashboard() {
         )}
       </motion.div>
     </motion.div>
+  )
+}
+
+/** Small pill that signals scores are updating in real time. */
+function LiveBadge({ live }: { live: boolean }) {
+  return (
+    <span
+      className={cn(
+        'flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wider',
+        live ? 'bg-brand-500/10 text-brand-500' : 'bg-card-2 text-muted',
+      )}
+      title={live ? 'Scores update instantly' : 'Reconnecting…'}
+    >
+      <span className="relative flex h-2 w-2">
+        {live && (
+          <motion.span
+            className="absolute inline-flex h-full w-full rounded-full bg-brand-500"
+            animate={{ scale: [1, 2.2], opacity: [0.7, 0] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeOut' }}
+          />
+        )}
+        <span
+          className={cn(
+            'relative inline-flex h-2 w-2 rounded-full',
+            live ? 'bg-brand-500' : 'bg-muted',
+          )}
+        />
+      </span>
+      {live ? 'Live' : 'Offline'}
+    </span>
   )
 }
 
