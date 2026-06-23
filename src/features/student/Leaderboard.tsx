@@ -1,15 +1,10 @@
-import { AnimatePresence, motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
-import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotStamp } from '@/components/ui/SnapshotStamp'
-import { getLevelProgress } from '@/lib/leveling'
-import { cn } from '@/lib/cn'
-import type { LeaderboardEntry } from '@/lib/types'
+import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
 import { useStudentData } from './StudentData'
 
 const TOP_N = 10
-const rankStyles = ['text-gold-400', 'text-zinc-400', 'text-amber-700']
 
 export function Leaderboard() {
   const { loading, leaderboard, capturedAt, me, sectionName } = useStudentData()
@@ -36,81 +31,14 @@ export function Leaderboard() {
           No rankings yet — the board settles at 7:30 AM and 7:30 PM.
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <motion.div className="divide-y divide-line">
-            <AnimatePresence initial={false}>
-              {top.map((entry, i) => (
-                <Row
-                  key={entry.student_id}
-                  entry={entry}
-                  index={i}
-                  isMe={me?.id === entry.student_id}
-                  sectionLabel={sectionName(entry.section_id)}
-                />
-              ))}
-            </AnimatePresence>
-          </motion.div>
-
-          {pinnedSelf && (
-            <div className="border-t border-line">
-              <p className="px-4 pt-2 text-center text-[0.65rem] uppercase tracking-wider text-muted">
-                your standing
-              </p>
-              <Row
-                entry={pinnedSelf}
-                index={pinnedSelf.rank - 1}
-                isMe
-                sectionLabel={sectionName(pinnedSelf.section_id)}
-              />
-            </div>
-          )}
-        </Card>
+        <PodiumBoard
+          entries={top}
+          meId={me?.id}
+          sectionName={sectionName}
+          showSection
+          pinnedSelf={pinnedSelf}
+        />
       )}
     </div>
-  )
-}
-
-function Row({
-  entry,
-  index,
-  isMe,
-  sectionLabel,
-}: {
-  entry: LeaderboardEntry
-  index: number
-  isMe: boolean
-  sectionLabel: string
-}) {
-  const level = getLevelProgress(entry.lifetime_points).level
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0 }}
-      transition={{ delay: Math.min(index * 0.03, 0.3) }}
-      className={cn('flex items-center gap-3 p-4', isMe && 'bg-brand-500/5')}
-    >
-      <span
-        className={cn(
-          'w-7 text-center font-display text-lg font-bold',
-          rankStyles[entry.rank - 1] ?? 'text-muted',
-        )}
-      >
-        {entry.rank}
-      </span>
-      <Avatar name={entry.display_name} url={entry.avatar_url} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">
-          {entry.display_name} {isMe && <span className="text-brand-500">(you)</span>}
-        </p>
-        <p className="text-xs text-muted">
-          {sectionLabel} · Lv {level}
-        </p>
-      </div>
-      <span className="font-display text-base font-bold text-gold-600 dark:text-gold-400">
-        {entry.lifetime_points}
-      </span>
-    </motion.div>
   )
 }

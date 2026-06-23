@@ -29,6 +29,16 @@ export function TrophyIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+/** Solid crown — champion flair on the leaderboard podium. */
+export function CrownIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d="M2.6 8.4a1.3 1.3 0 1 1 1.9 1.2l1.2 8.1a1 1 0 0 0 1 .85h10.6a1 1 0 0 0 1-.85l1.2-8.1a1.3 1.3 0 1 1 1.36-.46 1.3 1.3 0 0 1-1.86.74l-3.3 2.5a1 1 0 0 1-1.4-.22L12 6.4l-3.05 5.1a1 1 0 0 1-1.4.22l-3.3-2.5a1.3 1.3 0 0 1-1.65-.82Z" />
+      <rect x="5.4" y="18.8" width="13.2" height="2.1" rx="1" />
+    </svg>
+  )
+}
+
 export function UserIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>

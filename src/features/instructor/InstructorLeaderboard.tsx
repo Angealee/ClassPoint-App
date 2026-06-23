@@ -1,17 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
-import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotStamp } from '@/components/ui/SnapshotStamp'
+import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
 import { useInstructor } from './InstructorLayout'
 import { getLeaderboardSnapshot } from '@/lib/api'
-import { getLevelProgress } from '@/lib/leveling'
-import { cn } from '@/lib/cn'
 import type { LeaderboardEntry } from '@/lib/types'
-
-const rankColor = ['text-gold-400', 'text-zinc-400', 'text-amber-700']
 
 export function InstructorLeaderboard() {
   const { sections } = useInstructor()
@@ -63,45 +58,11 @@ export function InstructorLeaderboard() {
             : 'No students in this section yet.'}
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <motion.div className="divide-y divide-line">
-            <AnimatePresence initial={false}>
-              {visible.map((r, i) => {
-                const level = getLevelProgress(r.lifetime_points).level
-                return (
-                  <motion.div
-                    key={r.student_id}
-                    layout
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ delay: Math.min(i * 0.03, 0.3) }}
-                    className="flex items-center gap-3 p-3.5"
-                  >
-                    <span
-                      className={cn(
-                        'w-7 text-center font-display text-lg font-bold',
-                        rankColor[r.rank - 1] ?? 'text-muted',
-                      )}
-                    >
-                      {r.rank}
-                    </span>
-                    <Avatar name={r.display_name} url={r.avatar_url} className="h-9 w-9" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{r.display_name}</p>
-                      <p className="text-xs text-muted">
-                        {sectionName(r.section_id)} · Lv {level}
-                      </p>
-                    </div>
-                    <span className="font-display text-base font-bold text-gold-600 dark:text-gold-400">
-                      {r.lifetime_points}
-                    </span>
-                  </motion.div>
-                )
-              })}
-            </AnimatePresence>
-          </motion.div>
-        </Card>
+        <PodiumBoard
+          entries={visible}
+          sectionName={sectionName}
+          showSection={filter === 'all'}
+        />
       )}
     </div>
   )
