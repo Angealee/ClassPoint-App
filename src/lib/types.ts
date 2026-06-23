@@ -72,5 +72,33 @@ export interface StudentSelf {
   full_name: string
   display_name: string
   avatar_url: string | null
+  /** Optional, student-written "about me" (max 160 chars). */
+  bio: string | null
+  /** Optional, comma-separated interests/hobbies (max 120 chars). */
+  interests: string | null
   lifetime_points: number
+}
+
+/** A point event as shown on another student's public profile preview. */
+export interface PublicPointEvent {
+  id: string
+  points: number
+  category: PointCategory
+  note: string | null
+  created_at: string
+}
+
+/** Public-safe profile of any student, shown in the leaderboard tap-preview. */
+export interface PublicProfile {
+  id: string
+  display_name: string
+  section_id: string
+  avatar_url: string | null
+  bio: string | null
+  interests: string | null
+  lifetime_points: number
+  /** When the roster entry was created — shown as "member since". */
+  created_at: string | null
+  /** Their most recent point awards (privacy-aware; from public_point_events). */
+  events: PublicPointEvent[]
 }

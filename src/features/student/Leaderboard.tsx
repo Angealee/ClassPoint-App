@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
@@ -7,12 +8,14 @@ import { getLevelProgress } from '@/lib/leveling'
 import { cn } from '@/lib/cn'
 import type { LeaderboardEntry } from '@/lib/types'
 import { useStudentData } from './StudentData'
+import { StudentProfilePreview } from './StudentProfilePreview'
 
 const TOP_N = 10
 const rankStyles = ['text-gold-400', 'text-zinc-400', 'text-amber-700']
 
 export function Leaderboard() {
   const { loading, leaderboard, capturedAt, me, sectionName } = useStudentData()
+  const [selected, setSelected] = useState<LeaderboardEntry | null>(null)
 
   // For now we only show the global Top 10. The snapshot already carries every
   // student + section, so future views (own-section, a chosen section) are just
@@ -25,7 +28,7 @@ export function Leaderboard() {
     <div className="space-y-4">
       <div>
         <h1 className="font-display text-2xl font-bold">Leaderboard</h1>
-        <p className="text-sm text-muted">Global · Top {TOP_N}</p>
+        <p className="text-sm text-muted">Global · Top {TOP_N} · tap anyone to view their profile</p>
         <SnapshotStamp capturedAt={capturedAt} />
       </div>
 
@@ -46,6 +49,7 @@ export function Leaderboard() {
                   index={i}
                   isMe={me?.id === entry.student_id}
                   sectionLabel={sectionName(entry.section_id)}
+                  onSelect={() => setSelected(entry)}
                 />
               ))}
             </AnimatePresence>
@@ -61,11 +65,20 @@ export function Leaderboard() {
                 index={pinnedSelf.rank - 1}
                 isMe
                 sectionLabel={sectionName(pinnedSelf.section_id)}
+                onSelect={() => setSelected(pinnedSelf)}
               />
             </div>
           )}
         </Card>
       )}
+
+      <StudentProfilePreview
+        target={selected}
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        isMe={!!selected && me?.id === selected.student_id}
+        sectionLabel={selected ? sectionName(selected.section_id) : ''}
+      />
     </div>
   )
 }
@@ -75,21 +88,31 @@ function Row({
   index,
   isMe,
   sectionLabel,
+  onSelect,
 }: {
   entry: LeaderboardEntry
   index: number
   isMe: boolean
   sectionLabel: string
+  onSelect: () => void
 }) {
   const level = getLevelProgress(entry.lifetime_points).level
   return (
-    <motion.div
+    <motion.button
+      type="button"
       layout
+      onClick={onSelect}
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0 }}
       transition={{ delay: Math.min(index * 0.03, 0.3) }}
-      className={cn('flex items-center gap-3 p-4', isMe && 'bg-brand-500/5')}
+      whileTap={{ scale: 0.985 }}
+      aria-label={`View ${entry.display_name}'s profile`}
+      className={cn(
+        'flex w-full items-center gap-3 p-4 text-left transition-colors',
+        'hover:bg-card-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500/40',
+        isMe && 'bg-brand-500/5',
+      )}
     >
       <span
         className={cn(
@@ -100,17 +123,17 @@ function Row({
         {entry.rank}
       </span>
       <Avatar name={entry.display_name} url={entry.avatar_url} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">
+      <span className="block min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">
           {entry.display_name} {isMe && <span className="text-brand-500">(you)</span>}
-        </p>
-        <p className="text-xs text-muted">
+        </span>
+        <span className="block text-xs text-muted">
           {sectionLabel} · Lv {level}
-        </p>
-      </div>
+        </span>
+      </span>
       <span className="font-display text-base font-bold text-gold-600 dark:text-gold-400">
         {entry.lifetime_points}
       </span>
-    </motion.div>
+    </motion.button>
   )
 }

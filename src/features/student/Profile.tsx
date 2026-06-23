@@ -12,16 +12,20 @@ import { getHapticsMuted, hapticsSupported, setHapticsMuted, vibrateOnce } from 
 import { disablePush, enablePush, getPushState, type PushState } from '@/lib/push'
 import { useAuth } from '@/lib/auth'
 import { useStudentData } from './StudentData'
+import { StudentProfilePreview } from './StudentProfilePreview'
 
 export function Profile() {
   const { signOut } = useAuth()
-  const { loading, me, sectionName, saveDisplayName, saveAvatar, clearAvatar } = useStudentData()
+  const { loading, me, rank, sectionName, saveProfile, saveAvatar, clearAvatar } = useStudentData()
   const { toast } = useToast()
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [editOpen, setEditOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [name, setName] = useState('')
+  const [bio, setBio] = useState('')
+  const [interests, setInterests] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
 
@@ -74,19 +78,21 @@ export function Profile() {
 
   function openEdit() {
     setName(me?.display_name ?? '')
+    setBio(me?.bio ?? '')
+    setInterests(me?.interests ?? '')
     setEditOpen(true)
   }
 
   async function onSave(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const { error } = await saveDisplayName(name)
+    const { error } = await saveProfile({ displayName: name, bio, interests })
     setSaving(false)
     if (error) {
       toast(error, 'error')
       return
     }
-    toast('Display name updated.', 'success')
+    toast('Profile updated.', 'success')
     setEditOpen(false)
   }
 
@@ -184,9 +190,40 @@ export function Profile() {
             <Field label="Total points" value={String(me.lifetime_points)} />
           </div>
 
-          <Button variant="outline" className="mt-5 w-full" onClick={openEdit}>
-            Edit display name
-          </Button>
+          {me.bio && (
+            <div className="mt-3 rounded-xl bg-card-2 px-4 py-3">
+              <p className="mb-1 text-sm text-muted">Bio</p>
+              <p className="text-sm leading-relaxed text-ink">{me.bio}</p>
+            </div>
+          )}
+
+          {interestTags(me.interests).length > 0 && (
+            <div className="mt-3 rounded-xl bg-card-2 px-4 py-3">
+              <p className="mb-2 text-sm text-muted">Interests</p>
+              <div className="flex flex-wrap gap-2">
+                {interestTags(me.interests).map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-500"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-5 flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={openEdit}>
+              Edit profile
+            </Button>
+            <Button variant="ghost" className="flex-1" onClick={() => setPreviewOpen(true)}>
+              Preview
+            </Button>
+          </div>
+          <p className="mt-1.5 text-center text-xs text-muted">
+            Preview is exactly what classmates see when they tap you on the leaderboard.
+          </p>
         </Card>
       )}
 
@@ -244,7 +281,7 @@ export function Profile() {
         Sign out
       </Button>
 
-      <Sheet open={editOpen} onClose={() => setEditOpen(false)} title="Edit display name">
+      <Sheet open={editOpen} onClose={() => setEditOpen(false)} title="Edit profile">
         <form onSubmit={onSave} className="space-y-4">
           <Input
             label="Display name"
@@ -255,13 +292,63 @@ export function Profile() {
             autoFocus
             required
           />
+          <div className="w-full">
+            <label htmlFor="profile-bio" className="mb-1.5 block text-sm font-medium text-ink">
+              Bio
+            </label>
+            <textarea
+              id="profile-bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value.slice(0, 160))}
+              placeholder="A short line about you — classmates see this on your profile."
+              rows={3}
+              className="w-full resize-none rounded-xl border border-line bg-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-muted/70 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+            />
+            <p className="mt-1.5 text-right text-xs text-muted">{bio.length}/160</p>
+          </div>
+          <Input
+            label="Interests"
+            value={interests}
+            onChange={(e) => setInterests(e.target.value.slice(0, 120))}
+            placeholder="anime, basketball, coding"
+            hint="Optional · separate with commas."
+          />
           <Button type="submit" size="lg" className="w-full" disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
           </Button>
         </form>
       </Sheet>
+
+      <StudentProfilePreview
+        target={
+          me
+            ? {
+                student_id: me.id,
+                display_name: me.display_name,
+                section_id: me.section_id,
+                lifetime_points: me.lifetime_points,
+                avatar_url: me.avatar_url,
+                rank,
+              }
+            : null
+        }
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        isMe
+        sectionLabel={me ? sectionName(me.section_id) : ''}
+      />
     </div>
   )
+}
+
+/** Split a comma-separated interests string into trimmed, non-empty tags. */
+function interestTags(raw: string | null): string[] {
+  if (!raw) return []
+  return raw
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, 12)
 }
 
 function pushHint(state: PushState): string {

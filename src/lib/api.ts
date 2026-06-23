@@ -6,6 +6,8 @@ import type {
   LeaderboardSnapshot,
   PointCategory,
   PointEvent,
+  PublicPointEvent,
+  PublicProfile,
   Section,
   SectionStudent,
   StudentSelf,
@@ -235,20 +237,65 @@ export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot> {
 export async function getMyStudent(userId: string): Promise<StudentSelf | null> {
   const { data, error } = await supabase
     .from('students')
-    .select('id, section_id, full_name, display_name, avatar_url, lifetime_points')
+    .select('id, section_id, full_name, display_name, avatar_url, bio, interests, lifetime_points')
     .eq('user_id', userId)
     .maybeSingle<StudentSelf>()
   if (error) throw error
   return data ?? null
 }
 
-/** Student updates their own public display name (column-guarded by trigger). */
-export async function updateDisplayName(studentId: string, displayName: string): Promise<void> {
+/**
+ * Student updates the public-facing fields on their own row in one write:
+ * display name, bio, and interests. Empty bio/interests are stored as NULL.
+ * (Column access is guarded by trg_guard_student_update; lengths by CHECKs.)
+ */
+export async function updateProfileFields(
+  studentId: string,
+  fields: { display_name: string; bio: string | null; interests: string | null },
+): Promise<void> {
   const { error } = await supabase
     .from('students')
-    .update({ display_name: displayName })
+    .update({
+      display_name: fields.display_name,
+      bio: fields.bio,
+      interests: fields.interests,
+    })
     .eq('id', studentId)
   if (error) throw error
+}
+
+/**
+ * A classmate's public-safe profile for the leaderboard tap-preview: their
+ * roster-public columns plus a few recent point events (via the SECURITY
+ * DEFINER `public_point_events` RPC, since RLS hides other students' history).
+ */
+export async function getPublicProfile(
+  studentId: string,
+  eventLimit = 5,
+): Promise<PublicProfile> {
+  const [studentRes, eventsRes] = await Promise.all([
+    supabase
+      .from('students')
+      .select('id, display_name, section_id, avatar_url, bio, interests, lifetime_points, created_at')
+      .eq('id', studentId)
+      .maybeSingle(),
+    supabase.rpc('public_point_events', { p_student_id: studentId, p_limit: eventLimit }),
+  ])
+  if (studentRes.error) throw studentRes.error
+  if (eventsRes.error) throw eventsRes.error
+  const s = studentRes.data
+  if (!s) throw new Error('Student not found.')
+  return {
+    id: s.id as string,
+    display_name: s.display_name as string,
+    section_id: s.section_id as string,
+    avatar_url: (s.avatar_url as string | null) ?? null,
+    bio: (s.bio as string | null) ?? null,
+    interests: (s.interests as string | null) ?? null,
+    lifetime_points: s.lifetime_points as number,
+    created_at: (s.created_at as string | null) ?? null,
+    events: (eventsRes.data ?? []) as PublicPointEvent[],
+  }
 }
 
 /**

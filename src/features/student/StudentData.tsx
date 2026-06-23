@@ -15,7 +15,7 @@ import {
   listStudentEvents,
   removeAvatar,
   updateAvatar,
-  updateDisplayName,
+  updateProfileFields,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { getLevelProgress } from '@/lib/leveling'
@@ -41,7 +41,12 @@ interface StudentDataValue {
   rank: number | null
   sectionName: (id: string) => string
   refresh: () => Promise<void>
-  saveDisplayName: (name: string) => Promise<{ error?: string }>
+  /** Save the public profile fields (display name + optional bio/interests). */
+  saveProfile: (fields: {
+    displayName: string
+    bio: string
+    interests: string
+  }) => Promise<{ error?: string }>
   /** Upload a new profile picture (≤5 MB image). */
   saveAvatar: (file: File) => Promise<{ error?: string }>
   /** Remove the current profile picture. */
@@ -287,15 +292,27 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     [sections],
   )
 
-  const saveDisplayName = useCallback(
-    async (name: string) => {
+  const saveProfile = useCallback(
+    async (fields: { displayName: string; bio: string; interests: string }) => {
       if (!me) return { error: 'Still loading — try again in a moment.' }
-      const trimmed = name.trim()
-      if (trimmed.length < 2) return { error: 'Use at least 2 characters.' }
-      if (trimmed.length > 40) return { error: 'Keep it under 40 characters.' }
+      const name = fields.displayName.trim()
+      if (name.length < 2) return { error: 'Use at least 2 characters for your display name.' }
+      if (name.length > 40) return { error: 'Keep your display name under 40 characters.' }
+      const bio = fields.bio.trim()
+      if (bio.length > 160) return { error: 'Keep your bio under 160 characters.' }
+      const interests = fields.interests.trim()
+      if (interests.length > 120) return { error: 'Keep your interests under 120 characters.' }
+      const nextBio = bio === '' ? null : bio
+      const nextInterests = interests === '' ? null : interests
       try {
-        await updateDisplayName(me.id, trimmed)
-        setMe((m) => (m ? { ...m, display_name: trimmed } : m))
+        await updateProfileFields(me.id, {
+          display_name: name,
+          bio: nextBio,
+          interests: nextInterests,
+        })
+        setMe((m) =>
+          m ? { ...m, display_name: name, bio: nextBio, interests: nextInterests } : m,
+        )
         return {}
       } catch {
         return { error: 'Could not save. Please try again.' }
@@ -349,7 +366,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         rank,
         sectionName,
         refresh: load,
-        saveDisplayName,
+        saveProfile,
         saveAvatar,
         clearAvatar,
         levelUp,
