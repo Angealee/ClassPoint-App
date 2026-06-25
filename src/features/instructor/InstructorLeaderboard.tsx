@@ -4,6 +4,9 @@ import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotStamp } from '@/components/ui/SnapshotStamp'
 import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
+// The profile-preview sheet is generic (loads any student's public profile);
+// reused here so the instructor can tap a ranked student just like students can.
+import { StudentProfilePreview } from '@/features/student/StudentProfilePreview'
 import { useInstructor } from './InstructorLayout'
 import { getLeaderboardSnapshot } from '@/lib/api'
 import type { LeaderboardEntry } from '@/lib/types'
@@ -14,6 +17,7 @@ export function InstructorLeaderboard() {
   const [capturedAt, setCapturedAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [selected, setSelected] = useState<LeaderboardEntry | null>(null)
 
   useEffect(() => {
     getLeaderboardSnapshot()
@@ -62,8 +66,16 @@ export function InstructorLeaderboard() {
           entries={visible}
           sectionName={sectionName}
           showSection={filter === 'all'}
+          onSelect={(entry) => setSelected(entry)}
         />
       )}
+
+      <StudentProfilePreview
+        target={selected}
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        sectionLabel={selected ? sectionName(selected.section_id) : ''}
+      />
     </div>
   )
 }

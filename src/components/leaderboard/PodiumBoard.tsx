@@ -70,7 +70,7 @@ export function PodiumBoard({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-end justify-center gap-2 px-1 pt-12 sm:gap-3">
+      <div className="flex items-end justify-center gap-1.5 px-0.5 pt-12 sm:gap-3 sm:px-1">
         {podiumOrder.map(({ entry, place }) => (
           <PodiumCard
             key={entry.student_id}
@@ -176,9 +176,9 @@ function PodiumCard({
 
       <Card
         className={cn(
-          'relative flex flex-col items-center gap-2 overflow-hidden border px-3 text-center',
+          'relative flex flex-col items-center gap-1.5 overflow-hidden border px-2 text-center sm:gap-2 sm:px-3',
           tier.border,
-          champ ? 'pb-4 pt-8' : 'pb-3.5 pt-6',
+          champ ? 'pb-3 pt-7 sm:pb-4 sm:pt-8' : 'pb-3 pt-5 sm:pb-3.5 sm:pt-6',
           champ && !reduced && 'cp-podium-glow',
         )}
       >
@@ -197,7 +197,7 @@ function PodiumCard({
 
         <span
           className={cn(
-            'relative z-[1] flex h-7 w-7 items-center justify-center rounded-full font-display text-sm font-bold shadow-sm',
+            'relative z-[1] flex h-6 w-6 items-center justify-center rounded-full font-display text-xs font-bold shadow-sm sm:h-7 sm:w-7 sm:text-sm',
             tier.badge,
           )}
         >
@@ -210,17 +210,17 @@ function PodiumCard({
           className={cn(
             'relative z-[1] ring-2 ring-offset-2 ring-offset-card',
             tier.ring,
-            champ ? 'h-20! w-20!' : 'h-16! w-16!',
+            champ ? 'h-14! w-14! sm:h-20! sm:w-20!' : 'h-11! w-11! sm:h-16! sm:w-16!',
           )}
-          textClassName={champ ? 'text-xl' : 'text-lg'}
+          textClassName={champ ? 'text-base sm:text-xl' : 'text-sm sm:text-lg'}
         />
 
         <div className="relative z-[1] w-full min-w-0">
-          <p className="truncate text-sm font-semibold">
+          <p className="truncate text-[0.78rem] font-semibold sm:text-sm">
             {entry.display_name}
             {isMe && <span className="text-brand-500"> (you)</span>}
           </p>
-          <p className="truncate text-xs text-muted">
+          <p className="truncate text-[0.65rem] text-muted sm:text-xs">
             {sectionLabel ? `${sectionLabel} · ` : ''}Lv {level}
           </p>
         </div>
@@ -229,7 +229,7 @@ function PodiumCard({
           <CountUp
             value={entry.lifetime_points}
             reduced={reduced}
-            className="font-display text-2xl font-bold text-gold-400"
+            className="font-display text-xl font-bold text-gold-400 sm:text-2xl"
           />
           <span className="text-xs font-medium text-muted">pts</span>
         </div>

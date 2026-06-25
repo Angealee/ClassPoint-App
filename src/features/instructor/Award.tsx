@@ -13,6 +13,9 @@ import { cn } from '@/lib/cn'
 import type { PointCategory, SectionStudent } from '@/lib/types'
 
 const POINTS = [1, 2, 3, 4, 5]
+// Largest magnitude a single award/penalty may carry. Must match the
+// point_events check constraint in migration 0011 (points between -100 and 100).
+const MAX_POINTS = 100
 type Mode = 'reward' | 'penalty'
 
 export function Award() {
@@ -89,8 +92,13 @@ export function Award() {
   function onCustom(v: string) {
     setCustom(v)
     const n = parseInt(v, 10)
-    setPoints(Number.isFinite(n) && n > 0 ? n : null)
+    // Valid only when a positive whole number within the allowed magnitude;
+    // anything over MAX_POINTS is treated as not-yet-valid (the DB would reject it).
+    setPoints(Number.isFinite(n) && n > 0 && n <= MAX_POINTS ? n : null)
   }
+
+  // The custom field has text but it doesn't resolve to a usable amount.
+  const customInvalid = custom.trim() !== '' && points === null
 
   const customActive = points !== null && !POINTS.includes(points)
 
@@ -297,24 +305,33 @@ export function Award() {
                     type="number"
                     inputMode="numeric"
                     min={1}
+                    max={MAX_POINTS}
                     step={1}
                     value={custom}
                     onChange={(e) => onCustom(e.target.value)}
                     placeholder="e.g. 10"
                     aria-label="Custom points"
+                    aria-invalid={customInvalid}
                     className={cn(
                       'h-11 w-full rounded-xl border bg-card pl-8 pr-3.5 font-display text-lg font-bold text-ink',
                       'placeholder:font-sans placeholder:text-base placeholder:font-normal placeholder:text-muted/70',
                       'transition-colors focus:outline-none focus:ring-2',
-                      customActive
-                        ? penalty
-                          ? 'border-red-500 ring-2 ring-red-500/30'
-                          : 'border-gold-500 ring-2 ring-gold-500/30'
-                        : 'border-line focus:border-brand-500 focus:ring-brand-500/30',
+                      customInvalid
+                        ? 'border-red-500 ring-2 ring-red-500/30'
+                        : customActive
+                          ? penalty
+                            ? 'border-red-500 ring-2 ring-red-500/30'
+                            : 'border-gold-500 ring-2 ring-gold-500/30'
+                          : 'border-line focus:border-brand-500 focus:ring-brand-500/30',
                     )}
                   />
                 </div>
               </div>
+              {customInvalid && (
+                <p className="-mt-1 text-xs font-medium text-red-500">
+                  Enter a whole number from 1 to {MAX_POINTS}.
+                </p>
+              )}
 
               <Input
                 value={note}

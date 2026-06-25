@@ -93,6 +93,9 @@ function buildNotifications(ev: EventBody): Notification[] {
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed.' }, 405)
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
+    console.error(
+      '[send-push] VAPID keys not configured — set VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY secrets.',
+    )
     return json({ ok: false, error: 'VAPID keys not configured.' }, 500)
   }
 
@@ -114,11 +117,20 @@ Deno.serve(async (req) => {
     .from('push_subscriptions')
     .select('endpoint, p256dh, auth')
     .eq('student_id', ev.student_id)
-  if (error) return json({ ok: false, error: 'Lookup failed.' }, 500)
-  if (!subs?.length) return json({ ok: true, sent: 0 })
+  if (error) {
+    console.error('[send-push] subscription lookup failed:', error.message)
+    return json({ ok: false, error: 'Lookup failed.' }, 500)
+  }
+  // A common reason a student never gets a closed-app push: they never enabled it
+  // on this device, so there's no subscription to deliver to. Make that visible.
+  if (!subs?.length) {
+    console.warn(`[send-push] no push subscriptions for student ${ev.student_id}`)
+    return json({ ok: true, sent: 0 })
+  }
 
   const notifications = buildNotifications(ev)
   let sent = 0
+  let failed = 0
   const stale: string[] = []
 
   for (const sub of subs) {
@@ -132,8 +144,18 @@ Deno.serve(async (req) => {
         sent++
       } catch (err) {
         const status = (err as { statusCode?: number }).statusCode
+        failed++
         // 404/410 mean the browser dropped the subscription — prune it.
-        if (status === 404 || status === 410) stale.push(sub.endpoint as string)
+        if (status === 404 || status === 410) {
+          stale.push(sub.endpoint as string)
+        } else {
+          // 401/403 usually means a VAPID key mismatch between this function and
+          // the key the browser subscribed with — surface it so it's diagnosable.
+          console.error(
+            `[send-push] delivery failed (status ${status ?? '?'}):`,
+            (err as Error).message,
+          )
+        }
       }
     }
   }
@@ -142,5 +164,8 @@ Deno.serve(async (req) => {
     await admin.from('push_subscriptions').delete().in('endpoint', stale)
   }
 
-  return json({ ok: true, sent, pruned: stale.length })
+  console.log(
+    `[send-push] student ${ev.student_id}: sent ${sent}, failed ${failed}, pruned ${stale.length}`,
+  )
+  return json({ ok: true, sent, failed, pruned: stale.length })
 })

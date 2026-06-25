@@ -21,6 +21,16 @@ export interface ChangelogEntry {
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.5.0',
+    date: '2026-06-25',
+    title: 'Section leaderboards & mobile polish',
+    items: [
+      'View any section’s leaderboard, not just the global one — use the new picker on the Leaderboard screen.',
+      'The top-3 podium now fits neatly on phones — no more cramped rank 1 / 2 / 3 cards.',
+      'Instructors can now award more than 5 points at once with the Custom amount.',
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-06-23',
     title: 'Smoother on mobile',
