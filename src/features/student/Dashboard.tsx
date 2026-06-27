@@ -4,10 +4,45 @@ import { XpBar } from '@/components/ui/XpBar'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
+import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { getLevelProgress } from '@/lib/leveling'
 import { snapshotLabel, timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
+import type { PointEvent } from '@/lib/types'
 import { useStudentData } from './StudentData'
+
+/** Time-of-day greeting for a warmer welcome. */
+function greeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
+/** Group the feed into Today / Yesterday / dated sections (preserving order). */
+function groupByDay(events: PointEvent[]): { label: string; items: PointEvent[] }[] {
+  const today = new Date().toDateString()
+  const yesterday = new Date(Date.now() - 86_400_000).toDateString()
+  const groups: { label: string; items: PointEvent[] }[] = []
+  const byKey = new Map<string, { label: string; items: PointEvent[] }>()
+  for (const e of events) {
+    const key = new Date(e.created_at).toDateString()
+    let group = byKey.get(key)
+    if (!group) {
+      const label =
+        key === today
+          ? 'Today'
+          : key === yesterday
+            ? 'Yesterday'
+            : new Date(e.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      group = { label, items: [] }
+      byKey.set(key, group)
+      groups.push(group)
+    }
+    group.items.push(e)
+  }
+  return groups
+}
 
 const container = {
   hidden: { opacity: 0 },
@@ -46,11 +81,12 @@ export function Dashboard() {
   const progress = getLevelProgress(me.lifetime_points)
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
+    <PullToRefresh onRefresh={refresh}>
+      <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
       <motion.div variants={item} className="flex items-center gap-3">
         <Avatar name={me.display_name} url={me.avatar_url} className="h-11 w-11" />
         <p className="min-w-0 flex-1 text-sm text-muted">
-          Welcome back, <span className="font-semibold text-ink">{me.display_name}</span> ·{' '}
+          {greeting()}, <span className="font-semibold text-ink">{me.display_name}</span> ·{' '}
           {sectionName(me.section_id)}
         </p>
         <LiveBadge live={live} />
@@ -59,7 +95,7 @@ export function Dashboard() {
       {/* Level / XP hero */}
       <motion.div variants={item}>
         <Card className="overflow-hidden">
-          <div className="relative bg-gradient-to-br from-brand-500 to-brand-700 p-5 text-white sm:p-6">
+          <div className="relative bg-linear-to-br from-brand-500 to-brand-700 p-5 text-white sm:p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-white/70">Level</p>
@@ -76,7 +112,9 @@ export function Dashboard() {
                 <span>
                   {progress.expIntoLevel} / {progress.expForLevel} XP
                 </span>
-                <span>{progress.expToNext} to next</span>
+                <span className="font-semibold text-white">
+                  {progress.expToNext} pts to Level {progress.level + 1}
+                </span>
               </div>
               <XpBar value={progress.progressPct} />
             </div>
@@ -106,51 +144,73 @@ export function Dashboard() {
           icon={<TrophyIcon className="h-5 w-5" />}
           label="Overall rank"
           value={rank ? `#${rank}` : '—'}
-          note={rank ? `as of ${snapshotLabel(capturedAt)}` : 'settles 7:30 AM/PM'}
+          note={rank ? `as of ${snapshotLabel(capturedAt)}` : 'settles 12:30 & 7:30 PM'}
           tone="brand"
         />
       </motion.div>
 
-      {/* Recent points feed */}
+      {/* Recent points feed — grouped by day. */}
       <motion.div variants={item}>
         <h2 className="mb-2 text-sm font-semibold text-muted">Recent points</h2>
         {events.length === 0 ? (
-          <Card className="p-8 text-center text-sm text-muted">
-            No points yet — they'll show up here the moment your instructor awards them.
+          <Card className="flex flex-col items-center gap-3 p-8 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gold-400/15 text-gold-600 dark:text-gold-400">
+              <BoltIcon className="h-6 w-6" />
+            </span>
+            <p className="text-sm font-medium">No points yet</p>
+            <p className="max-w-xs text-xs text-muted">
+              They'll show up here the moment your instructor awards them. Speak up in class to earn
+              your first!
+            </p>
           </Card>
         ) : (
-          <Card className="divide-y divide-line">
-            {events.map((e) => {
-              const negative = e.points < 0
-              return (
-                <div key={e.id} className="flex items-center gap-3 p-4">
-                  <span
-                    className={cn(
-                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold',
-                      negative
-                        ? 'bg-red-500/10 text-red-500'
-                        : e.category === 'activity'
-                          ? 'bg-brand-500/10 text-brand-500'
-                          : 'bg-gold-400/15 text-gold-600 dark:text-gold-400',
-                    )}
-                  >
-                    {negative ? e.points : `+${e.points}`}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {e.note ?? (negative ? 'Deduction' : 'Class points')}
-                    </p>
-                    <p className="text-xs capitalize text-muted">
-                      {e.category} · {timeAgo(e.created_at)}
-                    </p>
-                  </div>
-                </div>
-              )
-            })}
-          </Card>
+          <div className="space-y-4">
+            {groupByDay(events).map((group) => (
+              <div key={group.label}>
+                <p className="mb-1.5 px-1 text-[0.7rem] font-semibold uppercase tracking-wider text-muted/80">
+                  {group.label}
+                </p>
+                <Card className="divide-y divide-line">
+                  {group.items.map((e) => (
+                    <FeedRow key={e.id} event={e} />
+                  ))}
+                </Card>
+              </div>
+            ))}
+          </div>
         )}
       </motion.div>
-    </motion.div>
+      </motion.div>
+    </PullToRefresh>
+  )
+}
+
+/** One row in the recent-points feed. */
+function FeedRow({ event: e }: { event: PointEvent }) {
+  const negative = e.points < 0
+  return (
+    <div className="flex items-center gap-3 p-4">
+      <span
+        className={cn(
+          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold',
+          negative
+            ? 'bg-red-500/10 text-red-500'
+            : e.category === 'activity'
+              ? 'bg-brand-500/10 text-brand-500'
+              : 'bg-gold-400/15 text-gold-600 dark:text-gold-400',
+        )}
+      >
+        {negative ? e.points : `+${e.points}`}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">
+          {e.note ?? (negative ? 'Deduction' : 'Class points')}
+        </p>
+        <p className="text-xs capitalize text-muted">
+          {e.category} · {timeAgo(e.created_at)}
+        </p>
+      </div>
+    </div>
   )
 }
 

@@ -35,14 +35,37 @@ export function WhatsNew() {
               <span className="shrink-0 text-xs text-muted">v{entry.version}</span>
             </div>
             <p className="text-xs text-muted">{formatDate(entry.date)}</p>
-            <ul className="mt-2.5 space-y-2.5">
-              {entry.items.map((item, i) => (
-                <li key={i} className="flex gap-2.5 text-sm leading-relaxed">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+
+            {entry.sections ? (
+              // Main update → sub-module updates.
+              <div className="mt-3 space-y-3.5">
+                {entry.sections.map((section, si) => (
+                  <div key={si}>
+                    <p className="flex items-start gap-2 text-sm font-semibold">
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
+                      <span>{section.heading}</span>
+                    </p>
+                    <ul className="mt-1.5 space-y-1.5 pl-4">
+                      {section.items.map((item, i) => (
+                        <li key={i} className="flex gap-2 text-[0.82rem] leading-relaxed text-muted">
+                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <ul className="mt-2.5 space-y-2.5">
+                {entry.items?.map((item, i) => (
+                  <li key={i} className="flex gap-2.5 text-sm leading-relaxed">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         ))}
       </div>

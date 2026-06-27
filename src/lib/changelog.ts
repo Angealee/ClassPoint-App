@@ -7,6 +7,14 @@
  * workflow — no other wiring needed.
  */
 
+/** A main update with its sub-module bullet points. */
+export interface ChangelogSection {
+  /** The headline change (the "main update"). */
+  heading: string
+  /** The detail bullets under it (the "sub-module updates"). */
+  items: string[]
+}
+
 export interface ChangelogEntry {
   /** Semver-ish "major.minor.patch". Must increase for each new release. */
   version: string
@@ -14,8 +22,14 @@ export interface ChangelogEntry {
   date: string
   /** Short headline for the release. */
   title: string
-  /** User-facing bullet points — plain language, no jargon. */
-  items: string[]
+  /** Flat bullet points (legacy entries). */
+  items?: string[]
+  /**
+   * Grouped updates: each main update with its sub-module bullets. Preferred for
+   * new entries. While a release is still being built, keep ADDING to the
+   * current entry's sections instead of bumping the version each time.
+   */
+  sections?: ChangelogSection[]
 }
 
 // Newest first. Prepend a new entry for every user-facing change.
@@ -23,11 +37,35 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.6.0',
     date: '2026-06-27',
-    title: 'A leaderboard worth climbing',
-    items: [
-      'The top 3 now stand on a real winners’ podium, with a gold spotlight and a little confetti when the board opens.',
-      'A new “Your rank” band shows your standing — and whether you climbed or slipped since the last update — even when you’re outside the top 10.',
-      'Cleaner header so more of the screen is the board itself.',
+    title: 'Leaderboard glow-up',
+    sections: [
+      {
+        heading: 'A winners’ podium worth climbing',
+        items: [
+          'The top 3 now stand on a real podium with a platform base, a gold spotlight, and a confetti pop when the board opens.',
+          'A gold ring around each top-3 avatar shows their level progress.',
+          'Tap a podium spot for a quick spotlight before their profile opens.',
+        ],
+      },
+      {
+        heading: 'Your rank, front and center',
+        items: [
+          'A “Your rank” band shows your standing — even when you’re outside the top 10.',
+          'See if you climbed or slipped since the last update, and how many points to the next spot.',
+        ],
+      },
+      {
+        heading: 'New update times',
+        items: [
+          'The leaderboard now settles at 12:30 PM and 7:30 PM (the midday update moved from 7:30 AM).',
+        ],
+      },
+      {
+        heading: 'Cleaner and easier to read',
+        items: [
+          'Tidier header with the scope and countdown on one line, plus a recap when you return after being away.',
+        ],
+      },
     ],
   },
   {

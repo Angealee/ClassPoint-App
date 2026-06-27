@@ -6,6 +6,7 @@ import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotChip } from '@/components/ui/SnapshotStamp'
 import { TrophyIcon } from '@/components/ui/icons'
 import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
+import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { getLevelProgress } from '@/lib/leveling'
 import { cn } from '@/lib/cn'
 import type { LeaderboardEntry } from '@/lib/types'
@@ -16,7 +17,7 @@ const TOP_N = 10
 const GLOBAL = 'global'
 
 export function Leaderboard() {
-  const { loading, leaderboard, capturedAt, me, sections, sectionName } = useStudentData()
+  const { loading, leaderboard, capturedAt, me, sections, sectionName, refresh } = useStudentData()
   const [selected, setSelected] = useState<LeaderboardEntry | null>(null)
   // Which board to show: the global ranking or a single section's. The snapshot
   // already carries every student + section, so a section view is just a filter
@@ -39,56 +40,53 @@ export function Leaderboard() {
   const myPos = meIdx + 1
   const delta = useRankDelta(me?.id, view, capturedAt, meEntry ? myPos : null)
 
+  // Gap to the rank directly above — the next spot to chase.
+  const above = meEntry && meIdx > 0 ? ranked[meIdx - 1] : null
+  const toNext =
+    above && meEntry
+      ? { pts: Math.max(0, above.lifetime_points - meEntry.lifetime_points), pos: meIdx }
+      : null
+
   const subtitle = isGlobal ? `Top ${TOP_N}` : sectionName(view)
 
   return (
-    <div className="space-y-4">
-      {/* Compact header: title + slim chips on the left, picker on the right. */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+    <PullToRefresh onRefresh={refresh}>
+      <div className="space-y-4">
+      {/* Header: title + picker on one row; the scope/countdown chips sit on
+          their own row below so they always stay horizontal. */}
+      <div>
+        <div className="flex items-center justify-between gap-3">
           <h1 className="font-display text-2xl font-bold leading-tight">Leaderboard</h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-full bg-card-2 px-2.5 py-1 text-xs font-semibold text-muted">
-              <TrophyIcon className="h-3.5 w-3.5" />
-              {subtitle}
-            </span>
-            <SnapshotChip capturedAt={capturedAt} />
-          </div>
+          <Select
+            value={view}
+            onChange={(e) => setView(e.target.value)}
+            aria-label="Choose leaderboard"
+            className="max-w-34 shrink-0"
+          >
+            <option value={GLOBAL}>Global</option>
+            {sections.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+                {s.id === me?.section_id ? ' (mine)' : ''}
+              </option>
+            ))}
+          </Select>
         </div>
-        <Select
-          value={view}
-          onChange={(e) => setView(e.target.value)}
-          aria-label="Choose leaderboard"
-          className="max-w-34 shrink-0"
-        >
-          <option value={GLOBAL}>Global</option>
-          {sections.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-              {s.id === me?.section_id ? ' (mine)' : ''}
-            </option>
-          ))}
-        </Select>
+        <div className="mt-2 flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 rounded-full bg-card-2 px-2.5 py-1 text-xs font-semibold text-muted">
+            <TrophyIcon className="h-3.5 w-3.5" />
+            {subtitle}
+          </span>
+          <SnapshotChip capturedAt={capturedAt} />
+        </div>
       </div>
-
-      {/* Your standing — a hero band so every student feels seen, not just top 3. */}
-      {!loading && meEntry && (
-        <YourRankCard
-          entry={meEntry}
-          position={myPos}
-          delta={delta}
-          sectionLabel={sectionName(meEntry.section_id)}
-          inTop={meIdx < TOP_N}
-          onClick={() => setSelected(meEntry)}
-        />
-      )}
 
       {loading ? (
         <ListSkeleton rows={8} />
       ) : top.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted">
           {isGlobal
-            ? 'No rankings yet — the board settles at 7:30 AM and 7:30 PM.'
+            ? 'No rankings yet — the board settles at 12:30 PM and 7:30 PM.'
             : `No ranked students in ${sectionName(view)} yet.`}
         </Card>
       ) : (
@@ -101,6 +99,18 @@ export function Leaderboard() {
         />
       )}
 
+      {/* Your standing — pinned at the bottom so the board leads, not your row. */}
+      {!loading && meEntry && (
+        <YourRankCard
+          entry={meEntry}
+          position={myPos}
+          delta={delta}
+          toNext={toNext}
+          sectionLabel={sectionName(meEntry.section_id)}
+          onClick={() => setSelected(meEntry)}
+        />
+      )}
+
       <StudentProfilePreview
         target={selected}
         open={!!selected}
@@ -108,24 +118,25 @@ export function Leaderboard() {
         isMe={!!selected && me?.id === selected.student_id}
         sectionLabel={selected ? sectionName(selected.section_id) : ''}
       />
-    </div>
+      </div>
+    </PullToRefresh>
   )
 }
 
-/** The viewer's own standing, highlighted above the podium. Tap to open profile. */
+/** The viewer's own standing, pinned at the bottom of the board. Tap to open. */
 function YourRankCard({
   entry,
   position,
   delta,
+  toNext,
   sectionLabel,
-  inTop,
   onClick,
 }: {
   entry: LeaderboardEntry
   position: number
   delta: number | null
+  toNext: { pts: number; pos: number } | null
   sectionLabel: string
-  inTop: boolean
   onClick: () => void
 }) {
   const level = getLevelProgress(entry.lifetime_points).level
@@ -153,17 +164,17 @@ function YourRankCard({
           className="h-12! w-12! ring-2 ring-gold-400/50"
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">
-            {entry.display_name} <span className="text-brand-500">(you)</span>
-          </p>
+          <p className="truncate text-sm font-semibold">{entry.display_name}</p>
           <p className="truncate text-xs text-muted">
             {sectionLabel} · Lv {level}
           </p>
-          {inTop && (
-            <p className="mt-0.5 text-xs font-semibold text-gold-600 dark:text-gold-400">
-              In the Top {TOP_N}!
-            </p>
-          )}
+          <p className="truncate text-[0.7rem] font-semibold text-gold-600 dark:text-gold-400">
+            {toNext
+              ? toNext.pts > 0
+                ? `${toNext.pts} pts to #${toNext.pos}`
+                : `Tied with #${toNext.pos}`
+              : 'Top of the board'}
+          </p>
         </div>
         <div className="shrink-0 text-right">
           <p className="font-display text-xl font-bold text-gold-600 dark:text-gold-400">

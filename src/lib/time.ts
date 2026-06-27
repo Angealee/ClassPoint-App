@@ -1,5 +1,5 @@
-/** Snapshot settle times (local clock): 7:30 AM and 7:30 PM. */
-const SNAPSHOT_HOURS = [7, 19] as const
+/** Snapshot settle times (local clock): 12:30 PM and 7:30 PM. */
+const SNAPSHOT_HOURS = [12, 19] as const
 const SNAPSHOT_MINUTE = 30
 
 /** The next moment the leaderboard will settle, from `from` (local time). */
@@ -16,7 +16,6 @@ export function nextSnapshotAt(from: Date = new Date()): Date {
   return t
 }
 
-/** "5h 12m" / "47m" / "now" — time remaining until `target`. */
 export function countdownTo(target: Date, from: Date = new Date()): string {
   const ms = target.getTime() - from.getTime()
   if (ms <= 0) return 'now'

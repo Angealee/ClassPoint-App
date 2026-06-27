@@ -85,6 +85,8 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* Let the in-app pull-to-refresh own the top-overscroll instead of the browser. */
+    overscroll-behavior-y: contain;
   }
 
   h1, h2, h3, h4, .font-display {

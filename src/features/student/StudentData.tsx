@@ -35,6 +35,10 @@ interface StudentDataValue {
   /** When the frozen leaderboard was captured (ISO), or null. */
   capturedAt: string | null
   events: PointEvent[]
+  /** Points/penalties received while the app was closed — drives the recap modal. */
+  awayEvents: PointEvent[]
+  /** Dismiss the "while you were away" recap. */
+  clearAwayRecap: () => void
   /** True while the realtime channel is connected — scores update live. */
   live: boolean
   /** Official (snapshot) rank — settles twice daily. Null if not ranked yet. */
@@ -60,6 +64,9 @@ const StudentDataContext = createContext<StudentDataValue | undefined>(undefined
 
 const seenLevelKey = (studentId: string) => `cp_seen_level_${studentId}`
 const seenRankKey = (studentId: string) => `cp_seen_rank_${studentId}`
+// Timestamp through which the student has already seen their point events; events
+// newer than this on the next open are recapped in the "while you were away" modal.
+const seenEventsKey = (studentId: string) => `cp_events_seen_until_${studentId}`
 
 export function StudentDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -71,6 +78,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [capturedAt, setCapturedAt] = useState<string | null>(null)
   const [events, setEvents] = useState<PointEvent[]>([])
+  const [awayEvents, setAwayEvents] = useState<PointEvent[]>([])
   const [levelUp, setLevelUp] = useState<number | null>(null)
   const [live, setLive] = useState(false)
 
@@ -79,6 +87,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const rankRef = useRef<number | null>(null)
   // Prevents overlapping loads (resync can race the initial/refresh load).
   const inFlightRef = useRef(false)
+  // The away-recap is computed once per app open, not on every visibility refresh.
+  const recapCheckedRef = useRef(false)
   // True once the realtime channel has subscribed at least once — a *second*
   // SUBSCRIBED means we reconnected and may have missed awards while away.
   const subscribedOnceRef = useRef(false)
@@ -154,8 +164,25 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       setSections(secs)
       setLeaderboard(snap.entries)
       setCapturedAt(snap.capturedAt)
-      setEvents(mine ? await listStudentEvents(mine.id) : [])
+      const myEvents = mine ? await listStudentEvents(mine.id) : []
+      setEvents(myEvents)
       if (mine) {
+        // Once per app open: recap any points/penalties earned while it was
+        // closed (events newer than the last timestamp the student saw).
+        if (!recapCheckedRef.current) {
+          recapCheckedRef.current = true
+          try {
+            const until = localStorage.getItem(seenEventsKey(mine.id))
+            if (until) {
+              const away = myEvents.filter((e) => new Date(e.created_at) > new Date(until))
+              if (away.length > 0) setAwayEvents(away)
+            }
+            // First run (no stored value) just establishes the baseline — no recap.
+            localStorage.setItem(seenEventsKey(mine.id), new Date().toISOString())
+          } catch {
+            /* storage unavailable — skip the recap */
+          }
+        }
         considerLevelUp(mine.id, mine.lifetime_points)
         const myRank = snap.entries.find((e) => e.student_id === mine.id)?.rank ?? null
         considerRankChange(mine.id, myRank)
@@ -237,6 +264,12 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
             }
             return [ev, ...prev]
           })
+          // Seen live — advance the recap baseline so it isn't shown next open.
+          try {
+            localStorage.setItem(seenEventsKey(studentId), new Date().toISOString())
+          } catch {
+            /* ignore */
+          }
         },
       )
       // The frozen leaderboard is rewritten twice daily; catch our own new rank.
@@ -351,6 +384,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   }, [me])
 
   const clearLevelUp = useCallback(() => setLevelUp(null), [])
+  const clearAwayRecap = useCallback(() => setAwayEvents([]), [])
 
   return (
     <StudentDataContext.Provider
@@ -362,6 +396,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         leaderboard,
         capturedAt,
         events,
+        awayEvents,
+        clearAwayRecap,
         live,
         rank,
         sectionName,

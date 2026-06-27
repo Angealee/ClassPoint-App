@@ -34,6 +34,10 @@ export function Award() {
   const [category, setCategory] = useState<PointCategory>('recitation')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // The group from the last award this session, for the "reselect" shortcut.
+  const [lastAwarded, setLastAwarded] = useState<string[] | null>(null)
+  // Brief success burst after an award/penalty lands.
+  const [celebrate, setCelebrate] = useState<'reward' | 'penalty' | null>(null)
 
   const sectionName = sections.find((s) => s.id === selectedSectionId)?.name ?? ''
 
@@ -106,6 +110,11 @@ export function Award() {
 
   const penalty = mode === 'penalty'
 
+  // Students from the last award still present in the current list (reselect shortcut).
+  const reselectable = lastAwarded
+    ? lastAwarded.filter((id) => students.some((s) => s.id === id))
+    : []
+
   async function onAward() {
     if (points === null || selected.size === 0) return
     setSubmitting(true)
@@ -120,10 +129,12 @@ export function Award() {
       })
       const verb = penalty ? `−${points} from` : `+${points} to`
       toast(`${verb} ${count} student${count > 1 ? 's' : ''}`, 'success')
+      // Remember the group + keep the amount/category so the next award is fast.
+      setLastAwarded([...selected])
       setSelected(new Set())
-      setPoints(null)
-      setCustom('')
       setNote('')
+      setCelebrate(penalty ? 'penalty' : 'reward')
+      window.setTimeout(() => setCelebrate(null), 1100)
       await refresh()
     } catch {
       toast(penalty ? 'Could not deduct points.' : 'Could not award points.', 'error')
@@ -134,6 +145,31 @@ export function Award() {
 
   return (
     <div className={cn('space-y-4', selected.size > 0 && 'pb-80 md:pb-72')}>
+      {/* Success burst after an award/penalty lands. */}
+      <AnimatePresence>
+        {celebrate && (
+          <motion.div
+            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ scale: 0.4, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 1.25, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 16 }}
+              className={cn(
+                'flex h-24 w-24 items-center justify-center rounded-full text-white shadow-2xl',
+                celebrate === 'penalty' ? 'bg-red-500' : 'bg-brand-500',
+              )}
+            >
+              <CheckIcon className="h-12 w-12" />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Select
         label="Section"
         value={selectedSectionId}
@@ -170,6 +206,18 @@ export function Award() {
         />
       )}
 
+      {/* Quickly re-pick the group you just awarded (e.g. to add another category). */}
+      {selected.size === 0 && reselectable.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setSelected(new Set(reselectable))}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line py-2.5 text-sm font-medium text-muted transition-colors hover:border-brand-500 hover:text-brand-500"
+        >
+          <CheckIcon className="h-4 w-4" />
+          Reselect last {reselectable.length} student{reselectable.length > 1 ? 's' : ''}
+        </button>
+      )}
+
       {loading ? (
         <ListSkeleton rows={6} />
       ) : students.length === 0 ? (
@@ -189,15 +237,15 @@ export function Award() {
                 type="button"
                 key={s.id}
                 onClick={() => toggle(s.id)}
-                className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-card-2"
+                className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-card-2"
               >
                 <span
                   className={cn(
-                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors',
+                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors',
                     isSel ? 'border-brand-500 bg-brand-500 text-white' : 'border-line',
                   )}
                 >
-                  {isSel && <CheckIcon className="h-4 w-4" />}
+                  {isSel && <CheckIcon className="h-5 w-5" />}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.full_name}</span>
                 <span className="font-display text-sm font-bold text-gold-600 dark:text-gold-400">
@@ -272,7 +320,7 @@ export function Award() {
                     type="button"
                     onClick={() => pickPreset(p)}
                     className={cn(
-                      'flex h-11 flex-1 items-center justify-center rounded-xl font-display text-lg font-bold transition-all',
+                      'flex h-12 flex-1 items-center justify-center rounded-xl font-display text-lg font-bold transition-all',
                       points === p
                         ? penalty
                           ? 'bg-red-500 text-white ring-2 ring-red-600 ring-offset-2 ring-offset-card'
