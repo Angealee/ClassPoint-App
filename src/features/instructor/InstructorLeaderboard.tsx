@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
-import { SnapshotStamp } from '@/components/ui/SnapshotStamp'
+import { SnapshotChip } from '@/components/ui/SnapshotStamp'
+import { TrophyIcon } from '@/components/ui/icons'
 import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
 // The profile-preview sheet is generic (loads any student's public profile);
 // reused here so the instructor can tap a ranked student just like students can.
@@ -38,10 +39,16 @@ export function InstructorLeaderboard() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-xl font-bold">Leaderboard</h1>
-          <SnapshotStamp capturedAt={capturedAt} />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl font-bold leading-tight">Leaderboard</h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-card-2 px-2.5 py-1 text-xs font-semibold text-muted">
+              <TrophyIcon className="h-3.5 w-3.5" />
+              {filter === 'all' ? 'All sections' : sectionName(filter)}
+            </span>
+            <SnapshotChip capturedAt={capturedAt} />
+          </div>
         </div>
         <Select value={filter} onChange={(e) => setFilter(e.target.value)} className="max-w-[9rem]">
           <option value="all">All sections</option>
@@ -67,6 +74,7 @@ export function InstructorLeaderboard() {
           sectionName={sectionName}
           showSection={filter === 'all'}
           onSelect={(entry) => setSelected(entry)}
+          confetti={false}
         />
       )}
 

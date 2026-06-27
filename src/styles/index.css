@@ -155,6 +155,16 @@
   animation-delay: var(--cp-delay, 0s);
 }
 
+/* Arena spotlight — a soft gold radial that breathes behind the podium. */
+@keyframes cp-arena-glow {
+  0%, 100% { opacity: 0.55; transform: translateX(-50%) scale(1); }
+  50% { opacity: 0.85; transform: translateX(-50%) scale(1.06); }
+}
+
+.cp-arena-glow {
+  animation: cp-arena-glow 5s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

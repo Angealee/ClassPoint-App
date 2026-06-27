@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
 import { CrownIcon } from '@/components/ui/icons'
+import { ConfettiBurst } from '@/components/leaderboard/ConfettiBurst'
 import { getLevelProgress } from '@/lib/leveling'
 import { cn } from '@/lib/cn'
 import type { LeaderboardEntry } from '@/lib/types'
@@ -20,6 +21,10 @@ interface PodiumBoardProps {
   pinnedSelf?: LeaderboardEntry | null
   /** Tapping a card/row calls this (e.g. to open a profile preview). */
   onSelect?: (entry: LeaderboardEntry) => void
+  /** Soft gold spotlight behind the podium (on by default). */
+  glow?: boolean
+  /** One-shot confetti when the board first appears (on by default). */
+  confetti?: boolean
 }
 
 type Place = 1 | 2 | 3
@@ -27,26 +32,36 @@ type Place = 1 | 2 | 3
 /** Per-tier metal treatment for the top three. */
 const TIER: Record<
   Place,
-  { border: string; tint: string; ring: string; badge: string }
+  { border: string; tint: string; ring: string; pedestal: string; pedestalInk: string }
 > = {
   1: {
     border: 'border-gold-400/70!',
     tint: 'from-gold-400/25 via-gold-500/5',
     ring: 'ring-gold-400',
-    badge: 'bg-gradient-to-b from-gold-200 to-gold-500 text-brand-950',
+    pedestal: 'from-gold-300 to-gold-600',
+    pedestalInk: 'text-brand-950',
   },
   2: {
     border: 'border-zinc-400/60!',
     tint: 'from-zinc-300/20 via-zinc-400/5',
     ring: 'ring-zinc-300',
-    badge: 'bg-gradient-to-b from-zinc-100 to-zinc-400 text-zinc-800',
+    pedestal: 'from-zinc-200 to-zinc-500',
+    pedestalInk: 'text-zinc-800',
   },
   3: {
     border: 'border-amber-700/60!',
     tint: 'from-amber-600/25 via-amber-700/5',
     ring: 'ring-amber-600',
-    badge: 'bg-gradient-to-b from-amber-400 to-amber-700 text-amber-950',
+    pedestal: 'from-amber-400 to-amber-700',
+    pedestalInk: 'text-amber-950',
   },
+}
+
+/** Stand heights — #1 tallest, creating the classic winners' staircase. */
+const PEDESTAL_H: Record<Place, string> = {
+  1: 'h-14 sm:h-20',
+  2: 'h-10 sm:h-12',
+  3: 'h-7 sm:h-8',
 }
 
 export function PodiumBoard({
@@ -56,8 +71,18 @@ export function PodiumBoard({
   showSection = false,
   pinnedSelf = null,
   onSelect,
+  glow = true,
+  confetti = true,
 }: PodiumBoardProps) {
   const reduced = useReducedMotion() ?? false
+  // One-shot celebration when the board first mounts; auto-clears after ~2s.
+  const [showConfetti, setShowConfetti] = useState(confetti)
+  useEffect(() => {
+    if (!confetti) return
+    const t = setTimeout(() => setShowConfetti(false), 2200)
+    return () => clearTimeout(t)
+  }, [confetti])
+
   if (entries.length === 0) return null
 
   const label = (id: string) => (showSection ? sectionName?.(id) ?? '' : '')
@@ -70,18 +95,35 @@ export function PodiumBoard({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-end justify-center gap-1.5 px-0.5 pt-12 sm:gap-3 sm:px-1">
-        {podiumOrder.map(({ entry, place }) => (
-          <PodiumCard
-            key={entry.student_id}
-            entry={entry}
-            place={place}
-            isMe={meId === entry.student_id}
-            sectionLabel={label(entry.section_id)}
-            reduced={reduced}
-            onClick={pick?.(entry)}
+      <div className="relative">
+        {/* Arena spotlight behind the stand. */}
+        {glow && (
+          <div
+            className={cn(
+              'pointer-events-none absolute left-1/2 top-6 h-44 w-[130%] -translate-x-1/2 rounded-[50%]',
+              !reduced && 'cp-arena-glow',
+            )}
+            style={{
+              background:
+                'radial-gradient(ellipse at center, rgba(255,186,31,0.22), rgba(255,186,31,0) 70%)',
+            }}
           />
-        ))}
+        )}
+        {showConfetti && <ConfettiBurst />}
+
+        <div className="relative flex items-end justify-center gap-1.5 px-0.5 pt-12 sm:gap-3 sm:px-1">
+          {podiumOrder.map(({ entry, place }) => (
+            <PodiumCard
+              key={entry.student_id}
+              entry={entry}
+              place={place}
+              isMe={meId === entry.student_id}
+              sectionLabel={label(entry.section_id)}
+              reduced={reduced}
+              onClick={pick?.(entry)}
+            />
+          ))}
+        </div>
       </div>
 
       {rest.length > 0 && (
@@ -158,7 +200,7 @@ function PodiumCard({
         }
       }}
       className={cn(
-        'relative flex-1',
+        'relative flex flex-1 flex-col',
         champ ? 'max-w-[12rem]' : 'max-w-[10rem]',
         onClick &&
           'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50',
@@ -195,15 +237,6 @@ function PodiumCard({
         {/* "You" tint. */}
         {isMe && <div className="pointer-events-none absolute inset-0 bg-brand-500/10" />}
 
-        <span
-          className={cn(
-            'relative z-[1] flex h-6 w-6 items-center justify-center rounded-full font-display text-xs font-bold shadow-sm sm:h-7 sm:w-7 sm:text-sm',
-            tier.badge,
-          )}
-        >
-          {place}
-        </span>
-
         <Avatar
           name={entry.display_name}
           url={entry.avatar_url}
@@ -234,6 +267,28 @@ function PodiumCard({
           <span className="text-xs font-medium text-muted">pts</span>
         </div>
       </Card>
+
+      {/* Winners' stand — taller for #1, creating the staircase. */}
+      <motion.div
+        initial={reduced ? false : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 220, damping: 24, delay: 0.1 + 0.08 * place }}
+        className={cn(
+          'relative mt-2 w-full overflow-hidden rounded-t-lg bg-gradient-to-b shadow-sm',
+          PEDESTAL_H[place],
+          tier.pedestal,
+        )}
+      >
+        <div className="absolute inset-x-0 top-0 h-1.5 bg-white/30" />
+        <span
+          className={cn(
+            'absolute inset-0 flex items-start justify-center pt-1 font-display text-2xl font-bold sm:pt-1.5 sm:text-3xl',
+            tier.pedestalInk,
+          )}
+        >
+          {place}
+        </span>
+      </motion.div>
     </motion.div>
   )
 }

@@ -35,6 +35,9 @@ const InstructorLeaderboard = lazy(() =>
     default: m.InstructorLeaderboard,
   })),
 )
+const PodiumPreview = lazy(() =>
+  import('@/features/_PodiumPreview').then((m) => ({ default: m.PodiumPreview })),
+)
 
 /** Full-screen Suspense for top-level pages and layouts. */
 const withSplash = (node: ReactNode) => <Suspense fallback={<Splash />}>{node}</Suspense>
@@ -57,6 +60,9 @@ export const router = createBrowserRouter([
   // Retired public instructor path — dead-ends to the landing page so the login
   // can't be reached (or fingerprinted) the obvious way.
   { path: '/instructor/signin', element: <Navigate to="/" replace /> },
+
+  // TEMP: visual preview of the podium redesign (remove before shipping).
+  { path: '/podium-preview', element: withSplash(<PodiumPreview />) },
 
   // Student area. (Child screens lazy-load inside the Shell's own Suspense.)
   {

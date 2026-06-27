@@ -21,6 +21,16 @@ export interface ChangelogEntry {
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.6.0',
+    date: '2026-06-27',
+    title: 'A leaderboard worth climbing',
+    items: [
+      'The top 3 now stand on a real winners’ podium, with a gold spotlight and a little confetti when the board opens.',
+      'A new “Your rank” band shows your standing — and whether you climbed or slipped since the last update — even when you’re outside the top 10.',
+      'Cleaner header so more of the screen is the board itself.',
+    ],
+  },
+  {
     version: '1.5.0',
     date: '2026-06-25',
     title: 'Section leaderboards & mobile polish',
