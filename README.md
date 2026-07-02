@@ -312,7 +312,9 @@ Migration `0007` creates a **public `avatars` Storage bucket** (5 MB cap, image 
 
 **Student login afterwards** (`SignIn.tsx`): username + PIN (mapped to the synthetic email behind the scenes).
 
-> ⚠️ The `claim-token` function must have **JWT verification turned OFF** in the Supabase dashboard (callers don't have an account yet).
+**Forgot PIN** (`ResetPin.tsx` → `resetPin()` → `reset-pin` Edge Function): students have synthetic emails, so Supabase's email reset link can't work. Instead the instructor issues a one-time reset code from the roster (the key icon on a claimed student → `reset_student_pin` RPC, code valid 24 h). The student enters the code + a new PIN on `/reset`; the Edge Function (service role) verifies the code, calls `auth.admin.updateUserById` to set the new PIN, burns the code, and the client auto-signs-in. The student's old PIN keeps working until the code is redeemed. A self-service change for students who *still know* their PIN is not built yet (roadmap).
+
+> ⚠️ Both the `claim-token` **and** `reset-pin` functions must have **JWT verification turned OFF** in the Supabase dashboard (callers don't have a session yet).
 
 ---
 
@@ -339,8 +341,9 @@ Migration `0007` creates a **public `avatars` Storage bucket** (5 MB cap, image 
    - `0008` — push plumbing (`pg_net`, `push_subscriptions`, triggers). Ignore its `app.settings.*` header note — the hosted `postgres` role can't set those; `0010` supersedes it with Vault.
    - `0009` — adds `bio`/`interests` + `public_point_events`. **Apply before deploying the matching frontend** (the student load reads the new columns).
    - `0010` — run **after** storing the Vault secret in step 5. All migrations are idempotent / safe to re-run.
-4. **Edge Functions** — deploy both Deno functions (`npx supabase functions deploy <name>`):
+4. **Edge Functions** — deploy the Deno functions (`npx supabase functions deploy <name>`):
    - `claim-token` — **disable JWT verification** (callers have no account yet).
+   - `reset-pin` — **disable JWT verification** (a student resetting a forgotten PIN has no session).
    - `send-push` — leave JWT verification **on** (the DB calls it with the service role).
 5. **Push notifications (optional)** — generate keys with `npx web-push generate-vapid-keys`, put the **public** key in `.env` / Vercel as `VITE_VAPID_PUBLIC_KEY`, and set the function secrets `VAPID_PUBLIC_KEY` (same value), `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. Store the **service-role key** in Vault as `edge_service_key` (`select vault.create_secret('<key>','edge_service_key','send-push bearer');`), then run migration `0010`. Push only reaches a device once the PWA is **installed** and the student enables it in Profile (iOS 16.4+).
 6. **Instructor account** — create your instructor auth user in **Authentication → Users → Add user** (set a password). The email must match the one in `instructors` (`koby.macale@dct.edu.ph`).

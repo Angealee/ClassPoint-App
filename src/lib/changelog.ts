@@ -35,6 +35,15 @@ export interface ChangelogEntry {
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.7.0',
+    date: '2026-07-02',
+    title: 'Forgot your PIN?',
+    items: [
+      'Forgot your PIN? Tap “Forgot your PIN?” on the sign-in screen, ask your instructor for a one-time reset code, then choose a new PIN.',
+      'Instructors can issue a reset code straight from the roster — tap the key icon next to any student who has claimed their account.',
+    ],
+  },
+  {
     version: '1.6.0',
     date: '2026-06-27',
     title: 'Leaderboard glow-up',

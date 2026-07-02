@@ -31,6 +31,7 @@ interface AuthContextValue {
   signInStudent: (username: string, pin: string) => Promise<{ error?: string }>
   signInInstructor: (email: string, password: string) => Promise<{ error?: string }>
   claim: (input: ClaimInput) => Promise<{ error?: string }>
+  resetPin: (token: string, pin: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
 
@@ -132,6 +133,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [signInStudent],
   )
 
+  const resetPin = useCallback(
+    async (token: string, pin: string) => {
+      const { data, error } = await supabase.functions.invoke('reset-pin', {
+        body: { token: token.trim(), pin },
+      })
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error('[reset-pin] invoke failed:', error)
+        return { error: "Couldn't reach the reset service. Ask your instructor to check setup." }
+      }
+      if (!data?.ok) return { error: (data?.error as string) ?? 'Something went wrong.' }
+      // Sign in with the freshly set PIN using the username the function returned.
+      const username = data.username as string | undefined
+      if (!username) return { error: 'Reset succeeded — please sign in with your new PIN.' }
+      return signInStudent(username, pin)
+    },
+    [signInStudent],
+  )
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut()
   }, [])
@@ -145,9 +165,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInStudent,
       signInInstructor,
       claim,
+      resetPin,
       signOut,
     }),
-    [loading, session, role, signInStudent, signInInstructor, claim, signOut],
+    [loading, session, role, signInStudent, signInInstructor, claim, resetPin, signOut],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

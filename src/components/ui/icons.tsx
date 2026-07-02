@@ -177,6 +177,16 @@ export function ClockIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function KeyIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="7.5" cy="15.5" r="4.5" />
+      <path d="M10.8 12.2 21 2" />
+      <path d="m15 8 3 3M17.5 5.5 20 8" />
+    </svg>
+  )
+}
+
 export function TicketIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>

@@ -151,6 +151,22 @@ export async function deleteStudent(studentId: string): Promise<void> {
   if (error) throw error
 }
 
+/**
+ * Instructor: issue a one-time, expiring reset code for a student who forgot
+ * their PIN. The student redeems it on the /reset page (via the `reset-pin` Edge
+ * Function). Only works once the student has claimed their account.
+ * Returns the code to hand out + when it expires.
+ */
+export async function resetStudentPin(
+  studentId: string,
+): Promise<{ token: string; expiresAt: string }> {
+  const { data, error } = await supabase
+    .rpc('reset_student_pin', { p_student_id: studentId })
+    .single<{ reset_token: string; reset_expires_at: string }>()
+  if (error) throw error
+  return { token: data.reset_token, expiresAt: data.reset_expires_at }
+}
+
 /** Award the same points to one or more students in a single batch. */
 export async function awardPoints(args: {
   studentIds: string[]

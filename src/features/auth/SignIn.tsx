@@ -75,6 +75,11 @@ export function SignIn() {
           required
           error={error}
         />
+        <div className="-mt-1 text-right">
+          <Link to="/reset" className="text-sm font-medium text-brand-500 hover:underline">
+            Forgot your PIN?
+          </Link>
+        </div>
         <Button type="submit" size="lg" className="w-full" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </Button>

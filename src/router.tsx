@@ -7,6 +7,9 @@ import { Splash } from '@/components/layout/Splash'
 const Landing = lazy(() => import('@/features/Landing').then((m) => ({ default: m.Landing })))
 const SignIn = lazy(() => import('@/features/auth/SignIn').then((m) => ({ default: m.SignIn })))
 const Claim = lazy(() => import('@/features/auth/Claim').then((m) => ({ default: m.Claim })))
+const ResetPin = lazy(() =>
+  import('@/features/auth/ResetPin').then((m) => ({ default: m.ResetPin })),
+)
 const InstructorSignIn = lazy(() =>
   import('@/features/auth/InstructorSignIn').then((m) => ({ default: m.InstructorSignIn })),
 )
@@ -48,6 +51,7 @@ export const router = createBrowserRouter([
       { path: '/', element: withSplash(<Landing />) },
       { path: '/signin', element: withSplash(<SignIn />) },
       { path: '/claim', element: withSplash(<Claim />) },
+      { path: '/reset', element: withSplash(<ResetPin />) },
       // Instructor sign-in lives at a secret, unlinked path (not surfaced in any
       // UI). Bookmark it to access. The old public path is retired below.
       { path: '/macalesideauth', element: withSplash(<InstructorSignIn />) },

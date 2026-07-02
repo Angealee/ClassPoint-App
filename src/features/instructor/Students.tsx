@@ -12,6 +12,7 @@ import {
   CheckIcon,
   CopyIcon,
   DownloadIcon,
+  KeyIcon,
   PlusIcon,
   SearchIcon,
   TrashIcon,
@@ -19,7 +20,13 @@ import {
 } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
 import { SectionGrid } from './SectionGrid'
-import { createStudent, createStudentsBulk, deleteStudent, listStudents } from '@/lib/api'
+import {
+  createStudent,
+  createStudentsBulk,
+  deleteStudent,
+  listStudents,
+  resetStudentPin,
+} from '@/lib/api'
 import { exportRoster, parseRosterNames } from '@/lib/roster-io'
 import { getLevelProgress } from '@/lib/leveling'
 import type { SectionStudent } from '@/lib/types'
@@ -49,6 +56,10 @@ export function Students() {
 
   const [deleteTarget, setDeleteTarget] = useState<SectionStudent>()
   const [deleting, setDeleting] = useState(false)
+
+  const [resetTarget, setResetTarget] = useState<SectionStudent>()
+  const [resetInfo, setResetInfo] = useState<{ token: string }>()
+  const [resetting, setResetting] = useState(false)
 
   const sectionName = sections.find((s) => s.id === openId)?.name ?? ''
 
@@ -181,6 +192,24 @@ export function Students() {
     void copy(text, `Copied ${importResults.length} token(s)`)
   }
 
+  function openReset(s: SectionStudent) {
+    setResetInfo(undefined)
+    setResetTarget(s)
+  }
+
+  async function onGenerateReset() {
+    if (!resetTarget) return
+    setResetting(true)
+    try {
+      const { token } = await resetStudentPin(resetTarget.id)
+      setResetInfo({ token })
+    } catch {
+      toast('Could not create a reset code.', 'error')
+    } finally {
+      setResetting(false)
+    }
+  }
+
   async function onDelete() {
     if (!deleteTarget) return
     setDeleting(true)
@@ -303,7 +332,17 @@ export function Students() {
                     )}
                   </p>
                 </div>
-                {!s.claimed_at && (
+                {s.claimed_at ? (
+                  <button
+                    type="button"
+                    onClick={() => openReset(s)}
+                    aria-label={`Reset ${s.full_name}'s PIN`}
+                    title="Reset PIN"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-card-2 hover:text-ink"
+                  >
+                    <KeyIcon className="h-4.5 w-4.5" />
+                  </button>
+                ) : (
                   <button
                     type="button"
                     onClick={() => copy(s.claim_token, 'Token copied')}
@@ -453,6 +492,73 @@ export function Students() {
                 </Button>
               </>
             )}
+          </div>
+        )}
+      </Sheet>
+
+      {/* Reset PIN — issue a one-time reset code to hand to the student */}
+      <Sheet
+        open={!!resetTarget}
+        onClose={() => {
+          setResetTarget(undefined)
+          setResetInfo(undefined)
+        }}
+        title={resetInfo ? 'Reset code created' : 'Reset PIN?'}
+      >
+        {resetInfo ? (
+          <div className="space-y-4">
+            <p className="text-sm text-muted">
+              Give this one-time code to{' '}
+              <span className="font-semibold text-ink">{resetTarget?.full_name}</span>. They enter it
+              on the <span className="font-medium text-ink">Forgot your PIN?</span> screen to set a
+              new PIN. It expires in 24 hours and works once.
+            </p>
+            <div className="flex items-center justify-between rounded-xl border border-line bg-card-2 px-4 py-3">
+              <span className="font-mono text-lg font-bold tracking-widest">{resetInfo.token}</span>
+              <button
+                type="button"
+                onClick={() => copy(resetInfo.token, 'Reset code copied')}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-brand-500 hover:bg-brand-500/10"
+                aria-label="Copy reset code"
+              >
+                <CopyIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => {
+                setResetTarget(undefined)
+                setResetInfo(undefined)
+              }}
+            >
+              Done
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-muted">
+              Create a one-time reset code for{' '}
+              <span className="font-semibold text-ink">{resetTarget?.full_name}</span>
+              {resetTarget?.username ? (
+                <>
+                  {' '}
+                  (@{resetTarget.username})
+                </>
+              ) : null}
+              . Their current PIN keeps working until they use the code, so it's safe to generate.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setResetTarget(undefined)}
+              >
+                Cancel
+              </Button>
+              <Button className="flex-1" onClick={onGenerateReset} disabled={resetting}>
+                {resetting ? 'Creating…' : 'Create reset code'}
+              </Button>
+            </div>
           </div>
         )}
       </Sheet>
