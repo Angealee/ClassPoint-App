@@ -23,6 +23,9 @@ const Leaderboard = lazy(() =>
   import('@/features/student/Leaderboard').then((m) => ({ default: m.Leaderboard })),
 )
 const Profile = lazy(() => import('@/features/student/Profile').then((m) => ({ default: m.Profile })))
+const StudentAttendance = lazy(() =>
+  import('@/features/student/Attendance').then((m) => ({ default: m.Attendance })),
+)
 const InstructorLayout = lazy(() =>
   import('@/features/instructor/InstructorLayout').then((m) => ({ default: m.InstructorLayout })),
 )
@@ -37,6 +40,9 @@ const InstructorLeaderboard = lazy(() =>
   import('@/features/instructor/InstructorLeaderboard').then((m) => ({
     default: m.InstructorLeaderboard,
   })),
+)
+const InstructorAttendance = lazy(() =>
+  import('@/features/instructor/Attendance').then((m) => ({ default: m.Attendance })),
 )
 
 /** Full-screen Suspense for top-level pages and layouts. */
@@ -72,6 +78,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Dashboard /> },
           { path: 'leaderboard', element: <Leaderboard /> },
+          { path: 'attendance', element: <StudentAttendance /> },
           { path: 'profile', element: <Profile /> },
         ],
       },
@@ -88,6 +95,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Students /> },
           { path: 'award', element: <Award /> },
+          { path: 'attendance', element: <InstructorAttendance /> },
           { path: 'history', element: <AwardHistory /> },
           { path: 'leaderboard', element: <InstructorLeaderboard /> },
         ],

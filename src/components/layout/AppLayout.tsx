@@ -6,13 +6,14 @@ import { WhatsNew } from '@/features/WhatsNew'
 import { AwayRecap } from '@/features/student/AwayRecap'
 import { Onboarding } from '@/features/student/Onboarding'
 import { LATEST_VERSION, setSeenVersion } from '@/lib/changelog'
-import { HomeIcon, TrophyIcon, UserIcon } from '@/components/ui/icons'
+import { HomeIcon, ScanIcon, TrophyIcon, UserIcon } from '@/components/ui/icons'
 
 const ONBOARDED_KEY = 'cp_onboarded'
 
 const studentNav: NavItem[] = [
   { to: '/app', label: 'Home', Icon: HomeIcon, end: true },
   { to: '/app/leaderboard', label: 'Ranks', Icon: TrophyIcon },
+  { to: '/app/attendance', label: 'Attend', Icon: ScanIcon },
   { to: '/app/profile', label: 'Profile', Icon: UserIcon },
 ]
 

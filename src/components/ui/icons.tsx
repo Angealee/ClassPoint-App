@@ -195,3 +195,35 @@ export function TicketIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+/** QR-code glyph — the attendance session tab. */
+export function QrIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3.5" y="3.5" width="6" height="6" rx="1" />
+      <rect x="14.5" y="3.5" width="6" height="6" rx="1" />
+      <rect x="3.5" y="14.5" width="6" height="6" rx="1" />
+      <path d="M14.5 14.5h3v3M20.5 14.5v6M17.5 20.5h3M14.5 20.5v.01" />
+    </svg>
+  )
+}
+
+/** Camera viewfinder — the student "scan attendance" action. */
+export function ScanIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" />
+      <path d="M4 12h16" />
+    </svg>
+  )
+}
+
+/** Calendar — attendance history / past sessions. */
+export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3.5" y="5" width="17" height="16" rx="2" />
+      <path d="M3.5 9.5h17M8 3.5v3M16 3.5v3" />
+    </svg>
+  )
+}

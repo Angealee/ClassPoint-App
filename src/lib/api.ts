@@ -1,15 +1,22 @@
 import { supabase } from '@/lib/supabase'
 import type {
+  AttendanceRosterRow,
+  AttendanceStatus,
   AwardRecord,
+  ClassSession,
   LeaderboardEntry,
   LeaderboardRow,
   LeaderboardSnapshot,
+  MyAttendanceEntry,
   PointCategory,
   PointEvent,
   PublicPointEvent,
   PublicProfile,
+  ScanResult,
   Section,
   SectionStudent,
+  SessionConfig,
+  SessionSummary,
   StudentSelf,
 } from '@/lib/types'
 
@@ -375,4 +382,265 @@ export async function listStudentEvents(studentId: string, limit = 20): Promise<
     .limit(limit)
   if (error) throw error
   return data ?? []
+}
+
+// ============================================================================
+// Attendance — QR class sessions (migration 0014)
+// ============================================================================
+
+/** Shape of a raw class_sessions row (snake_case) as read from the DB. */
+interface SessionRow {
+  id: string
+  section_id: string
+  topic: string | null
+  status: 'active' | 'ended'
+  started_at: string
+  ended_at: string | null
+  late_after_min: number
+  absent_after_min: number
+  late_penalty: number
+  absent_penalty: number
+  apply_penalties: boolean
+  penalties_committed: boolean
+}
+
+const SESSION_COLS =
+  'id, section_id, topic, status, started_at, ended_at, late_after_min, absent_after_min, late_penalty, absent_penalty, apply_penalties, penalties_committed'
+
+function mapSession(r: SessionRow, qrSecret?: string): ClassSession {
+  return {
+    id: r.id,
+    sectionId: r.section_id,
+    topic: r.topic,
+    status: r.status,
+    startedAt: r.started_at,
+    endedAt: r.ended_at,
+    lateAfterMin: r.late_after_min,
+    absentAfterMin: r.absent_after_min,
+    latePenalty: r.late_penalty,
+    absentPenalty: r.absent_penalty,
+    applyPenalties: r.apply_penalties,
+    penaltiesCommitted: r.penalties_committed,
+    ...(qrSecret ? { qrSecret } : {}),
+  }
+}
+
+/** Instructor-only: read the rotating-QR secret for a session (RLS-gated). */
+async function getSessionSecret(sessionId: string): Promise<string | undefined> {
+  const { data, error } = await supabase
+    .from('class_session_secrets')
+    .select('qr_secret')
+    .eq('session_id', sessionId)
+    .maybeSingle<{ qr_secret: string }>()
+  if (error) throw error
+  return data?.qr_secret ?? undefined
+}
+
+/**
+ * Start (or resume) a class session for a section. Returns the session with its
+ * rotating-QR secret so the instructor's browser can render the live QR code.
+ */
+export async function startClassSession(config: SessionConfig): Promise<ClassSession> {
+  const { data, error } = await supabase
+    .rpc('start_class_session', {
+      p_section_id: config.sectionId,
+      p_topic: config.topic.trim() || null,
+      p_late_after_min: config.lateAfterMin,
+      p_absent_after_min: config.absentAfterMin,
+      p_late_penalty: config.latePenalty,
+      p_absent_penalty: config.absentPenalty,
+      p_apply_penalties: config.applyPenalties,
+    })
+    .single<{ session_id: string; qr_secret: string }>()
+  if (error) throw error
+  const row = await supabase.from('class_sessions').select(SESSION_COLS).eq('id', data.session_id).single<SessionRow>()
+  if (row.error) throw row.error
+  return mapSession(row.data, data.qr_secret)
+}
+
+/** One session by id (no QR secret). Used to re-open a session for finalising. */
+export async function getSession(id: string): Promise<ClassSession | null> {
+  const { data, error } = await supabase
+    .from('class_sessions')
+    .select(SESSION_COLS)
+    .eq('id', id)
+    .maybeSingle<SessionRow>()
+  if (error) throw error
+  return data ? mapSession(data) : null
+}
+
+/** The section's currently-active session (with its QR secret), or null. */
+export async function getActiveSession(sectionId: string): Promise<ClassSession | null> {
+  const { data, error } = await supabase
+    .from('class_sessions')
+    .select(SESSION_COLS)
+    .eq('section_id', sectionId)
+    .eq('status', 'active')
+    .maybeSingle<SessionRow>()
+  if (error) throw error
+  if (!data) return null
+  const secret = await getSessionSecret(data.id)
+  return mapSession(data, secret)
+}
+
+/** Past + present sessions for a section, with present/late/absent tallies. */
+export async function listSessions(sectionId: string): Promise<SessionSummary[]> {
+  const { data: sessions, error } = await supabase
+    .from('class_sessions')
+    .select('id, topic, started_at, ended_at, status, penalties_committed')
+    .eq('section_id', sectionId)
+    .order('started_at', { ascending: false })
+  if (error) throw error
+  const rows = sessions ?? []
+  if (rows.length === 0) return []
+
+  const ids = rows.map((s) => s.id as string)
+  const { data: records, error: recErr } = await supabase
+    .from('attendance_records')
+    .select('session_id, status')
+    .in('session_id', ids)
+  if (recErr) throw recErr
+
+  const tally = new Map<string, { present: number; late: number; absent: number; total: number }>()
+  for (const r of records ?? []) {
+    const t = tally.get(r.session_id as string) ?? { present: 0, late: 0, absent: 0, total: 0 }
+    t[r.status as AttendanceStatus] += 1
+    t.total += 1
+    tally.set(r.session_id as string, t)
+  }
+
+  return rows.map((s) => {
+    const t = tally.get(s.id as string) ?? { present: 0, late: 0, absent: 0, total: 0 }
+    return {
+      id: s.id as string,
+      topic: (s.topic as string | null) ?? null,
+      startedAt: s.started_at as string,
+      endedAt: (s.ended_at as string | null) ?? null,
+      status: s.status as 'active' | 'ended',
+      penaltiesCommitted: s.penalties_committed as boolean,
+      ...t,
+    }
+  })
+}
+
+/**
+ * The roster for one session: every student in the section merged with their
+ * attendance record (status / scan time), if any. Powers the live roster and the
+ * end-of-class review.
+ */
+export async function listSessionAttendance(
+  sessionId: string,
+  sectionId: string,
+): Promise<AttendanceRosterRow[]> {
+  const [students, records] = await Promise.all([
+    supabase
+      .from('students')
+      .select('id, full_name, avatar_url')
+      .eq('section_id', sectionId),
+    supabase
+      .from('attendance_records')
+      .select('id, student_id, status, scanned_at, committed')
+      .eq('session_id', sessionId),
+  ])
+  if (students.error) throw students.error
+  if (records.error) throw records.error
+
+  const byStudent = new Map(records.data?.map((r) => [r.student_id as string, r]) ?? [])
+  return (students.data ?? [])
+    .map((s) => {
+      const rec = byStudent.get(s.id as string)
+      return {
+        studentId: s.id as string,
+        fullName: s.full_name as string,
+        avatarUrl: (s.avatar_url as string | null) ?? null,
+        recordId: (rec?.id as string) ?? null,
+        status: (rec?.status as AttendanceStatus) ?? null,
+        scannedAt: (rec?.scanned_at as string | null) ?? null,
+        committed: (rec?.committed as boolean) ?? false,
+      }
+    })
+    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+}
+
+/** Instructor override of a student's status during the review step. */
+export async function updateAttendanceStatus(
+  recordId: string,
+  status: AttendanceStatus,
+): Promise<void> {
+  const { error } = await supabase
+    .from('attendance_records')
+    .update({ status })
+    .eq('id', recordId)
+  if (error) throw error
+}
+
+/** End a session and auto-mark every non-scanner Absent. */
+export async function endClassSession(sessionId: string): Promise<void> {
+  const { error } = await supabase.rpc('end_class_session', { p_session_id: sessionId })
+  if (error) throw error
+}
+
+/** Finalise a session — writes the late/absent penalties into point_events. */
+export async function commitAttendancePenalties(
+  sessionId: string,
+): Promise<{ applied: number; deducted: number }> {
+  const { data, error } = await supabase
+    .rpc('commit_attendance_penalties', { p_session_id: sessionId })
+    .single<{ applied: number; deducted: number }>()
+  if (error) throw error
+  return { applied: data.applied, deducted: data.deducted }
+}
+
+/** Toggle whether a session's penalties will be deducted (used before commit). */
+export async function setSessionApplyPenalties(
+  sessionId: string,
+  apply: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from('class_sessions')
+    .update({ apply_penalties: apply })
+    .eq('id', sessionId)
+  if (error) throw error
+}
+
+/** Student check-in: validate the scanned rotating code and log attendance. */
+export async function scanAttendance(
+  sessionId: string,
+  windowIndex: number,
+  code: string,
+): Promise<ScanResult> {
+  const { data, error } = await supabase
+    .rpc('scan_attendance', {
+      p_session_id: sessionId,
+      p_window: windowIndex,
+      p_code: code,
+    })
+    .single<{ status: AttendanceStatus; already: boolean; topic: string | null; marked_at: string | null }>()
+  if (error) throw error
+  return { status: data.status, already: data.already, topic: data.topic, markedAt: data.marked_at }
+}
+
+/** A student's own attendance history (newest first). */
+export async function listMyAttendance(studentId: string): Promise<MyAttendanceEntry[]> {
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .select('id, session_id, status, scanned_at, class_sessions(topic, started_at)')
+    .eq('student_id', studentId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  type Row = {
+    id: string
+    session_id: string
+    status: AttendanceStatus
+    scanned_at: string | null
+    class_sessions: { topic: string | null; started_at: string } | null
+  }
+  return ((data ?? []) as unknown as Row[]).map((r) => ({
+    recordId: r.id,
+    sessionId: r.session_id,
+    topic: r.class_sessions?.topic ?? null,
+    startedAt: r.class_sessions?.started_at ?? '',
+    status: r.status,
+    scannedAt: r.scanned_at,
+  }))
 }

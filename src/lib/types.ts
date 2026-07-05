@@ -88,6 +88,80 @@ export interface PublicPointEvent {
   created_at: string
 }
 
+export type AttendanceStatus = 'present' | 'late' | 'absent'
+
+/** Config the instructor sets before starting a class session. */
+export interface SessionConfig {
+  sectionId: string
+  topic: string
+  lateAfterMin: number
+  absentAfterMin: number
+  latePenalty: number
+  absentPenalty: number
+  applyPenalties: boolean
+}
+
+/** A live/started class session the instructor is running. */
+export interface ClassSession {
+  id: string
+  sectionId: string
+  topic: string | null
+  status: 'active' | 'ended'
+  startedAt: string
+  endedAt: string | null
+  lateAfterMin: number
+  absentAfterMin: number
+  latePenalty: number
+  absentPenalty: number
+  applyPenalties: boolean
+  penaltiesCommitted: boolean
+  /** Rotating-QR secret — only present for the instructor who owns the session. */
+  qrSecret?: string
+}
+
+/** A past session summarised for the history list. */
+export interface SessionSummary {
+  id: string
+  topic: string | null
+  startedAt: string
+  endedAt: string | null
+  status: 'active' | 'ended'
+  present: number
+  late: number
+  absent: number
+  total: number
+  penaltiesCommitted: boolean
+}
+
+/** One row of the instructor's per-session roster (student + their status). */
+export interface AttendanceRosterRow {
+  studentId: string
+  fullName: string
+  avatarUrl: string | null
+  recordId: string | null
+  status: AttendanceStatus | null
+  scannedAt: string | null
+  committed: boolean
+}
+
+/** The result a student sees after scanning. */
+export interface ScanResult {
+  status: AttendanceStatus
+  already: boolean
+  topic: string | null
+  markedAt: string | null
+}
+
+/** A student's own attendance entry for their history module. */
+export interface MyAttendanceEntry {
+  recordId: string
+  sessionId: string
+  topic: string | null
+  startedAt: string
+  status: AttendanceStatus
+  scannedAt: string | null
+}
+
 /** Public-safe profile of any student, shown in the leaderboard tap-preview. */
 export interface PublicProfile {
   id: string

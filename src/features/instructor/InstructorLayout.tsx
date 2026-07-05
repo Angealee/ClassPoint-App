@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Shell, type NavItem } from '@/components/layout/Shell'
 import { Splash } from '@/components/layout/Splash'
 import { WhatsNew } from '@/features/WhatsNew'
-import { BoltIcon, ClockIcon, LogOutIcon, TrophyIcon, UsersIcon } from '@/components/ui/icons'
+import { BoltIcon, ClockIcon, LogOutIcon, QrIcon, TrophyIcon, UsersIcon } from '@/components/ui/icons'
 import { listSections } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import type { Section } from '@/lib/types'
@@ -26,6 +26,7 @@ export function useInstructor(): InstructorContextValue {
 const nav: NavItem[] = [
   { to: '/teach', label: 'Students', Icon: UsersIcon, end: true },
   { to: '/teach/award', label: 'Award', Icon: BoltIcon },
+  { to: '/teach/attendance', label: 'Attend', Icon: QrIcon },
   { to: '/teach/history', label: 'Activity', Icon: ClockIcon },
   { to: '/teach/leaderboard', label: 'Ranks', Icon: TrophyIcon },
 ]

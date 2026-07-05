@@ -35,6 +35,29 @@ export interface ChangelogEntry {
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.8.0',
+    date: '2026-07-05',
+    title: 'QR attendance',
+    sections: [
+      {
+        heading: 'Check in by scanning a QR',
+        items: [
+          'Open the new Attendance tab and tap “Scan attendance” to check in to class with your instructor’s on-screen QR code.',
+          'The QR refreshes every few seconds, so a screenshot won’t let someone check in for you.',
+          'You’re marked Present, Late, or Absent based on when you scan — see it all in your attendance history.',
+        ],
+      },
+      {
+        heading: 'For instructors',
+        items: [
+          'Start a class from the Attend tab: set the topic and the late/absent timing, then show the rotating QR.',
+          'Watch the roster fill in live as students check in, then review and correct anyone before finalising.',
+          'Late and absent penalties are applied on finalise, and every session can be exported to Excel.',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.7.0',
     date: '2026-07-02',
     title: 'Forgot your PIN?',
