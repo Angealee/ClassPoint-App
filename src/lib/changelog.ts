@@ -78,6 +78,15 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Add up to 3 showcase photos to your profile (≤ 5 MB each) — classmates see them when they tap you on the leaderboard.',
         ],
       },
+      {
+        heading: 'New: Achievements',
+        items: [
+          '30 badges to unlock across points, attendance, growth, social, and a few secret ones — check your progress on the new Achievements page, linked from Profile.',
+          'The toughest badge in each category also unlocks a display title (like "Summit Climber" or "The Overachiever Elite") you can equip — classmates see it on your profile preview.',
+          'Pin your 3 favorite badges to feature them first, right alongside your photos.',
+          'Instructors can hand out special recognitions — Most Improved, Class MVP, and more — straight from the roster.',
+        ],
+      },
     ],
   },
   {

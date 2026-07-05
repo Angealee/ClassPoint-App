@@ -78,6 +78,10 @@ export interface StudentSelf {
   interests: string | null
   /** Up to 3 public "showcase" photo URLs on the profile. */
   banner_urls: string[] | null
+  /** The currently-equipped achievement title, or null. */
+  display_title: string | null
+  /** Up to 3 favorite unlocked achievement codes, featured first. */
+  pinned_achievements: string[] | null
   lifetime_points: number
 }
 
@@ -174,6 +178,10 @@ export interface PublicProfile {
   interests: string | null
   /** Up to 3 public "showcase" photo URLs on the profile. */
   banner_urls: string[] | null
+  /** Their currently-equipped achievement title, or null. */
+  display_title: string | null
+  /** Up to 3 favorite unlocked achievement codes, featured first. */
+  pinned_achievements: string[] | null
   lifetime_points: number
   /** When the roster entry was created — shown as "member since". */
   created_at: string | null
@@ -196,3 +204,55 @@ export interface ProfileViews {
   visitors: number
   recent: ProfileVisitor[]
 }
+
+export type AchievementCategory = 'points' | 'attendance' | 'growth' | 'social' | 'fun' | 'recognition'
+
+/** Which raw number (from get_achievement_progress) an achievement tracks. */
+export type AchievementMetric =
+  | 'points'
+  | 'recitations'
+  | 'present_count'
+  | 'attended_count'
+  | 'streak'
+  | 'early_streak'
+  | 'level'
+  | 'rank'
+  | 'views_received'
+  | 'views_given'
+  | 'unlocked_count'
+  | 'banner_count'
+
+/** One row of the achievement catalog — the static, shared definition. */
+export interface Achievement {
+  code: string
+  category: AchievementCategory
+  name: string
+  description: string
+  /** Hidden as "???" until unlocked. */
+  secret: boolean
+  /** 'system' = auto-evaluated by sync_achievements(); 'instructor' = only manually grantable. */
+  grantedBy: 'system' | 'instructor'
+  /** Non-null only for achievements that also grant a display title. */
+  titleText: string | null
+  /** Which metric this achievement tracks, for a "7/10"-style progress readout. Null = no numeric progress (boolean/one-off/instructor-granted). */
+  metric: AchievementMetric | null
+  /** The value that clears it (for 'rank', lower is better). */
+  threshold: number | null
+  sortOrder: number
+}
+
+/** The catalog merged with one student's unlock state. */
+export interface AchievementState extends Achievement {
+  /** ISO timestamp of when this student unlocked it, or null if still locked. */
+  unlockedAt: string | null
+}
+
+/** What sync_achievements() returns for each newly-unlocked achievement (drives the celebration). */
+export interface UnlockedAchievement {
+  code: string
+  name: string
+  titleText: string | null
+}
+
+/** The raw numbers behind locked achievements' progress bars (get_achievement_progress). */
+export type AchievementProgress = Record<AchievementMetric, number | null>

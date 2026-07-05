@@ -5,11 +5,13 @@ import { XpBar } from '@/components/ui/XpBar'
 import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
 import { ProfileBanner } from '@/components/profile/ProfileBanner'
 import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
+import { PinnedBadges } from '@/components/achievements/PinnedBadges'
 import { getPublicProfile, recordProfileView } from '@/lib/api'
 import { getLevelProgress } from '@/lib/leveling'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import type { PublicProfile } from '@/lib/types'
+import { useStudentData } from './StudentData'
 
 /** The minimum a caller already knows so the header renders instantly. */
 export interface PreviewTarget {
@@ -37,6 +39,7 @@ interface Props {
  * and recent point history are loaded lazily from `getPublicProfile`.
  */
 export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabel }: Props) {
+  const { achievements: catalog, syncMyAchievements } = useStudentData()
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -57,11 +60,14 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
     }
   }, [open, studentId])
 
-  // Count a profile view — but never your own (the RPC also guards this).
+  // Count a profile view — but never your own (the RPC also guards this) —
+  // then re-check the viewer's own achievements (e.g. "Curious Classmate").
   useEffect(() => {
     if (!open || !studentId || isMe) return
-    void recordProfileView(studentId).catch(() => {})
-  }, [open, studentId, isMe])
+    void recordProfileView(studentId)
+      .then(() => syncMyAchievements())
+      .catch(() => {})
+  }, [open, studentId, isMe, syncMyAchievements])
 
   // Prefer the live total once loaded (more current than the frozen snapshot).
   const points = profile?.lifetime_points ?? target?.lifetime_points ?? 0
@@ -85,6 +91,11 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
                 {target.display_name}
                 {isMe && <span className="ml-1 text-sm text-brand-500">(you)</span>}
               </p>
+              {profile?.display_title && (
+                <p className="truncate text-xs font-semibold text-gold-600 dark:text-gold-400">
+                  {profile.display_title}
+                </p>
+              )}
               <p className="text-sm text-muted">
                 {sectionLabel} · Level {progress.level}
               </p>
@@ -131,6 +142,16 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
           {isMe && (
             <div className="mt-4">
               <ProfileVisitors studentId={target.student_id} />
+            </div>
+          )}
+
+          {/* Pinned badges */}
+          {profile?.pinned_achievements && profile.pinned_achievements.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">
+                Badges
+              </p>
+              <PinnedBadges achievements={catalog} pinnedCodes={profile.pinned_achievements} />
             </div>
           )}
 

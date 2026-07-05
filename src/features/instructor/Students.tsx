@@ -16,20 +16,24 @@ import {
   PlusIcon,
   SearchIcon,
   TrashIcon,
+  TrophyIcon,
   UploadIcon,
 } from '@/components/ui/icons'
+import { BadgeArt } from '@/components/achievements/BadgeArt'
 import { useInstructor } from './InstructorLayout'
 import { SectionGrid } from './SectionGrid'
 import {
   createStudent,
   createStudentsBulk,
   deleteStudent,
+  grantAchievement,
+  listAchievements,
   listStudents,
   resetStudentPin,
 } from '@/lib/api'
 import { exportRoster, parseRosterNames } from '@/lib/roster-io'
 import { getLevelProgress } from '@/lib/leveling'
-import type { SectionStudent } from '@/lib/types'
+import type { Achievement, SectionStudent } from '@/lib/types'
 
 export function Students() {
   const { sections, setSelectedSectionId } = useInstructor()
@@ -60,6 +64,18 @@ export function Students() {
   const [resetTarget, setResetTarget] = useState<SectionStudent>()
   const [resetInfo, setResetInfo] = useState<{ token: string }>()
   const [resetting, setResetting] = useState(false)
+
+  const [recognitions, setRecognitions] = useState<Achievement[]>([])
+  const [grantTarget, setGrantTarget] = useState<SectionStudent>()
+  const [granting, setGranting] = useState<string | null>(null)
+
+  useEffect(() => {
+    listAchievements()
+      .then((all) => setRecognitions(all.filter((a) => a.grantedBy === 'instructor')))
+      .catch(() => {
+        /* the grant sheet just stays empty if this fails */
+      })
+  }, [])
 
   const sectionName = sections.find((s) => s.id === openId)?.name ?? ''
 
@@ -210,6 +226,20 @@ export function Students() {
     }
   }
 
+  async function onGrant(code: string) {
+    if (!grantTarget) return
+    setGranting(code)
+    try {
+      await grantAchievement(grantTarget.id, code)
+      toast(`Granted to ${grantTarget.full_name}.`, 'success')
+      setGrantTarget(undefined)
+    } catch {
+      toast('Could not grant that achievement.', 'error')
+    } finally {
+      setGranting(null)
+    }
+  }
+
   async function onDelete() {
     if (!deleteTarget) return
     setDeleting(true)
@@ -332,6 +362,15 @@ export function Students() {
                     )}
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setGrantTarget(s)}
+                  aria-label={`Grant ${s.full_name} an achievement`}
+                  title="Grant achievement"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-card-2 hover:text-ink"
+                >
+                  <TrophyIcon className="h-4.5 w-4.5" />
+                </button>
                 {s.claimed_at ? (
                   <button
                     type="button"
@@ -561,6 +600,36 @@ export function Students() {
             </div>
           </div>
         )}
+      </Sheet>
+
+      {/* Grant a recognition achievement */}
+      <Sheet
+        open={!!grantTarget}
+        onClose={() => setGrantTarget(undefined)}
+        title={`Grant an achievement to ${grantTarget?.full_name ?? ''}`}
+      >
+        <div className="space-y-2">
+          {recognitions.length === 0 ? (
+            <p className="p-4 text-center text-sm text-muted">No recognitions available.</p>
+          ) : (
+            recognitions.map((a) => (
+              <button
+                key={a.code}
+                type="button"
+                onClick={() => onGrant(a.code)}
+                disabled={!!granting}
+                className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-card-2 disabled:opacity-60"
+              >
+                <BadgeArt code={a.code} category={a.category} state="unlocked" isTitleGrantor={!!a.titleText} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{a.name}</p>
+                  <p className="truncate text-xs text-muted">{a.description}</p>
+                </div>
+                {granting === a.code && <span className="text-xs text-muted">Granting…</span>}
+              </button>
+            ))
+          )}
+        </div>
       </Sheet>
 
       {/* Delete confirm */}

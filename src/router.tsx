@@ -23,6 +23,9 @@ const Leaderboard = lazy(() =>
   import('@/features/student/Leaderboard').then((m) => ({ default: m.Leaderboard })),
 )
 const Profile = lazy(() => import('@/features/student/Profile').then((m) => ({ default: m.Profile })))
+const Achievements = lazy(() =>
+  import('@/features/student/Achievements').then((m) => ({ default: m.Achievements })),
+)
 const StudentAttendance = lazy(() =>
   import('@/features/student/Attendance').then((m) => ({ default: m.Attendance })),
 )
@@ -80,6 +83,7 @@ export const router = createBrowserRouter([
           { path: 'leaderboard', element: <Leaderboard /> },
           { path: 'attendance', element: <StudentAttendance /> },
           { path: 'profile', element: <Profile /> },
+          { path: 'achievements', element: <Achievements /> },
         ],
       },
     ],

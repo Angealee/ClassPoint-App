@@ -1,5 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import type {
+  Achievement,
+  AchievementProgress,
+  AchievementState,
   AttendanceRosterRow,
   AttendanceStatus,
   AwardRecord,
@@ -19,6 +22,7 @@ import type {
   SessionConfig,
   SessionSummary,
   StudentSelf,
+  UnlockedAchievement,
 } from '@/lib/types'
 
 export async function listSections(): Promise<Section[]> {
@@ -262,7 +266,7 @@ export async function getMyStudent(userId: string): Promise<StudentSelf | null> 
   const { data, error } = await supabase
     .from('students')
     .select(
-      'id, section_id, full_name, display_name, avatar_url, bio, interests, banner_urls, lifetime_points',
+      'id, section_id, full_name, display_name, avatar_url, bio, interests, banner_urls, display_title, pinned_achievements, lifetime_points',
     )
     .eq('user_id', userId)
     .maybeSingle<StudentSelf>()
@@ -303,7 +307,7 @@ export async function getPublicProfile(
     supabase
       .from('students')
       .select(
-        'id, display_name, section_id, avatar_url, bio, interests, banner_urls, lifetime_points, created_at',
+        'id, display_name, section_id, avatar_url, bio, interests, banner_urls, display_title, pinned_achievements, lifetime_points, created_at',
       )
       .eq('id', studentId)
       .maybeSingle(),
@@ -321,6 +325,8 @@ export async function getPublicProfile(
     bio: (s.bio as string | null) ?? null,
     interests: (s.interests as string | null) ?? null,
     banner_urls: (s.banner_urls as string[] | null) ?? null,
+    display_title: (s.display_title as string | null) ?? null,
+    pinned_achievements: (s.pinned_achievements as string[] | null) ?? null,
     lifetime_points: s.lifetime_points as number,
     created_at: (s.created_at as string | null) ?? null,
     events: (eventsRes.data ?? []) as PublicPointEvent[],
@@ -818,4 +824,128 @@ export async function listMyAttendance(studentId: string): Promise<MyAttendanceE
     status: r.status,
     scannedAt: r.scanned_at,
   }))
+}
+
+type AchievementRow = {
+  code: string
+  category: Achievement['category']
+  name: string
+  description: string
+  secret: boolean
+  granted_by: 'system' | 'instructor'
+  title_text: string | null
+  metric: Achievement['metric']
+  threshold: number | null
+  sort_order: number
+}
+
+const ACHIEVEMENT_COLS =
+  'code, category, name, description, secret, granted_by, title_text, metric, threshold, sort_order'
+
+function mapAchievement(r: AchievementRow): Achievement {
+  return {
+    code: r.code,
+    category: r.category,
+    name: r.name,
+    description: r.description,
+    secret: r.secret,
+    grantedBy: r.granted_by,
+    titleText: r.title_text,
+    metric: r.metric,
+    threshold: r.threshold,
+    sortOrder: r.sort_order,
+  }
+}
+
+/** The full 30-achievement catalog (locked + unlocked; no per-student state). */
+export async function listAchievements(): Promise<Achievement[]> {
+  const { data, error } = await supabase
+    .from('achievements')
+    .select(ACHIEVEMENT_COLS)
+    .order('sort_order')
+  if (error) throw error
+  return ((data ?? []) as AchievementRow[]).map(mapAchievement)
+}
+
+/** The catalog merged with one student's unlock timestamps (null = still locked). */
+export async function getMyAchievements(studentId: string): Promise<AchievementState[]> {
+  const [catalog, unlocked] = await Promise.all([
+    supabase.from('achievements').select(ACHIEVEMENT_COLS).order('sort_order'),
+    supabase
+      .from('student_achievements')
+      .select('achievement_code, unlocked_at')
+      .eq('student_id', studentId),
+  ])
+  if (catalog.error) throw catalog.error
+  if (unlocked.error) throw unlocked.error
+  const unlockedAt = new Map(
+    (unlocked.data ?? []).map((r) => [r.achievement_code as string, r.unlocked_at as string]),
+  )
+  return ((catalog.data ?? []) as AchievementRow[]).map((r) => ({
+    ...mapAchievement(r),
+    unlockedAt: unlockedAt.get(r.code) ?? null,
+  }))
+}
+
+/** The raw numbers behind locked achievements' "7/10"-style progress bars. */
+export async function getAchievementProgress(studentId: string): Promise<AchievementProgress> {
+  const { data, error } = await supabase
+    .rpc('get_achievement_progress', { p_student_id: studentId })
+    .single<Record<string, number | null>>()
+  if (error) throw error
+  return {
+    points: data.points,
+    recitations: data.recitations,
+    present_count: data.present_count,
+    attended_count: data.attended_count,
+    streak: data.streak,
+    early_streak: data.early_streak,
+    level: data.level,
+    rank: data.rank,
+    views_received: data.views_received,
+    views_given: data.views_given,
+    unlocked_count: data.unlocked_count,
+    banner_count: data.banner_count,
+  }
+}
+
+/**
+ * Re-evaluate a student's auto-computed achievements against their current
+ * stats. Safe to call often — the RPC re-derives everything server-side and is
+ * idempotent (already-unlocked achievements are skipped). Returns only the
+ * ones newly unlocked by this call, so the caller can trigger a celebration.
+ */
+export async function syncAchievements(studentId: string): Promise<UnlockedAchievement[]> {
+  const { data, error } = await supabase.rpc('sync_achievements', { p_student_id: studentId })
+  if (error) throw error
+  return ((data ?? []) as Array<{ code: string; name: string; title_text: string | null }>).map(
+    (r) => ({ code: r.code, name: r.name, titleText: r.title_text }),
+  )
+}
+
+/** Equip (or clear, with null) a display title. Must be one the student has unlocked. */
+export async function setDisplayTitle(studentId: string, title: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('students')
+    .update({ display_title: title })
+    .eq('id', studentId)
+  if (error) throw error
+}
+
+/** Choose up to 3 unlocked achievements to feature first on the profile. */
+export async function setPinnedAchievements(studentId: string, codes: string[]): Promise<void> {
+  const { error } = await supabase
+    .from('students')
+    .update({ pinned_achievements: codes.length ? codes : null })
+    .eq('id', studentId)
+  if (error) throw error
+}
+
+/** Instructor-only: manually award one of the 'recognition' achievements. */
+export async function grantAchievement(studentId: string, code: string): Promise<void> {
+  const { error } = await supabase.rpc('grant_achievement', {
+    p_student_id: studentId,
+    p_code: code,
+  })
+  if (error) throw error
 }

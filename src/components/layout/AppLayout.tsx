@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Shell, type NavItem } from '@/components/layout/Shell'
 import { StudentDataProvider, useStudentData } from '@/features/student/StudentData'
 import { LevelUpBurst } from '@/components/ui/LevelUpBurst'
+import { AchievementUnlockBurst } from '@/components/achievements/AchievementUnlockBurst'
 import { WhatsNew } from '@/features/WhatsNew'
 import { AwayRecap } from '@/features/student/AwayRecap'
 import { Onboarding } from '@/features/student/Onboarding'
@@ -21,6 +22,12 @@ const studentNav: NavItem[] = [
 function LevelUpOverlay() {
   const { levelUp, clearLevelUp } = useStudentData()
   return <LevelUpBurst level={levelUp} onDone={clearLevelUp} />
+}
+
+/** Renders the achievement-unlock celebration, one at a time from the queue. */
+function AchievementUnlockOverlay() {
+  const { unlockedAchievement, clearUnlockedAchievement } = useStudentData()
+  return <AchievementUnlockBurst achievement={unlockedAchievement} onDone={clearUnlockedAchievement} />
 }
 
 /** Recaps points/penalties received while the app was closed. */
@@ -63,6 +70,7 @@ export function AppLayout() {
     <StudentDataProvider>
       <Shell nav={studentNav} />
       <LevelUpOverlay />
+      <AchievementUnlockOverlay />
       <IntroOrWhatsNew />
       <AwayRecapOverlay />
     </StudentDataProvider>

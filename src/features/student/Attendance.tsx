@@ -24,7 +24,7 @@ function errorText(e: unknown): string {
 }
 
 export function Attendance() {
-  const { me } = useStudentData()
+  const { me, syncMyAchievements } = useStudentData()
   const [history, setHistory] = useState<MyAttendanceEntry[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -84,12 +84,13 @@ export function Attendance() {
       const res = await scanAttendance(parsed.sessionId, parsed.windowIndex, parsed.code)
       setResult(res)
       vibrate(res.status === 'present' ? 'point' : 'deduct')
+      void syncMyAchievements() // may unlock Checked In / On Time / streaks
     } catch (e) {
       setError(errorText(e))
     } finally {
       setSubmitting(false)
     }
-  }, [])
+  }, [syncMyAchievements])
 
   const stats = useMemo(() => {
     const s = { present: 0, late: 0, absent: 0 }

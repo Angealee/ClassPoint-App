@@ -13,18 +13,31 @@ import { disablePush, enablePush, getPushState, type PushState } from '@/lib/pus
 import { useAuth } from '@/lib/auth'
 import { ProfileBanner } from '@/components/profile/ProfileBanner'
 import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
+import { PinnedBadges } from '@/components/achievements/PinnedBadges'
 import { useStudentData } from './StudentData'
 import { StudentProfilePreview } from './StudentProfilePreview'
 
 export function Profile() {
   const { signOut } = useAuth()
-  const { loading, me, rank, sectionName, saveProfile, saveAvatar, clearAvatar, saveBanner, removeBanner } =
-    useStudentData()
+  const {
+    loading,
+    me,
+    rank,
+    sectionName,
+    saveProfile,
+    saveAvatar,
+    clearAvatar,
+    saveBanner,
+    removeBanner,
+    achievements,
+    setPinnedAchievements,
+  } = useStudentData()
   const { toast } = useToast()
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
   const bannerRef = useRef<HTMLInputElement>(null)
   const [bannerBusy, setBannerBusy] = useState(false)
+  const [pinBusy, setPinBusy] = useState(false)
 
   const [editOpen, setEditOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -135,6 +148,13 @@ export function Profile() {
     if (error) toast(error, 'error')
   }
 
+  async function onPinChange(codes: string[]) {
+    setPinBusy(true)
+    const { error } = await setPinnedAchievements(codes)
+    setPinBusy(false)
+    if (error) toast(error, 'error')
+  }
+
   return (
     <div className="space-y-4">
       <h1 className="font-display text-2xl font-bold">Profile</h1>
@@ -167,6 +187,11 @@ export function Profile() {
             </button>
             <div className="min-w-0">
               <p className="truncate font-display text-xl font-bold">{me.display_name}</p>
+              {me.display_title && (
+                <p className="truncate text-xs font-semibold text-gold-600 dark:text-gold-400">
+                  {me.display_title}
+                </p>
+              )}
               <p className="text-sm text-muted">
                 {sectionName(me.section_id)} · Level {getLevelProgress(me.lifetime_points).level}
               </p>
@@ -254,6 +279,27 @@ export function Profile() {
               accept="image/png,image/jpeg,image/webp,image/gif"
               className="hidden"
               onChange={onPickBanner}
+            />
+          </div>
+
+          {/* Achievements */}
+          <div className="mt-5">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm text-muted">Achievements</p>
+              <button
+                type="button"
+                onClick={() => navigate('/app/achievements')}
+                className="text-xs font-semibold text-brand-500 transition-opacity hover:opacity-80"
+              >
+                {achievements.filter((a) => a.unlockedAt).length}/{achievements.length} · View all →
+              </button>
+            </div>
+            <PinnedBadges
+              achievements={achievements}
+              pinnedCodes={me.pinned_achievements ?? []}
+              editable
+              onChange={onPinChange}
+              busy={pinBusy}
             />
           </div>
 

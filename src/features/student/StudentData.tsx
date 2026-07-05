@@ -9,12 +9,17 @@ import {
 } from 'react'
 import { useAuth } from '@/lib/auth'
 import {
+  getAchievementProgress,
   getLeaderboardSnapshot,
+  getMyAchievements,
   getMyStudent,
   listSections,
   listStudentEvents,
   removeAvatar,
   setBannerUrls,
+  setDisplayTitle as apiSetDisplayTitle,
+  setPinnedAchievements as apiSetPinnedAchievements,
+  syncAchievements,
   updateAvatar,
   updateProfileFields,
   uploadBannerPhoto,
@@ -25,7 +30,15 @@ import { useToast } from '@/components/ui/Toast'
 import { initSound, playSound } from '@/lib/sound'
 import { vibrate } from '@/lib/haptics'
 import { showLocalNotification, syncPushSubscription } from '@/lib/push'
-import type { LeaderboardEntry, PointEvent, Section, StudentSelf } from '@/lib/types'
+import type {
+  Achievement,
+  AchievementProgress,
+  AchievementState,
+  LeaderboardEntry,
+  PointEvent,
+  Section,
+  StudentSelf,
+} from '@/lib/types'
 
 interface StudentDataValue {
   loading: boolean
@@ -64,6 +77,21 @@ interface StudentDataValue {
   /** The level to celebrate with the burst, or null. */
   levelUp: number | null
   clearLevelUp: () => void
+  /** The full catalog merged with the signed-in student's unlock state. */
+  achievements: AchievementState[]
+  achievementsLoading: boolean
+  /** Raw metric values behind locked achievements' progress bars. */
+  achievementProgress: AchievementProgress | null
+  /** The achievement to celebrate with the unlock burst right now, or null. */
+  unlockedAchievement: Achievement | null
+  /** Dismiss the current celebration and advance to the next queued one, if any. */
+  clearUnlockedAchievement: () => void
+  /** Re-check the signed-in student's achievements against their current stats. */
+  syncMyAchievements: () => Promise<void>
+  /** Equip (or clear, with null) a display title — must be one already unlocked. */
+  setDisplayTitle: (title: string | null) => Promise<{ error?: string }>
+  /** Choose up to 3 unlocked achievements to feature on the profile. */
+  setPinnedAchievements: (codes: string[]) => Promise<{ error?: string }>
 }
 
 const StudentDataContext = createContext<StudentDataValue | undefined>(undefined)
@@ -87,6 +115,11 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const [awayEvents, setAwayEvents] = useState<PointEvent[]>([])
   const [levelUp, setLevelUp] = useState<number | null>(null)
   const [live, setLive] = useState(false)
+  const [achievements, setAchievements] = useState<AchievementState[]>([])
+  const [achievementsLoading, setAchievementsLoading] = useState(true)
+  const [achievementProgress, setAchievementProgress] = useState<AchievementProgress | null>(null)
+  // Achievements queued to celebrate, shown one at a time (oldest first).
+  const [unlockQueue, setUnlockQueue] = useState<Achievement[]>([])
 
   // Tracks the level/rank we last reflected, to detect changes.
   const levelRef = useRef<number | null>(null)
@@ -98,6 +131,16 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   // True once the realtime channel has subscribed at least once — a *second*
   // SUBSCRIBED means we reconnected and may have missed awards while away.
   const subscribedOnceRef = useRef(false)
+  // Latest achievements list, readable from callbacks without re-subscribing
+  // effects (mirrors the loadRef pattern below).
+  const achievementsRef = useRef<AchievementState[]>([])
+  useEffect(() => {
+    achievementsRef.current = achievements
+  }, [achievements])
+  // Codes already queued/celebrated this session — a sync's own return value
+  // and the realtime echo of that same insert both try to celebrate the same
+  // unlock, so this dedupes whichever arrives first.
+  const celebratedRef = useRef<Set<string>>(new Set())
 
   // Unlock audio playback on the first user gesture (browsers require this).
   useEffect(() => {
@@ -156,6 +199,62 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     [toast],
   )
 
+  /** Refresh the achievement catalog + this student's unlock state/progress. */
+  const loadAchievements = useCallback(async (studentId: string) => {
+    try {
+      const [list, progress] = await Promise.all([
+        getMyAchievements(studentId),
+        getAchievementProgress(studentId),
+      ])
+      setAchievements(list)
+      setAchievementProgress(progress)
+    } catch {
+      /* non-fatal — the trophy case just stays on its last-known state */
+    }
+  }, [])
+
+  /** Queue a celebration for one newly-unlocked achievement, once per code. */
+  const celebrate = useCallback((a: Achievement) => {
+    if (celebratedRef.current.has(a.code)) return
+    celebratedRef.current.add(a.code)
+    setUnlockQueue((q) => [...q, a])
+    if (document.visibilityState === 'visible') {
+      playSound('levelup')
+      vibrate('levelup')
+    } else {
+      void showLocalNotification({
+        title: `Achievement unlocked: ${a.name} 🏆`,
+        body: a.titleText ? `New title: "${a.titleText}"` : 'Nice work — check it out!',
+        tag: 'cp-achievement',
+      })
+    }
+  }, [])
+
+  /** Re-evaluate this student's auto-computed achievements against current
+   * stats. Safe to call often — the RPC is idempotent and only ever reports
+   * genuinely new unlocks, which get queued for the celebration burst. */
+  const runAchievementSync = useCallback(
+    async (studentId: string) => {
+      try {
+        const unlocked = await syncAchievements(studentId)
+        if (unlocked.length === 0) return
+        let catalog = achievementsRef.current
+        if (catalog.length === 0) {
+          catalog = await getMyAchievements(studentId).catch(() => [])
+        }
+        const byCode = new Map(catalog.map((a) => [a.code, a]))
+        for (const u of unlocked) {
+          const full = byCode.get(u.code)
+          if (full) celebrate(full)
+        }
+        await loadAchievements(studentId)
+      } catch {
+        /* non-fatal — the next opportunistic call will retry */
+      }
+    },
+    [celebrate, loadAchievements],
+  )
+
   const load = useCallback(async () => {
     if (!user || inFlightRef.current) return
     inFlightRef.current = true
@@ -192,13 +291,17 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         considerLevelUp(mine.id, mine.lifetime_points)
         const myRank = snap.entries.find((e) => e.student_id === mine.id)?.rank ?? null
         considerRankChange(mine.id, myRank)
+        // Independent of the main load — achievements populate the trophy
+        // case as soon as they're ready without delaying the dashboard.
+        void loadAchievements(mine.id).finally(() => setAchievementsLoading(false))
+        void runAchievementSync(mine.id)
       }
     } catch {
       setError(true)
     } finally {
       inFlightRef.current = false
     }
-  }, [user, considerLevelUp, considerRankChange])
+  }, [user, considerLevelUp, considerRankChange, loadAchievements, runAchievementSync])
 
   // Always call the freshest `load` from listeners/callbacks without making the
   // realtime channel re-subscribe when `load`'s identity changes.
@@ -292,6 +395,24 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
           if (typeof row.rank === 'number') considerRankChange(studentId, row.rank)
         },
       )
+      // Catches instructor-granted achievements live (self-triggered unlocks
+      // already celebrate synchronously from syncAchievements' own return
+      // value — `celebrate()` dedupes so this never double-fires for those).
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'student_achievements',
+          filter: `student_id=eq.${studentId}`,
+        },
+        (payload) => {
+          const row = payload.new as { achievement_code: string }
+          const full = achievementsRef.current.find((a) => a.code === row.achievement_code)
+          if (full) celebrate(full)
+          void loadAchievements(studentId)
+        },
+      )
       .subscribe((status) => {
         setLive(status === 'SUBSCRIBED')
         if (status === 'SUBSCRIBED') {
@@ -310,7 +431,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       setLive(false)
       void supabase.removeChannel(channel)
     }
-  }, [studentId, considerLevelUp, considerRankChange, toast])
+  }, [studentId, considerLevelUp, considerRankChange, toast, celebrate, loadAchievements])
 
   // Returning to the tab/app: realtime may have been suspended in the
   // background, so pull fresh data to guarantee the score is current.
@@ -352,12 +473,13 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         setMe((m) =>
           m ? { ...m, display_name: name, bio: nextBio, interests: nextInterests } : m,
         )
+        void runAchievementSync(me.id) // may clear "Open Book"
         return {}
       } catch {
         return { error: 'Could not save. Please try again.' }
       }
     },
-    [me],
+    [me, runAchievementSync],
   )
 
   const MAX_AVATAR_BYTES = 5 * 1024 * 1024
@@ -370,12 +492,13 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       try {
         const url = await updateAvatar(me.id, user.id, file)
         setMe((m) => (m ? { ...m, avatar_url: url } : m))
+        void runAchievementSync(me.id) // may clear "Picture Perfect"
         return {}
       } catch {
         return { error: 'Could not upload the picture. Please try again.' }
       }
     },
-    [me, user, MAX_AVATAR_BYTES],
+    [me, user, MAX_AVATAR_BYTES, runAchievementSync],
   )
 
   const clearAvatar = useCallback(async () => {
@@ -401,12 +524,13 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         const next = [...current, url]
         await setBannerUrls(me.id, next)
         setMe((m) => (m ? { ...m, banner_urls: next } : m))
+        void runAchievementSync(me.id) // may clear "Show and Tell"
         return {}
       } catch {
         return { error: 'Could not upload the photo. Please try again.' }
       }
     },
-    [me, user, MAX_AVATAR_BYTES],
+    [me, user, MAX_AVATAR_BYTES, runAchievementSync],
   )
 
   const removeBanner = useCallback(
@@ -426,6 +550,46 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   const clearLevelUp = useCallback(() => setLevelUp(null), [])
   const clearAwayRecap = useCallback(() => setAwayEvents([]), [])
+
+  /** Exposed for other student pages (e.g. after scanning attendance, or
+   * after viewing a classmate's profile) to opportunistically re-check. */
+  const syncMyAchievements = useCallback(async () => {
+    if (!me) return
+    await runAchievementSync(me.id)
+  }, [me, runAchievementSync])
+
+  const setDisplayTitleField = useCallback(
+    async (title: string | null) => {
+      if (!me) return { error: 'Still loading — try again in a moment.' }
+      try {
+        await apiSetDisplayTitle(me.id, title)
+        setMe((m) => (m ? { ...m, display_title: title } : m))
+        return {}
+      } catch {
+        return { error: 'Could not equip that title. Please try again.' }
+      }
+    },
+    [me],
+  )
+
+  const setPinnedAchievementsField = useCallback(
+    async (codes: string[]) => {
+      if (!me) return { error: 'Still loading — try again in a moment.' }
+      try {
+        await apiSetPinnedAchievements(me.id, codes)
+        setMe((m) => (m ? { ...m, pinned_achievements: codes.length ? codes : null } : m))
+        return {}
+      } catch {
+        return { error: 'Could not update your pinned badges. Please try again.' }
+      }
+    },
+    [me],
+  )
+
+  // Celebrate the queued achievements one at a time — dismissing pops the
+  // front of the queue rather than clearing everything at once.
+  const unlockedAchievement = unlockQueue[0] ?? null
+  const clearUnlockedAchievement = useCallback(() => setUnlockQueue((q) => q.slice(1)), [])
 
   return (
     <StudentDataContext.Provider
@@ -450,6 +614,14 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         removeBanner,
         levelUp,
         clearLevelUp,
+        achievements,
+        achievementsLoading,
+        achievementProgress,
+        unlockedAchievement,
+        clearUnlockedAchievement,
+        syncMyAchievements,
+        setDisplayTitle: setDisplayTitleField,
+        setPinnedAchievements: setPinnedAchievementsField,
       }}
     >
       {children}
