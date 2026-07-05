@@ -35,6 +35,36 @@ export interface ChangelogEntry {
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.1.0',
+    date: '2026-07-06',
+    title: 'Achievements are here! 🏆',
+    sections: [
+      {
+        heading: 'Unlock 30 achievements',
+        items: [
+          'Earn illustrated badges for what you already do — racking up points, showing up to class, building your profile, and climbing the ranks.',
+          'Locked badges show your progress (like “7 / 12”) so you always know how close you are to the next one.',
+          'A few are secret — hidden as “???” until you discover them. Can you find them all?',
+          'Every unlock pops a little celebration, and your newest badges appear on your Profile.',
+        ],
+      },
+      {
+        heading: 'Earn and wear a title',
+        items: [
+          'The hardest achievements grant a display title — like “The Overachiever Elite” or “The Eye of Seeing Everything”.',
+          'Equip your favorite title from your Profile; classmates see it under your name when they tap you on the leaderboard.',
+        ],
+      },
+      {
+        heading: 'Show off your best badges',
+        items: [
+          'Pin up to 3 favorite badges to feature them first on your profile preview.',
+          'See everything you’ve earned (and what’s left) in the new trophy case, opened from your Profile.',
+        ],
+      },
+    ],
+  },
+  {
     version: '2.0.0',
     date: '2026-07-05',
     title: 'Attendance, profiles & more',

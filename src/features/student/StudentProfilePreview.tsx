@@ -6,12 +6,12 @@ import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
 import { ProfileBanner } from '@/components/profile/ProfileBanner'
 import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
 import { PinnedBadges } from '@/components/achievements/PinnedBadges'
-import { getPublicProfile, recordProfileView } from '@/lib/api'
+import { getPublicProfile, listAchievements, recordProfileView } from '@/lib/api'
 import { getLevelProgress } from '@/lib/leveling'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
-import type { PublicProfile } from '@/lib/types'
-import { useStudentData } from './StudentData'
+import type { AchievementState, PublicProfile } from '@/lib/types'
+import { useStudentDataOptional } from './StudentData'
 
 /** The minimum a caller already knows so the header renders instantly. */
 export interface PreviewTarget {
@@ -39,10 +39,17 @@ interface Props {
  * and recent point history are loaded lazily from `getPublicProfile`.
  */
 export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabel }: Props) {
-  const { achievements: catalog, syncMyAchievements } = useStudentData()
+  // Optional: this sheet is shared with the instructor's Rank tab, which has no
+  // StudentDataProvider around it. Fall back gracefully when the context is absent.
+  const studentCtx = useStudentDataOptional()
+  const syncMyAchievements = studentCtx?.syncMyAchievements
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
+  // Achievement catalog for rendering the viewed student's pinned badges. From
+  // student context when available; otherwise fetched directly (instructor view).
+  const [fallbackCatalog, setFallbackCatalog] = useState<AchievementState[]>([])
+  const catalog = studentCtx?.achievements ?? fallbackCatalog
 
   const studentId = target?.student_id
   useEffect(() => {
@@ -60,12 +67,25 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
     }
   }, [open, studentId])
 
-  // Count a profile view — but never your own (the RPC also guards this) —
-  // then re-check the viewer's own achievements (e.g. "Curious Classmate").
+  // No student context (instructor view) → load the static catalog once so the
+  // viewed student's pinned badges still render.
+  useEffect(() => {
+    if (studentCtx || !open) return
+    let active = true
+    listAchievements()
+      .then((list) => active && setFallbackCatalog(list.map((a) => ({ ...a, unlockedAt: null }))))
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [studentCtx, open])
+
+  // Count a profile view — but never your own (the RPC also guards this) — then
+  // re-check the viewer's own achievements (only meaningful in student context).
   useEffect(() => {
     if (!open || !studentId || isMe) return
     void recordProfileView(studentId)
-      .then(() => syncMyAchievements())
+      .then(() => syncMyAchievements?.())
       .catch(() => {})
   }, [open, studentId, isMe, syncMyAchievements])
 

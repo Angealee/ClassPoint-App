@@ -27,28 +27,31 @@ export function WhatsNew() {
 
   return (
     <Sheet open={open} onClose={dismiss} title="What's new">
-      <div className="space-y-5">
+      <div className="space-y-6">
         {entries.map((entry) => (
           <section key={entry.version}>
             <div className="flex items-baseline justify-between gap-2">
-              <h3 className="font-display text-base font-bold">{entry.title}</h3>
+              <h3 className="font-display text-xl font-bold">{entry.title}</h3>
               <span className="shrink-0 text-xs text-muted">v{entry.version}</span>
             </div>
-            <p className="text-xs text-muted">{formatDate(entry.date)}</p>
+            <p className="text-sm text-muted">{formatDate(entry.date)}</p>
 
             {entry.sections ? (
               // Main update → sub-module updates.
-              <div className="mt-3 space-y-3.5">
+              <div className="mt-4 space-y-4">
                 {entry.sections.map((section, si) => (
                   <div key={si}>
-                    <p className="flex items-start gap-2 text-sm font-semibold">
-                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
+                    <p className="flex items-start gap-2.5 text-base font-bold">
+                      <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-brand-500" />
                       <span>{section.heading}</span>
                     </p>
-                    <ul className="mt-1.5 space-y-1.5 pl-4">
+                    <ul className="mt-2 space-y-2 pl-5">
                       {section.items.map((item, i) => (
-                        <li key={i} className="flex gap-2 text-[0.82rem] leading-relaxed text-muted">
-                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted" />
+                        <li
+                          key={i}
+                          className="flex gap-2.5 text-[0.95rem] leading-relaxed text-ink/80"
+                        >
+                          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-muted" />
                           <span>{item}</span>
                         </li>
                       ))}
@@ -57,9 +60,9 @@ export function WhatsNew() {
                 ))}
               </div>
             ) : (
-              <ul className="mt-2.5 space-y-2.5">
+              <ul className="mt-3 space-y-3">
                 {entry.items?.map((item, i) => (
-                  <li key={i} className="flex gap-2.5 text-sm leading-relaxed">
+                  <li key={i} className="flex gap-2.5 text-base leading-relaxed">
                     <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />
                     <span>{item}</span>
                   </li>

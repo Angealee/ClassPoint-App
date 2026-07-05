@@ -634,3 +634,13 @@ export function useStudentData(): StudentDataValue {
   if (!ctx) throw new Error('useStudentData must be used within StudentDataProvider')
   return ctx
 }
+
+/**
+ * Like {@link useStudentData}, but returns `undefined` instead of throwing when
+ * rendered outside a `StudentDataProvider`. For components shared across both the
+ * student and instructor areas — e.g. the profile-preview sheet, which the
+ * instructor's Rank tab reuses with no student context around it.
+ */
+export function useStudentDataOptional(): StudentDataValue | undefined {
+  return useContext(StudentDataContext)
+}
