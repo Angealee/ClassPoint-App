@@ -13,6 +13,8 @@ export interface ChangelogSection {
   heading: string
   /** The detail bullets under it (the "sub-module updates"). */
   items: string[]
+  /** Flags a headline feature — renders a "MAJOR" pill so it stands out. */
+  major?: boolean
 }
 
 export interface ChangelogEntry {
@@ -35,57 +37,41 @@ export interface ChangelogEntry {
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '2.1.0',
+    version: '2.2.0',
     date: '2026-07-06',
-    title: 'Achievements are here! 🏆',
+    title: 'The big update 🎉',
     sections: [
       {
-        heading: 'Unlock 30 achievements',
+        heading: 'QR Attendance',
+        major: true,
         items: [
-          'Earn illustrated badges for what you already do — racking up points, showing up to class, building your profile, and climbing the ranks.',
-          'Locked badges show your progress (like “7 / 12”) so you always know how close you are to the next one.',
-          'A few are secret — hidden as “???” until you discover them. Can you find them all?',
-          'Every unlock pops a little celebration, and your newest badges appear on your Profile.',
+          'Students: open the Attendance tab and tap “Scan attendance” to check in with your instructor’s on-screen QR — you’re marked Present, Late, or Absent from when you scan.',
+          'The QR refreshes every few seconds, so a screenshot can’t check in for someone else.',
+          'Instructors: start a class with your own late/absent timing, watch the roster fill in live, and mark anyone by hand who has no internet.',
+          'Show the QR fullscreen for a whole class to scan from a projector; the code stops once the Absent-after time passes.',
+          'Review and correct everyone before finalising — penalties apply on finish, and any session exports to Excel.',
         ],
       },
       {
-        heading: 'Earn and wear a title',
+        heading: 'Achievements & titles',
+        major: true,
         items: [
-          'The hardest achievements grant a display title — like “The Overachiever Elite” or “The Eye of Seeing Everything”.',
-          'Equip your favorite title from your Profile; classmates see it under your name when they tap you on the leaderboard.',
+          'Unlock 30 illustrated badges for what you already do — earning points, showing up, building your profile, and climbing the ranks.',
+          'Locked badges show your progress (like “7 / 12”), and a few are secret — hidden as “???” until you find them.',
+          'The toughest badges grant a display title (like “The Overachiever Elite” or “The Eye of Seeing Everything”) you can equip — classmates see it on your profile.',
+          'Pin your 3 favorite badges and browse everything in the new trophy case from your Profile. Every unlock pops a celebration.',
         ],
       },
       {
-        heading: 'Show off your best badges',
+        heading: 'Show off with 3 photos',
         items: [
-          'Pin up to 3 favorite badges to feature them first on your profile preview.',
-          'See everything you’ve earned (and what’s left) in the new trophy case, opened from your Profile.',
-        ],
-      },
-    ],
-  },
-  {
-    version: '2.0.0',
-    date: '2026-07-05',
-    title: 'Attendance, profiles & more',
-    sections: [
-      {
-        heading: 'New: check in by scanning a QR',
-        items: [
-          'Open the new Attendance tab and tap “Scan attendance” to check in to class with your instructor’s on-screen QR code.',
-          'The QR refreshes every few seconds, so a screenshot won’t let someone check in for you.',
-          'You’re marked Present, Late, or Absent based on when you scan — see it all in your attendance history.',
+          'Add up to 3 showcase photos to your profile (≤ 5 MB each) — classmates see them when they tap you on the leaderboard.',
         ],
       },
       {
-        heading: 'Attendance — for instructors',
+        heading: 'See who viewed your profile',
         items: [
-          'Start a class from the Attendance tab: set the topic and the late/absent timing, then show the rotating QR.',
-          'Watch the roster fill in live as students check in, then review and correct anyone before finalising.',
-          'Tap any student on the live roster to check them in by hand — for anyone with no internet to scan — or reset them back to waiting.',
-          'Present the QR fullscreen so a whole class can scan from a projector, and search or filter a long roster to find someone fast.',
-          'The QR stops once the Absent-after time passes, the section picker stays pinned at the top, and you can edit or delete a past session.',
-          'Late and absent penalties are applied on finalise, and every session can be exported to Excel.',
+          'Your profile shows who recently viewed it — photo and name, just like “seen by” — plus your total view count. Only you can see this.',
         ],
       },
       {
@@ -96,25 +82,12 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
-        heading: 'See who viewed your profile',
+        heading: 'Fixes & polish',
         items: [
-          'Your profile now shows who recently viewed it — with their photo and name, just like “seen by”.',
-          'Check your total profile views on your Profile tab and your own preview. Only you can see this.',
-        ],
-      },
-      {
-        heading: 'Show off with photo banners',
-        items: [
-          'Add up to 3 showcase photos to your profile (≤ 5 MB each) — classmates see them when they tap you on the leaderboard.',
-        ],
-      },
-      {
-        heading: 'New: Achievements',
-        items: [
-          '30 badges to unlock across points, attendance, growth, social, and a few secret ones — check your progress on the new Achievements page, linked from Profile.',
-          'The toughest badge in each category also unlocks a display title (like "Summit Climber" or "The Overachiever Elite") you can equip — classmates see it on your profile preview.',
-          'Pin your 3 favorite badges to feature them first, right alongside your photos.',
-          'Instructors can hand out special recognitions — Most Improved, Class MVP, and more — straight from the roster.',
+          'Fixed the “couldn’t start the class” error — sessions now open reliably the first time.',
+          'Fixed a crash when instructors tapped a student on the Ranks tab.',
+          'Faster, smoother live attendance roster — it stays snappy even when a whole class scans at once.',
+          'Lots of little reliability and mobile-layout polish across the app.',
         ],
       },
     ],

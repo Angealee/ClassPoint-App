@@ -14,6 +14,8 @@ import { useAuth } from '@/lib/auth'
 import { ProfileBanner } from '@/components/profile/ProfileBanner'
 import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
 import { PinnedBadges } from '@/components/achievements/PinnedBadges'
+import { ChangelogList } from '@/components/changelog/ChangelogList'
+import { CHANGELOG, LATEST_VERSION } from '@/lib/changelog'
 import { useStudentData } from './StudentData'
 import { StudentProfilePreview } from './StudentProfilePreview'
 
@@ -31,6 +33,7 @@ export function Profile() {
     removeBanner,
     achievements,
     setPinnedAchievements,
+    hasUnseenAchievements,
   } = useStudentData()
   const { toast } = useToast()
   const navigate = useNavigate()
@@ -38,6 +41,7 @@ export function Profile() {
   const bannerRef = useRef<HTMLInputElement>(null)
   const [bannerBusy, setBannerBusy] = useState(false)
   const [pinBusy, setPinBusy] = useState(false)
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false)
 
   const [editOpen, setEditOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -285,7 +289,12 @@ export function Profile() {
           {/* Achievements */}
           <div className="mt-5">
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm text-muted">Achievements</p>
+              <p className="flex items-center gap-2 text-sm text-muted">
+                Achievements
+                {hasUnseenAchievements && (
+                  <span className="h-2 w-2 rounded-full bg-brand-500" aria-label="New badges" />
+                )}
+              </p>
               <button
                 type="button"
                 onClick={() => navigate('/app/achievements')}
@@ -372,9 +381,28 @@ export function Profile() {
         </div>
       </Card>
 
+      <button
+        type="button"
+        onClick={() => setWhatsNewOpen(true)}
+        className="flex w-full items-center justify-between rounded-2xl border border-line bg-card px-5 py-4 text-left transition-colors hover:bg-card-2"
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-medium">What's new</p>
+          <p className="text-xs text-muted">See the latest updates and features.</p>
+        </div>
+        <span className="shrink-0 text-xs font-semibold text-muted">v{LATEST_VERSION}</span>
+      </button>
+
       <Button variant="ghost" className="w-full text-muted" onClick={onSignOut}>
         Sign out
       </Button>
+
+      <Sheet open={whatsNewOpen} onClose={() => setWhatsNewOpen(false)} title="What's new">
+        <ChangelogList entries={CHANGELOG} />
+        <Button size="lg" className="mt-5 w-full" onClick={() => setWhatsNewOpen(false)}>
+          Got it
+        </Button>
+      </Sheet>
 
       <Sheet open={editOpen} onClose={() => setEditOpen(false)} title="Edit profile">
         <form onSubmit={onSave} className="space-y-4">

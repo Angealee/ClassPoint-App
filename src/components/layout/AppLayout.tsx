@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Shell, type NavItem } from '@/components/layout/Shell'
 import { StudentDataProvider, useStudentData } from '@/features/student/StudentData'
 import { LevelUpBurst } from '@/components/ui/LevelUpBurst'
@@ -17,6 +17,19 @@ const studentNav: NavItem[] = [
   { to: '/app/attendance', label: 'Attend', Icon: ScanIcon },
   { to: '/app/profile', label: 'Profile', Icon: UserIcon },
 ]
+
+/** The shell with a live nav — the Profile tab gets a dot for new achievements. */
+function StudentShell() {
+  const { hasUnseenAchievements } = useStudentData()
+  const nav = useMemo(
+    () =>
+      studentNav.map((n) =>
+        n.to === '/app/profile' ? { ...n, dot: hasUnseenAchievements } : n,
+      ),
+    [hasUnseenAchievements],
+  )
+  return <Shell nav={nav} />
+}
 
 /** Renders the celebratory burst from shared student data. */
 function LevelUpOverlay() {
@@ -68,7 +81,7 @@ function IntroOrWhatsNew() {
 export function AppLayout() {
   return (
     <StudentDataProvider>
-      <Shell nav={studentNav} />
+      <StudentShell />
       <LevelUpOverlay />
       <AchievementUnlockOverlay />
       <IntroOrWhatsNew />

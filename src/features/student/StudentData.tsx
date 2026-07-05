@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -88,6 +89,10 @@ interface StudentDataValue {
   clearUnlockedAchievement: () => void
   /** Re-check the signed-in student's achievements against their current stats. */
   syncMyAchievements: () => Promise<void>
+  /** True when the student has newly-unlocked badges they haven't viewed yet. */
+  hasUnseenAchievements: boolean
+  /** Mark all currently-unlocked achievements as seen (clears the nudge dot). */
+  markAchievementsSeen: () => void
   /** Equip (or clear, with null) a display title — must be one already unlocked. */
   setDisplayTitle: (title: string | null) => Promise<{ error?: string }>
   /** Choose up to 3 unlocked achievements to feature on the profile. */
@@ -101,6 +106,9 @@ const seenRankKey = (studentId: string) => `cp_seen_rank_${studentId}`
 // Timestamp through which the student has already seen their point events; events
 // newer than this on the next open are recapped in the "while you were away" modal.
 const seenEventsKey = (studentId: string) => `cp_events_seen_until_${studentId}`
+// Codes of the achievements the student has already looked at (in the trophy
+// case). Anything unlocked but not in here drives the "new badge" nudge dot.
+const seenAchKey = (studentId: string) => `cp_seen_achievements_${studentId}`
 
 export function StudentDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -551,6 +559,32 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const clearLevelUp = useCallback(() => setLevelUp(null), [])
   const clearAwayRecap = useCallback(() => setAwayEvents([]), [])
 
+  // "New badge" nudge: any unlocked achievement whose code the student hasn't
+  // viewed in the trophy case yet. `achSeenBump` forces a recompute after marking.
+  const [achSeenBump, setAchSeenBump] = useState(0)
+  const hasUnseenAchievements = useMemo(() => {
+    if (!me) return false
+    let seen: string[] = []
+    try {
+      seen = JSON.parse(localStorage.getItem(seenAchKey(me.id)) ?? '[]')
+    } catch {
+      seen = []
+    }
+    const seenSet = new Set(seen)
+    return achievements.some((a) => a.unlockedAt && !seenSet.has(a.code))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me, achievements, achSeenBump])
+  const markAchievementsSeen = useCallback(() => {
+    if (!me) return
+    const codes = achievements.filter((a) => a.unlockedAt).map((a) => a.code)
+    try {
+      localStorage.setItem(seenAchKey(me.id), JSON.stringify(codes))
+    } catch {
+      /* storage unavailable — the dot just persists */
+    }
+    setAchSeenBump((v) => v + 1)
+  }, [me, achievements])
+
   /** Exposed for other student pages (e.g. after scanning attendance, or
    * after viewing a classmate's profile) to opportunistically re-check. */
   const syncMyAchievements = useCallback(async () => {
@@ -620,6 +654,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         unlockedAchievement,
         clearUnlockedAchievement,
         syncMyAchievements,
+        hasUnseenAchievements,
+        markAchievementsSeen,
         setDisplayTitle: setDisplayTitleField,
         setPinnedAchievements: setPinnedAchievementsField,
       }}

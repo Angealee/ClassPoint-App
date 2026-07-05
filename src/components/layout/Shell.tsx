@@ -11,6 +11,8 @@ export interface NavItem {
   label: string
   Icon: ComponentType<SVGProps<SVGSVGElement>>
   end?: boolean
+  /** Shows a small "attention" dot on the item (e.g. new achievements). */
+  dot?: boolean
 }
 
 /**
@@ -38,7 +40,7 @@ export function Shell({
         </div>
 
         <nav className="mt-8 flex flex-col gap-1">
-          {nav.map(({ to, label, Icon, end }) => (
+          {nav.map(({ to, label, Icon, end, dot }) => (
             <NavLink
               key={to}
               to={to}
@@ -54,12 +56,17 @@ export function Shell({
             >
               {({ isActive }) => (
                 <>
-                  <Icon
-                    className={cn(
-                      'h-5 w-5',
-                      isActive && 'drop-shadow-[0_0_6px_var(--color-brand-500)]',
+                  <span className="relative">
+                    <Icon
+                      className={cn(
+                        'h-5 w-5',
+                        isActive && 'drop-shadow-[0_0_6px_var(--color-brand-500)]',
+                      )}
+                    />
+                    {dot && (
+                      <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-brand-500 ring-2 ring-canvas" />
                     )}
-                  />
+                  </span>
                   {label}
                 </>
               )}
@@ -98,7 +105,7 @@ export function Shell({
         {/* Mobile bottom navigation */}
         <nav className="theme-transition fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-2xl border-t border-line bg-canvas/90 px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md md:hidden">
           <ul className="flex items-center justify-around">
-            {nav.map(({ to, label, Icon, end }) => (
+            {nav.map(({ to, label, Icon, end, dot }) => (
               <li key={to} className="flex-1">
                 <NavLink
                   to={to}
@@ -112,12 +119,17 @@ export function Shell({
                 >
                   {({ isActive }) => (
                     <>
-                      <Icon
-                        className={cn(
-                          'h-6 w-6',
-                          isActive && 'drop-shadow-[0_0_6px_var(--color-brand-500)]',
+                      <span className="relative">
+                        <Icon
+                          className={cn(
+                            'h-6 w-6',
+                            isActive && 'drop-shadow-[0_0_6px_var(--color-brand-500)]',
+                          )}
+                        />
+                        {dot && (
+                          <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-brand-500 ring-2 ring-canvas" />
                         )}
-                      />
+                      </span>
                       {label}
                     </>
                   )}

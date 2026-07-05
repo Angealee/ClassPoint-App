@@ -1,14 +1,16 @@
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { XpBar } from '@/components/ui/XpBar'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { BadgeArt } from '@/components/achievements/BadgeArt'
 import { getLevelProgress } from '@/lib/leveling'
 import { snapshotLabel, timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
-import type { PointEvent } from '@/lib/types'
+import type { AchievementState, PointEvent } from '@/lib/types'
 import { useStudentData } from './StudentData'
 
 /** Time-of-day greeting for a warmer welcome. */
@@ -54,8 +56,20 @@ const item = {
 }
 
 export function Dashboard() {
-  const { loading, error, me, events, live, rank, capturedAt, sectionName, refresh } =
-    useStudentData()
+  const navigate = useNavigate()
+  const {
+    loading,
+    error,
+    me,
+    events,
+    live,
+    rank,
+    capturedAt,
+    sectionName,
+    refresh,
+    achievements,
+    hasUnseenAchievements,
+  } = useStudentData()
 
   if (loading) return <DashboardSkeleton />
 
@@ -149,6 +163,17 @@ export function Dashboard() {
         />
       </motion.div>
 
+      {/* Achievements teaser — the only home-screen entry point to the trophy case. */}
+      {achievements.length > 0 && (
+        <motion.div variants={item}>
+          <AchievementsTeaser
+            achievements={achievements}
+            hasUnseen={hasUnseenAchievements}
+            onOpen={() => navigate('/app/achievements')}
+          />
+        </motion.div>
+      )}
+
       {/* Recent points feed — grouped by day. */}
       <motion.div variants={item}>
         <h2 className="mb-2 text-sm font-semibold text-muted">Recent points</h2>
@@ -182,6 +207,62 @@ export function Dashboard() {
       </motion.div>
       </motion.div>
     </PullToRefresh>
+  )
+}
+
+/** Home-screen entry point to the trophy case: a few badges + unlock count. */
+function AchievementsTeaser({
+  achievements,
+  hasUnseen,
+  onOpen,
+}: {
+  achievements: AchievementState[]
+  hasUnseen: boolean
+  onOpen: () => void
+}) {
+  const unlocked = achievements.filter((a) => a.unlockedAt)
+  // Newest unlocked first; fall back to the first few locked ones to entice.
+  const showcase = (
+    unlocked.length
+      ? [...unlocked].sort((a, b) => (b.unlockedAt ?? '').localeCompare(a.unlockedAt ?? ''))
+      : achievements
+  ).slice(0, 4)
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label="Open achievements"
+      className="block w-full text-left"
+    >
+      <Card className="flex items-center gap-3 p-4 transition-colors hover:bg-card-2">
+        <div className="flex -space-x-3">
+          {showcase.map((a) => (
+            <BadgeArt
+              key={a.code}
+              code={a.code}
+              category={a.category}
+              state={a.unlockedAt ? 'unlocked' : a.secret ? 'secret' : 'locked'}
+              isTitleGrantor={!!a.titleText}
+              size="sm"
+              className="rounded-2xl ring-2 ring-canvas"
+            />
+          ))}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            Achievements
+            {hasUnseen && (
+              <span className="h-2 w-2 shrink-0 rounded-full bg-brand-500" aria-label="New" />
+            )}
+          </p>
+          <p className="text-xs text-muted">
+            {unlocked.length} / {achievements.length} unlocked
+          </p>
+        </div>
+        <span className="shrink-0 text-lg text-muted">›</span>
+      </Card>
+    </button>
   )
 }
 

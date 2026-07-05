@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -18,6 +18,15 @@ const CATEGORY_LABELS: Record<AchievementCategory, string> = {
   recognition: 'Recognition',
 }
 
+const CATEGORY_SHORT: Record<AchievementCategory, string> = {
+  points: 'Points',
+  attendance: 'Attendance',
+  growth: 'Growth',
+  social: 'Social',
+  fun: 'Fun',
+  recognition: 'Recognition',
+}
+
 const CATEGORY_ORDER: AchievementCategory[] = [
   'points',
   'attendance',
@@ -26,6 +35,36 @@ const CATEGORY_ORDER: AchievementCategory[] = [
   'fun',
   'recognition',
 ]
+
+type CategoryFilter = AchievementCategory | 'all'
+type StatusFilter = 'all' | 'unlocked' | 'locked'
+
+/** A pill toggle used by the category + status filter rows. */
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+        active
+          ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+          : 'border-line text-muted hover:text-ink',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
 
 /** The full "trophy case": every achievement, grouped by category, plus the
  * title-equip picker for whichever ones the student has unlocked. */
@@ -38,19 +77,37 @@ export function Achievements() {
     achievementsLoading,
     achievementProgress,
     setDisplayTitle: equipTitle,
+    markAchievementsSeen,
   } = useStudentData()
   const [equipping, setEquipping] = useState(false)
+  const [catFilter, setCatFilter] = useState<CategoryFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+
+  // Viewing the trophy case clears the "new badge" nudge dot.
+  useEffect(() => {
+    markAchievementsSeen()
+  }, [markAchievementsSeen])
 
   const unlockedCount = achievements.filter((a) => a.unlockedAt).length
+  const filtered = useMemo(
+    () =>
+      achievements.filter(
+        (a) =>
+          (catFilter === 'all' || a.category === catFilter) &&
+          (statusFilter === 'all' ||
+            (statusFilter === 'unlocked' ? !!a.unlockedAt : !a.unlockedAt)),
+      ),
+    [achievements, catFilter, statusFilter],
+  )
   const grouped = useMemo(() => {
     const map = new Map<AchievementCategory, AchievementState[]>()
-    for (const a of achievements) {
+    for (const a of filtered) {
       const list = map.get(a.category) ?? []
       list.push(a)
       map.set(a.category, list)
     }
     return map
-  }, [achievements])
+  }, [filtered])
 
   const unlockedTitles = achievements.filter((a) => a.unlockedAt && a.titleText)
 
@@ -115,8 +172,35 @@ export function Achievements() {
         </Card>
       )}
 
+      {/* Filters — narrow a 30-badge list by category and unlock status. */}
+      {!achievementsLoading && achievements.length > 0 && (
+        <div className="space-y-2">
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            <FilterChip active={catFilter === 'all'} onClick={() => setCatFilter('all')}>
+              All
+            </FilterChip>
+            {CATEGORY_ORDER.map((c) => (
+              <FilterChip key={c} active={catFilter === c} onClick={() => setCatFilter(c)}>
+                {CATEGORY_SHORT[c]}
+              </FilterChip>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            {(['all', 'unlocked', 'locked'] as const).map((s) => (
+              <FilterChip key={s} active={statusFilter === s} onClick={() => setStatusFilter(s)}>
+                {s === 'all' ? 'All' : s === 'unlocked' ? 'Unlocked' : 'Locked'}
+              </FilterChip>
+            ))}
+          </div>
+        </div>
+      )}
+
       {achievementsLoading ? (
         <Card className="h-64 animate-pulse bg-card-2" />
+      ) : filtered.length === 0 ? (
+        <Card className="p-8 text-center text-sm text-muted">
+          Nothing here — try a different filter.
+        </Card>
       ) : (
         CATEGORY_ORDER.map((cat) => {
           const list = grouped.get(cat)
