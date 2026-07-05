@@ -76,6 +76,8 @@ export interface StudentSelf {
   bio: string | null
   /** Optional, comma-separated interests/hobbies (max 120 chars). */
   interests: string | null
+  /** Up to 3 public "showcase" photo URLs on the profile. */
+  banner_urls: string[] | null
   lifetime_points: number
 }
 
@@ -170,9 +172,27 @@ export interface PublicProfile {
   avatar_url: string | null
   bio: string | null
   interests: string | null
+  /** Up to 3 public "showcase" photo URLs on the profile. */
+  banner_urls: string[] | null
   lifetime_points: number
   /** When the roster entry was created — shown as "member since". */
   created_at: string | null
   /** Their most recent point awards (privacy-aware; from public_point_events). */
   events: PublicPointEvent[]
+}
+
+/** One recent visitor to a student's own profile ("seen by …"). */
+export interface ProfileVisitor {
+  displayName: string
+  avatarUrl: string | null
+  lastViewedAt: string
+}
+
+/** A student's own profile-view stats + recent visitors. */
+export interface ProfileViews {
+  /** Total views across all visitors (repeat views counted). */
+  total: number
+  /** Distinct people who viewed. */
+  visitors: number
+  recent: ProfileVisitor[]
 }

@@ -10,6 +10,7 @@ import type {
   MyAttendanceEntry,
   PointCategory,
   PointEvent,
+  ProfileViews,
   PublicPointEvent,
   PublicProfile,
   ScanResult,
@@ -260,7 +261,9 @@ export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot> {
 export async function getMyStudent(userId: string): Promise<StudentSelf | null> {
   const { data, error } = await supabase
     .from('students')
-    .select('id, section_id, full_name, display_name, avatar_url, bio, interests, lifetime_points')
+    .select(
+      'id, section_id, full_name, display_name, avatar_url, bio, interests, banner_urls, lifetime_points',
+    )
     .eq('user_id', userId)
     .maybeSingle<StudentSelf>()
   if (error) throw error
@@ -299,7 +302,9 @@ export async function getPublicProfile(
   const [studentRes, eventsRes] = await Promise.all([
     supabase
       .from('students')
-      .select('id, display_name, section_id, avatar_url, bio, interests, lifetime_points, created_at')
+      .select(
+        'id, display_name, section_id, avatar_url, bio, interests, banner_urls, lifetime_points, created_at',
+      )
       .eq('id', studentId)
       .maybeSingle(),
     supabase.rpc('public_point_events', { p_student_id: studentId, p_limit: eventLimit }),
@@ -315,6 +320,7 @@ export async function getPublicProfile(
     avatar_url: (s.avatar_url as string | null) ?? null,
     bio: (s.bio as string | null) ?? null,
     interests: (s.interests as string | null) ?? null,
+    banner_urls: (s.banner_urls as string[] | null) ?? null,
     lifetime_points: s.lifetime_points as number,
     created_at: (s.created_at as string | null) ?? null,
     events: (eventsRes.data ?? []) as PublicPointEvent[],
@@ -359,6 +365,59 @@ export async function removeAvatar(studentId: string): Promise<void> {
     .update({ avatar_url: null })
     .eq('id', studentId)
   if (error) throw error
+}
+
+/**
+ * Upload one showcase banner photo to the shared `avatars` bucket (its RLS
+ * already scopes writes to <auth.uid()>/…) and return the public URL. The caller
+ * then persists the new banner_urls array via `setBannerUrls`.
+ */
+export async function uploadBannerPhoto(userId: string, file: File): Promise<string> {
+  const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+  const path = `${userId}/banner-${Date.now()}.${ext}`
+  const { error: upErr } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { cacheControl: '3600', upsert: true, contentType: file.type })
+  if (upErr) throw upErr
+  return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl
+}
+
+/** Save the student's showcase banner photo URLs (0–3). */
+export async function setBannerUrls(studentId: string, urls: string[]): Promise<void> {
+  const { error } = await supabase
+    .from('students')
+    .update({ banner_urls: urls.length ? urls : null })
+    .eq('id', studentId)
+  if (error) throw error
+}
+
+/** Record that the signed-in student viewed another student's profile. The DB
+ * resolves the viewer from auth.uid() and ignores self-views / non-students. */
+export async function recordProfileView(viewedId: string): Promise<void> {
+  const { error } = await supabase.rpc('record_profile_view', { p_viewed_id: viewedId })
+  if (error) throw error
+}
+
+/** The signed-in student's own view stats + recent visitors. Only returns data
+ * for your own profile (the RPC guards against reading anyone else's). */
+export async function getProfileViews(studentId: string): Promise<ProfileViews> {
+  const { data, error } = await supabase
+    .rpc('get_profile_views', { p_student_id: studentId, p_limit: 8 })
+    .single<{
+      total_views: number
+      visitor_count: number
+      recent: Array<{ display_name: string; avatar_url: string | null; last_viewed_at: string }>
+    }>()
+  if (error) throw error
+  return {
+    total: Number(data.total_views) || 0,
+    visitors: Number(data.visitor_count) || 0,
+    recent: (data.recent ?? []).map((r) => ({
+      displayName: r.display_name,
+      avatarUrl: r.avatar_url ?? null,
+      lastViewedAt: r.last_viewed_at,
+    })),
+  }
 }
 
 /** The student's current rank from the frozen snapshot, or null if not ranked. */
@@ -437,25 +496,73 @@ async function getSessionSecret(sessionId: string): Promise<string | undefined> 
 }
 
 /**
+ * Retry a Supabase call once behind a forced session refresh. Guards against the
+ * transient "Invalid Refresh Token / JWT expired" 400 that supabase-js can throw
+ * when a request races its own background token refresh — the hiccup a manual
+ * page reload used to clear.
+ */
+async function withAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (e) {
+    const err = e as { status?: number; code?: string; message?: string } | null
+    const msg = (err?.message ?? '').toLowerCase()
+    const isAuthBlip =
+      err?.status === 401 ||
+      err?.code === 'PGRST301' ||
+      msg.includes('jwt') ||
+      msg.includes('token is expired') ||
+      msg.includes('refresh token')
+    if (!isAuthBlip) throw e
+    await supabase.auth.getSession() // refreshes if the access token is stale
+    return fn()
+  }
+}
+
+/**
  * Start (or resume) a class session for a section. Returns the session with its
  * rotating-QR secret so the instructor's browser can render the live QR code.
+ *
+ * Resilient by design: the RPC's INSERT commits server-side before it returns, so
+ * even if we can't read its id back — a stale deployed function whose OUT columns
+ * are named differently, or a transient auth blip on the follow-up read — we fall
+ * back to the section's now-active session. That's why a manual reload always
+ * "fixed" a failed Start: it just resumed the session the RPC had already created.
  */
 export async function startClassSession(config: SessionConfig): Promise<ClassSession> {
-  const { data, error } = await supabase
-    .rpc('start_class_session', {
-      p_section_id: config.sectionId,
-      p_topic: config.topic.trim() || null,
-      p_late_after_min: config.lateAfterMin,
-      p_absent_after_min: config.absentAfterMin,
-      p_late_penalty: config.latePenalty,
-      p_absent_penalty: config.absentPenalty,
-      p_apply_penalties: config.applyPenalties,
-    })
-    .single<{ session_id: string; qr_secret: string }>()
-  if (error) throw error
-  const row = await supabase.from('class_sessions').select(SESSION_COLS).eq('id', data.session_id).single<SessionRow>()
-  if (row.error) throw row.error
-  return mapSession(row.data, data.qr_secret)
+  return withAuthRetry(async () => {
+    const { data, error } = await supabase
+      .rpc('start_class_session', {
+        p_section_id: config.sectionId,
+        p_topic: config.topic.trim() || null,
+        p_late_after_min: config.lateAfterMin,
+        p_absent_after_min: config.absentAfterMin,
+        p_late_penalty: config.latePenalty,
+        p_absent_penalty: config.absentPenalty,
+        p_apply_penalties: config.applyPenalties,
+      })
+      .maybeSingle<Record<string, string>>()
+    if (error) throw error
+
+    // Tolerate either column naming (out_session_id / session_id / id).
+    const sessionId = data?.out_session_id ?? data?.session_id ?? data?.id
+    const secret = data?.out_qr_secret ?? data?.qr_secret
+    if (sessionId) {
+      const row = await supabase
+        .from('class_sessions')
+        .select(SESSION_COLS)
+        .eq('id', sessionId)
+        .maybeSingle<SessionRow>()
+      if (!row.error && row.data) {
+        return mapSession(row.data, secret ?? (await getSessionSecret(sessionId)))
+      }
+    }
+
+    // Couldn't read the id back — resume the session the RPC just created/resumed.
+    const active = await getActiveSession(config.sectionId)
+    if (active) return active
+    throw new Error('Could not start the class. Try again.')
+  })
 }
 
 /** One session by id (no QR secret). Used to re-open a session for finalising. */
@@ -571,6 +678,74 @@ export async function updateAttendanceStatus(
     .from('attendance_records')
     .update({ status })
     .eq('id', recordId)
+  if (error) throw error
+}
+
+/**
+ * Instructor manually checks a student in during a live class — for students
+ * with no internet to scan. Upserts the record (overriding a prior scan if any)
+ * and stamps scanned_at so they count as checked in. RLS lets the instructor
+ * write attendance_records directly, so no RPC is needed.
+ */
+export async function markAttendanceManually(
+  sessionId: string,
+  studentId: string,
+  status: AttendanceStatus,
+): Promise<void> {
+  const { error } = await supabase.from('attendance_records').upsert(
+    {
+      session_id: sessionId,
+      student_id: studentId,
+      status,
+      scanned_at: new Date().toISOString(),
+    },
+    { onConflict: 'session_id,student_id' },
+  )
+  if (error) throw error
+}
+
+/** Undo a check-in (manual or scanned) — removes the record so the student is
+ * "waiting" again. Used by the live roster's reset action. */
+export async function resetAttendance(sessionId: string, studentId: string): Promise<void> {
+  const { error } = await supabase
+    .from('attendance_records')
+    .delete()
+    .eq('session_id', sessionId)
+    .eq('student_id', studentId)
+  if (error) throw error
+}
+
+/** Edit a session's saved topic (instructor tweak from the history sheet). */
+export async function updateSessionTopic(sessionId: string, topic: string): Promise<void> {
+  const { error } = await supabase
+    .from('class_sessions')
+    .update({ topic: topic.trim() || null })
+    .eq('id', sessionId)
+  if (error) throw error
+}
+
+/**
+ * Delete a session outright (instructor testing tool). Reverses any committed
+ * penalties first — deletes the point_events the session created so the
+ * leaderboard recomputes cleanly — then removes the session, which cascades its
+ * attendance_records and QR secret.
+ */
+export async function deleteSession(sessionId: string): Promise<void> {
+  const { data: recs, error: recErr } = await supabase
+    .from('attendance_records')
+    .select('penalty_event_id')
+    .eq('session_id', sessionId)
+  if (recErr) throw recErr
+
+  const eventIds = (recs ?? [])
+    .map((r) => (r as { penalty_event_id: string | null }).penalty_event_id)
+    .filter((id): id is string => !!id)
+  if (eventIds.length) {
+    const { error: delErr } = await supabase.from('point_events').delete().in('id', eventIds)
+    if (delErr) throw delErr
+  }
+
+  const { error } = await supabase.from('class_sessions').delete().eq('id', sessionId)
   if (error) throw error
 }
 

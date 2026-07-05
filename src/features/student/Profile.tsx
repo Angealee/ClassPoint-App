@@ -11,15 +11,20 @@ import { getSoundMuted, setSoundMuted } from '@/lib/sound'
 import { getHapticsMuted, hapticsSupported, setHapticsMuted, vibrateOnce } from '@/lib/haptics'
 import { disablePush, enablePush, getPushState, type PushState } from '@/lib/push'
 import { useAuth } from '@/lib/auth'
+import { ProfileBanner } from '@/components/profile/ProfileBanner'
+import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
 import { useStudentData } from './StudentData'
 import { StudentProfilePreview } from './StudentProfilePreview'
 
 export function Profile() {
   const { signOut } = useAuth()
-  const { loading, me, rank, sectionName, saveProfile, saveAvatar, clearAvatar } = useStudentData()
+  const { loading, me, rank, sectionName, saveProfile, saveAvatar, clearAvatar, saveBanner, removeBanner } =
+    useStudentData()
   const { toast } = useToast()
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
+  const bannerRef = useRef<HTMLInputElement>(null)
+  const [bannerBusy, setBannerBusy] = useState(false)
 
   const [editOpen, setEditOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -111,6 +116,23 @@ export function Profile() {
     const { error } = await clearAvatar()
     setUploading(false)
     toast(error ?? 'Profile picture removed.', error ? 'error' : 'success')
+  }
+
+  async function onPickBanner(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-picking the same file
+    if (!file) return
+    setBannerBusy(true)
+    const { error } = await saveBanner(file)
+    setBannerBusy(false)
+    if (error) toast(error, 'error')
+  }
+
+  async function onRemoveBanner(url: string) {
+    setBannerBusy(true)
+    const { error } = await removeBanner(url)
+    setBannerBusy(false)
+    if (error) toast(error, 'error')
   }
 
   return (
@@ -212,6 +234,33 @@ export function Profile() {
               </div>
             </div>
           )}
+
+          {/* Showcase photos (up to 3) */}
+          <div className="mt-5">
+            <p className="mb-2 text-sm text-muted">Photos</p>
+            <ProfileBanner
+              urls={me.banner_urls ?? []}
+              editable
+              onAdd={() => bannerRef.current?.click()}
+              onRemove={onRemoveBanner}
+              busy={bannerBusy}
+            />
+            <p className="mt-1.5 text-xs text-muted">
+              Up to 3 · classmates see these on your profile. JPG, PNG, WebP or GIF · ≤ 5 MB.
+            </p>
+            <input
+              ref={bannerRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={onPickBanner}
+            />
+          </div>
+
+          {/* Who viewed your profile */}
+          <div className="mt-5">
+            <ProfileVisitors studentId={me.id} />
+          </div>
 
           <div className="mt-5 flex gap-3">
             <Button variant="outline" className="flex-1" onClick={openEdit}>

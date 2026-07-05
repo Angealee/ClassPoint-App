@@ -3,7 +3,9 @@ import { Sheet } from '@/components/ui/Sheet'
 import { Avatar } from '@/components/ui/Avatar'
 import { XpBar } from '@/components/ui/XpBar'
 import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
-import { getPublicProfile } from '@/lib/api'
+import { ProfileBanner } from '@/components/profile/ProfileBanner'
+import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
+import { getPublicProfile, recordProfileView } from '@/lib/api'
 import { getLevelProgress } from '@/lib/leveling'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
@@ -54,6 +56,12 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
       active = false
     }
   }, [open, studentId])
+
+  // Count a profile view — but never your own (the RPC also guards this).
+  useEffect(() => {
+    if (!open || !studentId || isMe) return
+    void recordProfileView(studentId).catch(() => {})
+  }, [open, studentId, isMe])
 
   // Prefer the live total once loaded (more current than the frozen snapshot).
   const points = profile?.lifetime_points ?? target?.lifetime_points ?? 0
@@ -118,6 +126,23 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
               tone="brand"
             />
           </div>
+
+          {/* Who viewed you (own profile only) */}
+          {isMe && (
+            <div className="mt-4">
+              <ProfileVisitors studentId={target.student_id} />
+            </div>
+          )}
+
+          {/* Showcase photos */}
+          {profile?.banner_urls && profile.banner_urls.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">
+                Photos
+              </p>
+              <ProfileBanner urls={profile.banner_urls} />
+            </div>
+          )}
 
           {/* About */}
           {(loading || profile?.bio) && (

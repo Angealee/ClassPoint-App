@@ -35,12 +35,12 @@ export interface ChangelogEntry {
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.8.0',
+    version: '2.0.0',
     date: '2026-07-05',
-    title: 'QR attendance',
+    title: 'Attendance, profiles & more',
     sections: [
       {
-        heading: 'Check in by scanning a QR',
+        heading: 'New: check in by scanning a QR',
         items: [
           'Open the new Attendance tab and tap “Scan attendance” to check in to class with your instructor’s on-screen QR code.',
           'The QR refreshes every few seconds, so a screenshot won’t let someone check in for you.',
@@ -48,11 +48,34 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
-        heading: 'For instructors',
+        heading: 'Attendance — for instructors',
         items: [
-          'Start a class from the Attend tab: set the topic and the late/absent timing, then show the rotating QR.',
+          'Start a class from the Attendance tab: set the topic and the late/absent timing, then show the rotating QR.',
           'Watch the roster fill in live as students check in, then review and correct anyone before finalising.',
+          'Tap any student on the live roster to check them in by hand — for anyone with no internet to scan — or reset them back to waiting.',
+          'Present the QR fullscreen so a whole class can scan from a projector, and search or filter a long roster to find someone fast.',
+          'The QR stops once the Absent-after time passes, the section picker stays pinned at the top, and you can edit or delete a past session.',
           'Late and absent penalties are applied on finalise, and every session can be exported to Excel.',
+        ],
+      },
+      {
+        heading: 'Reset your PIN yourself',
+        items: [
+          'Forgot your PIN? Tap “Forgot your PIN?” on sign-in, get a one-time reset code from your instructor, then choose a new one.',
+          'Instructors can issue a reset code straight from the roster — tap the key icon next to any claimed student.',
+        ],
+      },
+      {
+        heading: 'See who viewed your profile',
+        items: [
+          'Your profile now shows who recently viewed it — with their photo and name, just like “seen by”.',
+          'Check your total profile views on your Profile tab and your own preview. Only you can see this.',
+        ],
+      },
+      {
+        heading: 'Show off with photo banners',
+        items: [
+          'Add up to 3 showcase photos to your profile (≤ 5 MB each) — classmates see them when they tap you on the leaderboard.',
         ],
       },
     ],

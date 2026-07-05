@@ -227,3 +227,29 @@ export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+export function XIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  )
+}
+
+export function PencilIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+      <path d="M13.5 6.5l3 3" />
+    </svg>
+  )
+}
+
+/** Expand to fullscreen — the "present the QR on a big screen" action. */
+export function ExpandIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+    </svg>
+  )
+}

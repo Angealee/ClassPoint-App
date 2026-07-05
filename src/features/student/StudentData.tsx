@@ -14,8 +14,10 @@ import {
   listSections,
   listStudentEvents,
   removeAvatar,
+  setBannerUrls,
   updateAvatar,
   updateProfileFields,
+  uploadBannerPhoto,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { getLevelProgress } from '@/lib/leveling'
@@ -55,6 +57,10 @@ interface StudentDataValue {
   saveAvatar: (file: File) => Promise<{ error?: string }>
   /** Remove the current profile picture. */
   clearAvatar: () => Promise<{ error?: string }>
+  /** Add one showcase banner photo (≤5 MB image, up to 3 total). */
+  saveBanner: (file: File) => Promise<{ error?: string }>
+  /** Remove one showcase banner photo by URL. */
+  removeBanner: (url: string) => Promise<{ error?: string }>
   /** The level to celebrate with the burst, or null. */
   levelUp: number | null
   clearLevelUp: () => void
@@ -383,6 +389,41 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     }
   }, [me])
 
+  const saveBanner = useCallback(
+    async (file: File) => {
+      if (!me || !user) return { error: 'Still loading — try again in a moment.' }
+      if (!file.type.startsWith('image/')) return { error: 'Please choose an image file.' }
+      if (file.size > MAX_AVATAR_BYTES) return { error: 'Image is too large (max 5 MB).' }
+      const current = me.banner_urls ?? []
+      if (current.length >= 3) return { error: 'You can add up to 3 photos.' }
+      try {
+        const url = await uploadBannerPhoto(user.id, file)
+        const next = [...current, url]
+        await setBannerUrls(me.id, next)
+        setMe((m) => (m ? { ...m, banner_urls: next } : m))
+        return {}
+      } catch {
+        return { error: 'Could not upload the photo. Please try again.' }
+      }
+    },
+    [me, user, MAX_AVATAR_BYTES],
+  )
+
+  const removeBanner = useCallback(
+    async (url: string) => {
+      if (!me) return { error: 'Still loading — try again in a moment.' }
+      const next = (me.banner_urls ?? []).filter((u) => u !== url)
+      try {
+        await setBannerUrls(me.id, next)
+        setMe((m) => (m ? { ...m, banner_urls: next } : m))
+        return {}
+      } catch {
+        return { error: 'Could not remove the photo. Please try again.' }
+      }
+    },
+    [me],
+  )
+
   const clearLevelUp = useCallback(() => setLevelUp(null), [])
   const clearAwayRecap = useCallback(() => setAwayEvents([]), [])
 
@@ -405,6 +446,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         saveProfile,
         saveAvatar,
         clearAvatar,
+        saveBanner,
+        removeBanner,
         levelUp,
         clearLevelUp,
       }}

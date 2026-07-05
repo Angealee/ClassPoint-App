@@ -8,16 +8,18 @@ import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { StatusChip } from '@/components/attendance/StatusChip'
-import { CalendarIcon, DownloadIcon, QrIcon } from '@/components/ui/icons'
+import { CalendarIcon, DownloadIcon, PencilIcon, QrIcon, TrashIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
 import { AttendanceSession } from './AttendanceSession'
 import { AttendanceReview } from './AttendanceReview'
 import {
+  deleteSession,
   getActiveSession,
   getSession,
   listSessionAttendance,
   listSessions,
   startClassSession,
+  updateSessionTopic,
 } from '@/lib/api'
 import { exportSessionAttendance } from '@/lib/attendance-io'
 import type { AttendanceRosterRow, ClassSession, SessionSummary } from '@/lib/types'
@@ -52,6 +54,12 @@ export function Attendance() {
   const [detail, setDetail] = useState<SessionSummary | null>(null)
   const [detailRows, setDetailRows] = useState<AttendanceRosterRow[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
+  // Manage a past session (testing tools): edit topic / delete.
+  const [editingTopic, setEditingTopic] = useState(false)
+  const [topicDraft, setTopicDraft] = useState('')
+  const [savingTopic, setSavingTopic] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const loadHistory = useCallback(async () => {
     if (!selectedSectionId) return
@@ -105,8 +113,11 @@ export function Attendance() {
       })
       setSession(s)
       setView('live')
-    } catch {
-      toast('Could not start the class. Try again.', 'error')
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[attendance] start failed:', e)
+      const msg = (e as { message?: string } | null)?.message
+      toast(msg && msg.length <= 160 ? msg : 'Could not start the class. Try again.', 'error')
     } finally {
       setStarting(false)
     }
@@ -120,6 +131,8 @@ export function Attendance() {
 
   async function openDetail(s: SessionSummary) {
     setDetail(s)
+    setEditingTopic(false)
+    setConfirmDelete(false)
     setDetailLoading(true)
     try {
       setDetailRows(await listSessionAttendance(s.id, selectedSectionId))
@@ -127,6 +140,37 @@ export function Attendance() {
       toast('Could not load that session.', 'error')
     } finally {
       setDetailLoading(false)
+    }
+  }
+
+  async function saveTopic() {
+    if (!detail) return
+    setSavingTopic(true)
+    try {
+      await updateSessionTopic(detail.id, topicDraft)
+      setDetail({ ...detail, topic: topicDraft.trim() || null })
+      setEditingTopic(false)
+      void loadHistory()
+    } catch {
+      toast('Could not save the topic.', 'error')
+    } finally {
+      setSavingTopic(false)
+    }
+  }
+
+  async function onDeleteSession() {
+    if (!detail) return
+    setDeleting(true)
+    try {
+      await deleteSession(detail.id)
+      toast('Session deleted.', 'success')
+      setDetail(null)
+      setConfirmDelete(false)
+      void loadHistory()
+    } catch {
+      toast('Could not delete the session.', 'error')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -161,7 +205,7 @@ export function Attendance() {
       aria-label="Section"
       value={selectedSectionId}
       onChange={(e) => setSelectedSectionId(e.target.value)}
-      className="max-w-40 font-display font-bold"
+      className="max-w-40 font-display font-bold ring-1 ring-brand-500/40"
     >
       {sections.map((s) => (
         <option key={s.id} value={s.id}>
@@ -186,9 +230,13 @@ export function Attendance() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-xl font-bold">Attendance</h1>
-        {sectionSelect}
+      {/* Sticky, highlighted section bar — pins under the app header so the
+          selected section is always in view and never scrolled past. */}
+      <div className="sticky top-[52px] z-10 -mx-4 -mt-5 border-b border-brand-500/20 bg-canvas/85 px-4 py-3 backdrop-blur-md md:top-0 md:-mx-8 md:mt-0 md:px-8">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="font-display text-xl font-bold">Attendance</h1>
+          {sectionSelect}
+        </div>
       </div>
 
       {/* Start a class */}
@@ -233,16 +281,22 @@ export function Attendance() {
             type="number"
             inputMode="numeric"
             min={0}
+            max={100}
             value={latePenalty}
-            onChange={(e) => setLatePenalty(Math.max(0, parseInt(e.target.value, 10) || 0))}
+            onChange={(e) =>
+              setLatePenalty(Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)))
+            }
           />
           <Input
             label="Absent penalty (pts)"
             type="number"
             inputMode="numeric"
             min={0}
+            max={100}
             value={absentPenalty}
-            onChange={(e) => setAbsentPenalty(Math.max(0, parseInt(e.target.value, 10) || 0))}
+            onChange={(e) =>
+              setAbsentPenalty(Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)))
+            }
           />
         </div>
 
@@ -356,6 +410,63 @@ export function Attendance() {
             <Button variant="outline" className="w-full" onClick={onExportDetail}>
               <DownloadIcon className="h-5 w-5" /> Export to Excel
             </Button>
+
+            {/* Manage — edit topic / delete (deleting reverses any penalties). */}
+            <div className="space-y-3 rounded-xl border border-line p-3">
+              {editingTopic ? (
+                <div className="space-y-2">
+                  <Input
+                    label="Topic"
+                    value={topicDraft}
+                    onChange={(e) => setTopicDraft(e.target.value)}
+                    placeholder="e.g. Lecture 5: Big-O"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" onClick={() => setEditingTopic(false)} disabled={savingTopic}>
+                      Cancel
+                    </Button>
+                    <Button onClick={saveTopic} disabled={savingTopic}>
+                      {savingTopic ? 'Saving…' : 'Save topic'}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTopicDraft(detail.topic ?? '')
+                    setEditingTopic(true)
+                  }}
+                  className="flex w-full items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-ink"
+                >
+                  <PencilIcon className="h-4 w-4" /> Edit topic
+                </button>
+              )}
+
+              {confirmDelete ? (
+                <div className="space-y-2 rounded-lg bg-brand-500/5 p-2.5">
+                  <p className="text-xs text-muted">
+                    Delete this session and reverse any penalties it applied? This can’t be undone.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                      Cancel
+                    </Button>
+                    <Button onClick={onDeleteSession} disabled={deleting}>
+                      {deleting ? 'Deleting…' : 'Delete session'}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  className="flex w-full items-center gap-2 text-sm font-medium text-brand-600 transition-opacity hover:opacity-80 dark:text-brand-400"
+                >
+                  <TrashIcon className="h-4 w-4" /> Delete session
+                </button>
+              )}
+            </div>
           </div>
         )}
       </Sheet>

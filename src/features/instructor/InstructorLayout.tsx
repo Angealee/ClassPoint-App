@@ -26,7 +26,7 @@ export function useInstructor(): InstructorContextValue {
 const nav: NavItem[] = [
   { to: '/teach', label: 'Students', Icon: UsersIcon, end: true },
   { to: '/teach/award', label: 'Award', Icon: BoltIcon },
-  { to: '/teach/attendance', label: 'Attend', Icon: QrIcon },
+  { to: '/teach/attendance', label: 'Attendance', Icon: QrIcon },
   { to: '/teach/history', label: 'Activity', Icon: ClockIcon },
   { to: '/teach/leaderboard', label: 'Ranks', Icon: TrophyIcon },
 ]

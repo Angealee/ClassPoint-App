@@ -82,6 +82,10 @@ create index if not exists attendance_student_idx on public.attendance_records (
 -- session id + its QR secret so the instructor's browser can render the rotating
 -- code. If a session is already active for the section, it's returned as-is
 -- (idempotent — a double tap or a page reload just resumes).
+--
+-- Dropped first because the OUT column names changed since an earlier revision,
+-- and `create or replace` cannot change a function's return type.
+drop function if exists public.start_class_session(uuid, text, integer, integer, integer, integer, boolean);
 create or replace function public.start_class_session(
   p_section_id       uuid,
   p_topic            text default null,
@@ -91,7 +95,12 @@ create or replace function public.start_class_session(
   p_absent_penalty   integer default 5,
   p_apply_penalties  boolean default true
 )
-returns table (session_id uuid, qr_secret text, started_at timestamptz)
+-- NOTE: the OUT columns are deliberately NOT named after any table column
+-- (e.g. `started_at`). A `RETURNS TABLE` column is an output variable, and if it
+-- shares a name with a column used in a `RETURNING ... INTO`, Postgres raises
+-- "column reference is ambiguous" (42702 -> HTTP 400). The client re-reads the
+-- full row separately, so this only needs to hand back the id + secret.
+returns table (out_session_id uuid, out_qr_secret text)
 language plpgsql
 security definer
 set search_path = public, extensions
@@ -99,22 +108,21 @@ as $$
 declare
   v_id     uuid;
   v_secret text;
-  v_start  timestamptz;
 begin
   if not public.is_instructor() then
     raise exception 'Only the instructor can start a class.';
   end if;
 
   -- Resume an already-running session rather than creating a duplicate.
-  select cs.id, css.qr_secret, cs.started_at
-    into v_id, v_secret, v_start
+  select cs.id, css.qr_secret
+    into v_id, v_secret
     from public.class_sessions cs
     join public.class_session_secrets css on css.session_id = cs.id
    where cs.section_id = p_section_id and cs.status = 'active'
    limit 1;
 
   if found then
-    return query select v_id, v_secret, v_start;
+    return query select v_id, v_secret;
     return;
   end if;
 
@@ -125,14 +133,16 @@ begin
     late_penalty, absent_penalty, apply_penalties, created_by
   ) values (
     p_section_id, nullif(btrim(p_topic), ''), p_late_after_min, p_absent_after_min,
-    greatest(0, p_late_penalty), greatest(0, p_absent_penalty), p_apply_penalties, auth.uid()
+    -- Clamp to the point_events magnitude ceiling (±100) so commit never fails.
+    least(100, greatest(0, p_late_penalty)), least(100, greatest(0, p_absent_penalty)),
+    p_apply_penalties, auth.uid()
   )
-  returning id, started_at into v_id, v_start;
+  returning id into v_id;
 
   insert into public.class_session_secrets (session_id, qr_secret)
        values (v_id, v_secret);
 
-  return query select v_id, v_secret, v_start;
+  return query select v_id, v_secret;
 end;
 $$;
 
@@ -177,10 +187,12 @@ begin
     raise exception 'This class is for a different section.';
   end if;
 
-  -- 15-second windows; accept the current or previous one to tolerate scan lag,
-  -- so a valid displayed code lasts ~15-30s and older screenshots are rejected.
+  -- 15-second windows. Accept the previous/current/next window: "previous" covers
+  -- scan latency, "next" tolerates the instructor device's clock running slightly
+  -- ahead of the DB. A valid code still lasts under a minute, so a forwarded
+  -- screenshot stops working quickly.
   v_now_w := floor(extract(epoch from now()) / 15)::bigint;
-  if p_window <> v_now_w and p_window <> v_now_w - 1 then
+  if p_window not in (v_now_w - 1, v_now_w, v_now_w + 1) then
     raise exception 'This QR code has expired — scan the one on screen now.';
   end if;
 
