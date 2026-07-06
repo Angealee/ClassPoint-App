@@ -3,8 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/app-logo.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#e11d2a" />
+    <!-- Capture the install prompt as early as possible: the browser can fire
+         beforeinstallprompt before the app bundle mounts its React listener, and
+         the event is never re-fired. Stash it for PwaInstallProvider to read. -->
+    <script>
+      window.__cpInstall = { event: null, installed: false }
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault()
+        window.__cpInstall.event = e
+        window.dispatchEvent(new Event('cp:installable'))
+      })
+      window.addEventListener('appinstalled', function () {
+        window.__cpInstall.installed = true
+        window.__cpInstall.event = null
+      })
+    </script>
     <meta name="description" content="ClassPoint — earn points, level up, climb the leaderboard." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/ui/Logo'
 import { Button } from '@/components/ui/Button'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { InstallButton } from '@/components/pwa/InstallButton'
 import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
 
 // Instructor sign-in is unlinked (router.tsx). Inside an installed PWA there's
@@ -84,6 +85,7 @@ export function Landing() {
           >
             First time? <span className="font-semibold text-brand-500">Claim your account</span>
           </button>
+          <InstallButton className="mt-1 w-full" />
         </motion.div>
 
         <div className="mt-12 grid gap-3 sm:grid-cols-3">

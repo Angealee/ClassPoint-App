@@ -14,6 +14,7 @@ import { useAuth } from '@/lib/auth'
 import { ProfileBanner } from '@/components/profile/ProfileBanner'
 import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
 import { PinnedBadges } from '@/components/achievements/PinnedBadges'
+import { InstallButton } from '@/components/pwa/InstallButton'
 import { ChangelogList } from '@/components/changelog/ChangelogList'
 import { CHANGELOG, LATEST_VERSION } from '@/lib/changelog'
 import { useStudentData } from './StudentData'
@@ -380,6 +381,8 @@ export function Profile() {
           )}
         </div>
       </Card>
+
+      <InstallButton className="w-full" />
 
       <button
         type="button"
