@@ -710,6 +710,26 @@ export async function markAttendanceManually(
   if (error) throw error
 }
 
+/** Mark many students at once (e.g. "mark all waiting" present/absent). Upserts
+ * one row per student, stamping scanned_at so they all count as checked in. */
+export async function markAttendanceBulk(
+  sessionId: string,
+  entries: { studentId: string; status: AttendanceStatus }[],
+): Promise<void> {
+  if (entries.length === 0) return
+  const nowIso = new Date().toISOString()
+  const rows = entries.map((e) => ({
+    session_id: sessionId,
+    student_id: e.studentId,
+    status: e.status,
+    scanned_at: nowIso,
+  }))
+  const { error } = await supabase
+    .from('attendance_records')
+    .upsert(rows, { onConflict: 'session_id,student_id' })
+  if (error) throw error
+}
+
 /** Undo a check-in (manual or scanned) — removes the record so the student is
  * "waiting" again. Used by the live roster's reset action. */
 export async function resetAttendance(sessionId: string, studentId: string): Promise<void> {

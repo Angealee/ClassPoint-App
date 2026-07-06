@@ -245,6 +245,16 @@ export function PencilIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+/** Speaker with sound waves — the live-session check-in chime toggle. */
+export function SoundIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a9 9 0 0 1 0 12" />
+    </svg>
+  )
+}
+
 /** Expand to fullscreen — the "present the QR on a big screen" action. */
 export function ExpandIcon(props: SVGProps<SVGSVGElement>) {
   return (

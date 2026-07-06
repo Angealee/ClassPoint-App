@@ -5,16 +5,18 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { useToast } from '@/components/ui/Toast'
-import { ClockIcon, ExpandIcon, SearchIcon, XIcon } from '@/components/ui/icons'
+import { ClockIcon, ExpandIcon, SearchIcon, SoundIcon, XIcon } from '@/components/ui/icons'
 import { QrCode } from '@/components/attendance/QrCode'
 import { StatusChip, STATUS_META } from '@/components/attendance/StatusChip'
 import {
   endClassSession,
   listSessionAttendance,
+  markAttendanceBulk,
   markAttendanceManually,
   resetAttendance,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
+import { initSound, playSound } from '@/lib/sound'
 import {
   QR_STEP_SECONDS,
   buildPayload,
@@ -30,11 +32,22 @@ const ORDER: AttendanceStatus[] = ['present', 'late', 'absent']
 /** Show the search/filter bar only once the roster is long enough to warrant it. */
 const SEARCH_THRESHOLD = 8
 
+/** Elapsed/countdown as h:mm:ss (e.g. "0:00:38", "1:23:45"). */
 function clock(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000))
-  const m = Math.floor(total / 60)
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
   const s = total % 60
-  return `${m}:${String(s).padStart(2, '0')}`
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+/** Wall-clock time a student checked in, e.g. "2:34:15 PM". */
+function scanTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 }
 
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
@@ -67,6 +80,26 @@ export function AttendanceSession({
   const [bigSize, setBigSize] = useState(320)
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [ending, setEnding] = useState(false)
+  const [bulkOpen, setBulkOpen] = useState(false)
+  // Play a soft chime + flash a row when a student scans in (instructor opt-in).
+  const [soundOn, setSoundOn] = useState(() => {
+    try {
+      return localStorage.getItem('cp_attendance_chime') === '1'
+    } catch {
+      return false
+    }
+  })
+  const soundOnRef = useRef(soundOn)
+  useEffect(() => {
+    soundOnRef.current = soundOn
+  }, [soundOn])
+  // Rows to briefly highlight because a scan just landed.
+  const [flashIds, setFlashIds] = useState<Set<string>>(new Set())
+  // Stable roster display order (studentId[]) so a manual mark never re-sorts the
+  // list and yanks the instructor's scroll — only genuine scans float to the top.
+  const [displayOrder, setDisplayOrder] = useState<string[]>([])
+  const prevScannedRef = useRef<Set<string>>(new Set())
+  const firstOrderRef = useRef(true)
 
   const startedMs = new Date(session.startedAt).getTime()
 
@@ -196,14 +229,74 @@ export function AttendanceSession({
   const present = roster.filter((r) => r.status === 'present').length
   const late = roster.filter((r) => r.status === 'late').length
 
-  // Most-recent check-ins first, then everyone still waiting (A–Z).
-  const ordered = useMemo(
-    () => [
-      ...roster.filter((r) => r.scannedAt).sort((a, b) => (b.scannedAt ?? '').localeCompare(a.scannedAt ?? '')),
-      ...roster.filter((r) => !r.scannedAt),
-    ],
-    [roster],
-  )
+  // Maintain a stable display order + react to freshly-landed scans. A genuine QR
+  // scan floats to the top (and optionally flashes/chimes); an instructor's manual
+  // mark keeps its slot, so tapping a student far down never resets the scroll.
+  useEffect(() => {
+    // Wait for the first real roster so a session *resume* seeds silently (no
+    // flash/chime for everyone who already scanned) rather than treating the
+    // empty initial state as "first".
+    if (roster.length === 0) return
+    const prevScanned = prevScannedRef.current
+    const first = firstOrderRef.current
+    // New non-manual scans since the last render — recent-first.
+    const newScans = roster
+      .filter((r) => r.scannedAt && !prevScanned.has(r.studentId) && !manualIds.has(r.studentId))
+      .sort((a, b) => (b.scannedAt ?? '').localeCompare(a.scannedAt ?? ''))
+      .map((r) => r.studentId)
+    // On the first load, seed the whole scanned group recent-first; after that,
+    // only the genuinely-new scans float up.
+    const floated = first
+      ? roster
+          .filter((r) => r.scannedAt && !manualIds.has(r.studentId))
+          .sort((a, b) => (b.scannedAt ?? '').localeCompare(a.scannedAt ?? ''))
+          .map((r) => r.studentId)
+      : newScans
+
+    prevScannedRef.current = new Set(roster.filter((r) => r.scannedAt).map((r) => r.studentId))
+    firstOrderRef.current = false
+
+    setDisplayOrder((prev) => {
+      const ids = new Set(roster.map((r) => r.studentId))
+      let order = prev.filter((id) => ids.has(id))
+      for (const r of roster) if (!order.includes(r.studentId)) order.push(r.studentId)
+      if (floated.length) {
+        const fset = new Set(floated)
+        order = [...floated, ...order.filter((id) => !fset.has(id))]
+      }
+      return order
+    })
+
+    // Flash + chime only for scans that arrive after the first load.
+    if (!first && newScans.length) {
+      if (soundOnRef.current) playSound('point')
+      setFlashIds((prev) => new Set([...prev, ...newScans]))
+      window.setTimeout(() => {
+        setFlashIds((prev) => {
+          const n = new Set(prev)
+          newScans.forEach((id) => n.delete(id))
+          return n
+        })
+      }, 1600)
+    }
+  }, [roster, manualIds])
+
+  const byId = useMemo(() => new Map(roster.map((r) => [r.studentId, r])), [roster])
+  const ordered = useMemo(() => {
+    const seen = new Set<string>()
+    const out: AttendanceRosterRow[] = []
+    for (const id of displayOrder) {
+      const r = byId.get(id)
+      if (r) {
+        out.push(r)
+        seen.add(id)
+      }
+    }
+    // Any roster rows the order effect hasn't placed yet (first seed, or a
+    // just-added student) fall in at the end so nobody is ever missing.
+    for (const r of roster) if (!seen.has(r.studentId)) out.push(r)
+    return out
+  }, [displayOrder, byId, roster])
 
   const q = query.trim().toLowerCase()
   const visible = ordered.filter(
@@ -278,6 +371,51 @@ export function AttendanceSession({
     }
   }
 
+  // Mark everyone still waiting at once (roll call, or auto-absent before ending).
+  // They're recorded as manual marks, so the roster order stays put.
+  async function markAllWaiting(status: AttendanceStatus) {
+    setBulkOpen(false)
+    const ids = roster.filter((r) => !r.scannedAt).map((r) => r.studentId)
+    if (ids.length === 0) return
+    const prev = roster
+    const nowIso = new Date().toISOString()
+    setRoster((rs) => rs.map((r) => (!r.scannedAt ? { ...r, status, scannedAt: nowIso } : r)))
+    setManualIds((s) => {
+      const n = new Set(s)
+      ids.forEach((id) => n.add(id))
+      return n
+    })
+    try {
+      await markAttendanceBulk(
+        session.id,
+        ids.map((studentId) => ({ studentId, status })),
+      )
+      toast(`Marked ${ids.length} ${STATUS_META[status].label.toLowerCase()}.`, 'success')
+    } catch {
+      setRoster(prev)
+      setManualIds((s) => {
+        const n = new Set(s)
+        ids.forEach((id) => n.delete(id))
+        return n
+      })
+      toast('Could not mark everyone. Try again.', 'error')
+    }
+  }
+
+  function toggleSound() {
+    const next = !soundOn
+    setSoundOn(next)
+    try {
+      localStorage.setItem('cp_attendance_chime', next ? '1' : '0')
+    } catch {
+      /* storage unavailable — the toggle just won't persist */
+    }
+    if (next) {
+      initSound() // this tap unlocks audio
+      playSound('point') // confirm it works
+    }
+  }
+
   const endedRef = useRef(false)
   async function onEndConfirmed() {
     if (endedRef.current) return
@@ -305,10 +443,27 @@ export function AttendanceSession({
             {sectionName} · <span className="tabular-nums">{clock(nowMs - startedMs)}</span> elapsed
           </p>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-brand-500" />
-          Live
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleSound}
+            aria-pressed={soundOn}
+            aria-label={soundOn ? 'Mute check-in chime' : 'Play a chime on check-in'}
+            title={soundOn ? 'Check-in chime on' : 'Check-in chime off'}
+            className={cn(
+              'flex h-8 w-8 items-center justify-center rounded-full border transition-colors',
+              soundOn
+                ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                : 'border-line text-muted hover:text-ink',
+            )}
+          >
+            <SoundIcon className="h-4 w-4" />
+          </button>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-brand-500" />
+            Live
+          </span>
+        </div>
       </div>
 
       {/* Rotating QR — or a closed state once the check-in window ends */}
@@ -383,6 +538,41 @@ export function AttendanceSession({
         ))}
       </div>
 
+      {/* Bulk action — mark everyone still waiting in one tap */}
+      {waiting.length > 0 &&
+        (bulkOpen ? (
+          <div className="flex items-center gap-2 rounded-xl border border-line bg-card p-2">
+            <span className="shrink-0 px-1 text-xs text-muted">Mark {waiting.length} waiting</span>
+            <Button size="sm" className="flex-1" onClick={() => markAllWaiting('present')}>
+              Present
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1"
+              onClick={() => markAllWaiting('absent')}
+            >
+              Absent
+            </Button>
+            <button
+              type="button"
+              onClick={() => setBulkOpen(false)}
+              aria-label="Cancel"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:text-ink"
+            >
+              <XIcon className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setBulkOpen(true)}
+            className="px-1 text-xs font-semibold text-brand-500 transition-opacity hover:opacity-80"
+          >
+            Mark all {waiting.length} waiting →
+          </button>
+        ))}
+
       {/* Search + filter (only when the roster is long enough to need it) */}
       {roster.length > SEARCH_THRESHOLD && (
         <div className="flex items-center gap-2">
@@ -434,19 +624,21 @@ export function AttendanceSession({
           {visible.map((r) => {
             const open = pickerFor === r.studentId
             const isManual = manualIds.has(r.studentId)
+            const flash = flashIds.has(r.studentId)
             return (
               <motion.div
                 key={r.studentId}
                 layout
                 transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                className={cn('transition-colors duration-700', flash && 'bg-emerald-500/10')}
               >
                 <button
                   type="button"
                   onClick={() => setPickerFor((id) => (id === r.studentId ? null : r.studentId))}
                   aria-expanded={open}
                   className={cn(
-                    'flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-card-2',
-                    open && 'bg-card-2',
+                    'flex w-full items-center gap-3 p-3.5 text-left transition-colors',
+                    open ? 'bg-card-2' : !flash && 'hover:bg-card-2',
                   )}
                 >
                   <Avatar name={r.fullName} url={r.avatarUrl} />
@@ -454,7 +646,9 @@ export function AttendanceSession({
                     <p className="truncate text-sm font-semibold">{r.fullName}</p>
                     {r.scannedAt ? (
                       <p className="text-xs text-muted">
-                        {isManual ? 'marked by you' : `checked in ${timeAgo(r.scannedAt)}`}
+                        {isManual ? 'marked' : 'checked in'} at{' '}
+                        <span className="tabular-nums">{scanTime(r.scannedAt)}</span>
+                        <span className="text-muted/60"> · {timeAgo(r.scannedAt)}</span>
                       </p>
                     ) : (
                       <p className="text-xs text-muted/70">not yet · tap to mark</p>
