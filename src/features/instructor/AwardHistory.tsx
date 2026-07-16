@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Sheet } from '@/components/ui/Sheet'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { TrashIcon } from '@/components/ui/icons'
@@ -113,28 +113,24 @@ export function AwardHistory() {
         </Card>
       )}
 
-      <Sheet open={!!target} onClose={() => setTarget(undefined)} title="Undo this award?">
-        <p className="text-sm text-muted">
-          This removes{' '}
-          <span className="font-semibold text-ink">
-            {target && target.points < 0 ? target.points : `+${target?.points}`}
-          </span>{' '}
-          from <span className="font-semibold text-ink">{target?.student_name}</span>. Their total
-          recomputes automatically.
-        </p>
-        <div className="mt-5 flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={() => setTarget(undefined)}>
-            Cancel
-          </Button>
-          <Button
-            className="flex-1 bg-brand-600 hover:bg-brand-700"
-            onClick={onUndo}
-            disabled={undoing}
-          >
-            {undoing ? 'Undoing…' : 'Undo'}
-          </Button>
-        </div>
-      </Sheet>
+      <ConfirmDialog
+        open={!!target}
+        title="Undo this award?"
+        message={
+          <>
+            This removes{' '}
+            <span className="font-semibold text-ink">
+              {target && target.points < 0 ? target.points : `+${target?.points}`}
+            </span>{' '}
+            from <span className="font-semibold text-ink">{target?.student_name}</span>. Their
+            total recomputes automatically.
+          </>
+        }
+        confirmLabel="Undo award"
+        busy={undoing}
+        onConfirm={onUndo}
+        onClose={() => setTarget(undefined)}
+      />
     </div>
   )
 }

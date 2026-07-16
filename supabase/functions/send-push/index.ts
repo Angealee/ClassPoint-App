@@ -1,36 +1,61 @@
 // ClassPoint · Edge Function · send-push
-// Delivers Web Push notifications to a student's registered devices.
+// Delivers Web Push for rows in the `notifications` outbox (migration 0017).
 //
-// Invoked by Postgres (pg_net) from the triggers in migration 0008 with a JSON
-// body describing the event. Looks up the student's push_subscriptions with the
-// service role and signs each push with the project's VAPID keys.
+// Invoked by Postgres (pg_net) with `{ "notification_ids": ["uuid", ...] }`.
+// This function is the ONLY component that transitions `push_status` — pg_net
+// gives the database no delivery feedback, so SQL never marks rows sent. The
+// pg_cron sweep re-dispatches anything still pending/failed (max 5 attempts).
+//
+// Reliability specifics:
+//   - `urgency: 'high'` + TTL on every push — the fix for Android deliveries
+//     that used to arrive minutes late (default urgency lets the OS batch
+//     pushes to save battery).
+//   - Rows already read in-app are marked 'skipped' (no late lock-screen buzz
+//     for something the student has seen).
+//   - 404/410 endpoints are pruned immediately; endpoints that keep failing
+//     for other reasons are pruned after 10 consecutive failures.
 //
 // ── One-time setup ──────────────────────────────────────────────────────────
-//  1. Generate a VAPID key pair (run anywhere with Node):
-//       npx web-push generate-vapid-keys
-//     Put the PUBLIC key in the web app's .env as VITE_VAPID_PUBLIC_KEY.
-//  2. Set this function's secrets (Dashboard → Edge Functions → Secrets, or CLI):
-//       supabase secrets set VAPID_PUBLIC_KEY=...  VAPID_PRIVATE_KEY=...  \
-//                            VAPID_SUBJECT=mailto:you@school.edu
-//  3. Deploy:
+//  1. VAPID keys (already set): VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY /
+//     VAPID_SUBJECT in this function's secrets. The public key also lives in
+//     the web app's .env as VITE_VAPID_PUBLIC_KEY.
+//  2. Run migration 0017 FIRST, then deploy:
 //       supabase functions deploy send-push
-//     It's called server-to-server with the service-role JWT, so leave JWT
-//     verification ON (the default).
-//  4. Configure the DB settings from migration 0008 (edge_url + service_key).
+//     (Pushes queued between the two steps are swept within ~5 minutes.)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3.6.7'
 
-type EventBody =
-  | { type: 'point' | 'deduct'; student_id: string; points: number; note?: string | null; level?: number | null }
-  | { type: 'rank'; student_id: string; rank: number; prev_rank?: number | null }
-
-interface Notification {
+interface NotificationRow {
+  id: string
+  student_id: string
+  type: string
   title: string
   body: string
-  tag: string
   url: string
-  icon?: string
+  read_at: string | null
+  attempts: number
+}
+
+interface SubscriptionRow {
+  endpoint: string
+  p256dh: string
+  auth: string
+  student_id: string
+  fail_count: number
+}
+
+// Same tags the in-app `showLocalNotification` uses, so a live-page
+// notification and the server push collapse instead of stacking.
+const TAG_BY_TYPE: Record<string, string> = {
+  point: 'cp-points',
+  deduct: 'cp-points',
+  level: 'cp-level',
+  rank: 'cp-rank',
+  achievement: 'cp-achievement',
+  redemption: 'cp-redemption',
+  attendance_penalty: 'cp-penalty',
+  test: 'cp-test',
 }
 
 const VAPID_PUBLIC = Deno.env.get('VAPID_PUBLIC_KEY') ?? ''
@@ -48,48 +73,6 @@ function json(body: unknown, status = 200) {
   })
 }
 
-/** Turn a DB event into one or more notifications to fan out. */
-function buildNotifications(ev: EventBody): Notification[] {
-  const url = '/app'
-  if (ev.type === 'rank') {
-    const improved = ev.prev_rank != null && ev.rank < ev.prev_rank
-    return [
-      {
-        title: improved ? `You climbed to #${ev.rank}! 📈` : `Leaderboard update`,
-        body: improved ? 'Nice — you moved up the ranks.' : `Your rank is now #${ev.rank}.`,
-        tag: 'cp-rank',
-        url,
-      },
-    ]
-  }
-
-  const notes: Notification[] = []
-  if (ev.type === 'point') {
-    notes.push({
-      title: `+${ev.points} points 🎉`,
-      body: ev.note?.trim() || 'Nice work — keep it up!',
-      tag: 'cp-points',
-      url,
-    })
-  } else {
-    notes.push({
-      title: `${ev.points} points`,
-      body: ev.note?.trim() || 'Some points were deducted.',
-      tag: 'cp-points',
-      url,
-    })
-  }
-  if (ev.level != null) {
-    notes.push({
-      title: `Level ${ev.level}! ⭐`,
-      body: 'You leveled up — well done!',
-      tag: 'cp-level',
-      url,
-    })
-  }
-  return notes
-}
-
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed.' }, 405)
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
@@ -99,13 +82,16 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: 'VAPID keys not configured.' }, 500)
   }
 
-  let ev: EventBody
+  let ids: string[]
   try {
-    ev = (await req.json()) as EventBody
+    const body = (await req.json()) as { notification_ids?: unknown }
+    ids = Array.isArray(body.notification_ids)
+      ? body.notification_ids.filter((v): v is string => typeof v === 'string')
+      : []
   } catch {
     return json({ ok: false, error: 'Invalid JSON.' }, 400)
   }
-  if (!ev?.student_id || !ev?.type) return json({ ok: false, error: 'Missing fields.' }, 400)
+  if (ids.length === 0) return json({ ok: false, error: 'No notification_ids.' }, 400)
 
   const admin = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -113,59 +99,138 @@ Deno.serve(async (req) => {
     { auth: { autoRefreshToken: false, persistSession: false } },
   )
 
-  const { data: subs, error } = await admin
-    .from('push_subscriptions')
-    .select('endpoint, p256dh, auth')
-    .eq('student_id', ev.student_id)
-  if (error) {
-    console.error('[send-push] subscription lookup failed:', error.message)
+  const { data: rows, error: rowsError } = await admin
+    .from('notifications')
+    .select('id, student_id, type, title, body, url, read_at, attempts')
+    .in('id', ids)
+  if (rowsError) {
+    console.error('[send-push] outbox lookup failed:', rowsError.message)
     return json({ ok: false, error: 'Lookup failed.' }, 500)
   }
-  // A common reason a student never gets a closed-app push: they never enabled it
-  // on this device, so there's no subscription to deliver to. Make that visible.
-  if (!subs?.length) {
-    console.warn(`[send-push] no push subscriptions for student ${ev.student_id}`)
-    return json({ ok: true, sent: 0 })
+  const notifications = (rows ?? []) as NotificationRow[]
+  if (notifications.length === 0) return json({ ok: true, sent: 0 })
+
+  const studentIds = [...new Set(notifications.map((n) => n.student_id))]
+  const { data: subRows, error: subsError } = await admin
+    .from('push_subscriptions')
+    .select('endpoint, p256dh, auth, student_id, fail_count')
+    .in('student_id', studentIds)
+  if (subsError) {
+    console.error('[send-push] subscription lookup failed:', subsError.message)
+    return json({ ok: false, error: 'Lookup failed.' }, 500)
+  }
+  const subsByStudent = new Map<string, SubscriptionRow[]>()
+  for (const sub of (subRows ?? []) as SubscriptionRow[]) {
+    const list = subsByStudent.get(sub.student_id) ?? []
+    list.push(sub)
+    subsByStudent.set(sub.student_id, list)
   }
 
-  const notifications = buildNotifications(ev)
+  const now = new Date().toISOString()
   let sent = 0
   let failed = 0
-  const stale: string[] = []
+  let skipped = 0
+  // Per-endpoint outcome across all rows this call: prune > ok > fail.
+  const endpointOutcome = new Map<string, 'ok' | 'fail' | 'prune'>()
 
-  for (const sub of subs) {
-    const subscription = {
-      endpoint: sub.endpoint as string,
-      keys: { p256dh: sub.p256dh as string, auth: sub.auth as string },
+  for (const note of notifications) {
+    // Seen in-app already — don't buzz the lock screen late.
+    if (note.read_at) {
+      skipped++
+      await admin
+        .from('notifications')
+        .update({ push_status: 'skipped', last_attempt_at: now })
+        .eq('id', note.id)
+      continue
     }
-    for (const note of notifications) {
+
+    const subs = subsByStudent.get(note.student_id) ?? []
+    if (subs.length === 0) {
+      // No device ever enabled push — terminal; the in-app bell still has it.
+      skipped++
+      await admin
+        .from('notifications')
+        .update({ push_status: 'skipped', last_attempt_at: now })
+        .eq('id', note.id)
+      continue
+    }
+
+    const payload = JSON.stringify({
+      title: note.title,
+      body: note.body,
+      tag: TAG_BY_TYPE[note.type] ?? 'classpoint',
+      url: note.url || '/app',
+    })
+
+    let delivered = 0
+    for (const sub of subs) {
       try {
-        await webpush.sendNotification(subscription, JSON.stringify(note))
-        sent++
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload,
+          { TTL: 86400, urgency: 'high' },
+        )
+        delivered++
+        endpointOutcome.set(sub.endpoint, 'ok')
       } catch (err) {
         const status = (err as { statusCode?: number }).statusCode
-        failed++
-        // 404/410 mean the browser dropped the subscription — prune it.
         if (status === 404 || status === 410) {
-          stale.push(sub.endpoint as string)
+          // The browser dropped this subscription — prune it.
+          endpointOutcome.set(sub.endpoint, 'prune')
         } else {
-          // 401/403 usually means a VAPID key mismatch between this function and
-          // the key the browser subscribed with — surface it so it's diagnosable.
+          // 401/403 usually means a VAPID key mismatch — keep it diagnosable.
           console.error(
             `[send-push] delivery failed (status ${status ?? '?'}):`,
             (err as Error).message,
           )
+          if (endpointOutcome.get(sub.endpoint) !== 'ok') {
+            endpointOutcome.set(sub.endpoint, 'fail')
+          }
         }
       }
     }
+
+    if (delivered > 0) sent++
+    else failed++
+    await admin
+      .from('notifications')
+      .update({
+        push_status: delivered > 0 ? 'sent' : 'failed',
+        attempts: note.attempts + 1,
+        last_attempt_at: now,
+      })
+      .eq('id', note.id)
   }
 
-  if (stale.length) {
-    await admin.from('push_subscriptions').delete().in('endpoint', stale)
+  // Subscription health bookkeeping.
+  const toPrune: string[] = []
+  for (const [endpoint, outcome] of endpointOutcome) {
+    if (outcome === 'prune') {
+      toPrune.push(endpoint)
+    } else if (outcome === 'ok') {
+      await admin
+        .from('push_subscriptions')
+        .update({ last_seen_at: now, fail_count: 0 })
+        .eq('endpoint', endpoint)
+    } else {
+      const current = (subRows ?? []).find((s) => s.endpoint === endpoint)
+      const nextFails = ((current as SubscriptionRow | undefined)?.fail_count ?? 0) + 1
+      if (nextFails >= 10) {
+        toPrune.push(endpoint)
+      } else {
+        await admin
+          .from('push_subscriptions')
+          .update({ fail_count: nextFails })
+          .eq('endpoint', endpoint)
+      }
+    }
+  }
+  if (toPrune.length) {
+    await admin.from('push_subscriptions').delete().in('endpoint', toPrune)
   }
 
   console.log(
-    `[send-push] student ${ev.student_id}: sent ${sent}, failed ${failed}, pruned ${stale.length}`,
+    `[send-push] rows ${notifications.length}: sent ${sent}, failed ${failed}, skipped ${skipped}, pruned ${toPrune.length}`,
   )
-  return json({ ok: true, sent, failed, pruned: stale.length })
+  return json({ ok: true, sent, failed, skipped, pruned: toPrune.length })
 })

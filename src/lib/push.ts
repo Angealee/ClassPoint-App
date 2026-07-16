@@ -63,6 +63,27 @@ async function getRegistration(): Promise<ServiceWorkerRegistration | null> {
   return navigator.serviceWorker.ready
 }
 
+/**
+ * Hand the service worker the config it needs to self-heal a rotated push
+ * subscription from `pushsubscriptionchange` (which fires with no page and no
+ * Supabase session). The SW stashes it in IndexedDB — see public/push-sw.js.
+ */
+async function pushConfigToSw(): Promise<void> {
+  try {
+    const reg = await getRegistration()
+    reg?.active?.postMessage({
+      type: 'cp-push-config',
+      config: {
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL as string,
+        anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+        vapidKey: VAPID_PUBLIC_KEY,
+      },
+    })
+  } catch {
+    /* best-effort */
+  }
+}
+
 /** Current push state for this device (used to render the toggle). */
 export async function getPushState(): Promise<PushState> {
   if (!pushSupported()) return 'unsupported'
@@ -97,6 +118,7 @@ export async function enablePush(studentId: string): Promise<PushState> {
   }
 
   await saveSubscription(studentId, sub)
+  void pushConfigToSw()
   return 'subscribed'
 }
 
@@ -127,7 +149,10 @@ export async function syncPushSubscription(studentId: string): Promise<void> {
     if (Notification.permission !== 'granted') return
     const reg = await getRegistration()
     const sub = await reg?.pushManager.getSubscription()
-    if (sub) await saveSubscription(studentId, sub)
+    if (sub) {
+      await saveSubscription(studentId, sub)
+      void pushConfigToSw()
+    }
   } catch {
     /* best-effort — the toggle in Profile can always re-subscribe */
   }
@@ -189,6 +214,8 @@ async function saveSubscription(studentId: string, sub: PushSubscription): Promi
       p256dh: keys.p256dh ?? '',
       auth: keys.auth ?? '',
       user_agent: navigator.userAgent.slice(0, 300),
+      // Refreshed on every sync so stale devices are identifiable server-side.
+      last_seen_at: new Date().toISOString(),
     },
     { onConflict: 'endpoint' },
   )

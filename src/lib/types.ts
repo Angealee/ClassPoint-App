@@ -256,3 +256,30 @@ export interface UnlockedAchievement {
 
 /** The raw numbers behind locked achievements' progress bars (get_achievement_progress). */
 export type AchievementProgress = Record<AchievementMetric, number | null>
+
+/**
+ * What each notification is about — mirrors `notifications.type` in the DB
+ * (open set there; unknown values render with the default bell icon).
+ */
+export type NotificationType =
+  | 'point'
+  | 'deduct'
+  | 'level'
+  | 'rank'
+  | 'achievement'
+  | 'redemption'
+  | 'attendance_penalty'
+  | 'test'
+
+/** One row of the student's notification history (the bell). */
+export interface AppNotification {
+  id: string
+  type: NotificationType | (string & {})
+  title: string
+  body: string
+  /** In-app destination when tapped (e.g. '/app/leaderboard'). */
+  url: string
+  createdAt: string
+  /** Null while unread. */
+  readAt: string | null
+}

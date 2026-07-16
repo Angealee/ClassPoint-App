@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
@@ -31,6 +32,7 @@ export function AttendanceReview({
   const [loading, setLoading] = useState(true)
   const [apply, setApply] = useState(session.applyPenalties)
   const [committing, setCommitting] = useState(false)
+  const [confirmCommit, setConfirmCommit] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -194,7 +196,12 @@ export function AttendanceReview({
       )}
 
       <div className="sticky bottom-19 z-10 md:bottom-4">
-        <Button size="lg" className="w-full shadow-lg" onClick={onCommit} disabled={committing || loading}>
+        <Button
+          size="lg"
+          className="w-full shadow-lg"
+          onClick={() => setConfirmCommit(true)}
+          disabled={committing || loading}
+        >
           {committing
             ? 'Finalising…'
             : apply && deduction > 0
@@ -202,6 +209,38 @@ export function AttendanceReview({
               : 'Save attendance & finish'}
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={confirmCommit}
+        title="Finalise this class?"
+        message={
+          apply && deduction > 0 ? (
+            <>
+              Statuses lock in and penalties apply:{' '}
+              <span className="font-semibold text-ink">
+                {counts.late} late (−{session.latePenalty} each) · {counts.absent} absent (−
+                {session.absentPenalty} each)
+              </span>
+              .
+            </>
+          ) : (
+            'Attendance is saved as-is. Penalties are off, so no points are deducted.'
+          )
+        }
+        detail={
+          apply && deduction > 0
+            ? `Total deduction: −${deduction} points. You can still undo per-student from Recent activity.`
+            : undefined
+        }
+        confirmLabel={apply && deduction > 0 ? `Apply −${deduction} & finish` : 'Finish'}
+        variant={apply && deduction > 0 ? 'danger' : 'default'}
+        busy={committing}
+        onConfirm={() => {
+          setConfirmCommit(false)
+          void onCommit()
+        }}
+        onClose={() => setConfirmCommit(false)}
+      />
     </div>
   )
 }

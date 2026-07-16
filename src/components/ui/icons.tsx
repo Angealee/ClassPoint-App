@@ -228,6 +228,26 @@ export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+/** Notification bell — the student notification center. */
+export function BellIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6" />
+      <path d="M10 19a2.2 2.2 0 0 0 4 0" />
+    </svg>
+  )
+}
+
+/** Alert triangle — destructive-action confirmations. */
+export function WarningIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10.3 4.1 2.9 17a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 4.1a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9v4.5M12 17v.01" />
+    </svg>
+  )
+}
+
 export function XIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>

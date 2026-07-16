@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Avatar } from '@/components/ui/Avatar'
 import { useToast } from '@/components/ui/Toast'
 import { ClockIcon, ExpandIcon, SearchIcon, SoundIcon, XIcon } from '@/components/ui/icons'
@@ -81,6 +82,7 @@ export function AttendanceSession({
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [ending, setEnding] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkConfirm, setBulkConfirm] = useState<AttendanceStatus | null>(null)
   // Play a soft chime + flash a row when a student scans in (instructor opt-in).
   const [soundOn, setSoundOn] = useState(() => {
     try {
@@ -543,14 +545,14 @@ export function AttendanceSession({
         (bulkOpen ? (
           <div className="flex items-center gap-2 rounded-xl border border-line bg-card p-2">
             <span className="shrink-0 px-1 text-xs text-muted">Mark {waiting.length} waiting</span>
-            <Button size="sm" className="flex-1" onClick={() => markAllWaiting('present')}>
+            <Button size="sm" className="flex-1" onClick={() => setBulkConfirm('present')}>
               Present
             </Button>
             <Button
               size="sm"
               variant="outline"
               className="flex-1"
-              onClick={() => markAllWaiting('absent')}
+              onClick={() => setBulkConfirm('absent')}
             >
               Absent
             </Button>
@@ -798,6 +800,35 @@ export function AttendanceSession({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Bulk-mark confirm — this touches the whole waiting list at once. */}
+      <ConfirmDialog
+        open={!!bulkConfirm}
+        title={`Mark ${waiting.length} waiting as ${bulkConfirm ? STATUS_META[bulkConfirm].label : ''}?`}
+        message={
+          bulkConfirm === 'absent' ? (
+            <>
+              Everyone who hasn’t checked in yet is marked{' '}
+              <span className="font-semibold text-ink">Absent</span>. Penalties only apply when you
+              finalise the review.
+            </>
+          ) : (
+            <>
+              Everyone who hasn’t checked in yet is marked{' '}
+              <span className="font-semibold text-ink">Present</span>. You can still correct
+              individuals afterwards.
+            </>
+          )
+        }
+        confirmLabel={`Mark ${waiting.length} ${bulkConfirm ? STATUS_META[bulkConfirm].label.toLowerCase() : ''}`}
+        variant={bulkConfirm === 'absent' ? 'danger' : 'default'}
+        onConfirm={() => {
+          const status = bulkConfirm
+          setBulkConfirm(null)
+          if (status) void markAllWaiting(status)
+        }}
+        onClose={() => setBulkConfirm(null)}
+      />
     </div>
   )
 }

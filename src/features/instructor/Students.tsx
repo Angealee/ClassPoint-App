@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Sheet } from '@/components/ui/Sheet'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
@@ -633,25 +634,21 @@ export function Students() {
       </Sheet>
 
       {/* Delete confirm */}
-      <Sheet open={!!deleteTarget} onClose={() => setDeleteTarget(undefined)} title="Remove student?">
-        <p className="text-sm text-muted">
-          This permanently removes{' '}
-          <span className="font-semibold text-ink">{deleteTarget?.full_name}</span> and all their
-          points. This can't be undone.
-        </p>
-        <div className="mt-5 flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(undefined)}>
-            Cancel
-          </Button>
-          <Button
-            className="flex-1 bg-brand-600 hover:bg-brand-700"
-            onClick={onDelete}
-            disabled={deleting}
-          >
-            {deleting ? 'Removing…' : 'Remove'}
-          </Button>
-        </div>
-      </Sheet>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Remove this student?"
+        message={
+          <>
+            <span className="font-semibold text-ink">{deleteTarget?.full_name}</span> will be
+            permanently removed. This can't be undone.
+          </>
+        }
+        detail="All their points, attendance records, and achievements are deleted too."
+        confirmLabel="Remove student"
+        busy={deleting}
+        onConfirm={onDelete}
+        onClose={() => setDeleteTarget(undefined)}
+      />
     </div>
   )
 }

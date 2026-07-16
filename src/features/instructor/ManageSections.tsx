@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Sheet } from '@/components/ui/Sheet'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { CheckIcon, PlusIcon, TrashIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
@@ -17,6 +18,7 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
   const [draft, setDraft] = useState('')
   const [newName, setNewName] = useState('')
   const [busy, setBusy] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string }>()
 
   async function loadCounts() {
     try {
@@ -75,6 +77,7 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
       await refreshSections()
       await loadCounts()
       toast(`Section ${name} removed.`, 'success')
+      setDeleteTarget(undefined)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Could not remove the section.', 'error')
     } finally {
@@ -83,6 +86,7 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
   }
 
   return (
+    <>
     <Sheet open={open} onClose={onClose} title="Manage sections">
       <div className="space-y-2">
         {sections.length === 0 && (
@@ -135,7 +139,7 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
 
               <button
                 type="button"
-                onClick={() => void onDelete(s.id, s.name)}
+                onClick={() => setDeleteTarget({ id: s.id, name: s.name })}
                 disabled={busy || count > 0}
                 title={count > 0 ? 'Remove its students first' : 'Delete section'}
                 aria-label={`Delete ${s.name}`}
@@ -163,5 +167,22 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
         A section can only be deleted once it has no students.
       </p>
     </Sheet>
+
+    {/* Rendered as a sibling of the parent Sheet so the overlay stacks above it. */}
+    <ConfirmDialog
+      open={!!deleteTarget}
+      title="Delete this section?"
+      message={
+        <>
+          Section <span className="font-semibold text-ink">{deleteTarget?.name}</span> will be
+          permanently deleted. This can’t be undone.
+        </>
+      }
+      confirmLabel="Delete section"
+      busy={busy}
+      onConfirm={() => deleteTarget && void onDelete(deleteTarget.id, deleteTarget.name)}
+      onClose={() => setDeleteTarget(undefined)}
+    />
+    </>
   )
 }

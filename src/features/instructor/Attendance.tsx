@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Sheet } from '@/components/ui/Sheet'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
@@ -443,33 +444,39 @@ export function Attendance() {
                 </button>
               )}
 
-              {confirmDelete ? (
-                <div className="space-y-2 rounded-lg bg-brand-500/5 p-2.5">
-                  <p className="text-xs text-muted">
-                    Delete this session and reverse any penalties it applied? This can’t be undone.
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleting}>
-                      Cancel
-                    </Button>
-                    <Button onClick={onDeleteSession} disabled={deleting}>
-                      {deleting ? 'Deleting…' : 'Delete session'}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(true)}
-                  className="flex w-full items-center gap-2 text-sm font-medium text-brand-600 transition-opacity hover:opacity-80 dark:text-brand-400"
-                >
-                  <TrashIcon className="h-4 w-4" /> Delete session
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="flex w-full items-center gap-2 text-sm font-medium text-brand-600 transition-opacity hover:opacity-80 dark:text-brand-400"
+              >
+                <TrashIcon className="h-4 w-4" /> Delete session
+              </button>
             </div>
           </div>
         )}
       </Sheet>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this session?"
+        message={
+          <>
+            <span className="font-semibold text-ink">
+              {detail ? detail.topic || sessionDate(detail.startedAt) : 'This session'}
+            </span>{' '}
+            and all its check-ins will be permanently deleted. This can’t be undone.
+          </>
+        }
+        detail={
+          detail?.penaltiesCommitted
+            ? 'Any penalties this session applied are reversed — student points recompute automatically.'
+            : undefined
+        }
+        confirmLabel="Delete session"
+        busy={deleting}
+        onConfirm={onDeleteSession}
+        onClose={() => setConfirmDelete(false)}
+      />
     </div>
   )
 }

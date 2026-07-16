@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Sheet } from '@/components/ui/Sheet'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Avatar } from '@/components/ui/Avatar'
 import { useToast } from '@/components/ui/Toast'
 import { getLevelProgress } from '@/lib/leveling'
@@ -43,6 +44,8 @@ export function Profile() {
   const [bannerBusy, setBannerBusy] = useState(false)
   const [pinBusy, setPinBusy] = useState(false)
   const [whatsNewOpen, setWhatsNewOpen] = useState(false)
+  const [confirmPhoto, setConfirmPhoto] = useState(false)
+  const [confirmBannerUrl, setConfirmBannerUrl] = useState<string | null>(null)
 
   const [editOpen, setEditOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -133,6 +136,7 @@ export function Profile() {
     setUploading(true)
     const { error } = await clearAvatar()
     setUploading(false)
+    setConfirmPhoto(false)
     toast(error ?? 'Profile picture removed.', error ? 'error' : 'success')
   }
 
@@ -150,6 +154,7 @@ export function Profile() {
     setBannerBusy(true)
     const { error } = await removeBanner(url)
     setBannerBusy(false)
+    setConfirmBannerUrl(null)
     if (error) toast(error, 'error')
   }
 
@@ -226,7 +231,7 @@ export function Profile() {
                 variant="ghost"
                 size="sm"
                 className="text-muted"
-                onClick={onRemovePhoto}
+                onClick={() => setConfirmPhoto(true)}
                 disabled={uploading}
               >
                 Remove
@@ -272,7 +277,7 @@ export function Profile() {
               urls={me.banner_urls ?? []}
               editable
               onAdd={() => bannerRef.current?.click()}
-              onRemove={onRemoveBanner}
+              onRemove={(url) => setConfirmBannerUrl(url)}
               busy={bannerBusy}
             />
             <p className="mt-1.5 text-xs text-muted">
@@ -462,6 +467,26 @@ export function Profile() {
         onClose={() => setPreviewOpen(false)}
         isMe
         sectionLabel={me ? sectionName(me.section_id) : ''}
+      />
+
+      <ConfirmDialog
+        open={confirmPhoto}
+        title="Remove profile picture?"
+        message="Your photo is removed everywhere — classmates will see your initials instead."
+        confirmLabel="Remove photo"
+        busy={uploading}
+        onConfirm={onRemovePhoto}
+        onClose={() => setConfirmPhoto(false)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmBannerUrl}
+        title="Remove this photo?"
+        message="It disappears from your showcase — classmates won't see it anymore."
+        confirmLabel="Remove photo"
+        busy={bannerBusy}
+        onConfirm={() => confirmBannerUrl && void onRemoveBanner(confirmBannerUrl)}
+        onClose={() => setConfirmBannerUrl(null)}
       />
     </div>
   )

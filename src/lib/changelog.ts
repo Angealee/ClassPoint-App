@@ -34,6 +34,28 @@ export interface ChangelogEntry {
   sections?: ChangelogSection[]
 }
 
+/**
+ * THE OVERHAUL DRAFT — not visible to users yet.
+ *
+ * Per the user's decision (2026-07-16): all overhaul phases ship quietly and get
+ * announced together as one big 3.0.0. Accumulate sections here as each phase
+ * lands; when the user says "announce it", move this entry to the TOP of
+ * CHANGELOG (and delete this const). Do NOT add per-phase entries to CHANGELOG.
+ */
+export const DRAFT_3_0_0: ChangelogEntry = {
+  version: '3.0.0',
+  date: '2026-07-16', // update to the real announce date when it ships
+  title: 'The Overhaul 🚀',
+  sections: [
+    {
+      heading: 'Safety nets everywhere',
+      items: [
+        'Every risky action — deleting sessions, students, photos, or point awards — now asks you to confirm first. No more accidental oops.',
+      ],
+    },
+  ],
+}
+
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {

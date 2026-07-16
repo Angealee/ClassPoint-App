@@ -14,8 +14,10 @@ import {
   getLeaderboardSnapshot,
   getMyAchievements,
   getMyStudent,
+  getUnreadNotificationCount,
   listSections,
   listStudentEvents,
+  markNotificationsRead,
   removeAvatar,
   setBannerUrls,
   setDisplayTitle as apiSetDisplayTitle,
@@ -97,6 +99,10 @@ interface StudentDataValue {
   setDisplayTitle: (title: string | null) => Promise<{ error?: string }>
   /** Choose up to 3 unlocked achievements to feature on the profile. */
   setPinnedAchievements: (codes: string[]) => Promise<{ error?: string }>
+  /** Unread notifications — drives the bell badge. */
+  unreadCount: number
+  /** Mark every notification read (bell sheet open); clears the badge. */
+  markAllRead: () => Promise<void>
 }
 
 const StudentDataContext = createContext<StudentDataValue | undefined>(undefined)
@@ -128,6 +134,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const [achievementProgress, setAchievementProgress] = useState<AchievementProgress | null>(null)
   // Achievements queued to celebrate, shown one at a time (oldest first).
   const [unlockQueue, setUnlockQueue] = useState<Achievement[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
 
   // Tracks the level/rank we last reflected, to detect changes.
   const levelRef = useRef<number | null>(null)
@@ -299,6 +306,9 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         considerLevelUp(mine.id, mine.lifetime_points)
         const myRank = snap.entries.find((e) => e.student_id === mine.id)?.rank ?? null
         considerRankChange(mine.id, myRank)
+        // Bell badge — independent of the main load; failures just keep the
+        // last-known count.
+        void getUnreadNotificationCount(mine.id).then(setUnreadCount).catch(() => {})
         // Independent of the main load — achievements populate the trophy
         // case as soon as they're ready without delaying the dashboard.
         void loadAchievements(mine.id).finally(() => setAchievementsLoading(false))
@@ -402,6 +412,19 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
           const row = payload.new as { rank?: number }
           if (typeof row.rank === 'number') considerRankChange(studentId, row.rank)
         },
+      )
+      // Every queued notification bumps the bell badge live. The row is
+      // history; the point/achievement listeners above stay the live surface
+      // (toast/sound), so no announcement here — just the count.
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `student_id=eq.${studentId}`,
+        },
+        () => setUnreadCount((c) => c + 1),
       )
       // Catches instructor-granted achievements live (self-triggered unlocks
       // already celebrate synchronously from syncAchievements' own return
@@ -625,6 +648,16 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const unlockedAchievement = unlockQueue[0] ?? null
   const clearUnlockedAchievement = useCallback(() => setUnlockQueue((q) => q.slice(1)), [])
 
+  /** Bell sheet opened — everything up to now counts as read. */
+  const markAllRead = useCallback(async () => {
+    setUnreadCount(0) // optimistic; a failure just re-counts on the next load
+    try {
+      await markNotificationsRead()
+    } catch {
+      /* best-effort */
+    }
+  }, [])
+
   return (
     <StudentDataContext.Provider
       value={{
@@ -658,6 +691,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         markAchievementsSeen,
         setDisplayTitle: setDisplayTitleField,
         setPinnedAchievements: setPinnedAchievementsField,
+        unreadCount,
+        markAllRead,
       }}
     >
       {children}
