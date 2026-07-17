@@ -299,6 +299,30 @@ export interface ProfileViews {
   recent: ProfileVisitor[]
 }
 
+/** One row of the full, paginated visitor list. */
+export interface ProfileVisitorRow {
+  displayName: string
+  avatarUrl: string | null
+  lastViewedAt: string
+  viewCount: number
+}
+
+/** A page of the full visitor list, plus the grand total for the header. */
+export interface ProfileVisitorPage {
+  rows: ProfileVisitorRow[]
+  /** Distinct visitors overall (not just this page). */
+  total: number
+}
+
+/** How rare one achievement is across the class. */
+export interface AchievementRarity {
+  code: string
+  /** How many students hold it. */
+  holders: number
+  /** The pool it's out of (students with a real account). */
+  totalStudents: number
+}
+
 export type AchievementCategory = 'points' | 'attendance' | 'growth' | 'social' | 'fun' | 'recognition'
 
 /** Which raw number (from get_achievement_progress) an achievement tracks. */
@@ -315,6 +339,8 @@ export type AchievementMetric =
   | 'views_given'
   | 'unlocked_count'
   | 'banner_count'
+  | 'points_spent'
+  | 'redemptions_approved'
 
 /** One row of the achievement catalog — the static, shared definition. */
 export interface Achievement {

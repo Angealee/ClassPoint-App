@@ -189,7 +189,7 @@ function YouChip({ pos, points }: { pos: number; points: number | null }) {
             color: C.muted,
           }}
         >
-          YOUR RANK
+          RANK
         </div>
         {points !== null && (
           <div style={{ fontSize: 24, color: C.muted, marginTop: 6 }}>{points} points</div>

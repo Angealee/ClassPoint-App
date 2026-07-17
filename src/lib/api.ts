@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 import type {
   Achievement,
   AchievementProgress,
+  AchievementRarity,
   AchievementState,
   AppNotification,
   AttendanceAnalytics,
@@ -17,6 +18,7 @@ import type {
   PointCategory,
   PointEvent,
   ProfileViews,
+  ProfileVisitorPage,
   PublicPointEvent,
   PublicProfile,
   Redemption,
@@ -440,6 +442,55 @@ export async function getProfileViews(studentId: string): Promise<ProfileViews> 
       lastViewedAt: r.last_viewed_at,
     })),
   }
+}
+
+/**
+ * A page of the full "who viewed me" list (owner-only; empty for anyone else).
+ * The strip uses getProfileViews; this backs the tap-through modal.
+ */
+export async function getProfileVisitors(
+  studentId: string,
+  offset = 0,
+  limit = 20,
+): Promise<ProfileVisitorPage> {
+  const { data, error } = await supabase.rpc('get_profile_visitors', {
+    p_student_id: studentId,
+    p_offset: offset,
+    p_limit: limit,
+  })
+  if (error) throw error
+  const rows = (data ?? []) as Array<{
+    display_name: string
+    avatar_url: string | null
+    last_viewed_at: string
+    view_count: number
+    total_count: number
+  }>
+  return {
+    rows: rows.map((r) => ({
+      displayName: r.display_name,
+      avatarUrl: r.avatar_url ?? null,
+      lastViewedAt: r.last_viewed_at,
+      viewCount: Number(r.view_count) || 0,
+    })),
+    total: rows.length > 0 ? Number(rows[0].total_count) || 0 : 0,
+  }
+}
+
+/** Holders-per-badge across the class — powers the rarity readout. */
+export async function getAchievementRarity(): Promise<Map<string, AchievementRarity>> {
+  const { data, error } = await supabase.rpc('get_achievement_rarity')
+  if (error) throw error
+  const rows = (data ?? []) as Array<{ code: string; holders: number; total_students: number }>
+  const map = new Map<string, AchievementRarity>()
+  for (const r of rows) {
+    map.set(r.code, {
+      code: r.code,
+      holders: Number(r.holders) || 0,
+      totalStudents: Number(r.total_students) || 0,
+    })
+  }
+  return map
 }
 
 /** The student's current rank from the frozen snapshot, or null if not ranked. */
@@ -1059,6 +1110,8 @@ export async function getAchievementProgress(studentId: string): Promise<Achieve
     views_given: data.views_given,
     unlocked_count: data.unlocked_count,
     banner_count: data.banner_count,
+    points_spent: data.points_spent,
+    redemptions_approved: data.redemptions_approved,
   }
 }
 

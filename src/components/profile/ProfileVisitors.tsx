@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Avatar } from '@/components/ui/Avatar'
 import { getProfileViews } from '@/lib/api'
+import { VisitorsSheet } from './VisitorsSheet'
 import type { ProfileViews } from '@/lib/types'
 
 /**
@@ -12,6 +13,7 @@ import type { ProfileViews } from '@/lib/types'
 export function ProfileVisitors({ studentId }: { studentId: string }) {
   const [views, setViews] = useState<ProfileViews | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [listOpen, setListOpen] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -43,7 +45,11 @@ export function ProfileVisitors({ studentId }: { studentId: string }) {
           No profile views yet. Only you can see this.
         </p>
       ) : (
-        <div className="flex items-center gap-3 rounded-xl bg-card-2 px-4 py-3">
+        <button
+          type="button"
+          onClick={() => setListOpen(true)}
+          className="flex w-full items-center gap-3 rounded-xl bg-card-2 px-4 py-3 text-left transition-colors hover:bg-line/40"
+        >
           {views.recent.length > 0 && (
             <div className="flex -space-x-2.5">
               {views.recent.slice(0, 5).map((v, i) => (
@@ -63,8 +69,16 @@ export function ProfileVisitors({ studentId }: { studentId: string }) {
             </p>
             <p className="truncate text-xs text-muted">{caption(views)}</p>
           </div>
-        </div>
+          <span className="shrink-0 text-xs font-semibold text-brand-500">See all →</span>
+        </button>
       )}
+
+      <VisitorsSheet
+        studentId={studentId}
+        totalViews={views?.total ?? 0}
+        open={listOpen}
+        onClose={() => setListOpen(false)}
+      />
     </div>
   )
 }

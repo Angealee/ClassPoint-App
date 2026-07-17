@@ -92,9 +92,15 @@ Since 0017–0020: `notifications` (the push outbox AND the in-app bell's histor
 `recitation|activity|penalty|redeem`.
 
 Gotchas:
-- `cp_achievement_metrics` (canonical body now in **0018**, not 0016) derives
-  attendance streaks/counts from `attendance_records`. Copy the latest body forward
-  when changing it — never fork it.
+- `cp_achievement_metrics` (canonical body now in **0021**, not 0016/0018) derives
+  attendance streaks/counts from `attendance_records` and spending from
+  `point_redemptions`. Copy the latest body forward when changing it — never fork it.
+  Its return type has grown twice; return-type changes need `drop function` first,
+  plus recreation of dependents `sync_achievements` + `get_achievement_progress`.
+- Event-granted badges (`town_crier`, `window_shopper`) are set by TRIGGERS
+  (`trg_town_crier` on leaderboard_comments, `trg_window_shopper` on
+  point_redemptions), NOT by `sync_achievements` — they're not in its satisfied
+  list. `granted_by='system'` but no metric. Don't add them to sync.
 - pg_net `http_post` is fire-and-forget — never mark push work "sent" from SQL.
   Only the `send-push` edge function transitions `notifications.push_status`.
 - `end_class_session` inserts absents with `on conflict do nothing` — records that

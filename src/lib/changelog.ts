@@ -59,6 +59,14 @@ export const DRAFT_3_0_0: ChangelogEntry = {
       ],
     },
     {
+      heading: 'Achievement library + who’s viewing you',
+      items: [
+        'Tap any badge to see its full story — how rare it is (“✦ Legendary · 8% of the class · 3 of 42”), when you unlocked it, and a little something extra under each one.',
+        'Four new badges to chase, including two secret ones tied to spending and commenting.',
+        'Your profile-views strip is now tappable — open the full list of who’s viewed you and when. Still only you can see it.',
+      ],
+    },
+    {
       heading: 'Share the board · flying comments',
       major: true,
       items: [

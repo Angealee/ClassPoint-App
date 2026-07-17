@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { ArrowLeftIcon } from '@/components/ui/icons'
 import { AchievementCard } from '@/components/achievements/AchievementCard'
+import { AchievementDetailSheet } from './AchievementDetailSheet'
+import { getAchievementRarity } from '@/lib/api'
 import { cn } from '@/lib/cn'
-import type { AchievementCategory, AchievementState } from '@/lib/types'
+import type { AchievementCategory, AchievementRarity, AchievementState } from '@/lib/types'
 import { useStudentData } from './StudentData'
 
 const CATEGORY_LABELS: Record<AchievementCategory, string> = {
@@ -82,11 +84,19 @@ export function Achievements() {
   const [equipping, setEquipping] = useState(false)
   const [catFilter, setCatFilter] = useState<CategoryFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [detail, setDetail] = useState<AchievementState | null>(null)
+  const [rarity, setRarity] = useState<Map<string, AchievementRarity> | null>(null)
 
   // Viewing the trophy case clears the "new badge" nudge dot.
   useEffect(() => {
     markAchievementsSeen()
   }, [markAchievementsSeen])
+
+  // Rarity is class-wide, so fetch it once for the whole page and share it
+  // across every detail sheet.
+  useEffect(() => {
+    getAchievementRarity().then(setRarity).catch(() => {})
+  }, [])
 
   const unlockedCount = achievements.filter((a) => a.unlockedAt).length
   const filtered = useMemo(
@@ -210,7 +220,12 @@ export function Achievements() {
               <h2 className="mb-2 px-1 text-sm font-semibold text-muted">{CATEGORY_LABELS[cat]}</h2>
               <Card className="divide-y divide-line">
                 {list.map((a) => (
-                  <AchievementCard key={a.code} achievement={a} progress={achievementProgress} />
+                  <AchievementCard
+                    key={a.code}
+                    achievement={a}
+                    progress={achievementProgress}
+                    onClick={() => setDetail(a)}
+                  />
                 ))}
               </Card>
             </div>
@@ -221,6 +236,14 @@ export function Achievements() {
       <Button variant="ghost" className="w-full text-muted" onClick={() => navigate('/app/profile')}>
         Back to profile
       </Button>
+
+      <AchievementDetailSheet
+        achievement={detail}
+        progress={achievementProgress}
+        rarity={rarity}
+        open={!!detail}
+        onClose={() => setDetail(null)}
+      />
     </div>
   )
 }
