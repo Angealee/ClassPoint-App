@@ -228,6 +228,16 @@ export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+/** Share glyph — export the leaderboard as an image. */
+export function ShareIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 15V4M8.5 7.5 12 4l3.5 3.5" />
+      <path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6" />
+    </svg>
+  )
+}
+
 /** Notification bell — the student notification center. */
 export function BellIcon(props: SVGProps<SVGSVGElement>) {
   return (

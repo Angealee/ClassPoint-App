@@ -167,6 +167,28 @@
   animation: cp-arena-glow 5s ease-in-out infinite;
 }
 
+/* Flying leaderboard comments (danmaku). A pure transform animation so it runs
+   on the compositor — a JS-driven equivalent would jank on low-end phones with
+   several pills in flight. `--cp-fly-dur` is set per pill from its length, so
+   longer comments travel slower and stay readable. Reduced-motion users get a
+   static list instead (see CommentsOverlay), never this.
+
+   The pill is parked at `left: 100%` (just past the deck's right edge) and
+   travels the deck's width PLUS its own, so it enters and exits fully
+   off-screen. `cqw` measures the deck, not the viewport — the deck is a
+   centred content column, so viewport units would overshoot badly on desktop.
+   Requires `container-type: inline-size` on the deck. */
+@keyframes cp-fly {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(calc(-100cqw - 100%), 0, 0); }
+}
+
+.cp-fly {
+  left: 100%;
+  animation: cp-fly var(--cp-fly-dur, 9s) linear forwards;
+  will-change: transform;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

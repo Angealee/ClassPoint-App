@@ -1,16 +1,22 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotChip } from '@/components/ui/SnapshotStamp'
-import { TrophyIcon } from '@/components/ui/icons'
+import { ShareIcon, TrophyIcon } from '@/components/ui/icons'
 import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
+import { CommentsOverlay } from '@/components/leaderboard/CommentsOverlay'
 // The profile-preview sheet is generic (loads any student's public profile);
 // reused here so the instructor can tap a ranked student just like students can.
 import { StudentProfilePreview } from '@/features/student/StudentProfilePreview'
 import { useInstructor } from './InstructorLayout'
 import { getLeaderboardSnapshot } from '@/lib/api'
 import type { LeaderboardEntry } from '@/lib/types'
+
+// Only pulled in once Share is tapped — see the student board for the rationale.
+const ShareSheet = lazy(() =>
+  import('@/components/leaderboard/ShareSheet').then((m) => ({ default: m.ShareSheet })),
+)
 
 export function InstructorLeaderboard() {
   const { sections } = useInstructor()
@@ -19,6 +25,8 @@ export function InstructorLeaderboard() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [selected, setSelected] = useState<LeaderboardEntry | null>(null)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareMounted, setShareMounted] = useState(false)
 
   useEffect(() => {
     getLeaderboardSnapshot()
@@ -61,6 +69,18 @@ export function InstructorLeaderboard() {
             {filter === 'all' ? 'All sections' : sectionName(filter)}
           </span>
           <SnapshotChip capturedAt={capturedAt} />
+          {visible.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setShareMounted(true)
+                setShareOpen(true)
+              }}
+              className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-semibold text-brand-500 transition-opacity hover:opacity-80"
+            >
+              <ShareIcon className="h-3.5 w-3.5" /> Share
+            </button>
+          )}
         </div>
       </div>
 
@@ -73,13 +93,15 @@ export function InstructorLeaderboard() {
             : 'No students in this section yet.'}
         </Card>
       ) : (
-        <PodiumBoard
-          entries={visible}
-          sectionName={sectionName}
-          showSection={filter === 'all'}
-          onSelect={(entry) => setSelected(entry)}
-          confetti={false}
-        />
+        <CommentsOverlay isInstructor>
+          <PodiumBoard
+            entries={visible}
+            sectionName={sectionName}
+            showSection={filter === 'all'}
+            onSelect={(entry) => setSelected(entry)}
+            confetti={false}
+          />
+        </CommentsOverlay>
       )}
 
       <StudentProfilePreview
@@ -88,6 +110,18 @@ export function InstructorLeaderboard() {
         onClose={() => setSelected(null)}
         sectionLabel={selected ? sectionName(selected.section_id) : ''}
       />
+
+      {shareMounted && (
+        <Suspense fallback={null}>
+          <ShareSheet
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            entries={visible}
+            scopeLabel={filter === 'all' ? 'All sections' : sectionName(filter)}
+            capturedAt={capturedAt}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

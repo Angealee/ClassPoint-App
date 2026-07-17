@@ -150,6 +150,23 @@ export interface SessionSummary {
   penaltiesCommitted: boolean
 }
 
+/** One flying comment on the leaderboard. Self-destructs after 24h. */
+export interface LeaderboardComment {
+  id: string
+  /** Null when the instructor posted it. */
+  studentId: string | null
+  /** Denormalized at post time so realtime payloads render with no extra fetch. */
+  displayName: string
+  avatarUrl: string | null
+  body: string
+  createdAt: string
+}
+
+/** Comments a student may post per rolling 24h (mirrors the RPC). */
+export const MAX_COMMENTS_PER_DAY = 3
+/** Longest a comment may be (mirrors the DB CHECK). */
+export const MAX_COMMENT_LENGTH = 120
+
 /** What a student is putting their points toward. */
 export type RedemptionKind = 'quiz' | 'activity' | 'exam' | 'other'
 export type RedemptionStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'

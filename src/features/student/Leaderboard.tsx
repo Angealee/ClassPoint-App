@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotChip } from '@/components/ui/SnapshotStamp'
-import { TrophyIcon } from '@/components/ui/icons'
+import { ShareIcon, TrophyIcon } from '@/components/ui/icons'
 import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
+import { CommentsOverlay } from '@/components/leaderboard/CommentsOverlay'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { getLevelProgress } from '@/lib/leveling'
 import { cn } from '@/lib/cn'
@@ -16,9 +17,19 @@ import { StudentProfilePreview } from './StudentProfilePreview'
 const TOP_N = 10
 const GLOBAL = 'global'
 
+// The share card + its capture path are only needed once someone actually taps
+// Share, so they stay out of the leaderboard's own chunk.
+const ShareSheet = lazy(() =>
+  import('@/components/leaderboard/ShareSheet').then((m) => ({ default: m.ShareSheet })),
+)
+
 export function Leaderboard() {
   const { loading, leaderboard, capturedAt, me, sections, sectionName, refresh } = useStudentData()
   const [selected, setSelected] = useState<LeaderboardEntry | null>(null)
+  const [shareOpen, setShareOpen] = useState(false)
+  // Sticky once opened, so the sheet keeps its close animation instead of
+  // being yanked out of the tree the moment it's dismissed.
+  const [shareMounted, setShareMounted] = useState(false)
   // Which board to show: the global ranking or a single section's. The snapshot
   // already carries every student + section, so a section view is just a filter
   // over `leaderboard` — no extra query.
@@ -78,6 +89,18 @@ export function Leaderboard() {
             {subtitle}
           </span>
           <SnapshotChip capturedAt={capturedAt} />
+          {top.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setShareMounted(true)
+                setShareOpen(true)
+              }}
+              className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-semibold text-brand-500 transition-opacity hover:opacity-80"
+            >
+              <ShareIcon className="h-3.5 w-3.5" /> Share
+            </button>
+          )}
         </div>
       </div>
 
@@ -90,13 +113,15 @@ export function Leaderboard() {
             : `No ranked students in ${sectionName(view)} yet.`}
         </Card>
       ) : (
-        <PodiumBoard
-          entries={top}
-          meId={me?.id}
-          sectionName={sectionName}
-          showSection={isGlobal}
-          onSelect={(entry) => setSelected(entry)}
-        />
+        <CommentsOverlay studentId={me?.id}>
+          <PodiumBoard
+            entries={top}
+            meId={me?.id}
+            sectionName={sectionName}
+            showSection={isGlobal}
+            onSelect={(entry) => setSelected(entry)}
+          />
+        </CommentsOverlay>
       )}
 
       {/* Your standing — pinned at the bottom so the board leads, not your row. */}
@@ -118,6 +143,21 @@ export function Leaderboard() {
         isMe={!!selected && me?.id === selected.student_id}
         sectionLabel={selected ? sectionName(selected.section_id) : ''}
       />
+
+      {shareMounted && (
+        <Suspense fallback={null}>
+          <ShareSheet
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            entries={ranked}
+            meId={me?.id}
+            myPos={meEntry ? myPos : null}
+            myPoints={meEntry?.lifetime_points ?? null}
+            scopeLabel={isGlobal ? 'Global' : sectionName(view)}
+            capturedAt={capturedAt}
+          />
+        </Suspense>
+      )}
       </div>
     </PullToRefresh>
   )
