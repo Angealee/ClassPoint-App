@@ -30,3 +30,34 @@ export const supabase: SupabaseClient = createClient(
     },
   },
 )
+
+/**
+ * A realtime channel whose topic is unique to THIS subscription.
+ *
+ * Why this exists: `supabase.channel(topic)` does not always make a new
+ * channel — if one with that topic is already registered it hands the existing
+ * one back (RealtimeClient.channel → `return exists`). Calling `.on()` on a
+ * channel that has already subscribed throws:
+ *
+ *   cannot add `postgres_changes` callbacks for realtime:<topic> after `subscribe()`
+ *
+ * Two ordinary situations hit that:
+ *   1. A component that renders more than once — e.g. anything passed to
+ *      Shell's `actions`, which is rendered in BOTH the desktop sidebar and the
+ *      mobile header. Both instances mount (only one is visible), the first
+ *      subscribes, and the second's `.on()` lands on a channel that is already
+ *      joining. This is what broke /teach.
+ *   2. A remount racing the teardown: `removeChannel` awaits `unsubscribe()`
+ *      before the topic leaves the registry, so the next `channel(sameTopic)`
+ *      can still hand back the dying one — which is how a channel ends up
+ *      silently dead instead of resubscribed (see StudentData.tsx's comment).
+ *
+ * A per-subscription suffix sidesteps both. Pair it with `removeChannel` on
+ * unmount (page-scoped channel discipline) and nothing leaks.
+ *
+ * Use this for page-scoped channels. The one durable per-student channel in
+ * StudentData.tsx deliberately keeps a stable topic — see the comment there.
+ */
+export function uniqueChannel(prefix: string) {
+  return supabase.channel(`${prefix}-${Math.random().toString(36).slice(2, 10)}`)
+}

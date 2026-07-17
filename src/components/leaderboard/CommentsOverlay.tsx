@@ -9,7 +9,7 @@ import {
   mapComment,
   postLeaderboardComment,
 } from '@/lib/api'
-import { supabase } from '@/lib/supabase'
+import { supabase, uniqueChannel } from '@/lib/supabase'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import {
@@ -163,8 +163,7 @@ export function CommentsOverlay({
   // Page-scoped channel: subscribed on mount, removed on unmount. The durable
   // student-self channel is untouched.
   useEffect(() => {
-    const channel = supabase
-      .channel('leaderboard-comments')
+    const channel = uniqueChannel('leaderboard-comments')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'leaderboard_comments' },
@@ -239,12 +238,12 @@ export function CommentsOverlay({
             {flying.map((p) => (
               <div
                 key={p.key}
-                className="cp-fly absolute left-0 whitespace-nowrap"
+                // `left` comes from .cp-fly (100% — parked off the right edge).
+                className="cp-fly absolute whitespace-nowrap"
                 style={
                   {
                     top: p.lane * 34 + 4,
                     '--cp-fly-dur': `${p.durationMs}ms`,
-                    '--cp-fly-w': '520px',
                   } as React.CSSProperties
                 }
                 onAnimationEnd={() => setFlying((f) => f.filter((x) => x.key !== p.key))}

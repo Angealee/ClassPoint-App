@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/Toast'
 import { TicketIcon } from '@/components/ui/icons'
 import { decideRedemption, listRedemptions, listTopSpenders } from '@/lib/api'
 import { timeAgo } from '@/lib/time'
-import { supabase } from '@/lib/supabase'
+import { supabase, uniqueChannel } from '@/lib/supabase'
 import { cn } from '@/lib/cn'
 import { useInstructor } from './InstructorLayout'
 import type { RedemptionKind, RedemptionRequest, RedemptionStatus, SpenderStat } from '@/lib/types'
@@ -71,8 +71,7 @@ export function Redemptions() {
 
   // Page-scoped: new requests appear without a refresh. Removed on unmount.
   useEffect(() => {
-    const channel = supabase
-      .channel('redemptions-inbox')
+    const channel = uniqueChannel('redemptions-inbox')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'point_redemptions' }, () => {
         void load()
       })

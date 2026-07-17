@@ -59,6 +59,17 @@ export const DRAFT_3_0_0: ChangelogEntry = {
       ],
     },
     {
+      heading: 'Share the board · flying comments',
+      major: true,
+      items: [
+        'New Share button on the leaderboard: turn the rankings into a proper 1080×1350 image, sized for a story or a post. Pick Podium or Top 10, preview it, then share or save.',
+        'Your rank rides along on the card — everyone has something to brag about, not just the top 3.',
+        'Comments now fly across the leaderboard. Post one and the whole class sees it drift past their board in real time.',
+        'Three comments a day each, they vanish after 24 hours, and your name rides with them — so keep it fun. Tap a quick chip if you can’t think of anything.',
+        'Instructors can post too (badged as Instructor, no daily limit) and delete anything — tap a comment, or use the Recent comments list.',
+      ],
+    },
+    {
       heading: 'Spend your points on your grades',
       major: true,
       items: [

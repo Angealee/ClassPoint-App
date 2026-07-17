@@ -12,6 +12,8 @@ achievements. Single instructor (the user), students at DCT. Classes started
   Tailwind CSS v4 (CSS-first config — NO tailwind.config.js; tokens live in
   `src/styles/index.css`: `--canvas/--card/--card-2/--ink/--muted/--line`, brand red
   `#e11d2a`, gold scale) · framer-motion 12 · custom UI primitives (NOT shadcn).
+  Heavy/optional libs are dynamic-import only: `xlsx` (exports),
+  `modern-screenshot` (leaderboard share image).
 - **Backend:** Supabase only (project ref `cxfxstazlwjijozkglgx`) — Postgres + RLS +
   Realtime + Edge Functions (Deno) + pg_cron + pg_net + Vault + Storage (`avatars` bucket).
 - **PWA:** vite-plugin-pwa (Workbox, `registerType: 'prompt'`). Custom push logic in
@@ -41,6 +43,14 @@ achievements. Single instructor (the user), students at DCT. Classes started
   (`student-self-*`); page-scoped channels subscribe on mount and are removed on
   unmount; NEVER key channel effects on object identity (use the stable id — see the
   comment in StudentData.tsx).
+  **Page-scoped channels MUST use `uniqueChannel()` from `lib/supabase.ts`, not
+  `supabase.channel()`.** `channel(topic)` returns an EXISTING channel for a
+  repeated topic, and `.on()` on an already-subscribed channel throws
+  ("cannot add `postgres_changes` callbacks … after `subscribe()`"). This bites
+  whenever a component mounts twice — notably anything passed to Shell's
+  `actions`, which renders in BOTH the desktop sidebar and the mobile header.
+  For that reason, **a component in `actions` must never own a subscription**:
+  hoist state to the layout (mounts once) and pass it down as a prop.
 
 ## Changelog workflow
 
@@ -75,8 +85,9 @@ ledger — awards, penalties, and future spending all flow through it), `instruc
 `class_sessions` + `class_session_secrets` + `attendance_records`, `profile_views`,
 `achievements` + `student_achievements`.
 
-Since 0017/0018/0019: `notifications` (the push outbox AND the in-app bell's
-history), `point_redemptions` (spend requests). Attendance statuses are
+Since 0017–0020: `notifications` (the push outbox AND the in-app bell's history),
+`point_redemptions` (spend requests), `leaderboard_comments` +
+`leaderboard_banned_words` (24h flying comments). Attendance statuses are
 `present|late|absent|excused|irregular`. `point_events.category` is
 `recitation|activity|penalty|redeem`.
 
@@ -108,6 +119,12 @@ Gotchas:
   the points while the redemption still reads "approved" (a silent desync).
 - `cp_notify_point_event` skips `redeem`; `decide_point_redemption` sends the
   single richer notification instead. Don't add a second.
+- `leaderboard_comments` denormalizes `display_name`/`avatar_url` at post time so
+  a realtime INSERT payload can render a pill with no extra fetch. Rows live 24h,
+  so staleness is a non-issue. `student_id is null` ⇒ posted by the instructor.
+- The danmaku keyframe (`.cp-fly`) needs `container-type: inline-size` on the
+  deck — `cqw` resolves against it. Without it pills start mid-board instead of
+  off the right edge. Never swap `cqw` for `vw`: the deck is a centred column.
 - `npm run lint` (`tsc --noEmit`) misses unused locals; **`npm run build` (`tsc -b`)
   is the stricter gate** — run it before declaring done.
 

@@ -10,7 +10,7 @@ import { TicketIcon, WarningIcon } from '@/components/ui/icons'
 import { cancelRedemption, listMyRedemptions, requestRedemption } from '@/lib/api'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
-import { supabase } from '@/lib/supabase'
+import { supabase, uniqueChannel } from '@/lib/supabase'
 import { useStudentData } from './StudentData'
 import {
   MAX_PENDING_REDEMPTIONS,
@@ -83,8 +83,7 @@ export function UsePoints() {
   // in StudentData stays untouched.
   useEffect(() => {
     if (!studentId) return
-    const channel = supabase
-      .channel(`redemptions-${studentId}`)
+    const channel = uniqueChannel(`redemptions-${studentId}`)
       .on(
         'postgres_changes',
         {

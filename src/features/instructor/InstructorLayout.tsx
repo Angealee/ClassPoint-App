@@ -14,7 +14,7 @@ import {
   UsersIcon,
 } from '@/components/ui/icons'
 import { getPendingRedemptionCount, listSections } from '@/lib/api'
-import { supabase } from '@/lib/supabase'
+import { supabase, uniqueChannel } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import type { Section } from '@/lib/types'
 
@@ -42,28 +42,17 @@ const nav: NavItem[] = [
 ]
 
 /**
- * Point-request inbox with a live pending count. Lives in the Shell's actions
- * slot rather than the tab bar — five tabs is already the comfortable limit on
- * a phone.
+ * Point-request inbox button. Lives in the Shell's actions slot rather than the
+ * tab bar — five tabs is already the comfortable limit on a phone.
+ *
+ * Presentational on purpose: Shell renders `actions` in BOTH the desktop
+ * sidebar and the mobile header, so this component mounts twice. The count and
+ * its realtime subscription therefore live in InstructorLayout, which mounts
+ * once — two instances subscribing to one topic is exactly what makes
+ * supabase-js throw.
  */
-function RedemptionInbox() {
+function RedemptionInbox({ count }: { count: number }) {
   const navigate = useNavigate()
-  const [count, setCount] = useState(0)
-
-  useEffect(() => {
-    const refresh = () => getPendingRedemptionCount().then(setCount).catch(() => {})
-    void refresh()
-    // Page-scoped channel: a new request lights the badge without a reload.
-    const channel = supabase
-      .channel('redemptions-badge')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'point_redemptions' }, () => {
-        void refresh()
-      })
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [])
 
   return (
     <button
@@ -94,6 +83,28 @@ export function InstructorLayout() {
   const [sections, setSections] = useState<Section[]>([])
   const [selectedSectionId, setSelectedSectionId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [pendingRedemptions, setPendingRedemptions] = useState(0)
+
+  // Owned here (single mount) rather than in RedemptionInbox, which Shell
+  // renders twice. Page-scoped channel: subscribed on mount, removed on unmount.
+  useEffect(() => {
+    let cancelled = false
+    const refresh = () => {
+      getPendingRedemptionCount()
+        .then((n) => !cancelled && setPendingRedemptions(n))
+        .catch(() => {})
+    }
+    refresh()
+    const channel = uniqueChannel('redemptions-badge')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'point_redemptions' }, () =>
+        refresh(),
+      )
+      .subscribe()
+    return () => {
+      cancelled = true
+      void supabase.removeChannel(channel)
+    }
+  }, [])
 
   async function refreshSections() {
     const data = await listSections()
@@ -129,7 +140,7 @@ export function InstructorLayout() {
           // Wrapped so the desktop sidebar's justify-between treats these as a
           // single unit instead of spreading them apart.
           <div className="flex items-center gap-2">
-            <RedemptionInbox />
+            <RedemptionInbox count={pendingRedemptions} />
             <button
               type="button"
               onClick={onSignOut}
