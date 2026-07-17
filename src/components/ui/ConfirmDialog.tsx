@@ -17,6 +17,8 @@ interface ConfirmDialogProps {
   variant?: 'danger' | 'default'
   /** Disables both buttons and shows a spinner while the action runs. */
   busy?: boolean
+  /** Optional input rendered above the buttons (e.g. a decision note). */
+  children?: ReactNode
   onConfirm: () => void
   onClose: () => void
 }
@@ -36,6 +38,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   variant = 'danger',
   busy = false,
+  children,
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
@@ -56,6 +59,7 @@ export function ConfirmDialog({
             {detail}
           </p>
         )}
+        {children && <div className="w-full pt-1 text-left">{children}</div>}
         <div className="mt-2 flex w-full gap-2">
           <Button variant="outline" className="flex-1" disabled={busy} onClick={onClose}>
             {cancelLabel}

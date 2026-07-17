@@ -11,6 +11,7 @@ import { getLevelProgress } from '@/lib/leveling'
 import { getSoundMuted, setSoundMuted } from '@/lib/sound'
 import { getHapticsMuted, hapticsSupported, setHapticsMuted, vibrateOnce } from '@/lib/haptics'
 import { disablePush, enablePush, getPushState, type PushState } from '@/lib/push'
+import { sendTestPush } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { ProfileBanner } from '@/components/profile/ProfileBanner'
 import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
@@ -57,6 +58,7 @@ export function Profile() {
 
   const [pushState, setPushState] = useState<PushState>('default')
   const [pushBusy, setPushBusy] = useState(false)
+  const [testBusy, setTestBusy] = useState(false)
   const [muted, setMuted] = useState(() => getSoundMuted())
   const vibeSupported = useMemo(() => hapticsSupported(), [])
   const [vibeMuted, setVibeMuted] = useState(() => getHapticsMuted())
@@ -79,6 +81,18 @@ export function Profile() {
       toast('Could not update notifications. Try again.', 'error')
     } finally {
       setPushBusy(false)
+    }
+  }
+
+  async function onTestPush() {
+    setTestBusy(true)
+    try {
+      await sendTestPush()
+      toast('Test sent — check your lock screen.', 'success')
+    } catch {
+      toast('Could not send the test. Try again.', 'error')
+    } finally {
+      setTestBusy(false)
     }
   }
 
@@ -385,6 +399,22 @@ export function Profile() {
             </Button>
           )}
         </div>
+
+        {/* Runs the real pipeline (outbox → edge function → your lock screen),
+            so it proves delivery rather than just the UI. */}
+        {pushState === 'subscribed' && (
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Test it</p>
+              <p className="text-xs text-muted">
+                Lock your phone, then tap — it should buzz within a few seconds.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={onTestPush} disabled={testBusy}>
+              {testBusy ? 'Sending…' : 'Send test'}
+            </Button>
+          </div>
+        )}
       </Card>
 
       <InstallButton className="w-full" />

@@ -29,7 +29,9 @@ import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import type { AttendanceRosterRow, AttendanceStatus, ClassSession } from '@/lib/types'
 
-const ORDER: AttendanceStatus[] = ['present', 'late', 'absent']
+// All five are markable live: mark what you know the moment you know it,
+// rather than remembering to fix it in Review later.
+const ORDER: AttendanceStatus[] = ['present', 'late', 'absent', 'excused', 'irregular']
 /** Show the search/filter bar only once the roster is long enough to warrant it. */
 const SEARCH_THRESHOLD = 8
 
@@ -51,10 +53,13 @@ function scanTime(iso: string): string {
   })
 }
 
+/** Bare text colour per status — sourced from the shared status palette. */
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
-  present: 'text-emerald-600 dark:text-emerald-400',
-  late: 'text-gold-600 dark:text-gold-400',
-  absent: 'text-brand-600 dark:text-brand-400',
+  present: STATUS_META.present.text,
+  late: STATUS_META.late.text,
+  absent: STATUS_META.absent.text,
+  excused: STATUS_META.excused.text,
+  irregular: STATUS_META.irregular.text,
 }
 
 /** The live class session: rotating QR + real-time check-in roster. */
@@ -677,7 +682,11 @@ export function AttendanceSession({
                       transition={{ duration: 0.16 }}
                       className="overflow-hidden"
                     >
-                      <div className="flex flex-wrap items-center gap-2 px-3.5 pb-3">
+                      {/* A fixed 3-up grid, not flex-wrap: five statuses (+
+                          Reset) land as tidy rows of three instead of a ragged
+                          4-then-1. The rule above separates it from the student
+                          row so the buttons don't crowd the name. */}
+                      <div className="mx-3.5 mb-3 grid grid-cols-3 gap-2 border-t border-line pt-3">
                         {ORDER.map((s) => {
                           const active = r.status === s
                           const suggested = !active && s === autoStatus
@@ -687,13 +696,9 @@ export function AttendanceSession({
                               type="button"
                               onClick={() => mark(r.studentId, s)}
                               className={cn(
-                                'h-9 rounded-lg px-3 text-sm font-semibold transition-colors',
+                                'h-9 rounded-lg px-2 text-sm font-semibold transition-colors',
                                 active
-                                  ? s === 'present'
-                                    ? 'bg-emerald-500 text-white'
-                                    : s === 'late'
-                                      ? 'bg-gold-400 text-brand-950'
-                                      : 'bg-brand-500 text-white'
+                                  ? STATUS_META[s].solid
                                   : 'bg-card-2 text-muted hover:text-ink',
                                 suggested && 'ring-2 ring-brand-500/40',
                               )}
@@ -706,7 +711,7 @@ export function AttendanceSession({
                           <button
                             type="button"
                             onClick={() => clearMark(r.studentId)}
-                            className="ml-auto h-9 rounded-lg px-3 text-sm font-medium text-muted transition-colors hover:text-ink"
+                            className="h-9 rounded-lg px-2 text-sm font-medium text-muted transition-colors hover:bg-card-2 hover:text-ink"
                           >
                             Reset
                           </button>

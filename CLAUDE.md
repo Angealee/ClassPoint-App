@@ -75,12 +75,41 @@ ledger — awards, penalties, and future spending all flow through it), `instruc
 `class_sessions` + `class_session_secrets` + `attendance_records`, `profile_views`,
 `achievements` + `student_achievements`.
 
+Since 0017/0018/0019: `notifications` (the push outbox AND the in-app bell's
+history), `point_redemptions` (spend requests). Attendance statuses are
+`present|late|absent|excused|irregular`. `point_events.category` is
+`recitation|activity|penalty|redeem`.
+
 Gotchas:
-- `cp_achievement_metrics` (0016) derives attendance streaks/counts directly from
-  `attendance_records` — any attendance-status change ripples into it.
+- `cp_achievement_metrics` (canonical body now in **0018**, not 0016) derives
+  attendance streaks/counts from `attendance_records`. Copy the latest body forward
+  when changing it — never fork it.
 - pg_net `http_post` is fire-and-forget — never mark push work "sent" from SQL.
+  Only the `send-push` edge function transitions `notifications.push_status`.
 - `end_class_session` inserts absents with `on conflict do nothing` — records that
   already exist (any status) are never overwritten. Intentional; don't "fix".
+- **Every attendance status change must go through `set_attendance_status`** (via
+  `updateAttendanceStatus` in api.ts). A direct `.update({status})` bypasses penalty
+  reconciliation and leaves a stale penalty in the ledger. The direct upserts
+  (`markAttendanceManually`/`markAttendanceBulk`/`resetAttendance`) are LIVE-SESSION
+  ONLY, where nothing is committed yet.
+- `commit_attendance_penalties` deliberately queues no notifications: its
+  `point_events` insert already fires `cp_notify_point_event`. Adding one = double push.
+- 'excused'/'irregular' are NEUTRAL everywhere: no penalty, excluded from streaks,
+  show-up rate, and achievement metrics (`NEUTRAL_STATUSES` in types.ts).
+- **Spending = ONE BALANCE** (user's decision): an approved redemption inserts a
+  negative `point_events` row (category `redeem`), so it lowers XP/level/rank like
+  any loss. Overspend prevention = `select students … for update` in BOTH
+  `request_point_redemption` and `decide_point_redemption` (same lock order —
+  student row first — so they can't deadlock); available = `lifetime_points` minus
+  pending. Validating against `lifetime_points` is safe because it's
+  `greatest(0, sum)` and therefore always ≥ the raw sum.
+- `listRecentAwards` filters out `redeem` events: deleting one there would refund
+  the points while the redemption still reads "approved" (a silent desync).
+- `cp_notify_point_event` skips `redeem`; `decide_point_redemption` sends the
+  single richer notification instead. Don't add a second.
+- `npm run lint` (`tsc --noEmit`) misses unused locals; **`npm run build` (`tsc -b`)
+  is the stricter gate** — run it before declaring done.
 
 ## Auth model
 

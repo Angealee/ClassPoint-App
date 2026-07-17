@@ -29,6 +29,9 @@ const Achievements = lazy(() =>
 const StudentAttendance = lazy(() =>
   import('@/features/student/Attendance').then((m) => ({ default: m.Attendance })),
 )
+const UsePoints = lazy(() =>
+  import('@/features/student/UsePoints').then((m) => ({ default: m.UsePoints })),
+)
 const InstructorLayout = lazy(() =>
   import('@/features/instructor/InstructorLayout').then((m) => ({ default: m.InstructorLayout })),
 )
@@ -46,6 +49,15 @@ const InstructorLeaderboard = lazy(() =>
 )
 const InstructorAttendance = lazy(() =>
   import('@/features/instructor/Attendance').then((m) => ({ default: m.Attendance })),
+)
+const SessionDetail = lazy(() =>
+  import('@/features/instructor/SessionDetail').then((m) => ({ default: m.SessionDetail })),
+)
+const SessionHistory = lazy(() =>
+  import('@/features/instructor/SessionHistory').then((m) => ({ default: m.SessionHistory })),
+)
+const Redemptions = lazy(() =>
+  import('@/features/instructor/Redemptions').then((m) => ({ default: m.Redemptions })),
 )
 
 /** Full-screen Suspense for top-level pages and layouts. */
@@ -82,6 +94,7 @@ export const router = createBrowserRouter([
           { index: true, element: <Dashboard /> },
           { path: 'leaderboard', element: <Leaderboard /> },
           { path: 'attendance', element: <StudentAttendance /> },
+          { path: 'points', element: <UsePoints /> },
           { path: 'profile', element: <Profile /> },
           { path: 'achievements', element: <Achievements /> },
         ],
@@ -100,6 +113,9 @@ export const router = createBrowserRouter([
           { index: true, element: <Students /> },
           { path: 'award', element: <Award /> },
           { path: 'attendance', element: <InstructorAttendance /> },
+          { path: 'attendance/history', element: <SessionHistory /> },
+          { path: 'attendance/session/:sessionId', element: <SessionDetail /> },
+          { path: 'redemptions', element: <Redemptions /> },
           { path: 'history', element: <AwardHistory /> },
           { path: 'leaderboard', element: <InstructorLeaderboard /> },
         ],

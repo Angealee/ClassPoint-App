@@ -4,6 +4,7 @@ import type {
   AchievementProgress,
   AchievementState,
   AppNotification,
+  AttendanceAnalytics,
   AttendanceRosterRow,
   AttendanceStatus,
   AwardRecord,
@@ -17,11 +18,16 @@ import type {
   ProfileViews,
   PublicPointEvent,
   PublicProfile,
+  Redemption,
+  RedemptionKind,
+  RedemptionRequest,
+  RedemptionStatus,
   ScanResult,
   Section,
   SectionStudent,
   SessionConfig,
   SessionSummary,
+  SpenderStat,
   StudentSelf,
   UnlockedAchievement,
 } from '@/lib/types'
@@ -207,11 +213,19 @@ export async function listLeaderboard(): Promise<LeaderboardRow[]> {
   return data ?? []
 }
 
-/** Recent point awards across all students (instructor review / undo). */
+/**
+ * Recent point awards across all students (instructor review / undo).
+ *
+ * Excludes 'redeem' debits on purpose: those are owned by point_redemptions,
+ * and deleting the event here would give the points back while the request
+ * still reads "approved" — a desync with no way to notice. Spending is
+ * reviewed and reversed from the Requests screen instead.
+ */
 export async function listRecentAwards(limit = 30): Promise<AwardRecord[]> {
   const { data, error } = await supabase
     .from('point_events')
     .select('id, student_id, points, category, note, created_at, students(full_name, section_id)')
+    .neq('category', 'redeem')
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) throw error
@@ -597,7 +611,12 @@ export async function getActiveSession(sectionId: string): Promise<ClassSession 
   return mapSession(data, secret)
 }
 
-/** Past + present sessions for a section, with present/late/absent tallies. */
+/** A zeroed tally — one counter per status, plus the roster total. */
+function emptyTally(): Record<AttendanceStatus, number> & { total: number } {
+  return { present: 0, late: 0, absent: 0, excused: 0, irregular: 0, total: 0 }
+}
+
+/** Past + present sessions for a section, tallied by status. */
 export async function listSessions(sectionId: string): Promise<SessionSummary[]> {
   const { data: sessions, error } = await supabase
     .from('class_sessions')
@@ -615,16 +634,16 @@ export async function listSessions(sectionId: string): Promise<SessionSummary[]>
     .in('session_id', ids)
   if (recErr) throw recErr
 
-  const tally = new Map<string, { present: number; late: number; absent: number; total: number }>()
+  const tally = new Map<string, ReturnType<typeof emptyTally>>()
   for (const r of records ?? []) {
-    const t = tally.get(r.session_id as string) ?? { present: 0, late: 0, absent: 0, total: 0 }
+    const t = tally.get(r.session_id as string) ?? emptyTally()
     t[r.status as AttendanceStatus] += 1
     t.total += 1
     tally.set(r.session_id as string, t)
   }
 
   return rows.map((s) => {
-    const t = tally.get(s.id as string) ?? { present: 0, late: 0, absent: 0, total: 0 }
+    const t = tally.get(s.id as string) ?? emptyTally()
     return {
       id: s.id as string,
       topic: (s.topic as string | null) ?? null,
@@ -676,15 +695,35 @@ export async function listSessionAttendance(
     .sort((a, b) => a.fullName.localeCompare(b.fullName))
 }
 
-/** Instructor override of a student's status during the review step. */
+/**
+ * Change a student's status — the ONE path for it (review step, session detail,
+ * any post-hoc edit).
+ *
+ * Goes through the RPC rather than a direct update because the RPC reconciles
+ * the points ledger: if the session's penalties were already committed, it
+ * removes the old penalty event and writes the one the new status deserves.
+ * A direct `.update({ status })` would silently leave a stale −5 behind.
+ */
 export async function updateAttendanceStatus(
   recordId: string,
   status: AttendanceStatus,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('attendance_records')
-    .update({ status })
-    .eq('id', recordId)
+  const { error } = await supabase.rpc('set_attendance_status', {
+    p_record_id: recordId,
+    p_status: status,
+  })
+  if (error) throw error
+}
+
+/**
+ * Delete one attendance record (reset a check-in). Removes the linked penalty
+ * event first, so resetting a committed record gives the points back instead of
+ * orphaning the deduction.
+ */
+export async function deleteAttendanceRecord(recordId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_attendance_record', {
+    p_record_id: recordId,
+  })
   if (error) throw error
 }
 
@@ -693,6 +732,9 @@ export async function updateAttendanceStatus(
  * with no internet to scan. Upserts the record (overriding a prior scan if any)
  * and stamps scanned_at so they count as checked in. RLS lets the instructor
  * write attendance_records directly, so no RPC is needed.
+ *
+ * LIVE SESSIONS ONLY: penalties aren't committed yet, so there's nothing to
+ * reconcile. For any edit after finalising, use updateAttendanceStatus().
  */
 export async function markAttendanceManually(
   sessionId: string,
@@ -740,6 +782,95 @@ export async function resetAttendance(sessionId: string, studentId: string): Pro
     .eq('session_id', sessionId)
     .eq('student_id', studentId)
   if (error) throw error
+}
+
+/**
+ * Section-wide attendance analytics for the history page: each student's
+ * per-status counts + show-up rate, and the penalty damage across all sessions.
+ *
+ * The rate excludes excused/irregular from the denominator — those sessions
+ * don't count for that student at all, so they can't drag a rate down.
+ */
+export async function getAttendanceAnalytics(sectionId: string): Promise<AttendanceAnalytics> {
+  const [sessionsRes, studentsRes] = await Promise.all([
+    supabase.from('class_sessions').select('id').eq('section_id', sectionId),
+    supabase.from('students').select('id, full_name, avatar_url').eq('section_id', sectionId),
+  ])
+  if (sessionsRes.error) throw sessionsRes.error
+  if (studentsRes.error) throw studentsRes.error
+
+  const roster = (studentsRes.data ?? []) as Array<{
+    id: string
+    full_name: string
+    avatar_url: string | null
+  }>
+  const base = () =>
+    roster
+      .map((s) => ({
+        studentId: s.id,
+        fullName: s.full_name,
+        avatarUrl: s.avatar_url ?? null,
+        present: 0,
+        late: 0,
+        absent: 0,
+        excused: 0,
+        irregular: 0,
+        counted: 0,
+        rate: null as number | null,
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName))
+
+  const sessionIds = (sessionsRes.data ?? []).map((s) => s.id as string)
+  if (sessionIds.length === 0 || roster.length === 0) {
+    return { students: base(), penaltyPoints: 0, penalizedStudents: 0 }
+  }
+
+  const { data: records, error } = await supabase
+    .from('attendance_records')
+    .select('student_id, status, penalty_event_id')
+    .in('session_id', sessionIds)
+  if (error) throw error
+  const rows = (records ?? []) as Array<{
+    student_id: string
+    status: AttendanceStatus
+    penalty_event_id: string | null
+  }>
+
+  const stats = base()
+  const byId = new Map(stats.map((s) => [s.studentId, s]))
+  const penaltyIds = new Set<string>()
+  for (const r of rows) {
+    const s = byId.get(r.student_id)
+    if (!s) continue // a student who left the section
+    s[r.status] += 1
+    if (r.status !== 'excused' && r.status !== 'irregular') s.counted += 1
+    if (r.penalty_event_id) penaltyIds.add(r.penalty_event_id)
+  }
+  for (const s of stats) {
+    s.rate = s.counted > 0 ? (s.present + s.late) / s.counted : null
+  }
+
+  // Penalty damage. Fetching by student (a short list) instead of by event id
+  // (which grows with every session) keeps the request URL bounded; the
+  // penaltyIds set then narrows it to attendance penalties, excluding the
+  // instructor's manual ones which share the 'penalty' category.
+  let penaltyPoints = 0
+  const penalized = new Set<string>()
+  if (penaltyIds.size > 0) {
+    const { data: events, error: evErr } = await supabase
+      .from('point_events')
+      .select('id, points, student_id')
+      .eq('category', 'penalty')
+      .in('student_id', [...byId.keys()])
+    if (evErr) throw evErr
+    for (const e of (events ?? []) as Array<{ id: string; points: number; student_id: string }>) {
+      if (!penaltyIds.has(e.id)) continue
+      penaltyPoints += Math.abs(e.points)
+      penalized.add(e.student_id)
+    }
+  }
+
+  return { students: stats, penaltyPoints, penalizedStudents: penalized.size }
 }
 
 /** Edit a session's saved topic (instructor tweak from the history sheet). */
@@ -969,6 +1100,145 @@ export async function grantAchievement(studentId: string, code: string): Promise
     p_code: code,
   })
   if (error) throw error
+}
+
+// ============================================================================
+// Use Points — redemption requests (migration 0019)
+// ============================================================================
+
+const REDEMPTION_COLS =
+  'id, student_id, points, kind, note, status, requested_at, decided_at, decision_note'
+
+interface RedemptionRow {
+  id: string
+  student_id: string
+  points: number
+  kind: RedemptionKind
+  note: string | null
+  status: RedemptionStatus
+  requested_at: string
+  decided_at: string | null
+  decision_note: string | null
+}
+
+const mapRedemption = (r: RedemptionRow): Redemption => ({
+  id: r.id,
+  studentId: r.student_id,
+  points: r.points,
+  kind: r.kind,
+  note: r.note,
+  status: r.status,
+  requestedAt: r.requested_at,
+  decidedAt: r.decided_at,
+  decisionNote: r.decision_note,
+})
+
+/**
+ * Ask to put points toward a grade. Server-side this locks the student row and
+ * validates the balance against everything already pending, so it throws with a
+ * readable message rather than letting anyone overdraw.
+ */
+export async function requestRedemption(input: {
+  points: number
+  kind: RedemptionKind
+  note?: string
+}): Promise<void> {
+  const { error } = await supabase.rpc('request_point_redemption', {
+    p_points: input.points,
+    p_kind: input.kind,
+    p_note: input.note?.trim() || null,
+  })
+  if (error) throw error
+}
+
+/** Withdraw one of your own still-pending requests. */
+export async function cancelRedemption(id: string): Promise<void> {
+  const { error } = await supabase.rpc('cancel_point_redemption', { p_id: id })
+  if (error) throw error
+}
+
+/** Instructor: approve (spends the points) or reject, with an optional note. */
+export async function decideRedemption(
+  id: string,
+  approve: boolean,
+  note?: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('decide_point_redemption', {
+    p_id: id,
+    p_approve: approve,
+    p_note: note?.trim() || null,
+  })
+  if (error) throw error
+}
+
+/** One student's own request history, newest first. */
+export async function listMyRedemptions(studentId: string): Promise<Redemption[]> {
+  const { data, error } = await supabase
+    .from('point_redemptions')
+    .select(REDEMPTION_COLS)
+    .eq('student_id', studentId)
+    .order('requested_at', { ascending: false })
+  if (error) throw error
+  return ((data ?? []) as RedemptionRow[]).map(mapRedemption)
+}
+
+/** Instructor: every request (optionally just the pending ones), newest first. */
+export async function listRedemptions(opts?: {
+  status?: RedemptionStatus
+  limit?: number
+}): Promise<RedemptionRequest[]> {
+  let query = supabase
+    .from('point_redemptions')
+    .select(`${REDEMPTION_COLS}, students(full_name, avatar_url, section_id, lifetime_points)`)
+    .order('requested_at', { ascending: false })
+    .limit(opts?.limit ?? 100)
+  if (opts?.status) query = query.eq('status', opts.status)
+  const { data, error } = await query
+  if (error) throw error
+  type Row = RedemptionRow & {
+    students: {
+      full_name: string
+      avatar_url: string | null
+      section_id: string
+      lifetime_points: number
+    } | null
+  }
+  return ((data ?? []) as unknown as Row[]).map((r) => ({
+    ...mapRedemption(r),
+    studentName: r.students?.full_name ?? 'Unknown',
+    avatarUrl: r.students?.avatar_url ?? null,
+    sectionId: r.students?.section_id ?? '',
+    lifetimePoints: r.students?.lifetime_points ?? 0,
+  }))
+}
+
+/** How many requests are waiting — drives the instructor's inbox badge. */
+export async function getPendingRedemptionCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from('point_redemptions')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending')
+  if (error) throw error
+  return count ?? 0
+}
+
+/** Instructor: who has actually spent the most (approved requests only). */
+export async function listTopSpenders(limit = 5): Promise<SpenderStat[]> {
+  const all = await listRedemptions({ status: 'approved', limit: 500 })
+  const by = new Map<string, SpenderStat>()
+  for (const r of all) {
+    const cur = by.get(r.studentId) ?? {
+      studentId: r.studentId,
+      studentName: r.studentName,
+      avatarUrl: r.avatarUrl,
+      spent: 0,
+      requests: 0,
+    }
+    cur.spent += r.points
+    cur.requests += 1
+    by.set(r.studentId, cur)
+  }
+  return [...by.values()].sort((a, b) => b.spent - a.spent).slice(0, limit)
 }
 
 // ============================================================================

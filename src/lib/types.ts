@@ -1,4 +1,5 @@
-export type PointCategory = 'recitation' | 'activity' | 'penalty'
+/** 'redeem' rows are debits from an approved spend request (always negative). */
+export type PointCategory = 'recitation' | 'activity' | 'penalty' | 'redeem'
 
 export interface Section {
   id: string
@@ -94,7 +95,15 @@ export interface PublicPointEvent {
   created_at: string
 }
 
-export type AttendanceStatus = 'present' | 'late' | 'absent'
+/**
+ * 'excused' and 'irregular' are NEUTRAL: no penalty, and the session is
+ * excluded from streaks, show-up rate, and achievement metrics entirely.
+ * 'irregular' = the student isn't part of that session at all (off-section).
+ */
+export type AttendanceStatus = 'present' | 'late' | 'absent' | 'excused' | 'irregular'
+
+/** The two statuses that make a session not count for a student. */
+export const NEUTRAL_STATUSES: readonly AttendanceStatus[] = ['excused', 'irregular']
 
 /** Config the instructor sets before starting a class session. */
 export interface SessionConfig {
@@ -135,8 +144,76 @@ export interface SessionSummary {
   present: number
   late: number
   absent: number
+  excused: number
+  irregular: number
   total: number
   penaltiesCommitted: boolean
+}
+
+/** What a student is putting their points toward. */
+export type RedemptionKind = 'quiz' | 'activity' | 'exam' | 'other'
+export type RedemptionStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+
+/** The most points a student may put into one request (mirrors the DB CHECK). */
+export const MAX_REDEEM_POINTS = 50
+/** How many requests a student may have waiting at once (mirrors the RPC). */
+export const MAX_PENDING_REDEMPTIONS = 3
+
+/** One request to spend points on a grade. */
+export interface Redemption {
+  id: string
+  studentId: string
+  points: number
+  kind: RedemptionKind
+  note: string | null
+  status: RedemptionStatus
+  requestedAt: string
+  decidedAt: string | null
+  decisionNote: string | null
+}
+
+/** A pending/decided request as the instructor sees it (student joined in). */
+export interface RedemptionRequest extends Redemption {
+  studentName: string
+  avatarUrl: string | null
+  sectionId: string
+  /** The student's balance right now — context for the approve decision. */
+  lifetimePoints: number
+}
+
+/** One student's spending totals, for the instructor's top-spenders view. */
+export interface SpenderStat {
+  studentId: string
+  studentName: string
+  avatarUrl: string | null
+  /** Points actually spent (approved requests only). */
+  spent: number
+  requests: number
+}
+
+/** One student's attendance record across a whole section's sessions. */
+export interface StudentAttendanceStat {
+  studentId: string
+  fullName: string
+  avatarUrl: string | null
+  present: number
+  late: number
+  absent: number
+  excused: number
+  irregular: number
+  /** Sessions that count toward the rate — excludes excused/irregular. */
+  counted: number
+  /** (present + late) / counted, 0–1. Null when nothing counts yet. */
+  rate: number | null
+}
+
+/** Everything the Session History analytics view needs. */
+export interface AttendanceAnalytics {
+  students: StudentAttendanceStat[]
+  /** Points deducted by attendance penalties across these sessions. */
+  penaltyPoints: number
+  /** How many students took at least one attendance penalty. */
+  penalizedStudents: number
 }
 
 /** One row of the instructor's per-session roster (student + their status). */

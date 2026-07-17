@@ -48,6 +48,41 @@ export const DRAFT_3_0_0: ChangelogEntry = {
   title: 'The Overhaul 🚀',
   sections: [
     {
+      heading: 'Notifications that actually show up',
+      major: true,
+      items: [
+        'New bell in the header: every point, level-up, rank move and badge lands in one list you can scroll back through. The dot tells you what you missed.',
+        'Push is rebuilt — notifications now reach your lock screen fast instead of trickling in late, even with the app fully closed.',
+        'Nothing gets lost anymore: if a notification can’t be delivered right away, it retries on its own until it lands.',
+        'New “Send test” button in Profile → Notifications: lock your phone, tap it, and confirm push works on your device.',
+        'iPhone: push still needs ClassPoint added to your Home Screen (Share → Add to Home Screen). The bell works everywhere regardless.',
+      ],
+    },
+    {
+      heading: 'Spend your points on your grades',
+      major: true,
+      items: [
+        'New on your Home screen: Use points. Put up to 50 points toward a quiz, activity or exam and your instructor approves or declines it.',
+        'Nothing is spent until it’s approved — and you can withdraw a request any time before that.',
+        'Fair warning: spending really does cost you. Your points, level and leaderboard rank all drop, exactly like losing points. The app tells you the damage before you commit.',
+        'A new gold gauge tracks everything you’ve ever cashed in, so your spending is a flex of its own.',
+        'You’ll get a notification the moment your instructor decides, with their note if they left one.',
+        'Instructors: a new inbox (the ticket icon) badges every waiting request — approve or decline with an optional note, and see who’s spent the most.',
+      ],
+    },
+    {
+      heading: 'Attendance, rebuilt',
+      major: true,
+      items: [
+        'Two new marks: Excused and Irregular. Neither costs you points, and neither counts against your attendance — an excused class is simply left out of your show-up rate and never breaks your streak.',
+        'Your show-up rate is now fairer: it only counts classes that actually counted.',
+        'Instructors: sessions are grouped by week (“Week 5 · Jul 13–19”) so you can find any class at a glance.',
+        'Instructors: tap any past session for a full page — everyone grouped by status, editable after the fact, exportable, deletable.',
+        'Instructors: fixing attendance after finalising now adjusts points automatically. Mark someone present who was absent and their −5 comes straight back.',
+        'Instructors: new Class history page — attendance % per student, a weekly show-up trend, an automatic “needs attention” list, and a one-tap Excel summary.',
+      ],
+    },
+    {
       heading: 'Safety nets everywhere',
       items: [
         'Every risky action — deleting sessions, students, photos, or point awards — now asks you to confirm first. No more accidental oops.',

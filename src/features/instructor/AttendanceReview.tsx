@@ -15,7 +15,9 @@ import {
 import { cn } from '@/lib/cn'
 import type { AttendanceRosterRow, AttendanceStatus, ClassSession } from '@/lib/types'
 
-const ORDER: AttendanceStatus[] = ['present', 'late', 'absent']
+const ORDER: AttendanceStatus[] = ['present', 'late', 'absent', 'excused', 'irregular']
+/** The three that drive the headline tallies; the neutral pair is summarised. */
+const TALLY_ORDER: AttendanceStatus[] = ['present', 'late', 'absent']
 
 /** Post-class review: confirm/override each status, then commit penalties. */
 export function AttendanceReview({
@@ -50,10 +52,17 @@ export function AttendanceReview({
   }, [load])
 
   const counts = useMemo(() => {
-    const c = { present: 0, late: 0, absent: 0 }
+    const c: Record<AttendanceStatus, number> = {
+      present: 0,
+      late: 0,
+      absent: 0,
+      excused: 0,
+      irregular: 0,
+    }
     for (const r of roster) if (r.status) c[r.status] += 1
     return c
   }, [roster])
+  const neutral = counts.excused + counts.irregular
 
   const deduction = apply
     ? counts.late * session.latePenalty + counts.absent * session.absentPenalty
@@ -111,22 +120,24 @@ export function AttendanceReview({
 
       {/* Tallies */}
       <div className="grid grid-cols-3 gap-3">
-        {ORDER.map((s) => (
+        {TALLY_ORDER.map((s) => (
           <Card key={s} className="p-3 text-center">
-            <p
-              className={cn(
-                'font-display text-2xl font-bold tabular-nums',
-                s === 'present' && 'text-emerald-600 dark:text-emerald-400',
-                s === 'late' && 'text-gold-600 dark:text-gold-400',
-                s === 'absent' && 'text-brand-600 dark:text-brand-400',
-              )}
-            >
+            <p className={cn('font-display text-2xl font-bold tabular-nums', STATUS_META[s].text)}>
               {counts[s]}
             </p>
             <p className="text-xs text-muted">{STATUS_META[s].label}</p>
           </Card>
         ))}
       </div>
+
+      {neutral > 0 && (
+        <p className="px-1 text-xs text-muted">
+          {counts.excused > 0 && `${counts.excused} excused`}
+          {counts.excused > 0 && counts.irregular > 0 && ' · '}
+          {counts.irregular > 0 && `${counts.irregular} irregular`} — this class doesn’t count for
+          {neutral === 1 ? ' them' : ' them'}, and no points are deducted.
+        </p>
+      )}
 
       {/* Penalty control */}
       <Card className="flex items-center justify-between gap-3 p-4">
@@ -174,18 +185,15 @@ export function AttendanceReview({
                       onClick={() => setStatus(r, s)}
                       aria-pressed={active}
                       aria-label={STATUS_META[s].label}
+                      title={STATUS_META[s].label}
                       className={cn(
                         'flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors',
-                        active
-                          ? s === 'present'
-                            ? 'bg-emerald-500 text-white'
-                            : s === 'late'
-                              ? 'bg-gold-400 text-brand-950'
-                              : 'bg-brand-500 text-white'
-                          : 'bg-card-2 text-muted hover:text-ink',
+                        active ? STATUS_META[s].solid : 'bg-card-2 text-muted hover:text-ink',
                       )}
                     >
-                      {STATUS_META[s].label[0]}
+                      {/* Excused/Irregular both start with a letter already in
+                          use, so they get their own initials. */}
+                      {s === 'excused' ? 'E' : s === 'irregular' ? 'I' : STATUS_META[s].label[0]}
                     </button>
                   )
                 })}

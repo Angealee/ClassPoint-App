@@ -12,7 +12,7 @@ import { listMyAttendance, scanAttendance } from '@/lib/api'
 import { parsePayload } from '@/lib/qr'
 import { vibrate } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
-import type { MyAttendanceEntry, ScanResult } from '@/lib/types'
+import type { AttendanceStatus, MyAttendanceEntry, ScanResult } from '@/lib/types'
 
 const entryDate = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''
@@ -93,11 +93,20 @@ export function Attendance() {
   }, [syncMyAchievements])
 
   const stats = useMemo(() => {
-    const s = { present: 0, late: 0, absent: 0 }
+    const s: Record<AttendanceStatus, number> = {
+      present: 0,
+      late: 0,
+      absent: 0,
+      excused: 0,
+      irregular: 0,
+    }
     for (const h of history) s[h.status] += 1
-    const total = history.length
-    const rate = total ? Math.round(((s.present + s.late) / total) * 100) : 0
-    return { ...s, total, rate }
+    // Excused/irregular classes don't count for you at all, so they're out of
+    // the denominator — they can't drag the rate down.
+    const counted = s.present + s.late + s.absent
+    const rate = counted ? Math.round(((s.present + s.late) / counted) * 100) : 0
+    const neutral = s.excused + s.irregular
+    return { ...s, total: history.length, counted, neutral, rate }
   }, [history])
 
   return (
@@ -121,14 +130,7 @@ export function Attendance() {
           <Card className="col-span-3 grid grid-cols-3 divide-x divide-line p-0">
             {(['present', 'late', 'absent'] as const).map((k) => (
               <div key={k} className="flex flex-col items-center justify-center py-3">
-                <p
-                  className={cn(
-                    'font-display text-xl font-bold tabular-nums',
-                    k === 'present' && 'text-emerald-600 dark:text-emerald-400',
-                    k === 'late' && 'text-gold-600 dark:text-gold-400',
-                    k === 'absent' && 'text-brand-600 dark:text-brand-400',
-                  )}
-                >
+                <p className={cn('font-display text-xl font-bold tabular-nums', STATUS_META[k].text)}>
                   {stats[k]}
                 </p>
                 <p className="text-[11px] text-muted">{STATUS_META[k].label}</p>
@@ -136,6 +138,15 @@ export function Attendance() {
             ))}
           </Card>
         </div>
+      )}
+
+      {stats.neutral > 0 && (
+        <p className="px-1 text-xs text-muted">
+          {stats.excused > 0 && `${stats.excused} excused`}
+          {stats.excused > 0 && stats.irregular > 0 && ' · '}
+          {stats.irregular > 0 && `${stats.irregular} irregular`} — those classes don’t count
+          against you.
+        </p>
       )}
 
       {/* History */}

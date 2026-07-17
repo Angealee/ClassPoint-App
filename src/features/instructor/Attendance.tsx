@@ -1,29 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { Sheet } from '@/components/ui/Sheet'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
-import { StatusChip } from '@/components/attendance/StatusChip'
-import { CalendarIcon, DownloadIcon, PencilIcon, QrIcon, TrashIcon } from '@/components/ui/icons'
+import { CalendarIcon, QrIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
 import { AttendanceSession } from './AttendanceSession'
 import { AttendanceReview } from './AttendanceReview'
-import {
-  deleteSession,
-  getActiveSession,
-  getSession,
-  listSessionAttendance,
-  listSessions,
-  startClassSession,
-  updateSessionTopic,
-} from '@/lib/api'
-import { exportSessionAttendance } from '@/lib/attendance-io'
-import type { AttendanceRosterRow, ClassSession, SessionSummary } from '@/lib/types'
+import { getActiveSession, getSession, listSessions, startClassSession } from '@/lib/api'
+import { groupByWeek } from '@/lib/term'
+import type { ClassSession, SessionSummary } from '@/lib/types'
 
 type View = 'home' | 'live' | 'review'
 
@@ -33,6 +22,8 @@ const sessionDate = (iso: string) =>
 export function Attendance() {
   const { sections, selectedSectionId, setSelectedSectionId } = useInstructor()
   const { toast } = useToast()
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const sectionName = sections.find((s) => s.id === selectedSectionId)?.name ?? ''
 
   const [view, setView] = useState<View>('home')
@@ -51,17 +42,6 @@ export function Attendance() {
   const [history, setHistory] = useState<SessionSummary[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
 
-  // Past-session detail sheet.
-  const [detail, setDetail] = useState<SessionSummary | null>(null)
-  const [detailRows, setDetailRows] = useState<AttendanceRosterRow[]>([])
-  const [detailLoading, setDetailLoading] = useState(false)
-  // Manage a past session (testing tools): edit topic / delete.
-  const [editingTopic, setEditingTopic] = useState(false)
-  const [topicDraft, setTopicDraft] = useState('')
-  const [savingTopic, setSavingTopic] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-
   const loadHistory = useCallback(async () => {
     if (!selectedSectionId) return
     setHistoryLoading(true)
@@ -75,15 +55,23 @@ export function Attendance() {
   }, [selectedSectionId])
 
   // On section change: resume any active session, else land on the config home.
+  //
+  // A pending ?review=<id> deep-link (from the session detail page) owns the
+  // view instead — skip the reset so it isn't stomped back to home/live. Read
+  // from searchParams at run time rather than depending on it: consuming the
+  // param below clears it, and a dep would re-run this and reset the view.
   useEffect(() => {
     if (!selectedSectionId) return
     let cancelled = false
-    setView('home')
-    setSession(null)
+    const pendingReview = !!searchParams.get('review')
+    if (!pendingReview) {
+      setView('home')
+      setSession(null)
+    }
     setChecking(true)
     getActiveSession(selectedSectionId)
       .then((s) => {
-        if (cancelled) return
+        if (cancelled || pendingReview) return
         if (s) {
           setSession(s)
           setView('live')
@@ -95,7 +83,26 @@ export function Attendance() {
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSectionId, loadHistory])
+
+  // Consume ?review=<id> once, then strip it from the URL so a refresh or a
+  // later section switch behaves normally.
+  const reviewConsumedRef = useRef(false)
+  const reviewParam = searchParams.get('review')
+  useEffect(() => {
+    if (!reviewParam || reviewConsumedRef.current) return
+    reviewConsumedRef.current = true
+    getSession(reviewParam)
+      .then((full) => {
+        if (full) {
+          setSession(full)
+          setView('review')
+        }
+      })
+      .catch(() => toast('Could not open that session.', 'error'))
+      .finally(() => setSearchParams({}, { replace: true }))
+  }, [reviewParam, setSearchParams, toast])
 
   const thresholdsValid = absentAfter >= lateAfter && lateAfter >= 0 && absentAfter >= 0
 
@@ -130,77 +137,6 @@ export function Attendance() {
     void loadHistory()
   }
 
-  async function openDetail(s: SessionSummary) {
-    setDetail(s)
-    setEditingTopic(false)
-    setConfirmDelete(false)
-    setDetailLoading(true)
-    try {
-      setDetailRows(await listSessionAttendance(s.id, selectedSectionId))
-    } catch {
-      toast('Could not load that session.', 'error')
-    } finally {
-      setDetailLoading(false)
-    }
-  }
-
-  async function saveTopic() {
-    if (!detail) return
-    setSavingTopic(true)
-    try {
-      await updateSessionTopic(detail.id, topicDraft)
-      setDetail({ ...detail, topic: topicDraft.trim() || null })
-      setEditingTopic(false)
-      void loadHistory()
-    } catch {
-      toast('Could not save the topic.', 'error')
-    } finally {
-      setSavingTopic(false)
-    }
-  }
-
-  async function onDeleteSession() {
-    if (!detail) return
-    setDeleting(true)
-    try {
-      await deleteSession(detail.id)
-      toast('Session deleted.', 'success')
-      setDetail(null)
-      setConfirmDelete(false)
-      void loadHistory()
-    } catch {
-      toast('Could not delete the session.', 'error')
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  async function onExportDetail() {
-    if (!detail) return
-    try {
-      await exportSessionAttendance(
-        sectionName,
-        detail.topic || sessionDate(detail.startedAt),
-        detail.startedAt,
-        detailRows,
-      )
-    } catch {
-      toast('Could not export.', 'error')
-    }
-  }
-
-  async function onFinaliseFromHistory(s: SessionSummary) {
-    try {
-      const full = await getSession(s.id)
-      if (!full) return
-      setDetail(null)
-      setSession(full)
-      setView('review')
-    } catch {
-      toast('Could not open that session.', 'error')
-    }
-  }
-
   const sectionSelect = (
     <Select
       aria-label="Section"
@@ -216,11 +152,8 @@ export function Attendance() {
     </Select>
   )
 
-  const detailCounts = useMemo(() => {
-    const c = { present: 0, late: 0, absent: 0 }
-    for (const r of detailRows) if (r.status) c[r.status] += 1
-    return c
-  }, [detailRows])
+  // Newest week first, matching the list's newest-first order.
+  const weeks = useMemo(() => groupByWeek(history, (s) => s.startedAt), [history])
 
   if (view === 'live' && session) {
     return <AttendanceSession session={session} sectionName={sectionName} onEnd={() => setView('review')} />
@@ -326,11 +259,22 @@ export function Attendance() {
         </Button>
       </Card>
 
-      {/* History */}
+      {/* History — grouped by term week, newest first */}
       <div>
-        <div className="mb-2 flex items-center gap-2 px-1">
-          <CalendarIcon className="h-4 w-4 text-muted" />
-          <h2 className="text-sm font-semibold text-muted">Recent sessions</h2>
+        <div className="mb-2 flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="h-4 w-4 text-muted" />
+            <h2 className="text-sm font-semibold text-muted">Recent sessions</h2>
+          </div>
+          {history.length > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate('/teach/attendance/history')}
+              className="text-xs font-semibold text-brand-500 transition-opacity hover:opacity-80"
+            >
+              See all & stats →
+            </button>
+          )}
         </div>
         {historyLoading ? (
           <ListSkeleton rows={3} />
@@ -339,144 +283,50 @@ export function Attendance() {
             No sessions yet. Start a class to take attendance.
           </Card>
         ) : (
-          <Card className="divide-y divide-line">
-            {history.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => openDetail(s)}
-                className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-card-2"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">
-                    {s.topic || sessionDate(s.startedAt)}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {sessionDate(s.startedAt)}
-                    {s.status === 'active'
-                      ? ' · live now'
-                      : !s.penaltiesCommitted
-                        ? ' · not finalised'
-                        : ''}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2 text-xs font-semibold tabular-nums">
-                  <span className="text-emerald-600 dark:text-emerald-400">{s.present}</span>
-                  <span className="text-gold-600 dark:text-gold-400">{s.late}</span>
-                  <span className="text-brand-600 dark:text-brand-400">{s.absent}</span>
-                </div>
-              </button>
+          <div className="space-y-4">
+            {weeks.map((w) => (
+              <div key={w.week}>
+                <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
+                  {w.label}
+                </p>
+                <Card className="divide-y divide-line">
+                  {w.items.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => navigate(`/teach/attendance/session/${s.id}`)}
+                      className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-card-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">
+                          {s.topic || sessionDate(s.startedAt)}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {sessionDate(s.startedAt)}
+                          {s.status === 'active'
+                            ? ' · live now'
+                            : !s.penaltiesCommitted
+                              ? ' · not finalised'
+                              : ''}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2 text-xs font-semibold tabular-nums">
+                        <span className="text-emerald-600 dark:text-emerald-400">{s.present}</span>
+                        <span className="text-gold-600 dark:text-gold-400">{s.late}</span>
+                        <span className="text-brand-600 dark:text-brand-400">{s.absent}</span>
+                        {s.excused + s.irregular > 0 && (
+                          <span className="text-muted">+{s.excused + s.irregular}</span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </Card>
+              </div>
             ))}
-          </Card>
+          </div>
         )}
       </div>
 
-      {/* Past-session detail */}
-      <Sheet
-        open={!!detail}
-        onClose={() => setDetail(null)}
-        title={detail ? detail.topic || sessionDate(detail.startedAt) : ''}
-      >
-        {detail && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-xs">
-              <StatusChip status="present" />
-              <span className="tabular-nums text-muted">{detailCounts.present}</span>
-              <StatusChip status="late" />
-              <span className="tabular-nums text-muted">{detailCounts.late}</span>
-              <StatusChip status="absent" />
-              <span className="tabular-nums text-muted">{detailCounts.absent}</span>
-            </div>
-
-            {detail.status === 'ended' && !detail.penaltiesCommitted && (
-              <Button className="w-full" onClick={() => onFinaliseFromHistory(detail)}>
-                Review & finalise penalties
-              </Button>
-            )}
-
-            {detailLoading ? (
-              <ListSkeleton rows={4} />
-            ) : (
-              <div className="max-h-72 divide-y divide-line overflow-y-auto rounded-xl border border-line">
-                {detailRows.map((r) => (
-                  <div key={r.studentId} className="flex items-center gap-3 p-3">
-                    <Avatar name={r.fullName} url={r.avatarUrl} />
-                    <span className="min-w-0 flex-1 truncate text-sm">{r.fullName}</span>
-                    {r.status && <StatusChip status={r.status} />}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <Button variant="outline" className="w-full" onClick={onExportDetail}>
-              <DownloadIcon className="h-5 w-5" /> Export to Excel
-            </Button>
-
-            {/* Manage — edit topic / delete (deleting reverses any penalties). */}
-            <div className="space-y-3 rounded-xl border border-line p-3">
-              {editingTopic ? (
-                <div className="space-y-2">
-                  <Input
-                    label="Topic"
-                    value={topicDraft}
-                    onChange={(e) => setTopicDraft(e.target.value)}
-                    placeholder="e.g. Lecture 5: Big-O"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button variant="outline" onClick={() => setEditingTopic(false)} disabled={savingTopic}>
-                      Cancel
-                    </Button>
-                    <Button onClick={saveTopic} disabled={savingTopic}>
-                      {savingTopic ? 'Saving…' : 'Save topic'}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTopicDraft(detail.topic ?? '')
-                    setEditingTopic(true)
-                  }}
-                  className="flex w-full items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-ink"
-                >
-                  <PencilIcon className="h-4 w-4" /> Edit topic
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(true)}
-                className="flex w-full items-center gap-2 text-sm font-medium text-brand-600 transition-opacity hover:opacity-80 dark:text-brand-400"
-              >
-                <TrashIcon className="h-4 w-4" /> Delete session
-              </button>
-            </div>
-          </div>
-        )}
-      </Sheet>
-
-      <ConfirmDialog
-        open={confirmDelete}
-        title="Delete this session?"
-        message={
-          <>
-            <span className="font-semibold text-ink">
-              {detail ? detail.topic || sessionDate(detail.startedAt) : 'This session'}
-            </span>{' '}
-            and all its check-ins will be permanently deleted. This can’t be undone.
-          </>
-        }
-        detail={
-          detail?.penaltiesCommitted
-            ? 'Any penalties this session applied are reversed — student points recompute automatically.'
-            : undefined
-        }
-        confirmLabel="Delete session"
-        busy={deleting}
-        onConfirm={onDeleteSession}
-        onClose={() => setConfirmDelete(false)}
-      />
     </div>
   )
 }

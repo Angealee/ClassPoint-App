@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/Card'
 import { XpBar } from '@/components/ui/XpBar'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
-import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
+import { BoltIcon, StarIcon, TicketIcon, TrophyIcon } from '@/components/ui/icons'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
 import { getLevelProgress } from '@/lib/leveling'
@@ -163,6 +163,14 @@ export function Dashboard() {
         />
       </motion.div>
 
+      {/* Use points — the only home-screen entry point to /app/points. */}
+      <motion.div variants={item}>
+        <UsePointsTeaser
+          balance={me.lifetime_points}
+          onOpen={() => navigate('/app/points')}
+        />
+      </motion.div>
+
       {/* Achievements teaser — the only home-screen entry point to the trophy case. */}
       {achievements.length > 0 && (
         <motion.div variants={item}>
@@ -292,6 +300,33 @@ function FeedRow({ event: e }: { event: PointEvent }) {
         </p>
       </div>
     </div>
+  )
+}
+
+/**
+ * Home-screen entry to Use Points. Deliberately a card and not a 5th bottom
+ * tab — four is the comfortable limit on a phone.
+ */
+function UsePointsTeaser({ balance, onOpen }: { balance: number; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 rounded-2xl border border-line bg-card p-4 text-left transition-colors hover:bg-card-2"
+    >
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-400/15 text-gold-600 dark:text-gold-400">
+        <TicketIcon className="h-5.5 w-5.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-display text-sm font-bold">Use your points</span>
+        <span className="block text-xs text-muted">
+          {balance > 0
+            ? `Put some of your ${balance} toward a quiz or activity grade.`
+            : 'Earn points first, then cash them in for a better grade.'}
+        </span>
+      </span>
+      <span className="shrink-0 text-xs font-semibold text-brand-500">Open →</span>
+    </button>
   )
 }
 
