@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { SuccessTick } from '@/components/ui/SuccessTick'
 import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
@@ -35,6 +36,7 @@ export function AttendanceReview({
   const [apply, setApply] = useState(session.applyPenalties)
   const [committing, setCommitting] = useState(false)
   const [confirmCommit, setConfirmCommit] = useState(false)
+  const [tick, setTick] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -101,7 +103,10 @@ export function AttendanceReview({
           : 'Attendance saved. No penalties applied.',
         'success',
       )
-      onDone()
+      // Show the tick, then leave — onDone navigates away, so gate it on the
+      // tick finishing rather than calling it here.
+      setTick(true)
+      return
     } catch {
       toast('Could not finalise. Try again.', 'error')
       setCommitting(false)
@@ -249,6 +254,8 @@ export function AttendanceReview({
         }}
         onClose={() => setConfirmCommit(false)}
       />
+
+      <SuccessTick show={tick} onDone={onDone} />
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { TicketIcon, WarningIcon } from '@/components/ui/icons'
@@ -165,13 +166,17 @@ export function UsePoints() {
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="text-xs text-muted">Available to spend</p>
-            <p className="font-display text-3xl font-bold tabular-nums">{available}</p>
+            <AnimatedNumber
+              value={available}
+              className="font-display text-3xl font-bold tabular-nums"
+            />
           </div>
           <div className="text-right">
             <p className="text-xs text-muted">Spent all-time</p>
-            <p className="font-display text-xl font-bold tabular-nums text-gold-600 dark:text-gold-400">
-              {spent}
-            </p>
+            <AnimatedNumber
+              value={spent}
+              className="font-display text-xl font-bold tabular-nums text-gold-600 dark:text-gold-400"
+            />
           </div>
         </div>
 

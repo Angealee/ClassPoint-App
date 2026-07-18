@@ -92,11 +92,13 @@ Since 0017–0020: `notifications` (the push outbox AND the in-app bell's histor
 `recitation|activity|penalty|redeem`.
 
 Gotchas:
-- `cp_achievement_metrics` (canonical body now in **0021**, not 0016/0018) derives
-  attendance streaks/counts from `attendance_records` and spending from
-  `point_redemptions`. Copy the latest body forward when changing it — never fork it.
-  Its return type has grown twice; return-type changes need `drop function` first,
-  plus recreation of dependents `sync_achievements` + `get_achievement_progress`.
+- `cp_achievement_metrics` has ONE owner: migration **0021** (drops + recreates it).
+  0018 deliberately does NOT recreate it — two migrations recreating a function
+  whose return type changes clash on re-run (`ERROR 42P13: cannot change return
+  type`, since `create or replace` can't change the signature). Any future change
+  goes in a single new migration that does `drop function if exists` first, then
+  recreates dependents `sync_achievements` + `get_achievement_progress` (also
+  drop-first) and re-grants. Never let two migrations own it.
 - Event-granted badges (`town_crier`, `window_shopper`) are set by TRIGGERS
   (`trg_town_crier` on leaderboard_comments, `trg_window_shopper` on
   point_redemptions), NOT by `sync_achievements` — they're not in its satisfied

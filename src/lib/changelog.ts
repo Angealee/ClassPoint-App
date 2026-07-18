@@ -59,6 +59,15 @@ export const DRAFT_3_0_0: ChangelogEntry = {
       ],
     },
     {
+      heading: 'Smoother, snappier everywhere',
+      items: [
+        'Screens now fade and rise gently as you move between them — a small thing that makes the whole app feel more alive.',
+        'Points, level and rank roll up when they change instead of snapping.',
+        'A satisfying check appears when you approve a request, save your profile, or finalise attendance.',
+        'The bottom tabs give a little bounce when tapped. (All of this respects your phone’s “reduce motion” setting.)',
+      ],
+    },
+    {
       heading: 'Achievement library + who’s viewing you',
       items: [
         'Tap any badge to see its full story — how rare it is (“✦ Legendary · 8% of the class · 3 of 42”), when you unlocked it, and a little something extra under each one.',

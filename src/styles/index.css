@@ -167,6 +167,22 @@
   animation: cp-arena-glow 5s ease-in-out infinite;
 }
 
+/* Enter-only page transition — a subtle fade + rise on each route.
+   Deliberately a CSS animation WITHOUT `forwards` fill: once it finishes the
+   element returns to its base style (no inline transform), so it never leaves a
+   containing block that would misplace `position: fixed` descendants (every
+   Sheet backdrop, the fullscreen QR). Keyed by pathname in Shell, so it replays
+   on navigation but not on same-route re-renders. Reduced-motion users get the
+   global near-zero duration below, i.e. effectively no animation. */
+@keyframes cp-route-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.cp-route-in {
+  animation: cp-route-in 0.18s ease-out;
+}
+
 /* Flying leaderboard comments (danmaku). A pure transform animation so it runs
    on the compositor — a JS-driven equivalent would jank on low-end phones with
    several pills in flight. `--cp-fly-dur` is set per pill from its length, so

@@ -162,120 +162,18 @@ grant execute on function public.set_attendance_status(uuid, text)   to authenti
 grant execute on function public.delete_attendance_record(uuid)      to authenticated;
 
 -- ----------------------------------------------------------------------------
--- 4. cp_achievement_metrics() — teach the streaks about neutral sessions
+-- 4. cp_achievement_metrics() — intentionally NOT recreated here.
 --
--- Return type is unchanged, so `create or replace` is fine here (a signature
--- change would need `drop function` first — the 0014 lesson).
+-- Migration 0021 is the SOLE owner of cp_achievement_metrics: it drops and
+-- recreates the function with two extra columns (points_spent,
+-- redemptions_approved) AND already includes the excused/irregular streak
+-- filters this phase introduced. Recreating it here too caused a return-type
+-- clash (ERROR 42P13) whenever 0021 had already been applied — two migrations
+-- can't both own a function whose signature changes.
 --
--- The only edits vs the 0016 body are the two `and ar.status not in
--- ('excused','irregular')` filters in the streak subqueries. Excluding those
--- rows entirely is exactly "neutral": the run continues across an excused
--- session, but the excused session itself doesn't add to it. present_count and
--- attended_count already filter on ('present','late'), so they need nothing.
+-- The neutral-status behaviour still ships: the filters live in 0021's
+-- canonical body. If you're applying these in a fresh, in-order run, the
+-- streak metric simply picks up the filters at 0021 instead of here — and
+-- since excused/irregular records can't exist until the CHECK widening above
+-- is applied, there's no window where the difference is observable.
 -- ----------------------------------------------------------------------------
-create or replace function public.cp_achievement_metrics(p_student_id uuid)
-returns table (
-  points          integer,
-  recitations     integer,
-  present_count   integer,
-  attended_count  integer,
-  streak          integer,
-  early_streak    integer,
-  level           integer,
-  rank            integer,
-  views_received  integer,
-  views_given     integer,
-  unlocked_count  integer,
-  banner_count    integer,
-  has_events      boolean,
-  has_attendance  boolean,
-  has_avatar      boolean,
-  has_bio_and_interests boolean,
-  has_clean_slate boolean,
-  has_comeback    boolean
-)
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_points     integer;
-  v_bio        text;
-  v_interests  text;
-  v_avatar     text;
-  v_banners    text[];
-  v_created_at timestamptz;
-begin
-  select lifetime_points, bio, interests, avatar_url, banner_urls, created_at
-    into v_points, v_bio, v_interests, v_avatar, v_banners, v_created_at
-    from public.students where id = p_student_id;
-  if not found then
-    raise exception 'Student not found.';
-  end if;
-
-  return query
-  select
-    v_points,
-    (select count(*)::integer from public.point_events
-      where student_id = p_student_id and category = 'recitation'),
-    (select count(*)::integer from public.attendance_records
-      where student_id = p_student_id and status = 'present'),
-    (select count(*)::integer from public.attendance_records
-      where student_id = p_student_id and status in ('present', 'late')),
-    -- Current consecutive non-absent streak, counting backward from the most
-    -- recent session: a running count of absences ordered newest-first hits 1
-    -- exactly at (and stays >=1 after) the first absence, so "running_absent
-    -- = 0" rows are exactly the unbroken run since then.
-    -- Excused/irregular sessions are filtered out entirely — they neither
-    -- break the run nor count toward it.
-    (select count(*)::integer from (
-        select sum(case when ar.status = 'absent' then 1 else 0 end)
-                 over (order by cs.started_at desc) as running_absent
-          from public.attendance_records ar
-          join public.class_sessions cs on cs.id = ar.session_id
-         where ar.student_id = p_student_id
-           and ar.status not in ('excused', 'irregular')
-      ) t where running_absent = 0),
-    -- Same gaps-and-islands technique, keyed on "checked in within 2 minutes
-    -- of the session opening" instead of "not absent".
-    (select count(*)::integer from (
-        select sum(
-                 case when ar.scanned_at is not null
-                           and ar.scanned_at <= cs.started_at + interval '2 minutes'
-                      then 0 else 1 end
-               ) over (order by cs.started_at desc) as running_not_early
-          from public.attendance_records ar
-          join public.class_sessions cs on cs.id = ar.session_id
-         where ar.student_id = p_student_id
-           and ar.status not in ('excused', 'irregular')
-      ) t where running_not_early = 0),
-    public.cp_level(v_points),
-    (select rank from public.leaderboard_snapshot where student_id = p_student_id),
-    (select coalesce(sum(view_count), 0)::integer from public.profile_views where viewed_id = p_student_id),
-    (select coalesce(sum(view_count), 0)::integer from public.profile_views where viewer_id = p_student_id),
-    (select count(*)::integer from public.student_achievements where student_id = p_student_id),
-    coalesce(array_length(v_banners, 1), 0),
-    exists(select 1 from public.point_events where student_id = p_student_id),
-    exists(select 1 from public.attendance_records where student_id = p_student_id and scanned_at is not null),
-    v_avatar is not null,
-    v_bio is not null and v_interests is not null,
-    -- Only eligible once enrolled 30+ days (otherwise a brand-new student
-    -- would trivially clear "zero penalties" with zero elapsed time to earn
-    -- one), and zero penalty-category events in the trailing 30 days.
-    v_created_at <= now() - interval '30 days'
-      and not exists (
-        select 1 from public.point_events
-         where student_id = p_student_id and category = 'penalty'
-           and created_at >= now() - interval '30 days'
-      ),
-    exists (
-      select 1
-        from public.point_events p
-        join public.point_events pen
-          on pen.student_id = p.student_id and pen.category = 'penalty'
-       where p.student_id = p_student_id and p.points > 0
-         and p.created_at > pen.created_at
-         and p.created_at <= pen.created_at + interval '24 hours'
-    );
-end;
-$$;

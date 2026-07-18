@@ -1,10 +1,27 @@
 import { Suspense } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
 import type { ComponentType, ReactNode, SVGProps } from 'react'
 import { Logo } from '@/components/ui/Logo'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { RouteFallback } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+
+/**
+ * The routed screen, with a subtle enter-only fade+rise on each navigation.
+ * Keyed by pathname so the CSS animation replays on route change but NOT on a
+ * same-route re-render (which would restart it mid-interaction). See the
+ * `.cp-route-in` comment in index.css for why this is CSS, not a transform that
+ * lingers and breaks fixed-position sheets.
+ */
+function RoutedOutlet() {
+  const { pathname } = useLocation()
+  return (
+    <div key={pathname} className="cp-route-in">
+      <Outlet />
+    </div>
+  )
+}
 
 export interface NavItem {
   to: string
@@ -29,6 +46,7 @@ export function Shell({
   badge?: ReactNode
   actions?: ReactNode
 }) {
+  const reduce = useReducedMotion()
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-6xl">
       {/* Desktop sidebar */}
@@ -97,7 +115,7 @@ export function Shell({
         <main className="flex-1 px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-8">
           <div className="mx-auto w-full max-w-2xl">
             <Suspense fallback={<RouteFallback />}>
-              <Outlet />
+              <RoutedOutlet />
             </Suspense>
           </div>
         </main>
@@ -119,7 +137,12 @@ export function Shell({
                 >
                   {({ isActive }) => (
                     <>
-                      <span className="relative">
+                      <motion.span
+                        className="relative"
+                        // Springy squish on tap — skipped for reduced-motion.
+                        whileTap={reduce ? undefined : { scale: 0.82 }}
+                        transition={{ type: 'spring', stiffness: 600, damping: 20 }}
+                      >
                         <Icon
                           className={cn(
                             'h-6 w-6',
@@ -129,7 +152,7 @@ export function Shell({
                         {dot && (
                           <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-brand-500 ring-2 ring-canvas" />
                         )}
-                      </span>
+                      </motion.span>
                       {label}
                     </>
                   )}

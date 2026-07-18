@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Sheet } from '@/components/ui/Sheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { SuccessTick } from '@/components/ui/SuccessTick'
 import { Avatar } from '@/components/ui/Avatar'
 import { useToast } from '@/components/ui/Toast'
 import { getLevelProgress } from '@/lib/leveling'
@@ -47,6 +48,7 @@ export function Profile() {
   const [whatsNewOpen, setWhatsNewOpen] = useState(false)
   const [confirmPhoto, setConfirmPhoto] = useState(false)
   const [confirmBannerUrl, setConfirmBannerUrl] = useState<string | null>(null)
+  const [tick, setTick] = useState(false)
 
   const [editOpen, setEditOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -134,6 +136,7 @@ export function Profile() {
     }
     toast('Profile updated.', 'success')
     setEditOpen(false)
+    setTick(true)
   }
 
   async function onPickFile(e: ChangeEvent<HTMLInputElement>) {
@@ -518,6 +521,8 @@ export function Profile() {
         onConfirm={() => confirmBannerUrl && void onRemoveBanner(confirmBannerUrl)}
         onClose={() => setConfirmBannerUrl(null)}
       />
+
+      <SuccessTick show={tick} onDone={() => setTick(false)} />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { XpBar } from '@/components/ui/XpBar'
+import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { BoltIcon, StarIcon, TicketIcon, TrophyIcon } from '@/components/ui/icons'
@@ -143,13 +144,15 @@ export function Dashboard() {
           label="Total points"
           value={
             <motion.span
+              // The colour/scale pop still fires on change; the number itself
+              // now rolls up via AnimatedNumber instead of snapping.
               key={me.lifetime_points}
               initial={{ scale: 1.35, color: 'var(--color-gold-500)' }}
               animate={{ scale: 1, color: 'var(--color-ink)' }}
               transition={{ type: 'spring', stiffness: 500, damping: 18 }}
               className="inline-block"
             >
-              {me.lifetime_points}
+              <AnimatedNumber value={me.lifetime_points} />
             </motion.span>
           }
           tone="gold"

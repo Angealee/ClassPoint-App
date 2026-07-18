@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Avatar } from '@/components/ui/Avatar'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { SuccessTick } from '@/components/ui/SuccessTick'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { TicketIcon } from '@/components/ui/icons'
@@ -46,6 +47,7 @@ export function Redemptions() {
   )
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
+  const [tick, setTick] = useState(false)
 
   const sectionName = useCallback(
     (id: string) => sections.find((s) => s.id === id)?.name ?? '',
@@ -95,6 +97,7 @@ export function Redemptions() {
           : 'Request declined.',
         decision.approve ? 'success' : 'info',
       )
+      if (decision.approve) setTick(true)
       setDecision(null)
       setNote('')
       await load()
@@ -277,6 +280,8 @@ export function Redemptions() {
           hint="They'll see this in their history and notification."
         />
       </ConfirmDialog>
+
+      <SuccessTick show={tick} onDone={() => setTick(false)} />
     </div>
   )
 }
