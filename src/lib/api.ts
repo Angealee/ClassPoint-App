@@ -8,6 +8,8 @@ import type {
   ArchivedStudent,
   AttendanceAnalytics,
   AttendanceRosterRow,
+  InstructorStudentDetail,
+  SectionRegister,
   AttendanceStatus,
   AwardRecord,
   ClassSession,
@@ -516,6 +518,107 @@ export async function getProfileViews(studentId: string): Promise<ProfileViews> 
       lastViewedAt: r.last_viewed_at,
     })),
   }
+}
+
+/** One student, for the instructor's record page (includes archive + claim state). */
+export async function getStudent(studentId: string): Promise<InstructorStudentDetail | null> {
+  const [studentRes, secretRes] = await Promise.all([
+    supabase
+      .from('students')
+      .select(
+        'id, section_id, full_name, display_name, avatar_url, lifetime_points, archived_at, sections(name)',
+      )
+      .eq('id', studentId)
+      .maybeSingle(),
+    supabase
+      .from('student_secrets')
+      .select('username, claimed_at')
+      .eq('student_id', studentId)
+      .maybeSingle(),
+  ])
+  if (studentRes.error) throw studentRes.error
+  if (!studentRes.data) return null
+  const s = studentRes.data as unknown as {
+    id: string
+    section_id: string
+    full_name: string
+    display_name: string
+    avatar_url: string | null
+    lifetime_points: number
+    archived_at: string | null
+    sections: { name: string } | null
+  }
+  const secret = secretRes.data as { username: string | null; claimed_at: string | null } | null
+  return {
+    id: s.id,
+    sectionId: s.section_id,
+    sectionName: s.sections?.name ?? '',
+    fullName: s.full_name,
+    displayName: s.display_name,
+    avatarUrl: s.avatar_url,
+    lifetimePoints: s.lifetime_points,
+    archivedAt: s.archived_at,
+    username: secret?.username ?? null,
+    claimed: !!secret?.claimed_at,
+  }
+}
+
+/**
+ * Whole-section attendance register (rows = active-or-recorded students, cols =
+ * sessions chronological). Backs the class-record matrix export.
+ */
+export async function getSectionRegister(sectionId: string): Promise<SectionRegister> {
+  const [sessionsRes, studentsRes] = await Promise.all([
+    supabase
+      .from('class_sessions')
+      .select('id, topic, started_at')
+      .eq('section_id', sectionId)
+      .order('started_at', { ascending: true }),
+    supabase
+      .from('students')
+      .select('id, full_name, archived_at')
+      .eq('section_id', sectionId),
+  ])
+  if (sessionsRes.error) throw sessionsRes.error
+  if (studentsRes.error) throw studentsRes.error
+
+  const sessions = (sessionsRes.data ?? []).map((s) => ({
+    id: s.id as string,
+    topic: (s.topic as string | null) ?? null,
+    startedAt: s.started_at as string,
+  }))
+  const roster = (studentsRes.data ?? []) as Array<{
+    id: string
+    full_name: string
+    archived_at: string | null
+  }>
+
+  const statuses: Record<string, Record<string, AttendanceStatus>> = {}
+  if (sessions.length > 0) {
+    const { data: records, error } = await supabase
+      .from('attendance_records')
+      .select('session_id, student_id, status')
+      .in(
+        'session_id',
+        sessions.map((s) => s.id),
+      )
+    if (error) throw error
+    for (const r of (records ?? []) as Array<{
+      session_id: string
+      student_id: string
+      status: AttendanceStatus
+    }>) {
+      ;(statuses[r.student_id] ??= {})[r.session_id] = r.status
+    }
+  }
+
+  // Active students, plus archived ones who have any record (history stays whole).
+  const students = roster
+    .filter((s) => s.archived_at == null || statuses[s.id])
+    .map((s) => ({ id: s.id, fullName: s.full_name }))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+
+  return { sessions, students, statuses }
 }
 
 /**

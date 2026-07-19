@@ -65,6 +65,12 @@ const SessionHistory = lazy(() =>
 const Redemptions = lazy(() =>
   import('@/features/instructor/Redemptions').then((m) => ({ default: m.Redemptions })),
 )
+const StudentRecord = lazy(() =>
+  import('@/features/instructor/StudentRecord').then((m) => ({ default: m.StudentRecord })),
+)
+const StudentReport = lazy(() =>
+  import('@/features/instructor/StudentReport').then((m) => ({ default: m.StudentReport })),
+)
 
 /** Full-screen Suspense for top-level pages and layouts. */
 const withSplash = (node: ReactNode) => <Suspense fallback={<Splash />}>{node}</Suspense>
@@ -132,9 +138,17 @@ export const router = createBrowserRouter([
           { path: 'attendance/history', element: <SessionHistory /> },
           { path: 'attendance/session/:sessionId', element: <SessionDetail /> },
           { path: 'redemptions', element: <Redemptions /> },
+          { path: 'student/:studentId', element: <StudentRecord /> },
           { path: 'history', element: <AwardHistory /> },
           { path: 'leaderboard', element: <InstructorLeaderboard /> },
         ],
+      },
+      // The printable report renders OUTSIDE the shell (no nav/tabs/theme) but
+      // still under the instructor role guard.
+      {
+        path: 'student/:studentId/report',
+        element: withSplash(<StudentReport />),
+        errorElement: <RouteError />,
       },
     ],
   },

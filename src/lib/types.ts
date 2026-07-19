@@ -250,6 +250,28 @@ export interface AttendanceRosterRow {
   syncedLate: boolean
 }
 
+/** One student's full detail for the instructor record page. */
+export interface InstructorStudentDetail {
+  id: string
+  sectionId: string
+  sectionName: string
+  fullName: string
+  displayName: string
+  avatarUrl: string | null
+  lifetimePoints: number
+  archivedAt: string | null
+  username: string | null
+  claimed: boolean
+}
+
+/** Whole-section register: students × sessions grid of statuses. */
+export interface SectionRegister {
+  sessions: Array<{ id: string; topic: string | null; startedAt: string }>
+  students: Array<{ id: string; fullName: string }>
+  /** statuses[studentId][sessionId] = status (missing = no record). */
+  statuses: Record<string, Record<string, AttendanceStatus>>
+}
+
 /** A student hidden by Archive — restorable, records intact. */
 export interface ArchivedStudent {
   id: string
