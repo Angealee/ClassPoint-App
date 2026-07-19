@@ -7,8 +7,8 @@ import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { ArrowLeftIcon, DownloadIcon, WarningIcon } from '@/components/ui/icons'
-import { getAttendanceAnalytics, listSessions } from '@/lib/api'
-import { exportAttendanceSummary } from '@/lib/attendance-io'
+import { getAttendanceAnalytics, getSectionRegister, listSessions } from '@/lib/api'
+import { exportAttendanceSummary, exportSectionRegister } from '@/lib/attendance-io'
 import { groupByWeek, weekOf } from '@/lib/term'
 import { cn } from '@/lib/cn'
 import { useInstructor } from './InstructorLayout'
@@ -107,6 +107,16 @@ export function SessionHistory() {
       await exportAttendanceSummary(sectionName, analytics.students)
     } catch {
       toast('Could not export.', 'error')
+    }
+  }
+
+  /** The traditional class-record grid: students × sessions, P/L/A/E/I cells. */
+  async function onExportRegister() {
+    if (!selectedSectionId) return
+    try {
+      await exportSectionRegister(sectionName, await getSectionRegister(selectedSectionId))
+    } catch {
+      toast('Could not export the register.', 'error')
     }
   }
 
@@ -246,9 +256,14 @@ export function SessionHistory() {
             </p>
           </div>
 
-          <Button variant="outline" className="w-full" onClick={onExport}>
-            <DownloadIcon className="h-5 w-5" /> Export summary to Excel
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={onExport}>
+              <DownloadIcon className="h-5 w-5" /> Summary
+            </Button>
+            <Button variant="outline" onClick={() => void onExportRegister()}>
+              <DownloadIcon className="h-5 w-5" /> Register
+            </Button>
+          </div>
 
           {/* Sessions by week */}
           <div>

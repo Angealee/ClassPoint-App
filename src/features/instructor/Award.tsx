@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -8,7 +9,7 @@ import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { CheckIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
-import { awardPoints, listStudents } from '@/lib/api'
+import { awardPoints, getStudent, listStudents } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import type { PointCategory, SectionStudent } from '@/lib/types'
 
@@ -21,6 +22,11 @@ type Mode = 'reward' | 'penalty'
 export function Award() {
   const { sections, selectedSectionId, setSelectedSectionId } = useInstructor()
   const { toast } = useToast()
+  const [searchParams, setSearchParams] = useSearchParams()
+  // A ?student=<id> deep link (from the record page) pre-selects that student.
+  // Held in a ref until their roster has loaded, since the section switch is
+  // async and the tick must land AFTER the list exists.
+  const pendingStudentRef = useRef<string | null>(null)
 
   const [students, setStudents] = useState<SectionStudent[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,12 +59,41 @@ export function Award() {
     }
   }
 
+  // Consume the ?student= deep link once: switch to their section, then tick
+  // them when that roster loads (the effect below applies pending selections).
+  const studentParam = searchParams.get('student')
+  useEffect(() => {
+    if (!studentParam) return
+    pendingStudentRef.current = studentParam
+    setSearchParams({}, { replace: true })
+    getStudent(studentParam)
+      .then((s) => {
+        if (s && s.sectionId !== selectedSectionId) setSelectedSectionId(s.sectionId)
+        // Same section → the roster is already loading/loaded; the pending
+        // tick is applied by the students effect below either way.
+      })
+      .catch(() => {
+        pendingStudentRef.current = null
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentParam])
+
   useEffect(() => {
     setSelected(new Set())
     setQuery('')
     void refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSectionId])
+
+  // Apply a pending deep-link selection as soon as their roster is on screen.
+  useEffect(() => {
+    const pending = pendingStudentRef.current
+    if (!pending) return
+    if (students.some((s) => s.id === pending)) {
+      pendingStudentRef.current = null
+      setSelected(new Set([pending]))
+    }
+  }, [students])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()

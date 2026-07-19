@@ -55,6 +55,15 @@ export const DRAFT_3_1_0: ChangelogEntry = {
   title: 'The Reliability Update',
   sections: [
     {
+      heading: 'A real record for every student',
+      items: [
+        'Instructors: tap “View ›” on any student for their full record — attendance week by week, points history, requests and badges, all on one page.',
+        'One tap prints a formal Attendance Record — sessions, check-in times, totals, attendance rate and signature lines — ready to hand to a parent or the dean’s office as paper or PDF.',
+        'New Register export: the classic class-record grid (students × sessions, P/L/A/E/I) as a spreadsheet.',
+        'From a student’s record you can award points, reset their PIN, or archive — everything in one place when someone’s standing at your desk.',
+      ],
+    },
+    {
       heading: 'Check in even with no data or wifi',
       major: true,
       items: [

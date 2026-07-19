@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -42,6 +43,7 @@ import type { Achievement, SectionStudent } from '@/lib/types'
 export function Students() {
   const { sections, setSelectedSectionId } = useInstructor()
   const { toast } = useToast()
+  const navigate = useNavigate()
   const importRef = useRef<HTMLInputElement>(null)
 
   // Landing on the section grid; opening a card switches to that section's roster.
@@ -440,6 +442,16 @@ export function Students() {
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-brand-500/10 hover:text-brand-500"
                 >
                   <TrashIcon className="h-4.5 w-4.5" />
+                </button>
+                {/* Explicit affordance (user's pick): the row itself stays
+                    inert so reaching for an icon can't mis-navigate. */}
+                <button
+                  type="button"
+                  onClick={() => navigate(`/teach/student/${s.id}`)}
+                  aria-label={`View ${s.full_name}'s record`}
+                  className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand-500 transition-colors hover:bg-brand-500/10"
+                >
+                  View ›
                 </button>
               </div>
             )
