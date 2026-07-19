@@ -129,6 +129,19 @@ archived student's row ONLY when they have a record in that session (history sta
 truthful). `deleteSection` counts archived students too. `claim-token` edge function
 rejects archived roster rows (redeploy after 0023).
 
+Since 0025: `absence_excuses` (DCT-CCS admission-slip flow) — student
+`request_absence_excuse` (own absent record, 7-day window, absent-only,
+`has_slip` flag) / `set_excuse_slip_status` / `cancel_absence_excuse`; instructor
+`decide_absence_excuse` (approve → `set_attendance_status(record,'excused')`
+reconciles the penalty; queues one `'excuse'` notification). **Ownership move:
+`cp_notify_point_event` 0017 → 0025** (absence penalty push gains the
+admission-slip line; still ONE push). Instructor inbox is the ONE tabbed
+`/teach/redemptions` "Requests" page (Points | Excuses); badge = pending
+redemptions + pending excuses, both counts + channels hoisted in InstructorLayout
+(`uniqueChannel('redemptions-badge')` + `'excuses-badge'`). Student surface:
+`AbsenceExcuses` above the attendance history (guidance card, per-record dismiss
+in localStorage `cp_excuse_guide_dismissed_v1`, request sheet + slip toggle).
+
 Since 0017–0020: `notifications` (the push outbox AND the in-app bell's history),
 `point_redemptions` (spend requests), `leaderboard_comments` +
 `leaderboard_banned_words` (24h flying comments). Attendance statuses are

@@ -55,6 +55,15 @@ export const DRAFT_3_1_0: ChangelogEntry = {
   title: 'The Reliability Update',
   sections: [
     {
+      heading: 'Excuse an absence, the proper way',
+      items: [
+        'Missed a class? The Attendance tab now walks you through it — get a valid excuse letter, have the Dean’s office validate it and issue your admission slip, then present it to your instructor.',
+        'File the request right in the app (within 7 days), mark when you’ve got your admission slip, and your instructor sees it in their Requests inbox — slip-holders first.',
+        'The moment your instructor excuses it, the absence stops counting against you and any deducted points come straight back — with a notification.',
+        'Instructors: absence and point requests now live in one tabbed Requests inbox.',
+      ],
+    },
+    {
       heading: 'A real record for every student',
       items: [
         'Instructors: tap “View ›” on any student for their full record — attendance week by week, points history, requests and badges, all on one page.',

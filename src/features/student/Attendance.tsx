@@ -20,6 +20,7 @@ import {
   type OfflineScanEntry,
 } from '@/lib/offline-scans'
 import { OfflineScanCards } from './OfflineScanCards'
+import { AbsenceExcuses } from './AbsenceExcuses'
 import type { AttendanceStatus, MyAttendanceEntry, ScanResult } from '@/lib/types'
 
 const entryDate = (iso: string) =>
@@ -219,6 +220,11 @@ export function Attendance() {
           {stats.irregular > 0 && `${stats.irregular} irregular`} — those classes don’t count
           against you.
         </p>
+      )}
+
+      {/* Absence-excuse flow (DCT-CCS admission slip) — sits above history. */}
+      {!loading && me && (
+        <AbsenceExcuses studentId={me.id} history={history} onChanged={load} />
       )}
 
       {/* History */}
