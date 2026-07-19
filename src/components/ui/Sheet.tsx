@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useDragControls, type PanInfo } from 'framer-motion'
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 interface SheetProps {
   open: boolean
@@ -14,6 +15,12 @@ interface SheetProps {
  * scrolls internally, so consumers can drop in tall content without their own
  * scroll wrapper. Drag is started from the grab handle only, so it never fights
  * the inner scroll area.
+ *
+ * Rendered through a portal to <body>: a Sheet opened from inside a
+ * `backdrop-filter` ancestor (the header/sidebar, which use backdrop-blur)
+ * would otherwise have its `fixed inset-0` resolve against that ancestor —
+ * trapping it in the header strip on mobile / the narrow sidebar on desktop.
+ * The portal escapes any such containing block.
  */
 export function Sheet({ open, onClose, title, children }: SheetProps) {
   const dragControls = useDragControls()
@@ -30,7 +37,9 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     if (info.offset.y > 110 || info.velocity.y > 600) onClose()
   }
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-40 flex items-end justify-center sm:items-center">
@@ -71,6 +80,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
