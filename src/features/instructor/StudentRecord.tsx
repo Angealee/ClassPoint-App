@@ -62,6 +62,11 @@ export function StudentRecord() {
   const [resetOpen, setResetOpen] = useState(false)
   const [archiveConfirm, setArchiveConfirm] = useState(false)
   const [archiving, setArchiving] = useState(false)
+  // Points ledger paginates on demand — heavy students stay fast, but you can
+  // dig into the full history when a question comes up.
+  const [eventsLimit, setEventsLimit] = useState(40)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMoreEvents, setHasMoreEvents] = useState(false)
 
   const load = useCallback(async () => {
     if (!studentId) return
@@ -82,6 +87,9 @@ export function StudentRecord() {
       ])
       setAttendance(att)
       setEvents(ev)
+      // A full page back suggests there may be older events to fetch.
+      setHasMoreEvents(ev.length >= 40)
+      setEventsLimit(40)
       setRedemptions(red)
       setAchievements(ach)
       setRank(rk)
@@ -111,6 +119,21 @@ export function StudentRecord() {
   const weeks = useMemo(() => groupByWeek(attendance, (a) => a.startedAt), [attendance])
   const unlocked = achievements.filter((a) => a.unlockedAt)
   const sectionName = sections.find((s) => s.id === student?.sectionId)?.name ?? ''
+
+  async function onLoadMoreEvents() {
+    setLoadingMore(true)
+    const next = eventsLimit + 40
+    try {
+      const older = await listStudentEvents(studentId, next)
+      setEvents(older)
+      setEventsLimit(next)
+      setHasMoreEvents(older.length >= next)
+    } catch {
+      toast('Could not load more.', 'error')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   async function onArchiveToggle() {
     if (!student) return
@@ -299,6 +322,16 @@ export function StudentRecord() {
                 </div>
               </div>
             ))}
+            {hasMoreEvents && (
+              <button
+                type="button"
+                onClick={() => void onLoadMoreEvents()}
+                disabled={loadingMore}
+                className="w-full py-3 text-center text-xs font-semibold text-brand-500 transition-colors hover:bg-card-2 disabled:opacity-60"
+              >
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </button>
+            )}
           </Card>
         )}
       </div>

@@ -13,7 +13,7 @@ import {
   TrophyIcon,
   UsersIcon,
 } from '@/components/ui/icons'
-import { getPendingRedemptionCount, listSections } from '@/lib/api'
+import { getPendingExcuseCount, getPendingRedemptionCount, listSections } from '@/lib/api'
 import { supabase, uniqueChannel } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import type { Section } from '@/lib/types'
@@ -58,7 +58,7 @@ function RedemptionInbox({ count }: { count: number }) {
     <button
       type="button"
       onClick={() => navigate('/teach/redemptions')}
-      aria-label={count > 0 ? `Point requests (${count} waiting)` : 'Point requests'}
+      aria-label={count > 0 ? `Requests (${count} waiting)` : 'Requests'}
       className="relative flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
     >
       <TicketIcon className="h-5 w-5" />
@@ -83,26 +83,37 @@ export function InstructorLayout() {
   const [sections, setSections] = useState<Section[]>([])
   const [selectedSectionId, setSelectedSectionId] = useState('')
   const [loading, setLoading] = useState(true)
+  // One inbox, two request types: point spends + absence excuses.
   const [pendingRedemptions, setPendingRedemptions] = useState(0)
+  const [pendingExcuses, setPendingExcuses] = useState(0)
 
   // Owned here (single mount) rather than in RedemptionInbox, which Shell
-  // renders twice. Page-scoped channel: subscribed on mount, removed on unmount.
+  // renders twice. Page-scoped channels: subscribed on mount, removed on unmount.
   useEffect(() => {
     let cancelled = false
     const refresh = () => {
       getPendingRedemptionCount()
         .then((n) => !cancelled && setPendingRedemptions(n))
         .catch(() => {})
+      getPendingExcuseCount()
+        .then((n) => !cancelled && setPendingExcuses(n))
+        .catch(() => {})
     }
     refresh()
-    const channel = uniqueChannel('redemptions-badge')
+    const redemptionsCh = uniqueChannel('redemptions-badge')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'point_redemptions' }, () =>
+        refresh(),
+      )
+      .subscribe()
+    const excusesCh = uniqueChannel('excuses-badge')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'absence_excuses' }, () =>
         refresh(),
       )
       .subscribe()
     return () => {
       cancelled = true
-      void supabase.removeChannel(channel)
+      void supabase.removeChannel(redemptionsCh)
+      void supabase.removeChannel(excusesCh)
     }
   }, [])
 
@@ -140,7 +151,7 @@ export function InstructorLayout() {
           // Wrapped so the desktop sidebar's justify-between treats these as a
           // single unit instead of spreading them apart.
           <div className="flex items-center gap-2">
-            <RedemptionInbox count={pendingRedemptions} />
+            <RedemptionInbox count={pendingRedemptions + pendingExcuses} />
             <button
               type="button"
               onClick={onSignOut}

@@ -98,6 +98,20 @@ over `cp_apply_attendance_status`, which is revoked from all API roles). `vite.c
 gained `navigateFallback: '/index.html'` (offline deep links) with a REST/functions/auth
 denylist.
 
+Phase C (frontend-only, no migration): instructor per-student record page at
+`/teach/student/:id` (`StudentRecord`) — reached via the "View ›" button on each
+roster row; reuses `listMyAttendance`/`listStudentEvents`/`listMyRedemptions`/
+`getMyAchievements`/`getMyRank` (all instructor-RLS-readable) + new `getStudent`
+(joins `sections(name)`). Printable "Attendance Record" at
+`/teach/student/:id/report` (`StudentReport`) is registered UNDER the `/teach`
+RequireRole node but OUTSIDE `InstructorLayout` (no Shell/tabs); it renders
+hardcoded light styles (no theme tokens → dark mode can't leak) + a `print:hidden`
+toolbar and `@page { size: A4 }`. Never call it "Parent Report" in UI. Register
+matrix export (`exportSectionRegister`, P/L/A/E/I cells via `aoa_to_sheet`) and
+"Backup all" workbook (`lib/export-all.ts` → `fetchFullBackup`, paged `.range`)
+both dynamic-import xlsx. Award deep-link: `/teach/award?student=<id>` preselects
+via a ref that applies once the section's roster loads.
+
 Since 0023 (Reliability Era): `audit_log` (full-JSON record of every destructive
 action; instructor-select only, written by the `cp_audit_delete` AFTER DELETE trigger
 on students/point_events/attendance_records/class_sessions + by the archive RPCs).

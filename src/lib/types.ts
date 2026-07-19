@@ -152,6 +152,34 @@ export interface SessionSummary {
   penaltiesCommitted: boolean
 }
 
+export type ExcuseStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+
+/** Days after a session a student may still file an excuse (mirrors the RPC). */
+export const EXCUSE_DEADLINE_DAYS = 7
+
+/** A student's absence-excuse request (the DCT-CCS admission-slip flow). */
+export interface AbsenceExcuse {
+  id: string
+  recordId: string
+  reason: string
+  /** True once the Dean's office has issued the physical admission slip. */
+  hasSlip: boolean
+  status: ExcuseStatus
+  requestedAt: string
+  decidedAt: string | null
+  decisionNote: string | null
+}
+
+/** An excuse as the instructor sees it in the Requests inbox. */
+export interface ExcuseRequest extends AbsenceExcuse {
+  studentId: string
+  studentName: string
+  avatarUrl: string | null
+  sectionId: string
+  sessionTopic: string | null
+  sessionStartedAt: string | null
+}
+
 /** One flying comment on the leaderboard. Self-destructs after 24h. */
 export interface LeaderboardComment {
   id: string

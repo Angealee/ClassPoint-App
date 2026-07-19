@@ -124,7 +124,10 @@ export function StudentReport() {
         {/* Header — "Attendance Record — {Section}" (per the chosen title). */}
         <div style={{ borderBottom: '2px solid #111', paddingBottom: 12, marginBottom: 16 }}>
           <h1>Attendance Record — {student.sectionName}</h1>
-          <p style={{ margin: '6px 0 0', fontSize: 15, fontWeight: 600 }}>{student.fullName}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 12, fontWeight: 600, color: '#444' }}>
+            DCT — College of Computer Studies
+          </p>
+          <p style={{ margin: '8px 0 0', fontSize: 15, fontWeight: 600 }}>{student.fullName}</p>
           <p className="report-muted" style={{ margin: '2px 0 0', fontSize: 12 }}>
             Term beginning {longDate(TERM_START)} · Generated {longDate(new Date())}
           </p>

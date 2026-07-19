@@ -13,7 +13,10 @@ import { timeAgo } from '@/lib/time'
 import { supabase, uniqueChannel } from '@/lib/supabase'
 import { cn } from '@/lib/cn'
 import { useInstructor } from './InstructorLayout'
+import { ExcusesInbox } from './ExcusesInbox'
 import type { RedemptionKind, RedemptionRequest, RedemptionStatus, SpenderStat } from '@/lib/types'
+
+type RequestsTab = 'points' | 'excuses'
 
 const KIND_LABEL: Record<RedemptionKind, string> = {
   quiz: 'Quiz',
@@ -48,6 +51,7 @@ export function Redemptions() {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [tick, setTick] = useState(false)
+  const [tab, setTab] = useState<RequestsTab>('points')
 
   const sectionName = useCallback(
     (id: string) => sections.find((s) => s.id === id)?.name ?? '',
@@ -111,13 +115,40 @@ export function Redemptions() {
   return (
     <div className="space-y-5 pb-4">
       <div>
-        <h1 className="font-display text-xl font-bold">Point requests</h1>
+        <h1 className="font-display text-xl font-bold">Requests</h1>
         <p className="text-sm text-muted">
-          Students asking to put points toward a grade. Nothing is spent until you approve.
+          {tab === 'points'
+            ? 'Students asking to put points toward a grade. Nothing is spent until you approve.'
+            : 'Absence excuses. Tap Excuse once the student presents their admission slip.'}
         </p>
       </div>
 
-      {loading ? (
+      {/* Tabs — one inbox, two request types. */}
+      <div className="grid grid-cols-2 gap-2">
+        {(
+          [
+            ['points', 'Points'],
+            ['excuses', 'Excuses'],
+          ] as Array<[RequestsTab, string]>
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={cn(
+              'h-10 rounded-xl text-sm font-semibold transition-colors',
+              tab === key ? 'bg-brand-500 text-white' : 'bg-card-2 text-muted hover:text-ink',
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'excuses' && <ExcusesInbox />}
+
+      {tab === 'points' &&
+        (loading ? (
         <ListSkeleton rows={4} />
       ) : (
         <>
@@ -241,7 +272,7 @@ export function Redemptions() {
             </div>
           )}
         </>
-      )}
+      ))}
 
       <ConfirmDialog
         open={!!decision}
