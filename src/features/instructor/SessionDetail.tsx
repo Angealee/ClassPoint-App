@@ -101,6 +101,8 @@ export function SessionDetail() {
     return c
   }, [rows])
 
+  const syncedLateCount = useMemo(() => rows.filter((r) => r.syncedLate).length, [rows])
+
   const grouped = useMemo(
     () =>
       ORDER.map((status) => ({
@@ -320,6 +322,12 @@ export function SessionDetail() {
       <p className="px-1 text-xs text-muted">
         Tap any student to correct their status.
         {session.penaltiesCommitted && ' Points are adjusted automatically.'}
+        {syncedLateCount > 0 && (
+          <span className="text-sky-600 dark:text-sky-400">
+            {' '}
+            {syncedLateCount} synced from an offline check-in.
+          </span>
+        )}
       </p>
 
       {/* Roster, grouped by status */}
@@ -338,7 +346,19 @@ export function SessionDetail() {
                 className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-card-2"
               >
                 <Avatar name={r.fullName} url={r.avatarUrl} />
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{r.fullName}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                  {r.fullName}
+                  {r.archived && (
+                    <span className="ml-1.5 rounded-full bg-card-2 px-1.5 py-0.5 text-[0.6rem] font-medium text-muted">
+                      archived
+                    </span>
+                  )}
+                </span>
+                {r.syncedLate && (
+                  <span className="shrink-0 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[0.65rem] font-medium text-sky-600 dark:text-sky-400">
+                    Offline
+                  </span>
+                )}
                 {r.scannedAt && (
                   <span className="shrink-0 text-xs tabular-nums text-muted">
                     {clockTime(r.scannedAt)}

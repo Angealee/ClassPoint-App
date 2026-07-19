@@ -21,7 +21,7 @@ import { InstallButton } from '@/components/pwa/InstallButton'
 import { ChangelogList } from '@/components/changelog/ChangelogList'
 import { CHANGELOG, LATEST_VERSION } from '@/lib/changelog'
 import { useStudentData } from './StudentData'
-import { StudentProfilePreview } from './StudentProfilePreview'
+import { StudentProfilePreview, type PreviewTarget } from './StudentProfilePreview'
 
 export function Profile() {
   const { signOut } = useAuth()
@@ -49,6 +49,8 @@ export function Profile() {
   const [confirmPhoto, setConfirmPhoto] = useState(false)
   const [confirmBannerUrl, setConfirmBannerUrl] = useState<string | null>(null)
   const [tick, setTick] = useState(false)
+  // A profile-viewer the student tapped in their "who viewed you" list.
+  const [viewerTarget, setViewerTarget] = useState<PreviewTarget | null>(null)
 
   const [editOpen, setEditOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -337,7 +339,19 @@ export function Profile() {
 
           {/* Who viewed your profile */}
           <div className="mt-5">
-            <ProfileVisitors studentId={me.id} />
+            <ProfileVisitors
+              studentId={me.id}
+              onOpenViewer={(row) =>
+                setViewerTarget({
+                  student_id: row.studentId,
+                  display_name: row.displayName,
+                  section_id: row.sectionId,
+                  lifetime_points: row.lifetimePoints,
+                  avatar_url: row.avatarUrl,
+                  rank: row.rank,
+                })
+              }
+            />
           </div>
 
           <div className="mt-5 flex gap-3">
@@ -500,6 +514,14 @@ export function Profile() {
         onClose={() => setPreviewOpen(false)}
         isMe
         sectionLabel={me ? sectionName(me.section_id) : ''}
+      />
+
+      {/* A viewer tapped from the "who viewed you" list — their real profile. */}
+      <StudentProfilePreview
+        target={viewerTarget}
+        open={!!viewerTarget}
+        onClose={() => setViewerTarget(null)}
+        sectionLabel={viewerTarget ? sectionName(viewerTarget.section_id) : ''}
       />
 
       <ConfirmDialog

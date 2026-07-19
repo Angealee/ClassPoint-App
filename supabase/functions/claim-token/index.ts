@@ -65,6 +65,20 @@ Deno.serve(async (req) => {
   if (!secret) return json({ ok: false, error: 'That token is not valid.' })
   if (secret.claimed_at) return json({ ok: false, error: 'This token has already been used.' })
 
+  // 1b. An archived roster row can't be claimed — prevents a "ghost" account
+  // that could sign in while invisible everywhere. Restore first, then claim.
+  const { data: studentRow, error: studentErr } = await admin
+    .from('students')
+    .select('archived_at')
+    .eq('id', secret.student_id)
+    .maybeSingle()
+  if (studentErr || !studentRow) {
+    return json({ ok: false, error: 'Lookup failed. Please try again.' }, 500)
+  }
+  if (studentRow.archived_at) {
+    return json({ ok: false, error: 'This account has been archived — talk to your instructor.' })
+  }
+
   // 2. Check username availability (the unique index is the real guard).
   const { data: taken } = await admin
     .from('student_secrets')

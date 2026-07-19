@@ -85,6 +85,36 @@ ledger — awards, penalties, and future spending all flow through it), `instruc
 `class_sessions` + `class_session_secrets` + `attendance_records`, `profile_views`,
 `achievements` + `student_achievements`.
 
+Since 0024: `attendance_records.synced_late` (offline check-in flag). Offline
+check-in: the QR now encodes `{origin}/scan#CP1|…` so native cameras work (public
+`/scan` route captures the proof, then routes by auth); `parsePayload` accepts both
+the URL and legacy `CP1|…` forms. Proofs queue in localStorage (`cp_offline_scans_v1`,
+`lib/offline-scans.ts`, capture-first), sync on app-start/`online`/Attendance-mount.
+`submit_offline_scan` re-validates the HMAC, computes status from the CAPTURE window
+(48h expiry), and UPGRADES to a better status (present>late>absent) via the shared
+`cp_apply_attendance_status` core — never worsens, never overwrites excused/irregular.
+**Ownership move: `set_attendance_status` 0018 → 0024** (now a thin instructor-gate
+over `cp_apply_attendance_status`, which is revoked from all API roles). `vite.config`
+gained `navigateFallback: '/index.html'` (offline deep links) with a REST/functions/auth
+denylist.
+
+Since 0023 (Reliability Era): `audit_log` (full-JSON record of every destructive
+action; instructor-select only, written by the `cp_audit_delete` AFTER DELETE trigger
+on students/point_events/attendance_records/class_sessions + by the archive RPCs).
+`backup` schema (one table per critical source, `snapshot_date`-keyed; nightly
+`cp_nightly_backup()` at 02:00 Manila, 14-day retention, self-heals on schema drift;
+no API-role grants). `students.archived_at` (archive-instead-of-delete): archive via
+`archive_student`/`restore_student`/`hard_delete_student` RPCs (hard delete refuses
+unless already archived; the app double-confirms with a typed-name challenge).
+**Ownership moved to 0023 (all same-signature `create or replace`):**
+`refresh_leaderboard_snapshot` (0006→0023, `where archived_at is null`),
+`end_class_session` + `scan_attendance` (0014→0023, archived guards),
+`get_achievement_rarity` (0021→0023, archived denominator). Client reads of active
+rosters filter `.is('archived_at', null)`; `listSessionAttendance` instead keeps an
+archived student's row ONLY when they have a record in that session (history stays
+truthful). `deleteSection` counts archived students too. `claim-token` edge function
+rejects archived roster rows (redeploy after 0023).
+
 Since 0017–0020: `notifications` (the push outbox AND the in-app bell's history),
 `point_redemptions` (spend requests), `leaderboard_comments` +
 `leaderboard_banned_words` (24h flying comments). Attendance statuses are
@@ -133,6 +163,15 @@ Gotchas:
 - The danmaku keyframe (`.cp-fly`) needs `container-type: inline-size` on the
   deck — `cqw` resolves against it. Without it pills start mid-board instead of
   off the right edge. Never swap `cqw` for `vw`: the deck is a centred column.
+  The deck is a `sticky top-[52px]` band ABOVE the podium (not an absolute
+  overlay on it) so it never covers the crown and stays visible while scrolling
+  the rankings. Tapping a student pill fires `onOpenProfile` up to the leaderboard
+  (which owns the profile sheet); instructor moderation lives only in the Recent
+  comments list.
+- `get_profile_visitors` (0022) returns the viewer's `student_id` + section/points/
+  rank so a tapped visitor row opens their profile. VisitorsSheet bubbles the row
+  up via `onOpenViewer` (Profile owns the preview) to avoid a component→feature
+  import cycle.
 - `npm run lint` (`tsc --noEmit`) misses unused locals; **`npm run build` (`tsc -b`)
   is the stricter gate** — run it before declaring done.
 

@@ -146,6 +146,8 @@ export interface SessionSummary {
   absent: number
   excused: number
   irregular: number
+  /** How many records in this session were synced from an offline scan. */
+  syncedLate: number
   total: number
   penaltiesCommitted: boolean
 }
@@ -238,10 +240,24 @@ export interface AttendanceRosterRow {
   studentId: string
   fullName: string
   avatarUrl: string | null
+  /** Archived students only appear in sessions where they have a record. */
+  archived: boolean
   recordId: string | null
   status: AttendanceStatus | null
   scannedAt: string | null
   committed: boolean
+  /** Recorded/upgraded via an offline sync. */
+  syncedLate: boolean
+}
+
+/** A student hidden by Archive — restorable, records intact. */
+export interface ArchivedStudent {
+  id: string
+  fullName: string
+  displayName: string
+  avatarUrl: string | null
+  lifetimePoints: number
+  archivedAt: string
 }
 
 /** The result a student sees after scanning. */
@@ -260,7 +276,19 @@ export interface MyAttendanceEntry {
   startedAt: string
   status: AttendanceStatus
   scannedAt: string | null
+  /** Recorded/upgraded by an offline sync (shown as "Offline check-in"). */
+  syncedLate: boolean
 }
+
+/** Server outcome from submit_offline_scan (mirrors the RPC's `outcome`). */
+export type OfflineScanOutcome =
+  | 'recorded'
+  | 'upgraded'
+  | 'already'
+  | 'expired'
+  | 'invalid'
+  | 'session_missing'
+  | 'wrong_section'
 
 /** Public-safe profile of any student, shown in the leaderboard tap-preview. */
 export interface PublicProfile {
@@ -301,8 +329,14 @@ export interface ProfileViews {
 
 /** One row of the full, paginated visitor list. */
 export interface ProfileVisitorRow {
+  /** The viewer's student id — lets a tap open their profile. */
+  studentId: string
   displayName: string
   avatarUrl: string | null
+  sectionId: string
+  lifetimePoints: number
+  /** Snapshot rank, or null if not ranked. */
+  rank: number | null
   lastViewedAt: string
   viewCount: number
 }

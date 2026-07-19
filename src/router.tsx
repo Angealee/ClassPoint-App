@@ -2,6 +2,9 @@ import { Suspense, lazy, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { RedirectIfAuthed, RequireRole } from '@/features/auth/guards'
 import { Splash } from '@/components/layout/Splash'
+// Eager import on purpose: the error screen must not be a lazy chunk, because
+// its most common trigger IS a lazy chunk failing to load after a deploy.
+import { RouteError } from '@/components/layout/RouteError'
 
 // Code-split: each screen/layout is fetched on demand to shrink the first load.
 const Landing = lazy(() => import('@/features/Landing').then((m) => ({ default: m.Landing })))
@@ -31,6 +34,9 @@ const StudentAttendance = lazy(() =>
 )
 const UsePoints = lazy(() =>
   import('@/features/student/UsePoints').then((m) => ({ default: m.UsePoints })),
+)
+const ScanLanding = lazy(() =>
+  import('@/features/student/ScanLanding').then((m) => ({ default: m.ScanLanding })),
 )
 const InstructorLayout = lazy(() =>
   import('@/features/instructor/InstructorLayout').then((m) => ({ default: m.InstructorLayout })),
@@ -68,6 +74,7 @@ export const router = createBrowserRouter([
   // so pressing Back after logging in never lands on the landing/login pages.
   {
     element: <RedirectIfAuthed />,
+    errorElement: <RouteError />,
     children: [
       { path: '/', element: withSplash(<Landing />) },
       { path: '/signin', element: withSplash(<SignIn />) },
@@ -83,13 +90,20 @@ export const router = createBrowserRouter([
   // can't be reached (or fingerprinted) the obvious way.
   { path: '/instructor/signin', element: <Navigate to="/" replace /> },
 
+  // Native-camera QR check-in target. PUBLIC (outside the role guards): a
+  // logged-out or not-yet-installed student's camera must land here. It
+  // captures the proof, then routes based on auth.
+  { path: '/scan', element: withSplash(<ScanLanding />), errorElement: <RouteError /> },
+
   // Student area. (Child screens lazy-load inside the Shell's own Suspense.)
   {
     path: '/app',
     element: <RequireRole role="student" />,
+    errorElement: <RouteError />,
     children: [
       {
         element: withSplash(<AppLayout />),
+        errorElement: <RouteError />,
         children: [
           { index: true, element: <Dashboard /> },
           { path: 'leaderboard', element: <Leaderboard /> },
@@ -106,9 +120,11 @@ export const router = createBrowserRouter([
   {
     path: '/teach',
     element: <RequireRole role="instructor" />,
+    errorElement: <RouteError />,
     children: [
       {
         element: withSplash(<InstructorLayout />),
+        errorElement: <RouteError />,
         children: [
           { index: true, element: <Students /> },
           { path: 'award', element: <Award /> },

@@ -42,6 +42,42 @@ export interface ChangelogEntry {
  * lands; when the user says "announce it", move this entry to the TOP of
  * CHANGELOG (and delete this const). Do NOT add per-phase entries to CHANGELOG.
  */
+/**
+ * THE RELIABILITY UPDATE DRAFT — not visible to users yet.
+ *
+ * Accumulates the Reliability Era phases (A–D). Announce it (move into
+ * CHANGELOG, delete this const) when the user says so — independently of
+ * DRAFT_3_0_0, which covers the earlier overhaul era.
+ */
+export const DRAFT_3_1_0: ChangelogEntry = {
+  version: '3.1.0',
+  date: '2026-07-18', // update to the real announce date when it ships
+  title: 'The Reliability Update',
+  sections: [
+    {
+      heading: 'Check in even with no data or wifi',
+      major: true,
+      items: [
+        'No signal? Scan the QR anyway — your phone reads it offline, saves the proof, and checks you in automatically the moment you’re back online. Your status counts from when you scanned, not when it syncs (you have 48 hours).',
+        'You can now scan the class QR straight from your phone’s normal camera — it opens ClassPoint and checks you in. The in-app scanner still works too.',
+        'The Attendance tab shows exactly what happened: waiting to sync, checked in, or — if something went wrong — the details to show your instructor.',
+        'If you were marked absent but actually scanned in time, syncing fixes it and gives back any deducted points automatically.',
+      ],
+    },
+    {
+      heading: 'Your records are now un-loseable',
+      items: [
+        'Every night at 2 AM the entire class record — points, attendance, sessions, everything — is snapshotted automatically, with two weeks of history kept.',
+        'Removing a student now ARCHIVES them instead of deleting: they vanish from the roster and leaderboard, but every record survives and they can be restored in one tap.',
+        'Permanent deletion still exists, but only for already-archived students — and it makes you type their name first. No more one-tap catastrophes.',
+        'A new audit log quietly records every destructive action with a full copy of what was removed.',
+        'Instructors: a new “Backup all” button downloads the whole term — roster, points ledger, attendance, sessions, requests — as one spreadsheet.',
+        'Crashes now show a friendly recovery screen instead of a wall of technical text.',
+      ],
+    },
+  ],
+}
+
 export const DRAFT_3_0_0: ChangelogEntry = {
   version: '3.0.0',
   date: '2026-07-16', // update to the real announce date when it ships

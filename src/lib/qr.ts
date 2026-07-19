@@ -50,9 +50,25 @@ export async function computeCode(
   return hex.slice(0, 16)
 }
 
-/** Encode the QR payload the student will scan. */
-export function buildPayload(sessionId: string, windowIndex: number, code: string): string {
+/** The raw `CP1|…` core the HMAC covers — used inside the deep-link URL. */
+export function buildCore(sessionId: string, windowIndex: number, code: string): string {
   return `${PREFIX}|${sessionId}|${windowIndex}|${code}`
+}
+
+/**
+ * Encode the QR payload the student scans — now a deep-link URL so a phone's
+ * NATIVE camera can offer "Open link" straight into the app's /scan route. The
+ * raw code rides in the hash fragment (never sent to the server / logs, and
+ * survives SPA routing). The in-app scanner still accepts the bare `CP1|…`
+ * form too (see parsePayload), so old-format codes and both scanners work.
+ */
+export function buildPayload(sessionId: string, windowIndex: number, code: string): string {
+  const core = buildCore(sessionId, windowIndex, code)
+  const origin =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : 'https://classpoint.app'
+  return `${origin}/scan#${core}`
 }
 
 export interface ScannedPayload {
@@ -61,9 +77,17 @@ export interface ScannedPayload {
   code: string
 }
 
-/** Parse a scanned string back into its parts, or null if it isn't ours. */
+/**
+ * Parse a scanned string back into its parts, or null if it isn't ours.
+ * Accepts BOTH the new deep-link URL (`https://…/scan#CP1|…`) and the legacy
+ * bare payload (`CP1|…`), so a rollback is just reverting buildPayload.
+ */
 export function parsePayload(text: string): ScannedPayload | null {
-  const parts = text.trim().split('|')
+  let raw = text.trim()
+  // Strip any `…/scan#` (or `…#`) prefix down to the `CP1|…` core.
+  const hash = raw.lastIndexOf('#')
+  if (hash !== -1) raw = raw.slice(hash + 1)
+  const parts = raw.split('|')
   if (parts.length !== 4 || parts[0] !== PREFIX) return null
   const [, sessionId, win, code] = parts
   const windowIndex = Number(win)

@@ -12,6 +12,14 @@ import { listMyAttendance, scanAttendance } from '@/lib/api'
 import { parsePayload } from '@/lib/qr'
 import { vibrate } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
+import {
+  dismiss as dismissScan,
+  enqueue as enqueueScan,
+  loadQueue,
+  syncOfflineScans,
+  type OfflineScanEntry,
+} from '@/lib/offline-scans'
+import { OfflineScanCards } from './OfflineScanCards'
 import type { AttendanceStatus, MyAttendanceEntry, ScanResult } from '@/lib/types'
 
 const entryDate = (iso: string) =>
@@ -21,6 +29,21 @@ function errorText(e: unknown): string {
   const m = (e as { message?: string } | null)?.message
   if (m && m.length <= 160) return m
   return 'Could not check in — scan the current QR and try again.'
+}
+
+/**
+ * Did the scan fail because we couldn't reach the server (vs. the server
+ * actively rejecting the payload)? A transport failure = keep the queued proof;
+ * a server rejection = drop it. supabase-js surfaces network failures as a
+ * TypeError ("Failed to fetch") with no HTTP status/code.
+ */
+function isOffline(e: unknown): boolean {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
+  if (e instanceof TypeError) return true
+  const err = e as { status?: number; code?: string; message?: string } | null
+  if (err?.status || err?.code) return false // a real server response — not offline
+  const m = err?.message?.toLowerCase() ?? ''
+  return m.includes('failed to fetch') || m.includes('network') || m.includes('load failed')
 }
 
 export function Attendance() {
@@ -33,7 +56,13 @@ export function Attendance() {
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<ScanResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Set when a scan couldn't reach the server — shows the optimistic "saved,
+  // will sync" pane instead of an error.
+  const [savedOffline, setSavedOffline] = useState<string | null>(null)
+  const [queue, setQueue] = useState<OfflineScanEntry[]>([])
   const handledRef = useRef(false)
+
+  const refreshQueue = useCallback(() => setQueue(loadQueue()), [])
 
   const load = useCallback(async () => {
     if (!me) return
@@ -49,11 +78,19 @@ export function Attendance() {
 
   useEffect(() => {
     void load()
-  }, [load])
+    // Flush any queued offline scans the moment this page opens, then reflect
+    // their resolved state; refresh history if something recorded.
+    void syncOfflineScans().then((changed) => {
+      refreshQueue()
+      if (changed) void load()
+    })
+    refreshQueue()
+  }, [load, refreshQueue])
 
   function openScan() {
     setResult(null)
     setError(null)
+    setSavedOffline(null)
     handledRef.current = false
     setScanKey((k) => k + 1)
     setScanOpen(true)
@@ -61,36 +98,62 @@ export function Attendance() {
 
   function closeScan() {
     setScanOpen(false)
-    if (result) void load()
+    if (result || savedOffline) void load()
+    refreshQueue()
   }
 
   function scanAgain() {
     setResult(null)
     setError(null)
+    setSavedOffline(null)
     handledRef.current = false
     setScanKey((k) => k + 1)
   }
 
-  const onDetect = useCallback(async (text: string) => {
-    if (handledRef.current) return
-    handledRef.current = true
-    const parsed = parsePayload(text)
-    if (!parsed) {
-      setError('That’s not a ClassPoint code. Point the camera at the QR on screen.')
-      return
-    }
-    setSubmitting(true)
-    try {
-      const res = await scanAttendance(parsed.sessionId, parsed.windowIndex, parsed.code)
-      setResult(res)
-      vibrate(res.status === 'present' ? 'point' : 'deduct')
-      void syncMyAchievements() // may unlock Checked In / On Time / streaks
-    } catch (e) {
-      setError(errorText(e))
-    } finally {
-      setSubmitting(false)
-    }
-  }, [syncMyAchievements])
+  const onDetect = useCallback(
+    async (text: string) => {
+      if (handledRef.current) return
+      handledRef.current = true
+      const parsed = parsePayload(text)
+      if (!parsed) {
+        setError('That’s not a ClassPoint code. Point the camera at the QR on screen.')
+        return
+      }
+
+      // Capture-first: persist the proof BEFORE the network call, so a crash or
+      // a dead connection can never lose it. Removed again only if the server
+      // accepts (or explicitly rejects) it right now.
+      const entry = enqueueScan({
+        sessionId: parsed.sessionId,
+        windowIndex: parsed.windowIndex,
+        code: parsed.code,
+      })
+
+      setSubmitting(true)
+      try {
+        const res = await scanAttendance(parsed.sessionId, parsed.windowIndex, parsed.code)
+        dismissScan(entry.id) // the online path handled it — no queue entry needed
+        setResult(res)
+        vibrate(res.status === 'present' ? 'point' : 'deduct')
+        void syncMyAchievements() // may unlock Checked In / On Time / streaks
+      } catch (e) {
+        if (isOffline(e)) {
+          // Keep the queued proof; reassure the student it's saved.
+          setSavedOffline(new Date(entry.capturedAt).toLocaleTimeString())
+          vibrate('point')
+        } else {
+          // The server actively refused THIS payload (expired/wrong section/
+          // ended) — queuing it for later would just re-fail. Drop it.
+          dismissScan(entry.id)
+          setError(errorText(e))
+        }
+      } finally {
+        setSubmitting(false)
+        refreshQueue()
+      }
+    },
+    [syncMyAchievements, refreshQueue],
+  )
 
   const stats = useMemo(() => {
     const s: Record<AttendanceStatus, number> = {
@@ -119,6 +182,15 @@ export function Attendance() {
       <Button size="lg" className="w-full" onClick={openScan}>
         <ScanIcon className="h-5 w-5" /> Scan attendance
       </Button>
+
+      {/* Offline check-ins waiting to sync / their outcomes. */}
+      <OfflineScanCards
+        entries={queue}
+        onChanged={() => {
+          refreshQueue()
+          void load()
+        }}
+      />
 
       {/* Summary */}
       {history.length > 0 && (
@@ -164,7 +236,14 @@ export function Attendance() {
                 <p className="truncate text-sm font-semibold">
                   {h.topic || entryDate(h.startedAt) || 'Class'}
                 </p>
-                <p className="text-xs text-muted">{entryDate(h.startedAt)}</p>
+                <p className="flex items-center gap-1.5 text-xs text-muted">
+                  {entryDate(h.startedAt)}
+                  {h.syncedLate && (
+                    <span className="rounded-full bg-card-2 px-1.5 py-0.5 text-[0.65rem] font-medium">
+                      Offline check-in
+                    </span>
+                  )}
+                </p>
               </div>
               <StatusChip status={h.status} />
             </div>
@@ -181,6 +260,27 @@ export function Attendance() {
           </div>
         ) : result ? (
           <ResultView result={result} onDone={closeScan} />
+        ) : savedOffline ? (
+          <div className="space-y-5 py-2 text-center">
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+              className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+            >
+              <CheckIcon className="h-10 w-10" />
+            </motion.div>
+            <div className="space-y-1">
+              <p className="font-display text-xl font-bold">Saved — you're checked in</p>
+              <p className="mx-auto max-w-xs text-sm text-muted">
+                You scanned at {savedOffline}. It'll sync automatically when you're back online —
+                and your status counts from when you scanned, not when it syncs.
+              </p>
+            </div>
+            <Button size="lg" className="w-full" onClick={closeScan}>
+              Done
+            </Button>
+          </div>
         ) : error ? (
           <div className="space-y-4 py-2 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-500/10 text-2xl">

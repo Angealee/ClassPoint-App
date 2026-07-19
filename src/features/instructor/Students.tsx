@@ -23,15 +23,18 @@ import {
 import { BadgeArt } from '@/components/achievements/BadgeArt'
 import { useInstructor } from './InstructorLayout'
 import { SectionGrid } from './SectionGrid'
+import { ArchivedStudentsSheet } from './ArchivedStudentsSheet'
 import {
+  archiveStudent,
   createStudent,
   createStudentsBulk,
-  deleteStudent,
   grantAchievement,
   listAchievements,
+  listArchivedStudents,
   listStudents,
   resetStudentPin,
 } from '@/lib/api'
+import { exportAllData } from '@/lib/export-all'
 import { exportRoster, parseRosterNames } from '@/lib/roster-io'
 import { getLevelProgress } from '@/lib/leveling'
 import type { Achievement, SectionStudent } from '@/lib/types'
@@ -61,6 +64,9 @@ export function Students() {
 
   const [deleteTarget, setDeleteTarget] = useState<SectionStudent>()
   const [deleting, setDeleting] = useState(false)
+  const [archivedCount, setArchivedCount] = useState(0)
+  const [archivedOpen, setArchivedOpen] = useState(false)
+  const [backingUp, setBackingUp] = useState(false)
 
   const [resetTarget, setResetTarget] = useState<SectionStudent>()
   const [resetInfo, setResetInfo] = useState<{ token: string }>()
@@ -91,6 +97,10 @@ export function Students() {
     setError(undefined)
     try {
       setStudents(await listStudents(openId))
+      // Non-blocking: the "Archived (n)" chip is secondary to the roster.
+      void listArchivedStudents(openId)
+        .then((list) => setArchivedCount(list.length))
+        .catch(() => {})
     } catch {
       setError('Could not load students.')
     } finally {
@@ -241,18 +251,30 @@ export function Students() {
     }
   }
 
-  async function onDelete() {
+  async function onArchive() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await deleteStudent(deleteTarget.id)
-      toast('Student removed.', 'success')
+      await archiveStudent(deleteTarget.id)
+      toast(`${deleteTarget.full_name} archived — restorable any time.`, 'success')
       setDeleteTarget(undefined)
       await refresh()
     } catch {
-      toast('Could not remove the student.', 'error')
+      toast('Could not archive the student.', 'error')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  async function onBackupAll() {
+    setBackingUp(true)
+    try {
+      await exportAllData()
+      toast('Full backup downloaded.', 'success')
+    } catch {
+      toast('Could not build the backup. Try again.', 'error')
+    } finally {
+      setBackingUp(false)
     }
   }
 
@@ -286,6 +308,15 @@ export function Students() {
             ))}
           </Select>
           <span className="whitespace-nowrap text-muted">· {students.length}</span>
+          {archivedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setArchivedOpen(true)}
+              className="shrink-0 rounded-full bg-card-2 px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:text-ink"
+            >
+              Archived ({archivedCount})
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {students.length > 0 && (
@@ -319,6 +350,15 @@ export function Students() {
         </Button>
         <Button variant="outline" onClick={onExport} className="shrink-0">
           <DownloadIcon className="h-5 w-5" /> Export
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => void onBackupAll()}
+          disabled={backingUp}
+          className="shrink-0"
+          title="Everything — all sections, points, attendance, sessions and requests — in one workbook"
+        >
+          <DownloadIcon className="h-5 w-5" /> {backingUp ? 'Backing up…' : 'Backup all'}
         </Button>
       </div>
 
@@ -395,7 +435,8 @@ export function Students() {
                 <button
                   type="button"
                   onClick={() => setDeleteTarget(s)}
-                  aria-label={`Remove ${s.full_name}`}
+                  aria-label={`Archive ${s.full_name}`}
+                  title="Archive (restorable)"
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-brand-500/10 hover:text-brand-500"
                 >
                   <TrashIcon className="h-4.5 w-4.5" />
@@ -633,22 +674,31 @@ export function Students() {
         </div>
       </Sheet>
 
-      {/* Delete confirm */}
+      {/* Archive confirm — calm on purpose: nothing is lost. */}
       <ConfirmDialog
         open={!!deleteTarget}
-        title="Remove this student?"
+        title="Archive this student?"
         message={
           <>
-            <span className="font-semibold text-ink">{deleteTarget?.full_name}</span> will be
-            permanently removed. This can't be undone.
+            <span className="font-semibold text-ink">{deleteTarget?.full_name}</span> disappears
+            from the roster, leaderboard and attendance-taking — but every record is kept, and you
+            can restore them any time from the Archived list.
           </>
         }
-        detail="All their points, attendance records, and achievements are deleted too."
-        confirmLabel="Remove student"
+        confirmLabel="Archive"
         busy={deleting}
-        onConfirm={onDelete}
+        onConfirm={onArchive}
         onClose={() => setDeleteTarget(undefined)}
       />
+
+      {openId && (
+        <ArchivedStudentsSheet
+          sectionId={openId}
+          open={archivedOpen}
+          onClose={() => setArchivedOpen(false)}
+          onChanged={() => void refresh()}
+        />
+      )}
     </div>
   )
 }

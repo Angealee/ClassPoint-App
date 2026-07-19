@@ -23,6 +23,13 @@ export default defineConfig({
       workbox: {
         // Pull the push/notificationclick handlers into the generated SW.
         importScripts: ['push-sw.js'],
+        // An OFFLINE navigation to /scan#… (a native camera scan with zero
+        // signal on the installed PWA) must still boot the SPA shell so the
+        // proof can be captured. Without this, the deep link 404s offline.
+        navigateFallback: '/index.html',
+        // …but never hijack API calls: let Supabase REST/Functions hit the
+        // network (or fail) rather than serving them the app shell.
+        navigateFallbackDenylist: [/^\/rest/, /^\/functions/, /^\/auth/],
       },
       manifest: {
         name: 'ClassPoint',

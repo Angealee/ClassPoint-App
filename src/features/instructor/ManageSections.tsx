@@ -6,7 +6,9 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { CheckIcon, PlusIcon, TrashIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
-import { createSection, deleteSection, getSectionCounts, renameSection } from '@/lib/api'
+// Total counts (incl. archived) on purpose: a section holding only archived
+// students must still read as non-empty here, or its delete would nuke them.
+import { createSection, deleteSection, getSectionTotalCounts, renameSection } from '@/lib/api'
 
 /** Instructor tool to add / rename / delete sections (delete blocked if not empty). */
 export function ManageSections({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -22,7 +24,7 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
 
   async function loadCounts() {
     try {
-      setCounts(await getSectionCounts())
+      setCounts(await getSectionTotalCounts())
     } catch {
       setCounts({})
     }

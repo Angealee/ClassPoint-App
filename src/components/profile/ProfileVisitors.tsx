@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Avatar } from '@/components/ui/Avatar'
 import { getProfileViews } from '@/lib/api'
 import { VisitorsSheet } from './VisitorsSheet'
-import type { ProfileViews } from '@/lib/types'
+import type { ProfileViews, ProfileVisitorRow } from '@/lib/types'
 
 /**
  * "Who viewed your profile" — a Messenger-style strip of recent visitors plus a
@@ -10,7 +10,14 @@ import type { ProfileViews } from '@/lib/types'
  * empty for anyone else), so render it only when `isMe`. Fails silent: if the
  * views RPC isn't available yet, the section simply doesn't appear.
  */
-export function ProfileVisitors({ studentId }: { studentId: string }) {
+export function ProfileVisitors({
+  studentId,
+  onOpenViewer,
+}: {
+  studentId: string
+  /** Tap a visitor to open their profile (only on your own Profile page). */
+  onOpenViewer?: (row: ProfileVisitorRow) => void
+}) {
   const [views, setViews] = useState<ProfileViews | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [listOpen, setListOpen] = useState(false)
@@ -78,6 +85,14 @@ export function ProfileVisitors({ studentId }: { studentId: string }) {
         totalViews={views?.total ?? 0}
         open={listOpen}
         onClose={() => setListOpen(false)}
+        onOpenViewer={
+          onOpenViewer
+            ? (row) => {
+                setListOpen(false)
+                onOpenViewer(row)
+              }
+            : undefined
+        }
       />
     </div>
   )

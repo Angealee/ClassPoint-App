@@ -18,12 +18,16 @@ export function VisitorsSheet({
   totalViews,
   open,
   onClose,
+  onOpenViewer,
 }: {
   studentId: string
   /** Total view *count* (repeat views included) — from the strip's summary. */
   totalViews: number
   open: boolean
   onClose: () => void
+  /** Tap a visitor → open their profile. The owner (Profile) holds the preview
+   *  sheet, so this just hands the row back (avoids a component→feature cycle). */
+  onOpenViewer?: (row: ProfileVisitorRow) => void
 }) {
   const [rows, setRows] = useState<ProfileVisitorRow[]>([])
   const [total, setTotal] = useState(0)
@@ -79,10 +83,19 @@ export function VisitorsSheet({
         <div className="space-y-3">
           <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
             {rows.map((v, i) => (
-              <li key={`${v.displayName}-${i}`} className="flex items-center gap-3 p-3">
-                <Avatar name={v.displayName} url={v.avatarUrl} className="h-9 w-9" />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{v.displayName}</span>
-                <span className="shrink-0 text-xs text-muted">{timeAgo(v.lastViewedAt)}</span>
+              <li key={`${v.studentId}-${i}`}>
+                <button
+                  type="button"
+                  disabled={!onOpenViewer}
+                  onClick={onOpenViewer ? () => onOpenViewer(v) : undefined}
+                  className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-card-2 disabled:cursor-default disabled:hover:bg-transparent"
+                >
+                  <Avatar name={v.displayName} url={v.avatarUrl} className="h-9 w-9" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {v.displayName}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted">{timeAgo(v.lastViewedAt)}</span>
+                </button>
               </li>
             ))}
           </ul>

@@ -23,7 +23,7 @@ const LANES = 3
 /** Minimum gap before re-using a lane, so pills never overlap mid-flight. */
 const LANE_GAP_MS = 1800
 /** Base flight time; longer comments get more so they stay readable. */
-const BASE_MS = 8000
+const BASE_MS = 13000
 const MS_PER_CHAR = 45
 
 /** Tap-to-fill prompts. A blank box gets far fewer posts than a chip does. */
@@ -55,16 +55,21 @@ interface CommentsOverlayProps {
   /** Null for the instructor (who posts as "Instructor" and has no daily cap). */
   studentId?: string | null
   isInstructor?: boolean
-  /** The board to fly comments over. Wrapped so the deck can overlay it and the
-   *  composer can still sit underneath in normal flow. */
+  /** Tap a student-authored comment → open that sender's profile. The parent
+   *  owns the profile sheet (it already has the leaderboard entries to build
+   *  the target), so this just hands back the tapped comment. */
+  onOpenProfile?: (comment: LeaderboardComment) => void
+  /** The board the comments relate to; rendered below the flying band. */
   children: React.ReactNode
 }
 
 /**
- * Flying comments over the leaderboard, plus the composer and the moderation
- * list. One global stream — every comment flies on every board view.
+ * Flying comments across the top of the leaderboard, plus the composer and the
+ * moderation list. One global stream — every comment flies on every board view.
  *
- * Rendering: each pill is a CSS keyframe transform (see `.cp-fly` in
+ * The flying band is a STICKY strip above the board (not an absolute overlay on
+ * top of it), so it never covers the podium/crown and stays visible as you
+ * scroll the rankings. Each pill is a CSS keyframe transform (see `.cp-fly` in
  * index.css), removed from state on animationend. Lanes are scheduled so two
  * pills never share a lane within LANE_GAP_MS; anything that would collide
  * waits in a queue and launches when a lane frees up.
@@ -72,6 +77,7 @@ interface CommentsOverlayProps {
 export function CommentsOverlay({
   studentId,
   isInstructor = false,
+  onOpenProfile,
   children,
 }: CommentsOverlayProps) {
   const { toast } = useToast()
@@ -224,18 +230,20 @@ export function CommentsOverlay({
 
   return (
     <>
-      <div className="relative">
-        {/* The flight deck. pointer-events-none so it never eats podium taps;
-            individual pills re-enable them for the instructor's delete. */}
-        {!reduced && (
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 z-10 overflow-hidden"
-            // container-type makes `cqw` in the cp-fly keyframe resolve against
-            // this deck's width — that's what tells a pill how far to travel.
-            style={{ height: LANES * 34 + 8, containerType: 'inline-size' }}
-            aria-hidden
-          >
-            {flying.map((p) => (
+      {/* Flying band — a STICKY strip ABOVE the board. It sits in normal flow
+          (so it never overlaps the podium/crown) and stays pinned below the app
+          header as you scroll the rankings. pointer-events-none so scrolls pass
+          through; student pills re-enable taps to open the sender's profile. */}
+      {!reduced && (
+        <div
+          className="pointer-events-none sticky top-[52px] z-10 mb-1 overflow-hidden md:top-2"
+          // container-type makes `cqw` in the cp-fly keyframe resolve against
+          // this band's width — that's what tells a pill how far to travel.
+          style={{ height: LANES * 34 + 8, containerType: 'inline-size' }}
+        >
+          {flying.map((p) => {
+            const tappable = p.studentId !== null && !!onOpenProfile
+            return (
               <div
                 key={p.key}
                 // `left` comes from .cp-fly (100% — parked off the right edge).
@@ -254,9 +262,9 @@ export function CommentsOverlay({
                     p.studentId === null
                       ? 'border-brand-500/40 bg-brand-500/15 text-brand-600 dark:text-brand-300'
                       : 'border-line bg-card/85 text-ink',
-                    isInstructor && 'pointer-events-auto cursor-pointer',
+                    tappable && 'pointer-events-auto cursor-pointer',
                   )}
-                  onClick={isInstructor ? () => setDeleteTarget(p) : undefined}
+                  onClick={tappable ? () => onOpenProfile!(p) : undefined}
                 >
                   {p.studentId === null ? (
                     <span className="text-[0.6rem] font-bold uppercase tracking-wide">
@@ -273,12 +281,12 @@ export function CommentsOverlay({
                   <span className="text-muted">{p.body}</span>
                 </span>
               </div>
-            ))}
-          </div>
-        )}
+            )
+          })}
+        </div>
+      )}
 
-        {children}
-      </div>
+      {children}
 
       {/* Composer */}
       <div className="mt-3 space-y-2">
@@ -334,33 +342,42 @@ export function CommentsOverlay({
             Recent comments ({recent.length})
           </summary>
           <div className="max-h-56 divide-y divide-line overflow-y-auto border-t border-line">
-            {recent.map((c) => (
-              <div key={c.id} className="flex items-center gap-2.5 px-4 py-2.5">
-                {c.studentId === null ? (
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-[0.5rem] font-bold text-brand-500">
-                    IN
-                  </span>
-                ) : (
-                  <Avatar name={c.displayName} url={c.avatarUrl} className="h-6 w-6 text-[0.6rem]" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs">
-                    <span className="font-semibold">{c.displayName}</span>{' '}
-                    <span className="text-muted">{c.body}</span>
-                  </p>
-                  <p className="text-[0.65rem] text-muted">{timeAgo(c.createdAt)}</p>
-                </div>
-                {(isInstructor || (studentId && c.studentId === studentId)) && (
+            {recent.map((c) => {
+              const tappable = c.studentId !== null && !!onOpenProfile
+              return (
+                <div key={c.id} className="flex items-center gap-2.5 px-4 py-2.5">
+                  {c.studentId === null ? (
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-[0.5rem] font-bold text-brand-500">
+                      IN
+                    </span>
+                  ) : (
+                    <Avatar name={c.displayName} url={c.avatarUrl} className="h-6 w-6 text-[0.6rem]" />
+                  )}
+                  {/* Row body opens the sender's profile; Delete stays separate. */}
                   <button
                     type="button"
-                    onClick={() => setDeleteTarget(c)}
-                    className="shrink-0 text-[0.65rem] font-semibold text-muted transition-colors hover:text-brand-500"
+                    disabled={!tappable}
+                    onClick={tappable ? () => onOpenProfile!(c) : undefined}
+                    className="min-w-0 flex-1 text-left disabled:cursor-default"
                   >
-                    Delete
+                    <p className="truncate text-xs">
+                      <span className="font-semibold">{c.displayName}</span>{' '}
+                      <span className="text-muted">{c.body}</span>
+                    </p>
+                    <p className="text-[0.65rem] text-muted">{timeAgo(c.createdAt)}</p>
                   </button>
-                )}
-              </div>
-            ))}
+                  {(isInstructor || (studentId && c.studentId === studentId)) && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(c)}
+                      className="shrink-0 text-[0.65rem] font-semibold text-muted transition-colors hover:text-brand-500"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </details>
       )}

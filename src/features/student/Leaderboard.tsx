@@ -10,7 +10,7 @@ import { CommentsOverlay } from '@/components/leaderboard/CommentsOverlay'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { getLevelProgress } from '@/lib/leveling'
 import { cn } from '@/lib/cn'
-import type { LeaderboardEntry } from '@/lib/types'
+import type { LeaderboardComment, LeaderboardEntry } from '@/lib/types'
 import { useStudentData } from './StudentData'
 import { StudentProfilePreview } from './StudentProfilePreview'
 
@@ -46,6 +46,24 @@ export function Leaderboard() {
   const top = ranked.slice(0, TOP_N)
   const meIdx = me ? ranked.findIndex((e) => e.student_id === me.id) : -1
   const meEntry = meIdx >= 0 ? ranked[meIdx] : null
+
+  /** Open a commenter's profile. Look them up in the FULL snapshot (not just the
+   *  filtered view) so a sender from another section still resolves; fall back
+   *  to a minimal target for anyone unranked. */
+  function openCommenter(c: LeaderboardComment) {
+    if (!c.studentId) return
+    const entry = leaderboard.find((e) => e.student_id === c.studentId)
+    setSelected(
+      entry ?? {
+        student_id: c.studentId,
+        display_name: c.displayName,
+        section_id: '',
+        lifetime_points: 0,
+        avatar_url: c.avatarUrl,
+        rank: 0,
+      },
+    )
+  }
   // Position within the current view: in the global view this is the snapshot
   // rank; in a section view it's the place within that section.
   const myPos = meIdx + 1
@@ -113,7 +131,7 @@ export function Leaderboard() {
             : `No ranked students in ${sectionName(view)} yet.`}
         </Card>
       ) : (
-        <CommentsOverlay studentId={me?.id}>
+        <CommentsOverlay studentId={me?.id} onOpenProfile={openCommenter}>
           <PodiumBoard
             entries={top}
             meId={me?.id}

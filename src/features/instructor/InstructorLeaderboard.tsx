@@ -11,7 +11,7 @@ import { CommentsOverlay } from '@/components/leaderboard/CommentsOverlay'
 import { StudentProfilePreview } from '@/features/student/StudentProfilePreview'
 import { useInstructor } from './InstructorLayout'
 import { getLeaderboardSnapshot } from '@/lib/api'
-import type { LeaderboardEntry } from '@/lib/types'
+import type { LeaderboardComment, LeaderboardEntry } from '@/lib/types'
 
 // Only pulled in once Share is tapped — see the student board for the rationale.
 const ShareSheet = lazy(() =>
@@ -39,6 +39,22 @@ export function InstructorLeaderboard() {
   }, [])
 
   const sectionName = (id: string) => sections.find((s) => s.id === id)?.name ?? ''
+
+  /** Open a commenter's profile from the full snapshot (all sections). */
+  function openCommenter(c: LeaderboardComment) {
+    if (!c.studentId) return
+    const entry = entries.find((e) => e.student_id === c.studentId)
+    setSelected(
+      entry ?? {
+        student_id: c.studentId,
+        display_name: c.displayName,
+        section_id: '',
+        lifetime_points: 0,
+        avatar_url: c.avatarUrl,
+        rank: 0,
+      },
+    )
+  }
 
   const visible = useMemo(
     () => (filter === 'all' ? entries : entries.filter((e) => e.section_id === filter)),
@@ -93,7 +109,7 @@ export function InstructorLeaderboard() {
             : 'No students in this section yet.'}
         </Card>
       ) : (
-        <CommentsOverlay isInstructor>
+        <CommentsOverlay isInstructor onOpenProfile={openCommenter}>
           <PodiumBoard
             entries={visible}
             sectionName={sectionName}

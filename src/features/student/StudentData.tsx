@@ -33,6 +33,7 @@ import { useToast } from '@/components/ui/Toast'
 import { initSound, playSound } from '@/lib/sound'
 import { vibrate } from '@/lib/haptics'
 import { showLocalNotification, syncPushSubscription } from '@/lib/push'
+import { syncOfflineScans } from '@/lib/offline-scans'
 import type {
   Achievement,
   AchievementProgress,
@@ -473,6 +474,17 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
+
+  // Offline attendance queue: flush on app start (once signed in) and whenever
+  // the network returns. This single durable mount owns those triggers; the
+  // Attendance page also flushes on its own mount for immediate feedback.
+  useEffect(() => {
+    if (!studentId) return
+    void syncOfflineScans()
+    const onOnline = () => void syncOfflineScans()
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [studentId])
 
   const rank = me
     ? leaderboard.find((e) => e.student_id === me.id)?.rank ?? null

@@ -5,6 +5,7 @@ import type {
   AchievementRarity,
   AchievementState,
   AppNotification,
+  ArchivedStudent,
   AttendanceAnalytics,
   AttendanceRosterRow,
   AttendanceStatus,
@@ -15,6 +16,7 @@ import type {
   LeaderboardRow,
   LeaderboardSnapshot,
   MyAttendanceEntry,
+  OfflineScanOutcome,
   PointCategory,
   PointEvent,
   ProfileViews,
@@ -61,20 +63,43 @@ export async function renameSection(id: string, name: string): Promise<void> {
 }
 
 export async function deleteSection(id: string): Promise<void> {
+  // Deliberately UNFILTERED: archived students still block deletion — the
+  // cascade would silently destroy their preserved records.
   const { count, error: countError } = await supabase
     .from('students')
     .select('id', { count: 'exact', head: true })
     .eq('section_id', id)
   if (countError) throw countError
   if ((count ?? 0) > 0) {
-    throw new Error('Section is not empty — move or remove its students first.')
+    throw new Error(
+      'Section is not empty — it still has students (archived ones count too).',
+    )
   }
   const { error } = await supabase.from('sections').delete().eq('id', id)
   if (error) throw error
 }
 
-export async function getSectionCounts(): Promise<Record<string, number>> {
+/**
+ * Total students per section INCLUDING archived. Gates section deletion in
+ * ManageSections — a section holding only archived students must read as
+ * non-empty there, even though rosters show it as empty.
+ */
+export async function getSectionTotalCounts(): Promise<Record<string, number>> {
   const { data, error } = await supabase.from('students').select('section_id')
+  if (error) throw error
+  const counts: Record<string, number> = {}
+  for (const row of data ?? []) {
+    const id = row.section_id as string
+    counts[id] = (counts[id] ?? 0) + 1
+  }
+  return counts
+}
+
+export async function getSectionCounts(): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from('students')
+    .select('section_id')
+    .is('archived_at', null)
   if (error) throw error
   const counts: Record<string, number> = {}
   for (const row of data ?? []) {
@@ -92,7 +117,7 @@ export interface SectionStat {
 /** Per-section roster stats (total students + how many have claimed). */
 export async function getSectionStats(): Promise<Record<string, SectionStat>> {
   const [students, secrets] = await Promise.all([
-    supabase.from('students').select('id, section_id'),
+    supabase.from('students').select('id, section_id').is('archived_at', null),
     supabase.from('student_secrets').select('student_id, claimed_at'),
   ])
   if (students.error) throw students.error
@@ -117,7 +142,8 @@ export async function listStudents(sectionId: string): Promise<SectionStudent[]>
     supabase
       .from('students')
       .select('id, section_id, full_name, display_name, avatar_url, lifetime_points, user_id')
-      .eq('section_id', sectionId),
+      .eq('section_id', sectionId)
+      .is('archived_at', null),
     supabase.from('student_secrets').select('student_id, claim_token, username, claimed_at'),
   ])
   if (students.error) throw students.error
@@ -168,9 +194,56 @@ export async function createStudentsBulk(
   return rows.map((r) => ({ fullName: r.full_name, claimToken: r.claim_token }))
 }
 
-export async function deleteStudent(studentId: string): Promise<void> {
-  const { error } = await supabase.from('students').delete().eq('id', studentId)
+/**
+ * Archive a student: hidden from rosters, leaderboard, attendance-taking and
+ * analytics, but every record survives. Restorable any time. The server logs
+ * the action (with a full row snapshot) and refreshes the frozen board.
+ */
+export async function archiveStudent(studentId: string): Promise<void> {
+  const { error } = await supabase.rpc('archive_student', { p_student_id: studentId })
   if (error) throw error
+}
+
+/** Bring an archived student back — they reappear everywhere immediately. */
+export async function restoreStudent(studentId: string): Promise<void> {
+  const { error } = await supabase.rpc('restore_student', { p_student_id: studentId })
+  if (error) throw error
+}
+
+/**
+ * The only irreversible deletion left in the app. Server-enforced: refuses
+ * unless the student is already archived, and audit-logs the full cascade
+ * (their points, records, achievements) as recoverable JSON first.
+ */
+export async function hardDeleteStudent(studentId: string): Promise<void> {
+  const { error } = await supabase.rpc('hard_delete_student', { p_student_id: studentId })
+  if (error) throw error
+}
+
+/** Archived students for a section, most recently archived first. */
+export async function listArchivedStudents(sectionId: string): Promise<ArchivedStudent[]> {
+  const { data, error } = await supabase
+    .from('students')
+    .select('id, full_name, display_name, avatar_url, lifetime_points, archived_at')
+    .eq('section_id', sectionId)
+    .not('archived_at', 'is', null)
+    .order('archived_at', { ascending: false })
+  if (error) throw error
+  return ((data ?? []) as Array<{
+    id: string
+    full_name: string
+    display_name: string
+    avatar_url: string | null
+    lifetime_points: number
+    archived_at: string
+  }>).map((r) => ({
+    id: r.id,
+    fullName: r.full_name,
+    displayName: r.display_name,
+    avatarUrl: r.avatar_url,
+    lifetimePoints: r.lifetime_points,
+    archivedAt: r.archived_at,
+  }))
 }
 
 /**
@@ -211,6 +284,7 @@ export async function listLeaderboard(): Promise<LeaderboardRow[]> {
   const { data, error } = await supabase
     .from('students')
     .select('id, display_name, full_name, section_id, lifetime_points')
+    .is('archived_at', null)
     .order('lifetime_points', { ascending: false })
   if (error) throw error
   return data ?? []
@@ -460,16 +534,24 @@ export async function getProfileVisitors(
   })
   if (error) throw error
   const rows = (data ?? []) as Array<{
+    student_id: string
     display_name: string
     avatar_url: string | null
+    section_id: string
+    lifetime_points: number
+    rank: number | null
     last_viewed_at: string
     view_count: number
     total_count: number
   }>
   return {
     rows: rows.map((r) => ({
+      studentId: r.student_id,
       displayName: r.display_name,
       avatarUrl: r.avatar_url ?? null,
+      sectionId: r.section_id,
+      lifetimePoints: Number(r.lifetime_points) || 0,
+      rank: r.rank == null ? null : Number(r.rank),
       lastViewedAt: r.last_viewed_at,
       viewCount: Number(r.view_count) || 0,
     })),
@@ -663,9 +745,9 @@ export async function getActiveSession(sectionId: string): Promise<ClassSession 
   return mapSession(data, secret)
 }
 
-/** A zeroed tally — one counter per status, plus the roster total. */
-function emptyTally(): Record<AttendanceStatus, number> & { total: number } {
-  return { present: 0, late: 0, absent: 0, excused: 0, irregular: 0, total: 0 }
+/** A zeroed tally — one counter per status, plus roster total + late-sync count. */
+function emptyTally(): Record<AttendanceStatus, number> & { total: number; syncedLate: number } {
+  return { present: 0, late: 0, absent: 0, excused: 0, irregular: 0, total: 0, syncedLate: 0 }
 }
 
 /** Past + present sessions for a section, tallied by status. */
@@ -682,7 +764,7 @@ export async function listSessions(sectionId: string): Promise<SessionSummary[]>
   const ids = rows.map((s) => s.id as string)
   const { data: records, error: recErr } = await supabase
     .from('attendance_records')
-    .select('session_id, status')
+    .select('session_id, status, synced_late')
     .in('session_id', ids)
   if (recErr) throw recErr
 
@@ -691,6 +773,7 @@ export async function listSessions(sectionId: string): Promise<SessionSummary[]>
     const t = tally.get(r.session_id as string) ?? emptyTally()
     t[r.status as AttendanceStatus] += 1
     t.total += 1
+    if (r.synced_late as boolean) t.syncedLate += 1
     tally.set(r.session_id as string, t)
   }
 
@@ -720,11 +803,11 @@ export async function listSessionAttendance(
   const [students, records] = await Promise.all([
     supabase
       .from('students')
-      .select('id, full_name, avatar_url')
+      .select('id, full_name, avatar_url, archived_at')
       .eq('section_id', sectionId),
     supabase
       .from('attendance_records')
-      .select('id, student_id, status, scanned_at, committed')
+      .select('id, student_id, status, scanned_at, committed, synced_late')
       .eq('session_id', sessionId),
   ])
   if (students.error) throw students.error
@@ -738,12 +821,17 @@ export async function listSessionAttendance(
         studentId: s.id as string,
         fullName: s.full_name as string,
         avatarUrl: (s.avatar_url as string | null) ?? null,
+        archived: (s.archived_at as string | null) != null,
         recordId: (rec?.id as string) ?? null,
         status: (rec?.status as AttendanceStatus) ?? null,
         scannedAt: (rec?.scanned_at as string | null) ?? null,
         committed: (rec?.committed as boolean) ?? false,
+        syncedLate: (rec?.synced_late as boolean) ?? false,
       }
     })
+    // History stays truthful, live rosters stay clean: an archived student
+    // appears only when they actually have a record in this session.
+    .filter((r) => !r.archived || r.recordId !== null)
     .sort((a, b) => a.fullName.localeCompare(b.fullName))
 }
 
@@ -846,7 +934,11 @@ export async function resetAttendance(sessionId: string, studentId: string): Pro
 export async function getAttendanceAnalytics(sectionId: string): Promise<AttendanceAnalytics> {
   const [sessionsRes, studentsRes] = await Promise.all([
     supabase.from('class_sessions').select('id').eq('section_id', sectionId),
-    supabase.from('students').select('id, full_name, avatar_url').eq('section_id', sectionId),
+    supabase
+      .from('students')
+      .select('id, full_name, avatar_url')
+      .eq('section_id', sectionId)
+      .is('archived_at', null),
   ])
   if (sessionsRes.error) throw sessionsRes.error
   if (studentsRes.error) throw studentsRes.error
@@ -1005,11 +1097,41 @@ export async function scanAttendance(
   return { status: data.status, already: data.already, topic: data.topic, markedAt: data.marked_at }
 }
 
+/**
+ * Submit a captured-offline scan proof. Returns a structured outcome (never
+ * throws for classifiable rejections) so the queue can decide keep/resolve/fail.
+ */
+export async function submitOfflineScan(
+  sessionId: string,
+  windowIndex: number,
+  code: string,
+): Promise<{
+  outcome: OfflineScanOutcome
+  status: AttendanceStatus | null
+  topic: string | null
+  markedAt: string | null
+}> {
+  const { data, error } = await supabase
+    .rpc('submit_offline_scan', {
+      p_session_id: sessionId,
+      p_window: windowIndex,
+      p_code: code,
+    })
+    .single<{
+      outcome: OfflineScanOutcome
+      status: AttendanceStatus | null
+      topic: string | null
+      marked_at: string | null
+    }>()
+  if (error) throw error
+  return { outcome: data.outcome, status: data.status, topic: data.topic, markedAt: data.marked_at }
+}
+
 /** A student's own attendance history (newest first). */
 export async function listMyAttendance(studentId: string): Promise<MyAttendanceEntry[]> {
   const { data, error } = await supabase
     .from('attendance_records')
-    .select('id, session_id, status, scanned_at, class_sessions(topic, started_at)')
+    .select('id, session_id, status, scanned_at, synced_late, class_sessions(topic, started_at)')
     .eq('student_id', studentId)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -1018,6 +1140,7 @@ export async function listMyAttendance(studentId: string): Promise<MyAttendanceE
     session_id: string
     status: AttendanceStatus
     scanned_at: string | null
+    synced_late: boolean
     class_sessions: { topic: string | null; started_at: string } | null
   }
   return ((data ?? []) as unknown as Row[]).map((r) => ({
@@ -1027,6 +1150,7 @@ export async function listMyAttendance(studentId: string): Promise<MyAttendanceE
     startedAt: r.class_sessions?.started_at ?? '',
     status: r.status,
     scannedAt: r.scanned_at,
+    syncedLate: r.synced_late,
   }))
 }
 
@@ -1154,6 +1278,121 @@ export async function grantAchievement(studentId: string, code: string): Promise
     p_code: code,
   })
   if (error) throw error
+}
+
+// ============================================================================
+// Full backup export (Phase A) — everything, for the "Backup all" workbook
+// ============================================================================
+
+/** Raw datasets for the full-backup workbook (assembled in lib/export-all.ts). */
+export interface FullBackupData {
+  sections: Array<{ id: string; name: string }>
+  students: Array<{
+    id: string
+    section_id: string
+    full_name: string
+    display_name: string
+    lifetime_points: number
+    user_id: string | null
+    archived_at: string | null
+  }>
+  secrets: Array<{ student_id: string; username: string | null; claimed_at: string | null }>
+  events: Array<{
+    student_id: string
+    points: number
+    category: string
+    note: string | null
+    created_at: string
+  }>
+  records: Array<{
+    session_id: string
+    student_id: string
+    status: string
+    scanned_at: string | null
+    committed: boolean
+  }>
+  sessions: Array<{
+    id: string
+    section_id: string
+    topic: string | null
+    status: string
+    started_at: string
+    ended_at: string | null
+    penalties_committed: boolean
+  }>
+  redemptions: Array<{
+    student_id: string
+    points: number
+    kind: string
+    note: string | null
+    status: string
+    requested_at: string
+    decided_at: string | null
+    decision_note: string | null
+  }>
+}
+
+/**
+ * Page through a table — Supabase caps responses at 1000 rows, and a term of
+ * point_events can exceed that. Ordering makes the pagination stable.
+ */
+async function fetchAllRows<T>(
+  table: string,
+  columns: string,
+  orderBy: string,
+): Promise<T[]> {
+  const PAGE = 1000
+  const out: T[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(columns)
+      .order(orderBy, { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error) throw error
+    const rows = (data ?? []) as T[]
+    out.push(...rows)
+    if (rows.length < PAGE) return out
+  }
+}
+
+/** Every dataset the full backup needs, in one go (instructor RLS covers all). */
+export async function fetchFullBackup(): Promise<FullBackupData> {
+  const [sections, students, secrets, events, records, sessions, redemptions] =
+    await Promise.all([
+      fetchAllRows<FullBackupData['sections'][number]>('sections', 'id, name', 'name'),
+      fetchAllRows<FullBackupData['students'][number]>(
+        'students',
+        'id, section_id, full_name, display_name, lifetime_points, user_id, archived_at',
+        'full_name',
+      ),
+      fetchAllRows<FullBackupData['secrets'][number]>(
+        'student_secrets',
+        'student_id, username, claimed_at',
+        'student_id',
+      ),
+      fetchAllRows<FullBackupData['events'][number]>(
+        'point_events',
+        'student_id, points, category, note, created_at',
+        'created_at',
+      ),
+      fetchAllRows<FullBackupData['records'][number]>(
+        'attendance_records',
+        'session_id, student_id, status, scanned_at, committed',
+        'created_at',
+      ),
+      fetchAllRows<FullBackupData['sessions'][number]>(
+        'class_sessions',
+        'id, section_id, topic, status, started_at, ended_at, penalties_committed',
+        'started_at',
+      ),
+      fetchAllRows<FullBackupData['redemptions'][number]>(
+        'point_redemptions',
+        'student_id, points, kind, note, status, requested_at, decided_at, decision_note',
+        'requested_at',
+      ),
+    ])
+  return { sections, students, secrets, events, records, sessions, redemptions }
 }
 
 // ============================================================================
