@@ -10,8 +10,14 @@ import { CalendarIcon, QrIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
 import { AttendanceSession } from './AttendanceSession'
 import { AttendanceReview } from './AttendanceReview'
-import { getActiveSession, getSession, listSessions, startClassSession } from '@/lib/api'
-import { groupByWeek } from '@/lib/term'
+import {
+  getActiveSession,
+  getSession,
+  listSessions,
+  startClassSession,
+  updateSessionSubject,
+} from '@/lib/api'
+import { groupByWeek, termLabel } from '@/lib/term'
 import type { ClassSession, SessionSummary } from '@/lib/types'
 
 type View = 'home' | 'live' | 'review'
@@ -45,6 +51,7 @@ export function Attendance() {
 
   const [history, setHistory] = useState<SessionSummary[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
+  const [tagging, setTagging] = useState<string>()
 
   const loadHistory = useCallback(async () => {
     if (!selectedSectionId) return
@@ -152,6 +159,19 @@ export function Attendance() {
       toast(msg && msg.length <= 160 ? msg : 'Could not start the class. Try again.', 'error')
     } finally {
       setStarting(false)
+    }
+  }
+
+  /** Assign a subject to a session that predates subjects (0028). */
+  async function onTagSession(sessionId: string, subjectId: string) {
+    setTagging(sessionId)
+    try {
+      await updateSessionSubject(sessionId, subjectId)
+      await loadHistory()
+    } catch {
+      toast('Could not tag that session.', 'error')
+    } finally {
+      setTagging(undefined)
     }
   }
 
@@ -344,38 +364,60 @@ export function Attendance() {
             {weeks.map((w) => (
               <div key={w.week}>
                 <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
+                  {w.term ? `${termLabel(w.term)} · ` : ''}
                   {w.label}
                 </p>
                 <Card className="divide-y divide-line">
                   {w.items.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => navigate(`/teach/attendance/session/${s.id}`)}
-                      className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-card-2"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">
-                          {s.topic || sessionDate(s.startedAt)}
-                        </p>
-                        <p className="text-xs text-muted">
-                          {sessionDate(s.startedAt)}
-                          {s.status === 'active'
-                            ? ' · live now'
-                            : !s.penaltiesCommitted
-                              ? ' · not finalised'
-                              : ''}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2 text-xs font-semibold tabular-nums">
-                        <span className="text-emerald-600 dark:text-emerald-400">{s.present}</span>
-                        <span className="text-gold-600 dark:text-gold-400">{s.late}</span>
-                        <span className="text-brand-600 dark:text-brand-400">{s.absent}</span>
-                        {s.excused + s.irregular > 0 && (
-                          <span className="text-muted">+{s.excused + s.irregular}</span>
-                        )}
-                      </div>
-                    </button>
+                    <div key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/teach/attendance/session/${s.id}`)}
+                        className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-card-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">
+                            {s.topic || sessionDate(s.startedAt)}
+                          </p>
+                          <p className="text-xs text-muted">
+                            {s.subjectCode ? `${s.subjectCode} · ` : ''}
+                            {sessionDate(s.startedAt)}
+                            {s.status === 'active'
+                              ? ' · live now'
+                              : !s.penaltiesCommitted
+                                ? ' · not finalised'
+                                : ''}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2 text-xs font-semibold tabular-nums">
+                          <span className="text-emerald-600 dark:text-emerald-400">{s.present}</span>
+                          <span className="text-gold-600 dark:text-gold-400">{s.late}</span>
+                          <span className="text-brand-600 dark:text-brand-400">{s.absent}</span>
+                          {s.excused + s.irregular > 0 && (
+                            <span className="text-muted">+{s.excused + s.irregular}</span>
+                          )}
+                        </div>
+                      </button>
+                      {/* Sessions from before subjects existed (0028). Tagging is
+                          offered right here because this is the screen you're on
+                          day to day; the chips vanish once nothing is untagged. */}
+                      {!s.subjectId && sectionSubjects.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+                          <span className="text-xs text-muted">Tag as</span>
+                          {sectionSubjects.map((subject) => (
+                            <button
+                              key={subject.id}
+                              type="button"
+                              disabled={tagging === s.id}
+                              onClick={() => onTagSession(s.id, subject.id)}
+                              className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-muted transition-colors hover:border-brand-500 hover:text-brand-500 disabled:opacity-50"
+                            >
+                              {subject.code}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </Card>
               </div>
