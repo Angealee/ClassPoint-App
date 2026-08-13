@@ -184,7 +184,7 @@ function PodiumCard({
   onClick?: () => void
 }) {
   const tier = TIER[place]
-  const progress = getLevelProgress(entry.lifetime_points)
+  const progress = getLevelProgress(entry.points)
   const level = progress.level
   const champ = place === 1
 
@@ -303,7 +303,7 @@ function PodiumCard({
 
         <div className="relative z-[1] flex items-baseline gap-1">
           <CountUp
-            value={entry.lifetime_points}
+            value={entry.points}
             reduced={reduced}
             className="font-display text-xl font-bold text-gold-400 sm:text-2xl"
           />
@@ -355,7 +355,7 @@ function RestRow({
   reduced: boolean
   onClick?: () => void
 }) {
-  const level = getLevelProgress(entry.lifetime_points).level
+  const level = getLevelProgress(entry.points).level
   return (
     <motion.div
       layout
@@ -400,7 +400,7 @@ function RestRow({
           </p>
         </div>
         <span className="relative z-[1] font-display text-base font-bold text-gold-600 dark:text-gold-400">
-          {entry.lifetime_points}
+          {entry.points}
         </span>
       </Card>
     </motion.div>

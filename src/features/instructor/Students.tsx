@@ -385,7 +385,7 @@ export function Students() {
       ) : (
         <Card className="divide-y divide-line">
           {filtered.map((s) => {
-            const level = getLevelProgress(s.lifetime_points).level
+            const level = getLevelProgress(s.semester_points).level
             return (
               <div key={s.id} className="flex items-center gap-3 p-3.5">
                 <Avatar name={s.full_name} url={s.avatar_url} />
@@ -395,7 +395,7 @@ export function Students() {
                     {s.claimed_at ? (
                       <>
                         <CheckIcon className="h-3.5 w-3.5 text-gold-500" />
-                        @{s.username} · Lv {level} · {s.lifetime_points} pts
+                        @{s.username} · Lv {level} · {s.semester_points} pts
                       </>
                     ) : (
                       <>

@@ -4,6 +4,37 @@ export type PointCategory = 'recitation' | 'activity' | 'penalty' | 'redeem'
 export interface Section {
   id: string
   name: string
+  /** Which semester this section belongs to (0027). */
+  semesterId: string
+}
+
+export type TermKey = 'prelim' | 'midterm' | 'finals'
+
+/** One of the three grading periods, with editable real-world dates (0027). */
+export interface SemesterTerm {
+  term: TermKey
+  /** 'YYYY-MM-DD' */
+  startsOn: string
+  /** 'YYYY-MM-DD' */
+  endsOn: string
+}
+
+/** An academic semester. Exactly one is active at a time (0027). */
+export interface Semester {
+  id: string
+  name: string
+  /** 'YYYY-MM-DD' — a Monday; anchors week 1. */
+  startsOn: string
+  isActive: boolean
+  terms: SemesterTerm[]
+}
+
+/** A subject offered in a semester, e.g. "IT 32 · Platform Technologies" (0027). */
+export interface Subject {
+  id: string
+  semesterId: string
+  code: string
+  name: string
 }
 
 /** A student as the instructor manages them (profile + secret token info). */
@@ -13,6 +44,9 @@ export interface SectionStudent {
   full_name: string
   display_name: string
   avatar_url: string | null
+  /** This semester's points — what the roster and Award screen show (0029). */
+  semester_points: number
+  /** Career total across every semester. */
   lifetime_points: number
   user_id: string | null
   claim_token: string
@@ -25,7 +59,8 @@ export interface LeaderboardRow {
   display_name: string
   full_name: string
   section_id: string
-  lifetime_points: number
+  /** This semester's points — what the board ranks on (0029). */
+  points: number
 }
 
 /** One row of the frozen (twice-daily) leaderboard snapshot. */
@@ -33,7 +68,11 @@ export interface LeaderboardEntry {
   student_id: string
   display_name: string
   section_id: string
-  lifetime_points: number
+  /**
+   * This semester's points — the board resets each semester (0029), so ranking
+   * on an all-time total would pit a new cohort against veterans.
+   */
+  points: number
   rank: number
   /** Merged in live from `students` at read time (the snapshot doesn't store it). */
   avatar_url: string | null
@@ -83,7 +122,13 @@ export interface StudentSelf {
   display_title: string | null
   /** Up to 3 favorite unlocked achievement codes, featured first. */
   pinned_achievements: string[] | null
-  lifetime_points: number
+  /**
+   * This semester's points (0029) — the spendable balance, and what drives XP,
+   * level and rank. Shown to students simply as "This semester".
+   */
+  semester_points: number
+  /** Career total across every semester. Achievements stay pinned to this. */
+  all_time_points: number
 }
 
 /** A point event as shown on another student's public profile preview. */
@@ -108,6 +153,8 @@ export const NEUTRAL_STATUSES: readonly AttendanceStatus[] = ['excused', 'irregu
 /** Config the instructor sets before starting a class session. */
 export interface SessionConfig {
   sectionId: string
+  /** Which subject this class is for (0028). Null only if none are assigned. */
+  subjectId: string | null
   topic: string
   lateAfterMin: number
   absentAfterMin: number
@@ -120,6 +167,10 @@ export interface SessionConfig {
 export interface ClassSession {
   id: string
   sectionId: string
+  /** Null for sessions that predate subjects ("untagged") — see 0028. */
+  subjectId: string | null
+  subjectCode: string | null
+  subjectName: string | null
   topic: string | null
   status: 'active' | 'ended'
   startedAt: string
@@ -137,6 +188,9 @@ export interface ClassSession {
 /** A past session summarised for the history list. */
 export interface SessionSummary {
   id: string
+  /** Null for sessions that predate subjects ("untagged") — see 0028. */
+  subjectId: string | null
+  subjectCode: string | null
   topic: string | null
   startedAt: string
   endedAt: string | null
@@ -224,8 +278,12 @@ export interface RedemptionRequest extends Redemption {
   studentName: string
   avatarUrl: string | null
   sectionId: string
-  /** The student's balance right now — context for the approve decision. */
-  lifetimePoints: number
+  /**
+   * The student's SPENDABLE balance right now — this semester's points (0029),
+   * not their career total. Context for the approve decision, and the same
+   * number decide_point_redemption re-validates against.
+   */
+  semesterPoints: number
 }
 
 /** One student's spending totals, for the instructor's top-spenders view. */
@@ -286,6 +344,9 @@ export interface InstructorStudentDetail {
   fullName: string
   displayName: string
   avatarUrl: string | null
+  /** This semester's points — the headline figure on the record page. */
+  semesterPoints: number
+  /** Career total across every semester. */
   lifetimePoints: number
   archivedAt: string | null
   username: string | null
@@ -322,6 +383,9 @@ export interface ScanResult {
 export interface MyAttendanceEntry {
   recordId: string
   sessionId: string
+  /** Null for sessions that predate subjects — see 0028. */
+  subjectId: string | null
+  subjectCode: string | null
   topic: string | null
   startedAt: string
   status: AttendanceStatus
@@ -354,7 +418,8 @@ export interface PublicProfile {
   display_title: string | null
   /** Up to 3 favorite unlocked achievement codes, featured first. */
   pinned_achievements: string[] | null
-  lifetime_points: number
+  /** This semester's points (0029) — what a public profile shows. */
+  semester_points: number
   /** When the roster entry was created — shown as "member since". */
   created_at: string | null
   /** Their most recent point awards (privacy-aware; from public_point_events). */

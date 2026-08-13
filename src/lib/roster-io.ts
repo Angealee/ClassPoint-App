@@ -49,8 +49,9 @@ export async function exportRoster(
     'Display name': s.display_name,
     Username: s.username ?? '',
     Status: s.claimed_at ? 'Claimed' : 'Unclaimed',
-    Level: getLevelProgress(s.lifetime_points).level,
-    Points: s.lifetime_points,
+    Level: getLevelProgress(s.semester_points).level,
+    'Points (this semester)': s.semester_points,
+    'Points (all-time)': s.lifetime_points,
     'Claim token': s.claimed_at ? '' : s.claim_token,
   }))
   const sheet = XLSX.utils.json_to_sheet(rows)

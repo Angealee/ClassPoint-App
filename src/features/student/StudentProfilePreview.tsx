@@ -18,7 +18,7 @@ export interface PreviewTarget {
   student_id: string
   display_name: string
   section_id: string
-  lifetime_points: number
+  points: number
   avatar_url: string | null
   /** Snapshot rank, or null if not ranked. */
   rank: number | null
@@ -90,7 +90,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
   }, [open, studentId, isMe, syncMyAchievements])
 
   // Prefer the live total once loaded (more current than the frozen snapshot).
-  const points = profile?.lifetime_points ?? target?.lifetime_points ?? 0
+  const points = profile?.semester_points ?? target?.points ?? 0
   const progress = getLevelProgress(points)
   const tags = splitInterests(profile?.interests)
 

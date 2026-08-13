@@ -23,7 +23,7 @@ import {
   updateSessionTopic,
 } from '@/lib/api'
 import { exportSessionAttendance } from '@/lib/attendance-io'
-import { weekLabel, weekOf } from '@/lib/term'
+import { termLabel, termOf, weekLabel, weekOf } from '@/lib/term'
 import { cn } from '@/lib/cn'
 import { useInstructor } from './InstructorLayout'
 import type { AttendanceRosterRow, AttendanceStatus, ClassSession } from '@/lib/types'
@@ -244,7 +244,8 @@ export function SessionDetail() {
                 {session.topic || sessionDate(session.startedAt)}
               </h1>
               <p className="text-sm text-muted">
-                {sectionName} · {weekLabel(week)}
+                {session.subjectCode ? `${session.subjectCode} · ` : ''}
+                {sectionName} · {termLabel(termOf(session.startedAt))} · {weekLabel(week)}
               </p>
             </div>
             <button

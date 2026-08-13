@@ -26,8 +26,9 @@ export async function exportAllData(): Promise<void> {
     'Display name': s.display_name,
     Username: secretByStudent.get(s.id)?.username ?? '',
     Claimed: secretByStudent.get(s.id)?.claimed_at ? 'Yes' : 'No',
-    Points: s.lifetime_points,
-    Level: getLevelProgress(s.lifetime_points).level,
+    'Points (this semester)': s.semester_points ?? 0,
+    'Points (all-time)': s.lifetime_points,
+    Level: getLevelProgress(s.semester_points ?? 0).level,
     Archived: s.archived_at ? d(s.archived_at) : '',
   }))
 

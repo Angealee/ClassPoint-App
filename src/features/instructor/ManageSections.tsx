@@ -12,7 +12,7 @@ import { createSection, deleteSection, getSectionTotalCounts, renameSection } fr
 
 /** Instructor tool to add / rename / delete sections (delete blocked if not empty). */
 export function ManageSections({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { sections, refreshSections } = useInstructor()
+  const { sections, refreshSections, semester } = useInstructor()
   const { toast } = useToast()
 
   const [counts, setCounts] = useState<Record<string, number>>({})
@@ -58,9 +58,13 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
     e.preventDefault()
     const name = newName.trim()
     if (!name) return
+    if (!semester) {
+      toast('No active semester — set one up first.', 'error')
+      return
+    }
     setBusy(true)
     try {
-      await createSection(name)
+      await createSection(name, semester.id)
       await refreshSections()
       await loadCounts()
       setNewName('')

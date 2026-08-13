@@ -1,5 +1,9 @@
 import { supabase } from '@/lib/supabase'
+import { configureTermCalendar } from '@/lib/term'
 import type {
+  Semester,
+  Subject,
+  TermKey,
   AbsenceExcuse,
   Achievement,
   AchievementProgress,
@@ -42,23 +46,250 @@ import type {
   UnlockedAchievement,
 } from '@/lib/types'
 
-export async function listSections(): Promise<Section[]> {
-  const { data, error } = await supabase
-    .from('sections')
-    .select('id, name')
-    .order('name')
-  if (error) throw error
-  return data ?? []
+// ── Semesters, terms & subjects (0027) ───────────────────────────────────────
+
+const SEMESTER_COLS = 'id, name, starts_on, is_active, semester_terms(term, starts_on, ends_on)'
+
+/** Six weeks per term: prelim weeks 1–6, midterm 7–12, finals 13–18. */
+const TERM_OFFSETS: Array<{ term: TermKey; from: number; to: number }> = [
+  { term: 'prelim', from: 0, to: 41 },
+  { term: 'midterm', from: 42, to: 83 },
+  { term: 'finals', from: 84, to: 125 },
+]
+
+/** Shift a 'YYYY-MM-DD' date by whole days, staying in local time. */
+function addDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(y ?? 2026, (m ?? 1) - 1, (d ?? 1) + days)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
 }
 
-export async function createSection(name: string): Promise<Section> {
+function mapSemester(row: Record<string, unknown>): Semester {
+  const terms = ((row.semester_terms as Array<Record<string, unknown>>) ?? []).map((t) => ({
+    term: t.term as TermKey,
+    startsOn: t.starts_on as string,
+    endsOn: t.ends_on as string,
+  }))
+  terms.sort((a, b) => a.startsOn.localeCompare(b.startsOn))
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    startsOn: row.starts_on as string,
+    isActive: !!row.is_active,
+    terms,
+  }
+}
+
+export async function getActiveSemester(): Promise<Semester | null> {
+  const { data, error } = await supabase
+    .from('semesters')
+    .select(SEMESTER_COLS)
+    .eq('is_active', true)
+    .maybeSingle()
+  if (error) throw error
+  return data ? mapSemester(data) : null
+}
+
+export async function listSemesters(): Promise<Semester[]> {
+  const { data, error } = await supabase
+    .from('semesters')
+    .select(SEMESTER_COLS)
+    .order('starts_on', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(mapSemester)
+}
+
+/**
+ * Create a semester with its three terms pre-filled to the six-week defaults.
+ * The instructor edits any of the six dates afterwards — holidays move things.
+ */
+export async function createSemester(name: string, startsOn: string): Promise<Semester> {
+  const { data, error } = await supabase
+    .from('semesters')
+    .insert({ name: name.trim(), starts_on: startsOn })
+    .select('id')
+    .single()
+  if (error) throw error
+  const semesterId = data.id as string
+
+  const { error: termsError } = await supabase.from('semester_terms').insert(
+    TERM_OFFSETS.map((t) => ({
+      semester_id: semesterId,
+      term: t.term,
+      starts_on: addDays(startsOn, t.from),
+      ends_on: addDays(startsOn, t.to),
+    })),
+  )
+  if (termsError) throw termsError
+
+  return {
+    id: semesterId,
+    name: name.trim(),
+    startsOn,
+    isActive: false,
+    terms: TERM_OFFSETS.map((t) => ({
+      term: t.term,
+      startsOn: addDays(startsOn, t.from),
+      endsOn: addDays(startsOn, t.to),
+    })),
+  }
+}
+
+export async function renameSemester(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from('semesters').update({ name: name.trim() }).eq('id', id)
+  if (error) throw error
+}
+
+/** Move one term's boundaries. Week numbering still derives from the semester start. */
+export async function updateSemesterTerm(
+  semesterId: string,
+  term: TermKey,
+  startsOn: string,
+  endsOn: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('semester_terms')
+    .update({ starts_on: startsOn, ends_on: endsOn })
+    .eq('semester_id', semesterId)
+    .eq('term', term)
+  if (error) throw error
+}
+
+function mapSubject(row: Record<string, unknown>): Subject {
+  return {
+    id: row.id as string,
+    semesterId: row.semester_id as string,
+    code: row.code as string,
+    name: row.name as string,
+  }
+}
+
+export async function listSubjects(semesterId: string): Promise<Subject[]> {
+  const { data, error } = await supabase
+    .from('subjects')
+    .select('id, semester_id, code, name')
+    .eq('semester_id', semesterId)
+    .order('code')
+  if (error) throw error
+  return (data ?? []).map(mapSubject)
+}
+
+export async function createSubject(
+  semesterId: string,
+  code: string,
+  name: string,
+): Promise<Subject> {
+  const { data, error } = await supabase
+    .from('subjects')
+    .insert({ semester_id: semesterId, code: code.trim(), name: name.trim() })
+    .select('id, semester_id, code, name')
+    .single()
+  if (error) throw error
+  return mapSubject(data)
+}
+
+export async function updateSubject(id: string, code: string, name: string): Promise<void> {
+  const { error } = await supabase
+    .from('subjects')
+    .update({ code: code.trim(), name: name.trim() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+/** Sessions referencing the subject keep their rows — subject_id nulls out. */
+export async function deleteSubject(id: string): Promise<void> {
+  const { error } = await supabase.from('subjects').delete().eq('id', id)
+  if (error) throw error
+}
+
+/** Which subjects each section takes: { sectionId: subjectId[] }. */
+export async function listSectionSubjects(semesterId: string): Promise<Record<string, string[]>> {
+  const { data, error } = await supabase
+    .from('section_subjects')
+    .select('section_id, subject_id, subjects!inner(semester_id)')
+    .eq('subjects.semester_id', semesterId)
+  if (error) throw error
+  const map: Record<string, string[]> = {}
+  for (const row of data ?? []) {
+    const sectionId = row.section_id as string
+    ;(map[sectionId] ??= []).push(row.subject_id as string)
+  }
+  return map
+}
+
+/** Replace one section's subject assignments with exactly `subjectIds`. */
+export async function setSectionSubjects(
+  sectionId: string,
+  subjectIds: string[],
+): Promise<void> {
+  const { error: delError } = await supabase
+    .from('section_subjects')
+    .delete()
+    .eq('section_id', sectionId)
+  if (delError) throw delError
+  if (subjectIds.length === 0) return
+  const { error } = await supabase
+    .from('section_subjects')
+    .insert(subjectIds.map((subjectId) => ({ section_id: sectionId, subject_id: subjectId })))
+  if (error) throw error
+}
+
+/**
+ * Point src/lib/term.ts at the active semester's real dates. Memoized: every
+ * screen that needs week/term labels can call this without re-fetching.
+ *
+ * Failure is deliberately swallowed — term.ts keeps its built-in fallback
+ * calendar, so a week label degrading is never worth taking a screen down.
+ */
+let termCalendarPromise: Promise<void> | null = null
+
+export function loadTermCalendar(force = false): Promise<void> {
+  if (force) termCalendarPromise = null
+  termCalendarPromise ??= getActiveSemester()
+    .then((semester) => {
+      if (!semester) return
+      configureTermCalendar({
+        semesterId: semester.id,
+        semesterName: semester.name,
+        startsOn: semester.startsOn,
+        terms: semester.terms,
+      })
+    })
+    .catch(() => {})
+  return termCalendarPromise
+}
+
+function mapSection(row: Record<string, unknown>): Section {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    semesterId: row.semester_id as string,
+  }
+}
+
+/**
+ * Sections, newest-semester-aware. Pass a semesterId to scope the list — the
+ * instructor area always does, so last semester's rosters don't pile up in every
+ * picker. Omitting it returns every section across all semesters (the archive
+ * views want that).
+ */
+export async function listSections(semesterId?: string): Promise<Section[]> {
+  let query = supabase.from('sections').select('id, name, semester_id').order('name')
+  if (semesterId) query = query.eq('semester_id', semesterId)
+  const { data, error } = await query
+  if (error) throw error
+  return (data ?? []).map(mapSection)
+}
+
+export async function createSection(name: string, semesterId: string): Promise<Section> {
   const { data, error } = await supabase
     .from('sections')
-    .insert({ name: name.trim() })
-    .select('id, name')
-    .single<Section>()
+    .insert({ name: name.trim(), semester_id: semesterId })
+    .select('id, name, semester_id')
+    .single()
   if (error) throw error
-  return data
+  return mapSection(data)
 }
 
 /** Rename a section (instructor-only via RLS). */
@@ -146,7 +377,9 @@ export async function listStudents(sectionId: string): Promise<SectionStudent[]>
   const [students, secrets] = await Promise.all([
     supabase
       .from('students')
-      .select('id, section_id, full_name, display_name, avatar_url, lifetime_points, user_id')
+      .select(
+        'id, section_id, full_name, display_name, avatar_url, semester_points, lifetime_points, user_id',
+      )
       .eq('section_id', sectionId)
       .is('archived_at', null),
     supabase.from('student_secrets').select('student_id, claim_token, username, claimed_at'),
@@ -284,15 +517,21 @@ export async function awardPoints(args: {
   if (error) throw error
 }
 
-/** All students ranked by lifetime points (live; used by instructor tools). */
+/** All students ranked by THIS SEMESTER's points (live; instructor tools). */
 export async function listLeaderboard(): Promise<LeaderboardRow[]> {
   const { data, error } = await supabase
     .from('students')
-    .select('id, display_name, full_name, section_id, lifetime_points')
+    .select('id, display_name, full_name, section_id, semester_points')
     .is('archived_at', null)
-    .order('lifetime_points', { ascending: false })
+    .order('semester_points', { ascending: false })
   if (error) throw error
-  return data ?? []
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    display_name: r.display_name as string,
+    full_name: r.full_name as string,
+    section_id: r.section_id as string,
+    points: (r.semester_points as number) ?? 0,
+  }))
 }
 
 /**
@@ -341,7 +580,7 @@ export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot> {
   const [snap, meta, avatars] = await Promise.all([
     supabase
       .from('leaderboard_snapshot')
-      .select('student_id, display_name, section_id, lifetime_points, rank')
+      .select('student_id, display_name, section_id, semester_points, rank')
       .order('rank'),
     supabase.from('leaderboard_meta').select('captured_at').maybeSingle(),
     // Avatars aren't part of the frozen ranking — merge the current ones in so a
@@ -352,9 +591,14 @@ export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot> {
   const avatarById = new Map(
     (avatars.data ?? []).map((a) => [a.id as string, (a.avatar_url as string | null) ?? null]),
   )
-  const entries: LeaderboardEntry[] = (
-    (snap.data as Omit<LeaderboardEntry, 'avatar_url'>[]) ?? []
-  ).map((e) => ({ ...e, avatar_url: avatarById.get(e.student_id) ?? null }))
+  const entries: LeaderboardEntry[] = (snap.data ?? []).map((e) => ({
+    student_id: e.student_id as string,
+    display_name: e.display_name as string,
+    section_id: e.section_id as string,
+    points: (e.semester_points as number) ?? 0,
+    rank: e.rank as number,
+    avatar_url: avatarById.get(e.student_id as string) ?? null,
+  }))
   return { entries, capturedAt: meta.data?.captured_at ?? null }
 }
 
@@ -363,12 +607,16 @@ export async function getMyStudent(userId: string): Promise<StudentSelf | null> 
   const { data, error } = await supabase
     .from('students')
     .select(
-      'id, section_id, full_name, display_name, avatar_url, bio, interests, banner_urls, display_title, pinned_achievements, lifetime_points',
+      'id, section_id, full_name, display_name, avatar_url, bio, interests, banner_urls, display_title, pinned_achievements, semester_points, lifetime_points',
     )
     .eq('user_id', userId)
-    .maybeSingle<StudentSelf>()
+    .maybeSingle()
   if (error) throw error
-  return data ?? null
+  if (!data) return null
+  // lifetime_points is the DB's career total; the app calls it all_time_points
+  // so nothing confuses it with the semester balance students actually see.
+  const { lifetime_points, ...rest } = data as Record<string, unknown>
+  return { ...rest, all_time_points: (lifetime_points as number) ?? 0 } as StudentSelf
 }
 
 /**
@@ -404,7 +652,7 @@ export async function getPublicProfile(
     supabase
       .from('students')
       .select(
-        'id, display_name, section_id, avatar_url, bio, interests, banner_urls, display_title, pinned_achievements, lifetime_points, created_at',
+        'id, display_name, section_id, avatar_url, bio, interests, banner_urls, display_title, pinned_achievements, semester_points, created_at',
       )
       .eq('id', studentId)
       .maybeSingle(),
@@ -424,7 +672,7 @@ export async function getPublicProfile(
     banner_urls: (s.banner_urls as string[] | null) ?? null,
     display_title: (s.display_title as string | null) ?? null,
     pinned_achievements: (s.pinned_achievements as string[] | null) ?? null,
-    lifetime_points: s.lifetime_points as number,
+    semester_points: (s.semester_points as number) ?? 0,
     created_at: (s.created_at as string | null) ?? null,
     events: (eventsRes.data ?? []) as PublicPointEvent[],
   }
@@ -529,7 +777,7 @@ export async function getStudent(studentId: string): Promise<InstructorStudentDe
     supabase
       .from('students')
       .select(
-        'id, section_id, full_name, display_name, avatar_url, lifetime_points, archived_at, sections(name)',
+        'id, section_id, full_name, display_name, avatar_url, semester_points, lifetime_points, archived_at, sections(name)',
       )
       .eq('id', studentId)
       .maybeSingle(),
@@ -547,6 +795,7 @@ export async function getStudent(studentId: string): Promise<InstructorStudentDe
     full_name: string
     display_name: string
     avatar_url: string | null
+    semester_points: number
     lifetime_points: number
     archived_at: string | null
     sections: { name: string } | null
@@ -559,6 +808,7 @@ export async function getStudent(studentId: string): Promise<InstructorStudentDe
     fullName: s.full_name,
     displayName: s.display_name,
     avatarUrl: s.avatar_url,
+    semesterPoints: s.semester_points ?? 0,
     lifetimePoints: s.lifetime_points,
     archivedAt: s.archived_at,
     username: secret?.username ?? null,
@@ -709,9 +959,24 @@ export async function listStudentEvents(studentId: string, limit = 20): Promise<
 // ============================================================================
 
 /** Shape of a raw class_sessions row (snake_case) as read from the DB. */
+/**
+ * Normalise a PostgREST embedded relation to a single row.
+ *
+ * A many-to-one embed (`subjects(code, name)` through a FK) comes back as an
+ * OBJECT at runtime, but supabase-js's generated types often infer an array.
+ * Rather than fight the inference at every call site, accept both shapes.
+ */
+function oneEmbed<T>(value: unknown): T | null {
+  if (!value) return null
+  return (Array.isArray(value) ? ((value[0] as T) ?? null) : (value as T)) || null
+}
+
 interface SessionRow {
   id: string
   section_id: string
+  subject_id: string | null
+  /** Embedded via the subjects FK — see oneEmbed above. */
+  subjects: { code: string; name: string } | { code: string; name: string }[] | null
   topic: string | null
   status: 'active' | 'ended'
   started_at: string
@@ -725,12 +990,16 @@ interface SessionRow {
 }
 
 const SESSION_COLS =
-  'id, section_id, topic, status, started_at, ended_at, late_after_min, absent_after_min, late_penalty, absent_penalty, apply_penalties, penalties_committed'
+  'id, section_id, subject_id, subjects(code, name), topic, status, started_at, ended_at, late_after_min, absent_after_min, late_penalty, absent_penalty, apply_penalties, penalties_committed'
 
 function mapSession(r: SessionRow, qrSecret?: string): ClassSession {
+  const subject = oneEmbed<{ code: string; name: string }>(r.subjects)
   return {
     id: r.id,
     sectionId: r.section_id,
+    subjectId: r.subject_id,
+    subjectCode: subject?.code ?? null,
+    subjectName: subject?.name ?? null,
     topic: r.topic,
     status: r.status,
     startedAt: r.started_at,
@@ -795,6 +1064,7 @@ export async function startClassSession(config: SessionConfig): Promise<ClassSes
     const { data, error } = await supabase
       .rpc('start_class_session', {
         p_section_id: config.sectionId,
+        p_subject_id: config.subjectId,
         p_topic: config.topic.trim() || null,
         p_late_after_min: config.lateAfterMin,
         p_absent_after_min: config.absentAfterMin,
@@ -860,7 +1130,7 @@ function emptyTally(): Record<AttendanceStatus, number> & { total: number; synce
 export async function listSessions(sectionId: string): Promise<SessionSummary[]> {
   const { data: sessions, error } = await supabase
     .from('class_sessions')
-    .select('id, topic, started_at, ended_at, status, penalties_committed')
+    .select('id, subject_id, subjects(code), topic, started_at, ended_at, status, penalties_committed')
     .eq('section_id', sectionId)
     .order('started_at', { ascending: false })
   if (error) throw error
@@ -885,8 +1155,11 @@ export async function listSessions(sectionId: string): Promise<SessionSummary[]>
 
   return rows.map((s) => {
     const t = tally.get(s.id as string) ?? emptyTally()
+    const subject = oneEmbed<{ code: string }>(s.subjects)
     return {
       id: s.id as string,
+      subjectId: (s.subject_id as string | null) ?? null,
+      subjectCode: subject?.code ?? null,
       topic: (s.topic as string | null) ?? null,
       startedAt: s.started_at as string,
       endedAt: (s.ended_at as string | null) ?? null,
@@ -1037,9 +1310,19 @@ export async function resetAttendance(sessionId: string, studentId: string): Pro
  * The rate excludes excused/irregular from the denominator — those sessions
  * don't count for that student at all, so they can't drag a rate down.
  */
-export async function getAttendanceAnalytics(sectionId: string): Promise<AttendanceAnalytics> {
+/**
+ * Section-wide attendance stats. Pass `subjectId` to scope them to one subject
+ * (0030) — a roster that meets you under two labels has two different attendance
+ * stories, and averaging them hides the one that needs attention.
+ */
+export async function getAttendanceAnalytics(
+  sectionId: string,
+  subjectId?: string,
+): Promise<AttendanceAnalytics> {
+  let sessionQuery = supabase.from('class_sessions').select('id').eq('section_id', sectionId)
+  if (subjectId) sessionQuery = sessionQuery.eq('subject_id', subjectId)
   const [sessionsRes, studentsRes] = await Promise.all([
-    supabase.from('class_sessions').select('id').eq('section_id', sectionId),
+    sessionQuery,
     supabase
       .from('students')
       .select('id, full_name, avatar_url')
@@ -1124,6 +1407,24 @@ export async function getAttendanceAnalytics(sectionId: string): Promise<Attenda
 }
 
 /** Edit a session's saved topic (instructor tweak from the history sheet). */
+/**
+ * Re-tag a session's subject (0028). Direct update under instructor RLS, same
+ * shape as updateSessionTopic — the picker only ever offers subjects assigned to
+ * that session's section, so there's no server-side validation to duplicate.
+ *
+ * Pass null to untag. This is how sessions that predate subjects get sorted out.
+ */
+export async function updateSessionSubject(
+  sessionId: string,
+  subjectId: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from('class_sessions')
+    .update({ subject_id: subjectId })
+    .eq('id', sessionId)
+  if (error) throw error
+}
+
 export async function updateSessionTopic(sessionId: string, topic: string): Promise<void> {
   const { error } = await supabase
     .from('class_sessions')
@@ -1237,7 +1538,9 @@ export async function submitOfflineScan(
 export async function listMyAttendance(studentId: string): Promise<MyAttendanceEntry[]> {
   const { data, error } = await supabase
     .from('attendance_records')
-    .select('id, session_id, status, scanned_at, synced_late, class_sessions(topic, started_at)')
+    .select(
+      'id, session_id, status, scanned_at, synced_late, class_sessions(topic, started_at, subject_id, subjects(code))',
+    )
     .eq('student_id', studentId)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -1247,11 +1550,18 @@ export async function listMyAttendance(studentId: string): Promise<MyAttendanceE
     status: AttendanceStatus
     scanned_at: string | null
     synced_late: boolean
-    class_sessions: { topic: string | null; started_at: string } | null
+    class_sessions: {
+      topic: string | null
+      started_at: string
+      subject_id: string | null
+      subjects: { code: string } | { code: string }[] | null
+    } | null
   }
   return ((data ?? []) as unknown as Row[]).map((r) => ({
     recordId: r.id,
     sessionId: r.session_id,
+    subjectId: r.class_sessions?.subject_id ?? null,
+    subjectCode: oneEmbed<{ code: string }>(r.class_sessions?.subjects)?.code ?? null,
     topic: r.class_sessions?.topic ?? null,
     startedAt: r.class_sessions?.started_at ?? '',
     status: r.status,
@@ -1398,6 +1708,7 @@ export interface FullBackupData {
     section_id: string
     full_name: string
     display_name: string
+    semester_points: number
     lifetime_points: number
     user_id: string | null
     archived_at: string | null
@@ -1469,7 +1780,7 @@ export async function fetchFullBackup(): Promise<FullBackupData> {
       fetchAllRows<FullBackupData['sections'][number]>('sections', 'id, name', 'name'),
       fetchAllRows<FullBackupData['students'][number]>(
         'students',
-        'id, section_id, full_name, display_name, lifetime_points, user_id, archived_at',
+        'id, section_id, full_name, display_name, semester_points, lifetime_points, user_id, archived_at',
         'full_name',
       ),
       fetchAllRows<FullBackupData['secrets'][number]>(
@@ -1790,7 +2101,7 @@ export async function listRedemptions(opts?: {
 }): Promise<RedemptionRequest[]> {
   let query = supabase
     .from('point_redemptions')
-    .select(`${REDEMPTION_COLS}, students(full_name, avatar_url, section_id, lifetime_points)`)
+    .select(`${REDEMPTION_COLS}, students(full_name, avatar_url, section_id, semester_points)`)
     .order('requested_at', { ascending: false })
     .limit(opts?.limit ?? 100)
   if (opts?.status) query = query.eq('status', opts.status)
@@ -1801,7 +2112,7 @@ export async function listRedemptions(opts?: {
       full_name: string
       avatar_url: string | null
       section_id: string
-      lifetime_points: number
+      semester_points: number
     } | null
   }
   return ((data ?? []) as unknown as Row[]).map((r) => ({
@@ -1809,7 +2120,8 @@ export async function listRedemptions(opts?: {
     studentName: r.students?.full_name ?? 'Unknown',
     avatarUrl: r.students?.avatar_url ?? null,
     sectionId: r.students?.section_id ?? '',
-    lifetimePoints: r.students?.lifetime_points ?? 0,
+    // The spendable balance the approve check re-validates against (0029).
+    semesterPoints: r.students?.semester_points ?? 0,
   }))
 }
 

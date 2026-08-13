@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getStudent, listMyAttendance } from '@/lib/api'
+import { getStudent, listMyAttendance, loadTermCalendar } from '@/lib/api'
 import { getLevelProgress } from '@/lib/leveling'
-import { TERM_START, groupByWeek, weekLabel } from '@/lib/term'
+import { groupByWeek, termCalendar, termLabel, termStart, weekLabel } from '@/lib/term'
 import type { InstructorStudentDetail, MyAttendanceEntry } from '@/lib/types'
 
 const NEUTRAL = new Set(['excused', 'irregular'])
@@ -30,17 +30,23 @@ export function StudentReport() {
   const { studentId = '' } = useParams()
   const navigate = useNavigate()
   const [student, setStudent] = useState<InstructorStudentDetail | null>(null)
-  const [attendance, setAttendance] = useState<MyAttendanceEntry[]>([])
+  const [allAttendance, setAllAttendance] = useState<MyAttendanceEntry[]>([])
   const [loading, setLoading] = useState(true)
+  // '' = every subject in one register. Chosen on the screen-only toolbar, so a
+  // printed record can be scoped to the subject a department actually asked for.
+  const [subjectFilter, setSubjectFilter] = useState('')
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([getStudent(studentId), listMyAttendance(studentId)])
-      .then(([s, att]) => {
+    // This route sits OUTSIDE InstructorLayout (see router.tsx), so nothing has
+    // configured the term calendar for us — load it before rendering week
+    // dividers, or the report prints against term.ts's fallback dates.
+    Promise.all([loadTermCalendar(), getStudent(studentId), listMyAttendance(studentId)])
+      .then(([, s, att]) => {
         if (cancelled) return
         setStudent(s)
         // Oldest-first for a paper register.
-        setAttendance([...att].sort((a, b) => a.startedAt.localeCompare(b.startedAt)))
+        setAllAttendance([...att].sort((a, b) => a.startedAt.localeCompare(b.startedAt)))
       })
       .catch(() => {})
       .finally(() => !cancelled && setLoading(false))
@@ -48,6 +54,23 @@ export function StudentReport() {
       cancelled = true
     }
   }, [studentId])
+
+  /** Subjects this student actually has sessions in, for the toolbar picker. */
+  const subjects = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const a of allAttendance) {
+      if (a.subjectId) seen.set(a.subjectId, a.subjectCode ?? 'Subject')
+    }
+    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  }, [allAttendance])
+
+  const attendance = useMemo(
+    () =>
+      subjectFilter ? allAttendance.filter((a) => a.subjectId === subjectFilter) : allAttendance,
+    [allAttendance, subjectFilter],
+  )
+
+  const subjectLabel = subjects.find(([id]) => id === subjectFilter)?.[1] ?? null
 
   const stats = useMemo(() => {
     const c = { present: 0, late: 0, absent: 0, excused: 0, irregular: 0, counted: 0 }
@@ -78,7 +101,7 @@ export function StudentReport() {
     )
   }
 
-  const level = getLevelProgress(student.lifetimePoints).level
+  const level = getLevelProgress(student.semesterPoints).level
 
   return (
     <>
@@ -87,9 +110,30 @@ export function StudentReport() {
         <button type="button" onClick={() => navigate(-1)} className="report-btn report-btn-ghost">
           ← Back
         </button>
-        <button type="button" onClick={() => window.print()} className="report-btn report-btn-primary">
-          Print
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {subjects.length > 1 && (
+            <select
+              aria-label="Subject"
+              value={subjectFilter}
+              onChange={(e) => setSubjectFilter(e.target.value)}
+              className="report-btn report-btn-ghost"
+            >
+              <option value="">All subjects</option>
+              {subjects.map(([id, code]) => (
+                <option key={id} value={id}>
+                  {code}
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="report-btn report-btn-primary"
+          >
+            Print
+          </button>
+        </div>
       </div>
 
       {/* Hardcoded light styles — theme-independent, print-safe. */}
@@ -123,13 +167,17 @@ export function StudentReport() {
       <div className="report-page">
         {/* Header — "Attendance Record — {Section}" (per the chosen title). */}
         <div style={{ borderBottom: '2px solid #111', paddingBottom: 12, marginBottom: 16 }}>
-          <h1>Attendance Record — {student.sectionName}</h1>
+          <h1>
+            Attendance Record — {student.sectionName}
+            {subjectLabel ? ` · ${subjectLabel}` : ''}
+          </h1>
           <p style={{ margin: '2px 0 0', fontSize: 12, fontWeight: 600, color: '#444' }}>
             DCT — College of Computer Studies
           </p>
           <p style={{ margin: '8px 0 0', fontSize: 15, fontWeight: 600 }}>{student.fullName}</p>
           <p className="report-muted" style={{ margin: '2px 0 0', fontSize: 12 }}>
-            Term beginning {longDate(TERM_START)} · Generated {longDate(new Date())}
+            {termCalendar().semesterName} · Beginning {longDate(termStart())} · Generated{' '}
+            {longDate(new Date())}
           </p>
         </div>
 
@@ -158,7 +206,8 @@ export function StudentReport() {
             Attendance rate <strong>{stats.rate === null ? '—' : `${stats.rate}%`}</strong>
           </span>
           <span className="report-muted">
-            Points {student.lifetimePoints} · Level {level}
+            This semester {student.semesterPoints} · Level {level} · All-time{' '}
+            {student.lifetimePoints}
           </span>
         </div>
 
@@ -168,11 +217,17 @@ export function StudentReport() {
         ) : (
           weeks.map((w) => (
             <div key={w.week} className="report-week">
-              <h3>{weekLabel(w.week)}</h3>
+              <h3>
+                {w.term ? `${termLabel(w.term)} · ` : ''}
+                {weekLabel(w.week)}
+              </h3>
               <table className="report-table">
                 <thead>
                   <tr>
                     <th style={{ width: 90 }}>Date</th>
+                    {/* Only when the register mixes subjects — a single-subject
+                        print already says which one in the heading. */}
+                    {!subjectFilter && subjects.length > 1 && <th style={{ width: 90 }}>Subject</th>}
                     <th>Topic</th>
                     <th style={{ width: 90 }}>Status</th>
                     <th style={{ width: 90 }}>Checked in</th>
@@ -184,6 +239,7 @@ export function StudentReport() {
                     .map((a) => (
                       <tr key={a.recordId}>
                         <td>{shortDate(a.startedAt)}</td>
+                        {!subjectFilter && subjects.length > 1 && <td>{a.subjectCode || '—'}</td>}
                         <td>{a.topic || '—'}</td>
                         <td>{STATUS_LABEL[a.status] ?? a.status}</td>
                         <td>{clock(a.scannedAt)}</td>

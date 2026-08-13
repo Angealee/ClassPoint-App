@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
@@ -13,16 +13,34 @@ import {
   TrophyIcon,
   UsersIcon,
 } from '@/components/ui/icons'
-import { getPendingExcuseCount, getPendingRedemptionCount, listSections } from '@/lib/api'
+import {
+  getActiveSemester,
+  getPendingExcuseCount,
+  getPendingRedemptionCount,
+  listSections,
+  listSectionSubjects,
+  listSubjects,
+} from '@/lib/api'
+import { configureTermCalendar } from '@/lib/term'
 import { supabase, uniqueChannel } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
-import type { Section } from '@/lib/types'
+import type { Section, Semester, Subject } from '@/lib/types'
 
 interface InstructorContextValue {
   sections: Section[]
   selectedSectionId: string
   setSelectedSectionId: (id: string) => void
   refreshSections: () => Promise<void>
+  /** The active semester (0027). Null only if none is marked active. */
+  semester: Semester | null
+  /** Subjects offered this semester. */
+  subjects: Subject[]
+  /** Which subjects each section takes: { sectionId: subjectId[] }. */
+  sectionSubjects: Record<string, string[]>
+  /** Subjects assigned to one section, in code order — for session pickers. */
+  subjectsForSection: (sectionId: string) => Subject[]
+  /** Re-read semester, subjects and assignments after editing them. */
+  refreshSemester: () => Promise<void>
 }
 
 const InstructorContext = createContext<InstructorContextValue | undefined>(undefined)
@@ -83,6 +101,9 @@ export function InstructorLayout() {
   const [sections, setSections] = useState<Section[]>([])
   const [selectedSectionId, setSelectedSectionId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [semester, setSemester] = useState<Semester | null>(null)
+  const [subjects, setSubjects] = useState<Subject[]>([])
+  const [sectionSubjects, setSectionSubjects] = useState<Record<string, string[]>>({})
   // One inbox, two request types: point spends + absence excuses.
   const [pendingRedemptions, setPendingRedemptions] = useState(0)
   const [pendingExcuses, setPendingExcuses] = useState(0)
@@ -117,14 +138,62 @@ export function InstructorLayout() {
     }
   }, [])
 
-  async function refreshSections() {
-    const data = await listSections()
-    setSections(data)
-    setSelectedSectionId((cur) => cur || data[0]?.id || '')
+  // The active semester gates everything else: sections are scoped to it, and
+  // every week/term label in the instructor area derives from its dates. Mirrored
+  // into a ref so refreshSections() can read it without a stale closure.
+  const semesterIdRef = useRef<string | undefined>(undefined)
+
+  async function loadSemester() {
+    const active = await getActiveSemester()
+    setSemester(active)
+    semesterIdRef.current = active?.id
+    if (!active) {
+      setSubjects([])
+      setSectionSubjects({})
+      return
+    }
+    // Do this before any child renders: term.ts falls back to hardcoded dates
+    // until it's configured, and we'd rather never show the fallback labels.
+    configureTermCalendar({
+      semesterId: active.id,
+      semesterName: active.name,
+      startsOn: active.startsOn,
+      terms: active.terms,
+    })
+    const [subs, assignments] = await Promise.all([
+      listSubjects(active.id),
+      listSectionSubjects(active.id),
+    ])
+    setSubjects(subs)
+    setSectionSubjects(assignments)
   }
 
+  async function refreshSections() {
+    const data = await listSections(semesterIdRef.current)
+    setSections(data)
+    // Keep the current pick when it still exists; otherwise fall back to the
+    // first. The "still exists" check matters when the semester changes.
+    setSelectedSectionId((cur) => (data.some((s) => s.id === cur) ? cur : (data[0]?.id ?? '')))
+  }
+
+  async function refreshSemester() {
+    await loadSemester()
+    await refreshSections()
+  }
+
+  // Memoized: screens use this as an effect dependency (Attendance defaults its
+  // subject picker from it), and a fresh function each render would loop.
+  const subjectsForSection = useCallback(
+    (sectionId: string): Subject[] => {
+      const ids = new Set(sectionSubjects[sectionId] ?? [])
+      return subjects.filter((s) => ids.has(s.id))
+    },
+    [sectionSubjects, subjects],
+  )
+
   useEffect(() => {
-    refreshSections()
+    loadSemester()
+      .then(refreshSections)
       .catch(() => setSections([]))
       .finally(() => setLoading(false))
   }, [])
@@ -138,7 +207,17 @@ export function InstructorLayout() {
 
   return (
     <InstructorContext.Provider
-      value={{ sections, selectedSectionId, setSelectedSectionId, refreshSections }}
+      value={{
+        sections,
+        selectedSectionId,
+        setSelectedSectionId,
+        refreshSections,
+        semester,
+        subjects,
+        sectionSubjects,
+        subjectsForSection,
+        refreshSemester,
+      }}
     >
       <Shell
         nav={nav}

@@ -277,7 +277,7 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
               marginTop: 4,
             }}
           >
-            {e!.lifetime_points}
+            {e!.points}
           </div>
           <div
             style={{
@@ -358,7 +358,7 @@ function RankRow({ e, pos, isMe }: { e: LeaderboardEntry; pos: number; isMe: boo
           color: medal ?? C.ink,
         }}
       >
-        {e.lifetime_points}
+        {e.points}
       </div>
     </div>
   )

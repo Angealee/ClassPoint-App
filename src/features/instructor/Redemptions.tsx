@@ -171,7 +171,7 @@ export function Redemptions() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{r.studentName}</p>
                         <p className="text-xs text-muted">
-                          {sectionName(r.sectionId)} · has {r.lifetimePoints} pts ·{' '}
+                          {sectionName(r.sectionId)} · has {r.semesterPoints} pts ·{' '}
                           {timeAgo(r.requestedAt)}
                         </p>
                       </div>
@@ -185,9 +185,9 @@ export function Redemptions() {
                       {r.note ? <span className="text-muted"> · {r.note}</span> : null}
                     </p>
 
-                    {r.points > r.lifetimePoints && (
+                    {r.points > r.semesterPoints && (
                       <p className="mt-2 text-xs font-semibold text-brand-500">
-                        They only have {r.lifetimePoints} points now — approving will fail.
+                        They only have {r.semesterPoints} points now — approving will fail.
                       </p>
                     )}
 
@@ -284,7 +284,7 @@ export function Redemptions() {
               <span className="font-semibold text-ink">{decision.req.studentName}</span> spends{' '}
               <span className="font-semibold text-ink">{decision.req.points} points</span> on their{' '}
               {KIND_LABEL[decision.req.kind].toLowerCase()}. Their total drops to{' '}
-              {Math.max(0, decision.req.lifetimePoints - decision.req.points)}.
+              {Math.max(0, decision.req.semesterPoints - decision.req.points)}.
             </>
           ) : (
             <>

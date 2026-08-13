@@ -93,7 +93,9 @@ export function Dashboard() {
     )
   }
 
-  const progress = getLevelProgress(me.lifetime_points)
+  // Level and XP track THIS SEMESTER (0029) — the race restarts each semester so
+  // a new cohort isn't chasing totals banked over previous ones.
+  const progress = getLevelProgress(me.semester_points)
 
   return (
     <PullToRefresh onRefresh={refresh}>
@@ -141,20 +143,21 @@ export function Dashboard() {
       <motion.div variants={item} className="grid grid-cols-2 gap-3">
         <StatTile
           icon={<BoltIcon className="h-5 w-5" />}
-          label="Total points"
+          label="This semester"
           value={
             <motion.span
               // The colour/scale pop still fires on change; the number itself
               // now rolls up via AnimatedNumber instead of snapping.
-              key={me.lifetime_points}
+              key={me.semester_points}
               initial={{ scale: 1.35, color: 'var(--color-gold-500)' }}
               animate={{ scale: 1, color: 'var(--color-ink)' }}
               transition={{ type: 'spring', stiffness: 500, damping: 18 }}
               className="inline-block"
             >
-              <AnimatedNumber value={me.lifetime_points} />
+              <AnimatedNumber value={me.semester_points} />
             </motion.span>
           }
+          note={`${me.all_time_points} all-time`}
           tone="gold"
         />
         <StatTile
@@ -169,7 +172,7 @@ export function Dashboard() {
       {/* Use points — the only home-screen entry point to /app/points. */}
       <motion.div variants={item}>
         <UsePointsTeaser
-          balance={me.lifetime_points}
+          balance={me.semester_points}
           onOpen={() => navigate('/app/points')}
         />
       </motion.div>

@@ -313,6 +313,43 @@ export const DRAFT_4_0_0: ChangelogEntry = {
   title: 'Semesters, subjects & a sturdier lock',
   sections: [
     {
+      heading: 'Prelim, midterm, finals — the app finally knows 📅',
+      major: true,
+      items: [
+        'Your attendance is now grouped by term, not just by week. "Midterm · Week 9" beats squinting at dates.',
+        'Each term has its own real dates, so a suspended class or a moved holiday no longer throws the whole calendar off.',
+        'Instructors: term dates and subjects live in one Semesters screen, and everything else follows them.',
+      ],
+    },
+    {
+      heading: 'Two subjects, two attendance records 📚',
+      major: true,
+      items: [
+        'IT 32 and Elective 1 are tracked separately now. Perfect attendance in one no longer hides a string of absences in the other.',
+        'Your streak and show-up rate are counted per subject — so each class gets its own clean slate.',
+        'Points do NOT split. A point earned in either subject goes into the same pile and spends anywhere. Only attendance cares which class you were in.',
+      ],
+    },
+    {
+      heading: 'Streaks and stats, per subject 🎯',
+      major: true,
+      items: [
+        'Your attendance screen now breaks your show-up rate down by subject, so a rough patch in one class doesn’t quietly drag the other one down with it.',
+        'Streaks got smarter, not stingier: we count your best run whether it’s within one subject or across both, so your streak can only ever look better than before.',
+        'Heads up on "On Time" and "Reliable": those two now measure your strongest subject instead of adding both together, so your progress bar on them may step back a little. Nothing you already unlocked is ever taken away.',
+        'Instructors: Class history has a subject toggle, and the printable record can be filtered to one subject before you print it.',
+      ],
+    },
+    {
+      heading: 'Every semester, a fresh race 🏁',
+      major: true,
+      items: [
+        'Points, level, and the leaderboard now reset when a new semester starts. Nobody has to catch up to a year of someone else’s recitations.',
+        'Your badges are yours forever — achievements never reset, and neither does your all-time total. Check the Profile for both numbers.',
+        'The points you can spend are this semester’s points, so the balance on your screen is always the real one.',
+      ],
+    },
+    {
       heading: 'Your account got a bouncer 🔒',
       major: true,
       items: [

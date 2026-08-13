@@ -222,7 +222,7 @@ export function Profile() {
                 </p>
               )}
               <p className="text-sm text-muted">
-                {sectionName(me.section_id)} · Level {getLevelProgress(me.lifetime_points).level}
+                {sectionName(me.section_id)} · Level {getLevelProgress(me.semester_points).level}
               </p>
             </div>
           </div>
@@ -263,7 +263,8 @@ export function Profile() {
             <Field label="Display name" value={me.display_name} />
             <Field label="Full name" value={me.full_name} />
             <Field label="Section" value={sectionName(me.section_id)} />
-            <Field label="Total points" value={String(me.lifetime_points)} />
+            <Field label="This semester" value={String(me.semester_points)} />
+            <Field label="All-time" value={String(me.all_time_points)} />
           </div>
 
           {me.bio && (
@@ -346,7 +347,7 @@ export function Profile() {
                   student_id: row.studentId,
                   display_name: row.displayName,
                   section_id: row.sectionId,
-                  lifetime_points: row.lifetimePoints,
+                  points: row.lifetimePoints,
                   avatar_url: row.avatarUrl,
                   rank: row.rank,
                 })
@@ -504,7 +505,7 @@ export function Profile() {
                 student_id: me.id,
                 display_name: me.display_name,
                 section_id: me.section_id,
-                lifetime_points: me.lifetime_points,
+                points: me.semester_points,
                 avatar_url: me.avatar_url,
                 rank,
               }

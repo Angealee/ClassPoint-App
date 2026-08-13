@@ -11,6 +11,7 @@ import {
 import { useAuth } from '@/lib/auth'
 import {
   getAchievementProgress,
+  getActiveSemester,
   getLeaderboardSnapshot,
   getMyAchievements,
   getMyStudent,
@@ -108,8 +109,13 @@ interface StudentDataValue {
 
 const StudentDataContext = createContext<StudentDataValue | undefined>(undefined)
 
-const seenLevelKey = (studentId: string) => `cp_seen_level_${studentId}`
-const seenRankKey = (studentId: string) => `cp_seen_rank_${studentId}`
+// Level and rank baselines are SEMESTER-scoped (0029): points reset each
+// semester, so a baseline carried over from the last one would silently suppress
+// every level-up celebration until the student climbed past their old peak.
+const seenLevelKey = (studentId: string, semesterId: string) =>
+  `cp_seen_level_${studentId}_${semesterId}`
+const seenRankKey = (studentId: string, semesterId: string) =>
+  `cp_seen_rank_${studentId}_${semesterId}`
 // Timestamp through which the student has already seen their point events; events
 // newer than this on the next open are recapped in the "while you were away" modal.
 const seenEventsKey = (studentId: string) => `cp_events_seen_until_${studentId}`
@@ -140,6 +146,9 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   // Tracks the level/rank we last reflected, to detect changes.
   const levelRef = useRef<number | null>(null)
   const rankRef = useRef<number | null>(null)
+  // Active semester id, read from callbacks that must not re-create on load.
+  // Empty until the first load resolves — the storage keys tolerate that.
+  const semesterIdRef = useRef('')
   // Prevents overlapping loads (resync can race the initial/refresh load).
   const inFlightRef = useRef(false)
   // The away-recap is computed once per app open, not on every visibility refresh.
@@ -166,7 +175,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   /** Compare a new point total against the last-seen level and celebrate if up. */
   const considerLevelUp = useCallback((studentId: string, totalPoints: number) => {
     const level = getLevelProgress(totalPoints).level
-    const stored = Number(localStorage.getItem(seenLevelKey(studentId)) ?? '')
+    const stored = Number(localStorage.getItem(seenLevelKey(studentId, semesterIdRef.current)) ?? '')
     const baseline = levelRef.current ?? (Number.isFinite(stored) && stored > 0 ? stored : null)
     if (baseline !== null && level > baseline) {
       setLevelUp(level)
@@ -183,14 +192,14 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       }
     }
     levelRef.current = level
-    localStorage.setItem(seenLevelKey(studentId), String(level))
+    localStorage.setItem(seenLevelKey(studentId, semesterIdRef.current), String(level))
   }, [])
 
   /** Compare a new rank against the last-seen one and announce any change. */
   const considerRankChange = useCallback(
     (studentId: string, newRank: number | null) => {
       if (newRank == null) return
-      const stored = Number(localStorage.getItem(seenRankKey(studentId)) ?? '')
+      const stored = Number(localStorage.getItem(seenRankKey(studentId, semesterIdRef.current)) ?? '')
       const baseline = rankRef.current ?? (Number.isFinite(stored) && stored > 0 ? stored : null)
       if (baseline !== null && newRank !== baseline) {
         const improved = newRank < baseline
@@ -210,7 +219,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         }
       }
       rankRef.current = newRank
-      localStorage.setItem(seenRankKey(studentId), String(newRank))
+      localStorage.setItem(seenRankKey(studentId, semesterIdRef.current), String(newRank))
     },
     [toast],
   )
@@ -276,11 +285,15 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     inFlightRef.current = true
     setError(false)
     try {
-      const [mine, secs, snap] = await Promise.all([
+      const [mine, secs, snap, semester] = await Promise.all([
         getMyStudent(user.id),
         listSections(),
         getLeaderboardSnapshot(),
+        // Also configures term.ts, so the attendance screen's week and term
+        // labels match the instructor's calendar rather than the fallback.
+        getActiveSemester().catch(() => null),
       ])
+      if (semester) semesterIdRef.current = semester.id
       setMe(mine)
       setSections(secs)
       setLeaderboard(snap.entries)
@@ -304,7 +317,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
             /* storage unavailable — skip the recap */
           }
         }
-        considerLevelUp(mine.id, mine.lifetime_points)
+        considerLevelUp(mine.id, mine.semester_points)
         const myRank = snap.entries.find((e) => e.student_id === mine.id)?.rank ?? null
         considerRankChange(mine.id, myRank)
         // Bell badge — independent of the main load; failures just keep the
@@ -353,10 +366,23 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'students', filter: `id=eq.${studentId}` },
         (payload) => {
-          const next = payload.new as Partial<StudentSelf>
-          setMe((m) => (m ? { ...m, ...next } : m))
-          if (typeof next.lifetime_points === 'number') {
-            considerLevelUp(studentId, next.lifetime_points)
+          // The payload is the RAW db row, where lifetime_points is the career
+          // total the app models as all_time_points. Translate rather than
+          // spreading it blind, or the "all-time" figure would never update.
+          const { lifetime_points, ...rest } = payload.new as Record<string, unknown>
+          setMe((m) =>
+            m
+              ? {
+                  ...m,
+                  ...(rest as Partial<StudentSelf>),
+                  ...(typeof lifetime_points === 'number'
+                    ? { all_time_points: lifetime_points }
+                    : {}),
+                }
+              : m,
+          )
+          if (typeof rest.semester_points === 'number') {
+            considerLevelUp(studentId, rest.semester_points)
           }
         },
       )

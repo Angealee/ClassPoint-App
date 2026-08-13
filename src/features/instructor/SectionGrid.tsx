@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -12,8 +13,9 @@ import { createSection, getSectionStats, type SectionStat } from '@/lib/api'
 
 /** Landing grid: pick a section card to open its roster. */
 export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void }) {
-  const { sections, refreshSections } = useInstructor()
+  const { sections, refreshSections, semester } = useInstructor()
   const { toast } = useToast()
+  const navigate = useNavigate()
 
   const [stats, setStats] = useState<Record<string, SectionStat>>({})
   const [statsLoading, setStatsLoading] = useState(true)
@@ -43,9 +45,13 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
     e.preventDefault()
     const name = newName.trim()
     if (!name) return
+    if (!semester) {
+      toast('No active semester — set one up first.', 'error')
+      return
+    }
     setBusy(true)
     try {
-      await createSection(name)
+      await createSection(name, semester.id)
       await refreshSections()
       await loadStats()
       setNewName('')
@@ -69,7 +75,18 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
           </Button>
         </div>
       </div>
-      <p className="text-sm text-muted">Tap a section to manage its students.</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted">Tap a section to manage its students.</p>
+        {semester && (
+          <button
+            type="button"
+            onClick={() => navigate('/teach/semesters')}
+            className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:text-ink"
+          >
+            {semester.name} · terms &amp; subjects
+          </button>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {sections.map((s) => {

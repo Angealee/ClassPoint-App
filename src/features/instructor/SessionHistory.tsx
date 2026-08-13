@@ -7,9 +7,14 @@ import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { ArrowLeftIcon, DownloadIcon, WarningIcon } from '@/components/ui/icons'
-import { getAttendanceAnalytics, getSectionRegister, listSessions } from '@/lib/api'
+import {
+  getAttendanceAnalytics,
+  getSectionRegister,
+  listSessions,
+  updateSessionSubject,
+} from '@/lib/api'
 import { exportAttendanceSummary, exportSectionRegister } from '@/lib/attendance-io'
-import { groupByWeek, weekOf } from '@/lib/term'
+import { groupByWeek, termLabel, weekOf } from '@/lib/term'
 import { cn } from '@/lib/cn'
 import { useInstructor } from './InstructorLayout'
 import type { AttendanceAnalytics, SessionSummary, StudentAttendanceStat } from '@/lib/types'
@@ -35,7 +40,7 @@ function rateTone(rate: number | null): string {
 
 /** The whole term at a glance: every session, plus who's actually showing up. */
 export function SessionHistory() {
-  const { sections, selectedSectionId, setSelectedSectionId } = useInstructor()
+  const { sections, selectedSectionId, setSelectedSectionId, subjectsForSection } = useInstructor()
   const { toast } = useToast()
   const navigate = useNavigate()
 
@@ -43,8 +48,26 @@ export function SessionHistory() {
   const [analytics, setAnalytics] = useState<AttendanceAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [sort, setSort] = useState<SortKey>('rate')
+  const [tagging, setTagging] = useState<string>()
+  // '' = both subjects combined. Scopes the analytics below, not the session list.
+  const [subjectFilter, setSubjectFilter] = useState('')
 
   const sectionName = sections.find((s) => s.id === selectedSectionId)?.name ?? ''
+  const sectionSubjects = subjectsForSection(selectedSectionId)
+  const untaggedCount = sessions.filter((s) => !s.subjectId).length
+
+  /** Assign a subject to a session that predates subjects (0028). */
+  async function onTag(sessionId: string, subjectId: string) {
+    setTagging(sessionId)
+    try {
+      await updateSessionSubject(sessionId, subjectId)
+      await load()
+    } catch {
+      toast('Could not tag that session.', 'error')
+    } finally {
+      setTagging(undefined)
+    }
+  }
 
   const load = useCallback(async () => {
     if (!selectedSectionId) return
@@ -52,7 +75,7 @@ export function SessionHistory() {
     try {
       const [list, stats] = await Promise.all([
         listSessions(selectedSectionId),
-        getAttendanceAnalytics(selectedSectionId),
+        getAttendanceAnalytics(selectedSectionId, subjectFilter || undefined),
       ])
       setSessions(list)
       setAnalytics(stats)
@@ -61,7 +84,7 @@ export function SessionHistory() {
     } finally {
       setLoading(false)
     }
-  }, [selectedSectionId, toast])
+  }, [selectedSectionId, subjectFilter, toast])
 
   useEffect(() => {
     void load()
@@ -148,6 +171,31 @@ export function SessionHistory() {
           ))}
         </Select>
       </div>
+
+      {/* Scopes the stats below to one subject — a roster that meets you twice a
+          week under two labels has two separate attendance stories. */}
+      {sectionSubjects.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {[{ id: '', code: 'Both subjects' }, ...sectionSubjects].map((s) => {
+            const on = s.id === subjectFilter
+            return (
+              <button
+                key={s.id || 'all'}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setSubjectFilter(s.id)}
+                className={
+                  on
+                    ? 'rounded-lg border border-brand-500 bg-brand-500/10 px-2.5 py-1.5 text-xs font-semibold text-brand-500'
+                    : 'rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:text-ink'
+                }
+              >
+                {s.code}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {loading ? (
         <ListSkeleton rows={6} />
@@ -269,34 +317,67 @@ export function SessionHistory() {
           <div>
             <h2 className="mb-2 px-1 text-sm font-semibold text-muted">All sessions</h2>
             <div className="space-y-4">
+              {untaggedCount > 0 && sectionSubjects.length > 0 && (
+                <Card className="border-gold-400/40 bg-gold-400/10 p-3.5">
+                  <p className="text-sm font-semibold">
+                    {untaggedCount} session{untaggedCount === 1 ? '' : 's'} with no subject yet
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    These ran before subjects existed. Tag each one below so per-subject
+                    attendance and streaks count them.
+                  </p>
+                </Card>
+              )}
+
               {weeks.map((w) => (
                 <div key={w.week}>
                   <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
+                    {w.term ? `${termLabel(w.term)} · ` : ''}
                     {w.label}
                   </p>
                   <Card className="divide-y divide-line">
                     {w.items.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => navigate(`/teach/attendance/session/${s.id}`)}
-                        className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-card-2"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">
-                            {s.topic || shortDate(s.startedAt)}
-                          </p>
-                          <p className="text-xs text-muted">
-                            {shortDate(s.startedAt)}
-                            {s.status === 'active'
-                              ? ' · live now'
-                              : !s.penaltiesCommitted
-                                ? ' · not finalised'
-                                : ''}
-                          </p>
-                        </div>
-                        <SessionTally s={s} />
-                      </button>
+                      <div key={s.id}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/teach/attendance/session/${s.id}`)}
+                          className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-card-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">
+                              {s.topic || shortDate(s.startedAt)}
+                            </p>
+                            <p className="text-xs text-muted">
+                              {s.subjectCode ? `${s.subjectCode} · ` : ''}
+                              {shortDate(s.startedAt)}
+                              {s.status === 'active'
+                                ? ' · live now'
+                                : !s.penaltiesCommitted
+                                  ? ' · not finalised'
+                                  : ''}
+                            </p>
+                          </div>
+                          <SessionTally s={s} />
+                        </button>
+                        {/* Sessions that predate subjects (0028). Tagging them
+                            here is what makes per-subject attendance complete. */}
+                        {!s.subjectId && sectionSubjects.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-2 px-3.5 pb-3">
+                            <span className="text-xs text-muted">Tag as</span>
+                            {sectionSubjects.map((subject) => (
+                              <button
+                                key={subject.id}
+                                type="button"
+                                disabled={tagging === s.id}
+                                onClick={() => onTag(s.id, subject.id)}
+                                className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-muted transition-colors hover:border-brand-500 hover:text-brand-500 disabled:opacity-50"
+                              >
+                                {subject.code}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </Card>
                 </div>

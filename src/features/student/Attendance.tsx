@@ -173,6 +173,44 @@ export function Attendance() {
     return { ...s, total: history.length, counted, neutral, rate }
   }, [history])
 
+  /**
+   * Same maths, split per subject (0030). Attendance is subject-scoped, so a
+   * perfect record in one class shouldn't be averaged away by a rough one in
+   * another. Sessions that predate subjects group under "Earlier" rather than
+   * being dropped — they happened.
+   */
+  const bySubject = useMemo(() => {
+    const groups = new Map<string, { label: string; present: number; late: number; absent: number }>()
+    for (const h of history) {
+      const key = h.subjectId ?? '__untagged'
+      const g = groups.get(key) ?? {
+        label: h.subjectCode ?? 'Earlier',
+        present: 0,
+        late: 0,
+        absent: 0,
+      }
+      if (h.status === 'present') g.present += 1
+      else if (h.status === 'late') g.late += 1
+      else if (h.status === 'absent') g.absent += 1
+      groups.set(key, g)
+    }
+    return [...groups.entries()]
+      .map(([key, g]) => {
+        const counted = g.present + g.late + g.absent
+        return {
+          key,
+          label: g.label,
+          counted,
+          rate: counted ? Math.round(((g.present + g.late) / counted) * 100) : 0,
+          absent: g.absent,
+        }
+      })
+      // Untagged last; otherwise alphabetical by subject code.
+      .sort((a, b) =>
+        a.key === '__untagged' ? 1 : b.key === '__untagged' ? -1 : a.label.localeCompare(b.label),
+      )
+  }, [history])
+
   return (
     <div className="space-y-5">
       <div>
@@ -213,6 +251,24 @@ export function Attendance() {
         </div>
       )}
 
+      {/* Per-subject split — only worth showing once there's more than one. */}
+      {bySubject.length > 1 && (
+        <Card className="divide-y divide-line p-0">
+          {bySubject.map((s) => (
+            <div key={s.key} className="flex items-center gap-3 px-4 py-2.5">
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{s.label}</span>
+              <span className="text-xs text-muted">
+                {s.counted} class{s.counted === 1 ? '' : 'es'}
+                {s.absent > 0 && ` · ${s.absent} absent`}
+              </span>
+              <span className="font-display text-sm font-bold tabular-nums text-brand-500">
+                {s.rate}%
+              </span>
+            </div>
+          ))}
+        </Card>
+      )}
+
       {stats.neutral > 0 && (
         <p className="px-1 text-xs text-muted">
           {stats.excused > 0 && `${stats.excused} excused`}
@@ -243,6 +299,7 @@ export function Attendance() {
                   {h.topic || entryDate(h.startedAt) || 'Class'}
                 </p>
                 <p className="flex items-center gap-1.5 text-xs text-muted">
+                  {h.subjectCode ? `${h.subjectCode} · ` : ''}
                   {entryDate(h.startedAt)}
                   {h.syncedLate && (
                     <span className="rounded-full bg-card-2 px-1.5 py-0.5 text-[0.65rem] font-medium">

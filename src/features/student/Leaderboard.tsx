@@ -58,7 +58,7 @@ export function Leaderboard() {
         student_id: c.studentId,
         display_name: c.displayName,
         section_id: '',
-        lifetime_points: 0,
+        points: 0,
         avatar_url: c.avatarUrl,
         rank: 0,
       },
@@ -73,7 +73,7 @@ export function Leaderboard() {
   const above = meEntry && meIdx > 0 ? ranked[meIdx - 1] : null
   const toNext =
     above && meEntry
-      ? { pts: Math.max(0, above.lifetime_points - meEntry.lifetime_points), pos: meIdx }
+      ? { pts: Math.max(0, above.points - meEntry.points), pos: meIdx }
       : null
 
   const subtitle = isGlobal ? `Top ${TOP_N}` : sectionName(view)
@@ -170,7 +170,7 @@ export function Leaderboard() {
             entries={ranked}
             meId={me?.id}
             myPos={meEntry ? myPos : null}
-            myPoints={meEntry?.lifetime_points ?? null}
+            myPoints={meEntry?.points ?? null}
             scopeLabel={isGlobal ? 'Global' : sectionName(view)}
             capturedAt={capturedAt}
           />
@@ -197,7 +197,7 @@ function YourRankCard({
   sectionLabel: string
   onClick: () => void
 }) {
-  const level = getLevelProgress(entry.lifetime_points).level
+  const level = getLevelProgress(entry.points).level
   return (
     <button
       type="button"
@@ -236,7 +236,7 @@ function YourRankCard({
         </div>
         <div className="shrink-0 text-right">
           <p className="font-display text-xl font-bold text-gold-600 dark:text-gold-400">
-            {entry.lifetime_points}
+            {entry.points}
           </p>
           <p className="text-[0.65rem] uppercase tracking-wider text-muted">pts</p>
         </div>

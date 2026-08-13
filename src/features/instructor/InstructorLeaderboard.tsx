@@ -49,7 +49,7 @@ export function InstructorLeaderboard() {
         student_id: c.studentId,
         display_name: c.displayName,
         section_id: '',
-        lifetime_points: 0,
+        points: 0,
         avatar_url: c.avatarUrl,
         rank: 0,
       },

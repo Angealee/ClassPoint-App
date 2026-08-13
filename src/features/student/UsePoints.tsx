@@ -104,7 +104,9 @@ export function UsePoints() {
     }
   }, [studentId, load, refresh])
 
-  const balance = me?.lifetime_points ?? 0
+  // Spendable = THIS SEMESTER's points (0029), matching what the
+  // request/decide RPCs validate against.
+  const balance = me?.semester_points ?? 0
   const pending = useMemo(() => history.filter((r) => r.status === 'pending'), [history])
   const decided = useMemo(() => history.filter((r) => r.status !== 'pending'), [history])
   const pendingPoints = useMemo(() => pending.reduce((n, r) => n + r.points, 0), [pending])

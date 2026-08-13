@@ -26,7 +26,7 @@ import {
   restoreStudent,
 } from '@/lib/api'
 import { getLevelProgress } from '@/lib/leveling'
-import { groupByWeek, weekLabel } from '@/lib/term'
+import { groupByWeek, termLabel, weekLabel } from '@/lib/term'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import { useInstructor } from './InstructorLayout'
@@ -116,6 +116,40 @@ export function StudentRecord() {
     return { ...c, rate: c.counted ? Math.round(((c.present + c.late) / c.counted) * 100) : null }
   }, [attendance])
 
+  /** The same rate, split per subject (0030) — the number that matters when a
+   *  student is solid in one class and slipping in the other. */
+  const bySubject = useMemo(() => {
+    const groups = new Map<string, { label: string; present: number; late: number; absent: number }>()
+    for (const a of attendance) {
+      if (NEUTRAL.has(a.status)) continue
+      const key = a.subjectId ?? '__untagged'
+      const g = groups.get(key) ?? {
+        label: a.subjectCode ?? 'Untagged',
+        present: 0,
+        late: 0,
+        absent: 0,
+      }
+      if (a.status === 'present') g.present++
+      else if (a.status === 'late') g.late++
+      else if (a.status === 'absent') g.absent++
+      groups.set(key, g)
+    }
+    return [...groups.entries()]
+      .map(([key, g]) => {
+        const counted = g.present + g.late + g.absent
+        return {
+          key,
+          label: g.label,
+          counted,
+          absent: g.absent,
+          rate: counted ? Math.round(((g.present + g.late) / counted) * 100) : null,
+        }
+      })
+      .sort((a, b) =>
+        a.key === '__untagged' ? 1 : b.key === '__untagged' ? -1 : a.label.localeCompare(b.label),
+      )
+  }, [attendance])
+
   const weeks = useMemo(() => groupByWeek(attendance, (a) => a.startedAt), [attendance])
   const unlocked = achievements.filter((a) => a.unlockedAt)
   const sectionName = sections.find((s) => s.id === student?.sectionId)?.name ?? ''
@@ -174,7 +208,7 @@ export function StudentRecord() {
     )
   }
 
-  const level = getLevelProgress(student.lifetimePoints).level
+  const level = getLevelProgress(student.semesterPoints).level
 
   return (
     <div className="space-y-5 pb-4">
@@ -198,8 +232,9 @@ export function StudentRecord() {
             </p>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-          <Stat label="Points" value={String(student.lifetimePoints)} />
+        <div className="mt-4 grid grid-cols-4 gap-2 text-center">
+          <Stat label="This sem" value={String(student.semesterPoints)} />
+          <Stat label="All-time" value={String(student.lifetimePoints)} />
           <Stat label="Level" value={String(level)} />
           <Stat label="Rank" value={rank ? `#${rank}` : '—'} />
         </div>
@@ -237,6 +272,21 @@ export function StudentRecord() {
             </span>
           )}
         </div>
+        {bySubject.length > 1 && (
+          <Card className="mb-3 divide-y divide-line p-0">
+            {bySubject.map((s) => (
+              <div key={s.key} className="flex items-center gap-3 px-4 py-2.5">
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{s.label}</span>
+                <span className="text-xs text-muted">
+                  {s.counted} counted{s.absent > 0 && ` · ${s.absent}A`}
+                </span>
+                <span className="font-display text-sm font-bold tabular-nums text-brand-500">
+                  {s.rate === null ? '—' : `${s.rate}%`}
+                </span>
+              </div>
+            ))}
+          </Card>
+        )}
         {attendance.length === 0 ? (
           <Card className="p-6 text-center text-sm text-muted">No sessions yet.</Card>
         ) : (
@@ -244,6 +294,7 @@ export function StudentRecord() {
             {weeks.map((w) => (
               <div key={w.week}>
                 <p className="mb-1 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
+                  {w.term ? `${termLabel(w.term)} · ` : ''}
                   {weekLabel(w.week)}
                 </p>
                 <Card className="divide-y divide-line">

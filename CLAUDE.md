@@ -2,8 +2,16 @@
 
 Mobile-first gamified classroom PWA. An instructor awards points; students level up,
 climb a leaderboard, check in to class via rotating HMAC QR codes, and collect
-achievements. Single instructor (the user), students at DCT. Classes started
-**June 15, 2026** (a Monday — week numbering derives from this, see `src/lib/term.ts`).
+achievements. Single instructor (the user), students at DCT.
+
+**Academic structure (since 0027).** Data is organised
+**semester → term (prelim/midterm/finals) → subject → section**. A semester is 18 weeks,
+six per term, but term dates are STORED and editable rather than computed — holidays
+move them. The first semester is "1st Sem AY 2026–2027", starting **June 15 2026** (a
+Monday; week 1 anchors there). Two subjects run in it: "IT 32 · Platform Technologies"
+and "Elective 1 · Event-driven Programming". The same roster takes both, so **attendance
+is per subject** while **points are one shared pool** spendable anywhere. Points, level
+and the leaderboard **reset each semester**; achievements and the all-time total never do.
 
 ## Stack
 
@@ -79,6 +87,10 @@ only move it into the array as `4.0.0` when the user says the era is ready to an
   functions stay on the old permissive CORS — by design, so a missing secret can never
   take the app down.
 - The user pastes migrations whole into the SQL editor — test idempotency by running twice.
+- **Migration before client, always.** 0027–0029 add columns the client now selects
+  (`sections.semester_id`, `class_sessions.subject_id`, `students.semester_points`,
+  `leaderboard_snapshot.semester_points`). Deploying the build first would 400 every
+  read. **Unrun as of 2026-08-13: 0026, 0027, 0028, 0029, 0030.**
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
@@ -89,6 +101,81 @@ ledger — awards, penalties, and future spending all flow through it), `instruc
 (frozen rank, pg_cron refresh 12:30 + 19:30 Manila), `push_subscriptions`,
 `class_sessions` + `class_session_secrets` + `attendance_records`, `profile_views`,
 `achievements` + `student_achievements`.
+
+Since 0030 (Per-subject metrics): **Ownership move `cp_achievement_metrics` 0021 → 0030**
+(drop-first, plus drop-first `get_achievement_progress` and recreated
+`sync_achievements`, all re-granted — the return type didn't change, but the discipline
+is what keeps the file re-runnable). Two different rules, both the user's call:
+**counts** (`present_count`, `attended_count`) are `max()` grouped by `subject_id` —
+BEST SUBJECT, which makes those two badges harder and visibly drops progress bars, so
+the changelog says so; **streaks** (`streak`, `early_streak`) are
+`greatest(combined_run, best_per_subject_run)` — best-of, so a run spanning two classes
+is never punished and nobody's progress can regress. Per-subject can EXCEED combined (an
+absence in IT 32 breaks the combined run but not an Elective 1 run), which is why it's a
+real `greatest()` and not just "combined". Untagged sessions form their own group rather
+than being dropped. Metrics still read `lifetime_points` (achievements are lifetime —
+see 0029). Client: `MyAttendanceEntry` gains `subjectId`/`subjectCode`;
+`getAttendanceAnalytics(sectionId, subjectId?)` scopes the instructor's Class history via
+a subject toggle; per-subject rate cards on the student Attendance screen and
+StudentRecord; StudentReport gained a print-time subject picker (and a Subject column
+only when the register mixes subjects).
+
+Since 0029 (Per-semester points): `point_events.semester_id` (stamped by the
+`trg_stamp_semester` BEFORE INSERT trigger — a trigger, not a column default, because
+`awardPoints` inserts directly and a default is skipped on an explicit null) +
+`students.semester_points` + `leaderboard_snapshot.semester_points`. **`semester_points`
+is the app's "points"**: XP, level, rank, and the spendable balance. `lifetime_points`
+keeps its old meaning (career total) and is what ACHIEVEMENTS still read — badges are
+lifetime by the user's decision, so a student can show "Level 1" this semester while
+holding the "Reach Level 3" badge. In app types the DB's `lifetime_points` is renamed
+`all_time_points` (StudentSelf) so nothing confuses the two; `LeaderboardEntry.points`
+and `LeaderboardRow.points` are semester points. **Ownership moves:**
+`cp_recompute_points` 0007 → 0029 (maintains BOTH caches),
+`refresh_leaderboard_snapshot` 0023 → 0029 (ranks by semester_points),
+`request_point_redemption` + `decide_point_redemption` 0019 → 0029 (spend against
+semester_points; lock order untouched). Student level/rank celebration baselines in
+StudentData are keyed `cp_seen_level_${studentId}_${semesterId}` — an un-scoped
+baseline would suppress every level-up after a reset until the old peak was passed.
+**Two things the rollover migration MUST do** (documented at the foot of 0029):
+`set_active_semester` has to bulk-recompute `semester_points` (the trigger is
+active-semester-relative and can't see a semester CHANGE), and its pre-flight must
+refuse while any redemption is pending (a request made in one semester, approved in the
+next, would debit the wrong pool).
+
+Since 0028 (Subject-scoped attendance): `class_sessions.subject_id` (nullable —
+pre-subject sessions are "untagged" and the instructor re-tags them from Class history;
+a one-time banner counts them). **Ownership move: `start_class_session` 0014 → 0028 —
+the SIGNATURE changed** (new `p_subject_id` second), so it drops the exact old signature
+first; a `create or replace` with a different parameter list creates an OVERLOAD and
+PostgREST then rejects every call as ambiguous. It validates the section is in the
+ACTIVE semester and that the subject is assigned to it, but requires a subject only when
+the section has any assigned — a setup gap must never block a live class. The resume
+path is checked before all validation for the same reason. `updateSessionSubject` is a
+direct client update (mirrors `updateSessionTopic`). `scan_attendance` deliberately does
+NOT get its active-semester guard here — that belongs to the rollover migration, where a
+past-semester section can first exist. Attendance embeds `subjects(code, name)`; use
+`oneEmbed()` in api.ts, since supabase-js infers an array for a many-to-one embed that
+PostgREST actually returns as an object.
+
+Since 0027 (Academic structure): `semesters` (one active at a time, enforced by the
+partial unique index `(is_active) where is_active`), `semester_terms`
+(prelim|midterm|finals with EDITABLE `starts_on`/`ends_on` — six-week arithmetic is only
+the seeded default; real calendars move), `subjects` (per semester), `section_subjects`
+(link table; pickers only offer valid combos), `sections.semester_id` (defaults to
+`cp_active_semester_id()`). **`sections.name` lost its GLOBAL unique constraint** —
+uniqueness is now `(semester_id, lower(name))`, which is what lets "BSIT 2A" exist in
+several semesters. The section_subjects seed is guarded on "the table is completely
+empty" so unticking a combination survives a re-run. **Ownership move:
+`cp_nightly_backup` 0023 → 0027** (four new tables; mirrors self-create via its existing
+exception handler). `src/lib/term.ts` is now DB-driven but still SYNCHRONOUS, with the
+old hardcoded dates as a fallback: `configureTermCalendar()` swaps in the real calendar,
+`termStart()` replaces the old `TERM_START` const, and `weekOf`/`weekRange`/`weekLabel`/
+`groupByWeek` keep their signatures (so their call sites didn't change); new `termOf`,
+`termLabel`, `termRanges`, `groupByTerm`, and a `term` field on each week group.
+InstructorLayout configures it for the whole instructor area; **StudentReport must call
+`loadTermCalendar()` itself** because it renders OUTSIDE that layout. term.ts imports no
+Supabase — the fetch lives in api.ts (`loadTermCalendar`, memoized, fails soft).
+Instructor screen: `/teach/semesters` (`ManageSemesters`).
 
 Since 0026 (Security): `auth_events` — every claim / PIN-reset attempt (`kind`,
 `success`, `ip`, `user_agent`, `student_id` with no FK, coarse `detail`). It is BOTH

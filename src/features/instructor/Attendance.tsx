@@ -19,8 +19,11 @@ type View = 'home' | 'live' | 'review'
 const sessionDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
+/** Remembers the last subject started per section, so the picker pre-fills. */
+const LAST_SUBJECT_KEY = 'cp_last_subject_'
+
 export function Attendance() {
-  const { sections, selectedSectionId, setSelectedSectionId } = useInstructor()
+  const { sections, selectedSectionId, setSelectedSectionId, subjectsForSection } = useInstructor()
   const { toast } = useToast()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -31,6 +34,7 @@ export function Attendance() {
   const [checking, setChecking] = useState(true)
 
   // Start config (instructor control before each class).
+  const [subjectId, setSubjectId] = useState('')
   const [topic, setTopic] = useState('')
   const [lateAfter, setLateAfter] = useState(10)
   const [absentAfter, setAbsentAfter] = useState(30)
@@ -106,12 +110,31 @@ export function Attendance() {
 
   const thresholdsValid = absentAfter >= lateAfter && lateAfter >= 0 && absentAfter >= 0
 
+  // Subjects this section takes. Usually one or two, so chips beat a dropdown.
+  const sectionSubjects = subjectsForSection(selectedSectionId)
+  // A section with nothing assigned can still hold class (the RPC allows an
+  // untagged session then) — being blocked by a setup gap would be worse.
+  const subjectMissing = sectionSubjects.length > 0 && !subjectId
+
+  // Default to the subject you ran last for this section: the same class meets
+  // on the same day most weeks, so the common case stays a single tap.
+  useEffect(() => {
+    if (!selectedSectionId) {
+      setSubjectId('')
+      return
+    }
+    const remembered = localStorage.getItem(`${LAST_SUBJECT_KEY}${selectedSectionId}`)
+    const available = subjectsForSection(selectedSectionId)
+    setSubjectId(available.find((s) => s.id === remembered)?.id ?? available[0]?.id ?? '')
+  }, [selectedSectionId, subjectsForSection])
+
   async function onStart() {
-    if (!selectedSectionId || !thresholdsValid) return
+    if (!selectedSectionId || !thresholdsValid || subjectMissing) return
     setStarting(true)
     try {
       const s = await startClassSession({
         sectionId: selectedSectionId,
+        subjectId: subjectId || null,
         topic,
         lateAfterMin: lateAfter,
         absentAfterMin: absentAfter,
@@ -119,6 +142,7 @@ export function Attendance() {
         absentPenalty,
         applyPenalties,
       })
+      if (subjectId) localStorage.setItem(`${LAST_SUBJECT_KEY}${selectedSectionId}`, subjectId)
       setSession(s)
       setView('live')
     } catch (e) {
@@ -184,6 +208,33 @@ export function Attendance() {
             <p className="text-xs text-muted">Students scan the QR to check in.</p>
           </div>
         </div>
+
+        {sectionSubjects.length > 0 && (
+          <div>
+            <span className="mb-1.5 block text-sm font-medium">Subject</span>
+            <div className="flex flex-wrap gap-2">
+              {sectionSubjects.map((subject) => {
+                const on = subject.id === subjectId
+                return (
+                  <button
+                    key={subject.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setSubjectId(subject.id)}
+                    className={
+                      on
+                        ? 'rounded-xl border border-brand-500 bg-brand-500/10 px-3 py-2 text-left text-sm font-semibold text-brand-500'
+                        : 'rounded-xl border border-line px-3 py-2 text-left text-sm font-medium text-muted transition-colors hover:text-ink'
+                    }
+                  >
+                    <span className="block font-display font-bold">{subject.code}</span>
+                    <span className="block text-xs opacity-80">{subject.name}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         <Input
           label="Topic (optional)"
@@ -253,9 +304,15 @@ export function Attendance() {
           size="lg"
           className="w-full"
           onClick={onStart}
-          disabled={starting || checking || !selectedSectionId || !thresholdsValid}
+          disabled={starting || checking || !selectedSectionId || !thresholdsValid || subjectMissing}
         >
-          {checking ? 'Checking…' : starting ? 'Starting…' : 'Start class & show QR'}
+          {checking
+            ? 'Checking…'
+            : subjectMissing
+              ? 'Pick a subject first'
+              : starting
+                ? 'Starting…'
+                : 'Start class & show QR'}
         </Button>
       </Card>
 
