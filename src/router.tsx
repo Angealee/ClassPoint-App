@@ -44,9 +44,8 @@ const InstructorLayout = lazy(() =>
 const Students = lazy(() =>
   import('@/features/instructor/Students').then((m) => ({ default: m.Students })),
 )
-const Award = lazy(() => import('@/features/instructor/Award').then((m) => ({ default: m.Award })))
-const AwardHistory = lazy(() =>
-  import('@/features/instructor/AwardHistory').then((m) => ({ default: m.AwardHistory })),
+const History = lazy(() =>
+  import('@/features/instructor/History').then((m) => ({ default: m.History })),
 )
 const InstructorLeaderboard = lazy(() =>
   import('@/features/instructor/InstructorLeaderboard').then((m) => ({
@@ -58,9 +57,6 @@ const InstructorAttendance = lazy(() =>
 )
 const SessionDetail = lazy(() =>
   import('@/features/instructor/SessionDetail').then((m) => ({ default: m.SessionDetail })),
-)
-const SessionHistory = lazy(() =>
-  import('@/features/instructor/SessionHistory').then((m) => ({ default: m.SessionHistory })),
 )
 const ManageSemesters = lazy(() =>
   import('@/features/instructor/ManageSemesters').then((m) => ({ default: m.ManageSemesters })),
@@ -136,15 +132,21 @@ export const router = createBrowserRouter([
         errorElement: <RouteError />,
         children: [
           { index: true, element: <Students /> },
-          { path: 'award', element: <Award /> },
           { path: 'attendance', element: <InstructorAttendance /> },
-          { path: 'attendance/history', element: <SessionHistory /> },
           { path: 'attendance/session/:sessionId', element: <SessionDetail /> },
           { path: 'redemptions', element: <Redemptions /> },
           { path: 'semesters', element: <ManageSemesters /> },
           { path: 'student/:studentId', element: <StudentRecord /> },
-          { path: 'history', element: <AwardHistory /> },
+          { path: 'history', element: <History /> },
           { path: 'leaderboard', element: <InstructorLeaderboard /> },
+          // Awarding moved into the section roster and class stats into the
+          // History tab. Old links (the record page's Award button, bookmarks,
+          // anything a student was sent) keep working.
+          { path: 'award', element: <Navigate to="/teach" replace /> },
+          {
+            path: 'attendance/history',
+            element: <Navigate to="/teach/history?tab=attendance" replace />,
+          },
         ],
       },
       // The printable report renders OUTSIDE the shell (no nav/tabs/theme) but

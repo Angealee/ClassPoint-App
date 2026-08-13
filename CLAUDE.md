@@ -319,6 +319,29 @@ Gotchas:
 - `npm run lint` (`tsc --noEmit`) misses unused locals; **`npm run build` (`tsc -b`)
   is the stricter gate** — run it before declaring done.
 
+## Instructor information architecture (reworked 2026-08-13)
+
+**Four bottom tabs: Students · Attendance · History · Ranks.** Requests stays in the
+Shell's `actions` slot with its badge. What moved and why:
+
+- **Awarding lost its tab** and lives in the section roster (`Students.tsx`): the row
+  body ticks a student (avatar doubles as the checkbox), the icon buttons and `View ›`
+  stay explicit. `AwardBar.tsx` docks above the mobile tab bar when anything is ticked
+  and carries the full controls. **The bulk flow is the reason this component exists** —
+  tick several, choose the amount once, award together — plus the "select the same N
+  again" shortcut. Do not regress it to one-student-at-a-time.
+- **`History.tsx` is a tabbed page** (Points | Attendance) in the Requests-page style,
+  hosting `AwardHistory` and `SessionHistory`, which each take an `embedded` prop that
+  hides their own page header. Class attendance stats used to be a text link on the
+  Attendance screen, which the live/review views replace outright — so they were
+  unreachable exactly while a class was running. The active tab mirrors to `?tab=`.
+- **Redirects keep old links alive** (router.tsx): `/teach/award` → `/teach`,
+  `/teach/attendance/history` → `/teach/history?tab=attendance`. The record page's Award
+  button now goes to `/teach?student=<id>`, which opens that student's section and
+  pre-ticks them.
+- `src/features/instructor/Award.tsx` is **orphaned** by this change and kept only until
+  the user confirms deletion.
+
 ## Auth model
 
 Students: username + PIN → synthetic email `@students.classpoint.app`; onboard via

@@ -346,7 +346,7 @@ export function Attendance() {
           {history.length > 0 && (
             <button
               type="button"
-              onClick={() => navigate('/teach/attendance/history')}
+              onClick={() => navigate('/teach/history?tab=attendance')}
               className="text-xs font-semibold text-brand-500 transition-opacity hover:opacity-80"
             >
               See all & stats →

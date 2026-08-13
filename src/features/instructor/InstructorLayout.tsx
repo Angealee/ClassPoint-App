@@ -5,7 +5,6 @@ import { Shell, type NavItem } from '@/components/layout/Shell'
 import { Splash } from '@/components/layout/Splash'
 import { WhatsNew } from '@/features/WhatsNew'
 import {
-  BoltIcon,
   ClockIcon,
   LogOutIcon,
   QrIcon,
@@ -51,11 +50,20 @@ export function useInstructor(): InstructorContextValue {
   return ctx
 }
 
+/**
+ * Four tabs, not five.
+ *
+ * Awarding lost its tab and moved into the section roster — you tick students
+ * where you're already looking at them, and the bulk flow survived intact.
+ * "Activity" became "History", which now holds BOTH the points ledger and the
+ * class attendance stats as sub-tabs. Those stats used to hang off a text link
+ * on the Attendance screen, which the live-class view replaces outright, so
+ * they were unreachable exactly when a class was running.
+ */
 const nav: NavItem[] = [
   { to: '/teach', label: 'Students', Icon: UsersIcon, end: true },
-  { to: '/teach/award', label: 'Award', Icon: BoltIcon },
   { to: '/teach/attendance', label: 'Attendance', Icon: QrIcon },
-  { to: '/teach/history', label: 'Activity', Icon: ClockIcon },
+  { to: '/teach/history', label: 'History', Icon: ClockIcon },
   { to: '/teach/leaderboard', label: 'Ranks', Icon: TrophyIcon },
 ]
 

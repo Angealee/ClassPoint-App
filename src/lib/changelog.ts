@@ -313,6 +313,16 @@ export const DRAFT_4_0_0: ChangelogEntry = {
   title: 'Semesters, subjects & a sturdier lock',
   sections: [
     {
+      heading: 'Instructors: fewer taps, nothing buried 🧭',
+      major: true,
+      items: [
+        'Awarding points moved to where the students already are: open a section, tap the students you want, and the award bar slides up. Ticking several and awarding them in one go still works exactly as before — it’s just fewer screens to get there.',
+        'Class stats are no longer trapped behind a live class. History is its own tab now, holding the points log and the full attendance record side by side.',
+        'The bottom bar is down to four tabs, so everything is a bigger target on a phone.',
+        'Old bookmarks still work — anything pointing at the old Award or Class history addresses lands in the right place.',
+      ],
+    },
+    {
       heading: 'Prelim, midterm, finals — the app finally knows 📅',
       major: true,
       items: [

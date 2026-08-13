@@ -245,7 +245,9 @@ export function StudentRecord() {
         <Button onClick={() => navigate(`/teach/student/${student.id}/report`)}>
           <DownloadIcon className="h-5 w-5" /> Print report
         </Button>
-        <Button variant="outline" onClick={() => navigate(`/teach/award?student=${student.id}`)}>
+        {/* Awarding lives in the section roster now — this opens it with the
+            student already ticked, so the bulk bar is one tap from here. */}
+        <Button variant="outline" onClick={() => navigate(`/teach?student=${student.id}`)}>
           <BoltIcon className="h-5 w-5" /> Award
         </Button>
         {student.claimed && (

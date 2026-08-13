@@ -11,7 +11,8 @@ import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import type { AwardRecord } from '@/lib/types'
 
-export function AwardHistory() {
+/** `embedded` hides the page header when rendered inside the History tabs. */
+export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) {
   const { sections } = useInstructor()
   const { toast } = useToast()
 
@@ -56,10 +57,12 @@ export function AwardHistory() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="font-display text-xl font-bold">Recent activity</h1>
-        <p className="text-sm text-muted">Last 40 awards & penalties · undo any mistake.</p>
-      </div>
+      {!embedded && (
+        <div>
+          <h1 className="font-display text-xl font-bold">Recent activity</h1>
+          <p className="text-sm text-muted">Last 40 awards & penalties · undo any mistake.</p>
+        </div>
+      )}
 
       {loading ? (
         <ListSkeleton rows={6} />

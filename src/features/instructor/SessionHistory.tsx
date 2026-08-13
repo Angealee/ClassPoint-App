@@ -39,7 +39,7 @@ function rateTone(rate: number | null): string {
 }
 
 /** The whole term at a glance: every session, plus who's actually showing up. */
-export function SessionHistory() {
+export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}) {
   const { sections, selectedSectionId, setSelectedSectionId, subjectsForSection } = useInstructor()
   const { toast } = useToast()
   const navigate = useNavigate()
@@ -145,17 +145,19 @@ export function SessionHistory() {
 
   return (
     <div className="space-y-5 pb-4">
-      <button
-        type="button"
-        onClick={() => navigate('/teach/attendance')}
-        className="flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-ink"
-      >
-        <ArrowLeftIcon className="h-4 w-4" /> Attendance
-      </button>
+      {!embedded && (
+        <button
+          type="button"
+          onClick={() => navigate('/teach/attendance')}
+          className="flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-ink"
+        >
+          <ArrowLeftIcon className="h-4 w-4" /> Attendance
+        </button>
+      )}
 
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-xl font-bold">Class history</h1>
+          {!embedded && <h1 className="font-display text-xl font-bold">Class history</h1>}
           <p className="text-sm text-muted">Every session, and who’s showing up.</p>
         </div>
         <Select

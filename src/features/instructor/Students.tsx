@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -23,12 +23,14 @@ import {
 } from '@/components/ui/icons'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
 import { useInstructor } from './InstructorLayout'
+import { AwardBar } from './AwardBar'
 import { SectionGrid } from './SectionGrid'
 import { ArchivedStudentsSheet } from './ArchivedStudentsSheet'
 import {
   archiveStudent,
   createStudent,
   createStudentsBulk,
+  getStudent,
   grantAchievement,
   listAchievements,
   listArchivedStudents,
@@ -38,16 +40,35 @@ import {
 import { exportAllData } from '@/lib/export-all'
 import { exportRoster, parseRosterNames } from '@/lib/roster-io'
 import { getLevelProgress } from '@/lib/leveling'
+import { cn } from '@/lib/cn'
 import type { Achievement, SectionStudent } from '@/lib/types'
 
 export function Students() {
   const { sections, setSelectedSectionId } = useInstructor()
   const { toast } = useToast()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const importRef = useRef<HTMLInputElement>(null)
 
   // Landing on the section grid; opening a card switches to that section's roster.
   const [openId, setOpenId] = useState<string | null>(null)
+
+  // ?student=<id> (from the record page's Award button) opens that student's
+  // section and pre-ticks them, so the award bar is already up on arrival.
+  const studentParam = searchParams.get('student')
+  useEffect(() => {
+    if (!studentParam) return
+    setSearchParams({}, { replace: true })
+    getStudent(studentParam)
+      .then((s) => {
+        if (!s) return
+        setSelectedSectionId(s.sectionId)
+        setOpenId(s.sectionId)
+        setSelected(new Set([s.id]))
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentParam])
 
   const [students, setStudents] = useState<SectionStudent[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,6 +90,24 @@ export function Students() {
   const [archivedCount, setArchivedCount] = useState(0)
   const [archivedOpen, setArchivedOpen] = useState(false)
   const [backingUp, setBackingUp] = useState(false)
+
+  // Awarding lives here now (the Award tab is gone). Ticking is bulk by design:
+  // pick several students, choose the amount once, award them together.
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  // The group from the last award, for the "same students again" shortcut.
+  const [lastAwarded, setLastAwarded] = useState<string[]>([])
+
+  // Students from the last award still on screen (drives the reselect shortcut).
+  const reselectable = lastAwarded.filter((id) => students.some((s) => s.id === id))
+
+  function toggleSelected(id: string) {
+    setSelected((cur) => {
+      const next = new Set(cur)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const [resetTarget, setResetTarget] = useState<SectionStudent>()
   const [resetInfo, setResetInfo] = useState<{ token: string }>()
@@ -387,24 +426,52 @@ export function Students() {
           {filtered.map((s) => {
             const level = getLevelProgress(s.semester_points).level
             return (
-              <div key={s.id} className="flex items-center gap-3 p-3.5">
-                <Avatar name={s.full_name} url={s.avatar_url} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{s.full_name}</p>
-                  <p className="flex items-center gap-1.5 text-xs text-muted">
-                    {s.claimed_at ? (
-                      <>
-                        <CheckIcon className="h-3.5 w-3.5 text-gold-500" />
-                        @{s.username} · Lv {level} · {s.semester_points} pts
-                      </>
-                    ) : (
-                      <>
-                        <span className="font-mono tracking-wider text-ink">{s.claim_token}</span>
-                        <span>· not claimed</span>
-                      </>
+              <div
+                key={s.id}
+                className={cn(
+                  'flex items-center gap-3 p-3.5 transition-colors',
+                  selected.has(s.id) && 'bg-brand-500/8',
+                )}
+              >
+                {/* The row body ticks for an award — a safe, reversible action,
+                    unlike the explicit icon buttons beside it. The avatar
+                    doubles as the checkbox so the row gains no extra width. */}
+                <button
+                  type="button"
+                  onClick={() => toggleSelected(s.id)}
+                  aria-pressed={selected.has(s.id)}
+                  aria-label={`Select ${s.full_name} to award points`}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  <span className="relative shrink-0">
+                    <Avatar
+                      name={s.full_name}
+                      url={s.avatar_url}
+                      className={cn(selected.has(s.id) && 'opacity-40')}
+                    />
+                    {selected.has(s.id) && (
+                      <span className="absolute inset-0 flex items-center justify-center rounded-full bg-brand-500 text-white">
+                        <CheckIcon className="h-5 w-5" />
+                      </span>
                     )}
-                  </p>
-                </div>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{s.full_name}</span>
+                    <span className="flex items-center gap-1.5 text-xs text-muted">
+                      {s.claimed_at ? (
+                        <>
+                          <CheckIcon className="h-3.5 w-3.5 text-gold-500" />@{s.username} · Lv{' '}
+                          {level} · {s.semester_points} pts
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-mono tracking-wider text-ink">{s.claim_token}</span>
+                          <span>· not claimed</span>
+                        </>
+                      )}
+                    </span>
+                  </span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setGrantTarget(s)}
@@ -458,6 +525,30 @@ export function Students() {
           })}
         </Card>
       )}
+
+      {/* Re-pick the group you just awarded — e.g. to add a second category. */}
+      {selected.size === 0 && reselectable.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setSelected(new Set(reselectable))}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line py-2.5 text-sm font-medium text-muted transition-colors hover:border-brand-500 hover:text-brand-500"
+        >
+          Select the same {reselectable.length} again
+        </button>
+      )}
+
+      {/* Keeps the last roster row clear of the docked award bar. */}
+      {selected.size > 0 && <div aria-hidden className="h-32" />}
+
+      <AwardBar
+        selectedIds={[...selected]}
+        onClear={() => setSelected(new Set())}
+        onAwarded={(ids) => {
+          setLastAwarded(ids)
+          setSelected(new Set())
+          void refresh()
+        }}
+      />
 
       {/* Add student / show token */}
       <Sheet
