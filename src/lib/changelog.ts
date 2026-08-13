@@ -5,6 +5,9 @@
  * bumped `version`. On the next app open, anyone who hasn't seen that version
  * gets the WhatsNew sheet listing every release they've missed. That's the whole
  * workflow — no other wiring needed.
+ *
+ * Sections flagged `major: true` render a "MAJOR" pill so headline features
+ * stand out from the smaller updates.
  */
 
 /** A main update with its sub-module bullet points. */
@@ -34,147 +37,118 @@ export interface ChangelogEntry {
   sections?: ChangelogSection[]
 }
 
-/**
- * THE OVERHAUL DRAFT — not visible to users yet.
- *
- * Per the user's decision (2026-07-16): all overhaul phases ship quietly and get
- * announced together as one big 3.0.0. Accumulate sections here as each phase
- * lands; when the user says "announce it", move this entry to the TOP of
- * CHANGELOG (and delete this const). Do NOT add per-phase entries to CHANGELOG.
- */
-/**
- * THE RELIABILITY UPDATE DRAFT — not visible to users yet.
- *
- * Accumulates the Reliability Era phases (A–D). Announce it (move into
- * CHANGELOG, delete this const) when the user says so — independently of
- * DRAFT_3_0_0, which covers the earlier overhaul era.
- */
-export const DRAFT_3_1_0: ChangelogEntry = {
-  version: '3.1.0',
-  date: '2026-07-18', // update to the real announce date when it ships
-  title: 'The Reliability Update',
-  sections: [
-    {
-      heading: 'Excuse an absence, the proper way',
-      items: [
-        'Missed a class? The Attendance tab now walks you through it — get a valid excuse letter, have the Dean’s office validate it and issue your admission slip, then present it to your instructor.',
-        'File the request right in the app (within 7 days), mark when you’ve got your admission slip, and your instructor sees it in their Requests inbox — slip-holders first.',
-        'The moment your instructor excuses it, the absence stops counting against you and any deducted points come straight back — with a notification.',
-        'Instructors: absence and point requests now live in one tabbed Requests inbox.',
-      ],
-    },
-    {
-      heading: 'A real record for every student',
-      items: [
-        'Instructors: tap “View ›” on any student for their full record — attendance week by week, points history, requests and badges, all on one page.',
-        'One tap prints a formal Attendance Record — sessions, check-in times, totals, attendance rate and signature lines — ready to hand to a parent or the dean’s office as paper or PDF.',
-        'New Register export: the classic class-record grid (students × sessions, P/L/A/E/I) as a spreadsheet.',
-        'From a student’s record you can award points, reset their PIN, or archive — everything in one place when someone’s standing at your desk.',
-      ],
-    },
-    {
-      heading: 'Check in even with no data or wifi',
-      major: true,
-      items: [
-        'No signal? Scan the QR anyway — your phone reads it offline, saves the proof, and checks you in automatically the moment you’re back online. Your status counts from when you scanned, not when it syncs (you have 48 hours).',
-        'You can now scan the class QR straight from your phone’s normal camera — it opens ClassPoint and checks you in. The in-app scanner still works too.',
-        'The Attendance tab shows exactly what happened: waiting to sync, checked in, or — if something went wrong — the details to show your instructor.',
-        'If you were marked absent but actually scanned in time, syncing fixes it and gives back any deducted points automatically.',
-      ],
-    },
-    {
-      heading: 'Your records are now un-loseable',
-      items: [
-        'Every night at 2 AM the entire class record — points, attendance, sessions, everything — is snapshotted automatically, with two weeks of history kept.',
-        'Removing a student now ARCHIVES them instead of deleting: they vanish from the roster and leaderboard, but every record survives and they can be restored in one tap.',
-        'Permanent deletion still exists, but only for already-archived students — and it makes you type their name first. No more one-tap catastrophes.',
-        'A new audit log quietly records every destructive action with a full copy of what was removed.',
-        'Instructors: a new “Backup all” button downloads the whole term — roster, points ledger, attendance, sessions, requests — as one spreadsheet.',
-        'Crashes now show a friendly recovery screen instead of a wall of technical text.',
-      ],
-    },
-  ],
-}
-
-export const DRAFT_3_0_0: ChangelogEntry = {
-  version: '3.0.0',
-  date: '2026-07-16', // update to the real announce date when it ships
-  title: 'The Overhaul 🚀',
-  sections: [
-    {
-      heading: 'Notifications that actually show up',
-      major: true,
-      items: [
-        'New bell in the header: every point, level-up, rank move and badge lands in one list you can scroll back through. The dot tells you what you missed.',
-        'Push is rebuilt — notifications now reach your lock screen fast instead of trickling in late, even with the app fully closed.',
-        'Nothing gets lost anymore: if a notification can’t be delivered right away, it retries on its own until it lands.',
-        'New “Send test” button in Profile → Notifications: lock your phone, tap it, and confirm push works on your device.',
-        'iPhone: push still needs ClassPoint added to your Home Screen (Share → Add to Home Screen). The bell works everywhere regardless.',
-      ],
-    },
-    {
-      heading: 'Smoother, snappier everywhere',
-      items: [
-        'Screens now fade and rise gently as you move between them — a small thing that makes the whole app feel more alive.',
-        'Points, level and rank roll up when they change instead of snapping.',
-        'A satisfying check appears when you approve a request, save your profile, or finalise attendance.',
-        'The bottom tabs give a little bounce when tapped. (All of this respects your phone’s “reduce motion” setting.)',
-      ],
-    },
-    {
-      heading: 'Achievement library + who’s viewing you',
-      items: [
-        'Tap any badge to see its full story — how rare it is (“✦ Legendary · 8% of the class · 3 of 42”), when you unlocked it, and a little something extra under each one.',
-        'Four new badges to chase, including two secret ones tied to spending and commenting.',
-        'Your profile-views strip is now tappable — open the full list of who’s viewed you and when. Still only you can see it.',
-      ],
-    },
-    {
-      heading: 'Share the board · flying comments',
-      major: true,
-      items: [
-        'New Share button on the leaderboard: turn the rankings into a proper 1080×1350 image, sized for a story or a post. Pick Podium or Top 10, preview it, then share or save.',
-        'Your rank rides along on the card — everyone has something to brag about, not just the top 3.',
-        'Comments now fly across the leaderboard. Post one and the whole class sees it drift past their board in real time.',
-        'Three comments a day each, they vanish after 24 hours, and your name rides with them — so keep it fun. Tap a quick chip if you can’t think of anything.',
-        'Instructors can post too (badged as Instructor, no daily limit) and delete anything — tap a comment, or use the Recent comments list.',
-      ],
-    },
-    {
-      heading: 'Spend your points on your grades',
-      major: true,
-      items: [
-        'New on your Home screen: Use points. Put up to 50 points toward a quiz, activity or exam and your instructor approves or declines it.',
-        'Nothing is spent until it’s approved — and you can withdraw a request any time before that.',
-        'Fair warning: spending really does cost you. Your points, level and leaderboard rank all drop, exactly like losing points. The app tells you the damage before you commit.',
-        'A new gold gauge tracks everything you’ve ever cashed in, so your spending is a flex of its own.',
-        'You’ll get a notification the moment your instructor decides, with their note if they left one.',
-        'Instructors: a new inbox (the ticket icon) badges every waiting request — approve or decline with an optional note, and see who’s spent the most.',
-      ],
-    },
-    {
-      heading: 'Attendance, rebuilt',
-      major: true,
-      items: [
-        'Two new marks: Excused and Irregular. Neither costs you points, and neither counts against your attendance — an excused class is simply left out of your show-up rate and never breaks your streak.',
-        'Your show-up rate is now fairer: it only counts classes that actually counted.',
-        'Instructors: sessions are grouped by week (“Week 5 · Jul 13–19”) so you can find any class at a glance.',
-        'Instructors: tap any past session for a full page — everyone grouped by status, editable after the fact, exportable, deletable.',
-        'Instructors: fixing attendance after finalising now adjusts points automatically. Mark someone present who was absent and their −5 comes straight back.',
-        'Instructors: new Class history page — attendance % per student, a weekly show-up trend, an automatic “needs attention” list, and a one-tap Excel summary.',
-      ],
-    },
-    {
-      heading: 'Safety nets everywhere',
-      items: [
-        'Every risky action — deleting sessions, students, photos, or point awards — now asks you to confirm first. No more accidental oops.',
-      ],
-    },
-  ],
-}
-
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '3.0.0',
+    date: '2026-07-19',
+    title: 'The big one 🚀',
+    sections: [
+      // ── Major updates ──────────────────────────────────────────────────
+      {
+        heading: 'Attendance, rebuilt',
+        major: true,
+        items: [
+          'Two new marks: Excused and Irregular. Neither costs you points, and neither counts against your attendance — an excused class is simply left out of your show-up rate and never breaks your streak.',
+          'Your show-up rate is now fairer: it only counts classes that actually counted.',
+          'Instructors: sessions are grouped by week (“Week 5 · Jul 13–19”) so you can find any class at a glance.',
+          'Instructors: tap any past session for a full page — everyone grouped by status, editable after the fact, exportable, deletable.',
+          'Instructors: fixing attendance after finalising now adjusts points automatically. Mark someone present who was absent and their −5 comes straight back.',
+          'Instructors: new Class history page — attendance % per student, a weekly show-up trend, an automatic “needs attention” list, and a one-tap Excel summary.',
+        ],
+      },
+      {
+        heading: 'Check in even with no data or wifi',
+        major: true,
+        items: [
+          'No signal? Scan the QR anyway — your phone reads it offline, saves the proof, and checks you in automatically the moment you’re back online. Your status counts from when you scanned, not when it syncs (you have 48 hours).',
+          'You can now scan the class QR straight from your phone’s normal camera — it opens ClassPoint and checks you in. The in-app scanner still works too.',
+          'The Attendance tab shows exactly what happened: waiting to sync, checked in, or — if something went wrong — the details to show your instructor.',
+          'If you were marked absent but actually scanned in time, syncing fixes it and gives back any deducted points automatically.',
+        ],
+      },
+      {
+        heading: 'Spend your points on your grades',
+        major: true,
+        items: [
+          'New on your Home screen: Use points. Put up to 50 points toward a quiz, activity or exam and your instructor approves or declines it.',
+          'Nothing is spent until it’s approved — and you can withdraw a request any time before that.',
+          'Fair warning: spending really does cost you. Your points, level and leaderboard rank all drop, exactly like losing points. The app tells you the damage before you commit.',
+          'A new gold gauge tracks everything you’ve ever cashed in, so your spending is a flex of its own.',
+          'You’ll get a notification the moment your instructor decides, with their note if they left one.',
+          'Instructors: a new inbox badges every waiting request — approve or decline with an optional note, and see who’s spent the most.',
+        ],
+      },
+      {
+        heading: 'Share the board · flying comments',
+        major: true,
+        items: [
+          'New Share button on the leaderboard: turn the rankings into a proper 1080×1350 image, sized for a story or a post. Pick Podium or Top 10, preview it, then share or save.',
+          'Your rank rides along on the card — everyone has something to brag about, not just the top 3.',
+          'Comments now fly across the leaderboard. Post one and the whole class sees it drift past their board in real time.',
+          'Three comments a day each, they vanish after 24 hours, and your name rides with them — so keep it fun. Tap a quick chip if you can’t think of anything, and tap a comment to open the sender’s profile.',
+          'Instructors can post too (badged as Instructor, no daily limit) and delete anything.',
+        ],
+      },
+      {
+        heading: 'Notifications that actually show up',
+        major: true,
+        items: [
+          'New bell in the header: every point, level-up, rank move and badge lands in one list you can scroll back through. The dot tells you what you missed.',
+          'Push is rebuilt — notifications now reach your lock screen fast instead of trickling in late, even with the app fully closed.',
+          'Nothing gets lost anymore: if a notification can’t be delivered right away, it retries on its own until it lands.',
+          'New “Send test” button in Profile → Notifications: lock your phone, tap it, and confirm push works on your device.',
+          'iPhone: push still needs ClassPoint added to your Home Screen (Share → Add to Home Screen). The bell works everywhere regardless.',
+        ],
+      },
+      // ── Minor updates ──────────────────────────────────────────────────
+      {
+        heading: 'Excuse an absence, the proper way',
+        items: [
+          'Missed a class? The Attendance tab now walks you through it — get a valid excuse letter, have the Dean’s office validate it and issue your admission slip, then present it to your instructor.',
+          'File the request right in the app (within 7 days), mark when you’ve got your admission slip, and your instructor sees it in their Requests inbox — slip-holders first.',
+          'The moment your instructor excuses it, the absence stops counting against you and any deducted points come straight back — with a notification.',
+          'Instructors: absence and point requests now live in one tabbed Requests inbox.',
+        ],
+      },
+      {
+        heading: 'Achievement library + who’s viewing you',
+        items: [
+          'Tap any badge to see its full story — how rare it is (“✦ Legendary · 8% of the class · 3 of 42”), when you unlocked it, and a little something extra under each one.',
+          'Four new badges to chase, including two secret ones tied to spending and commenting.',
+          'Your profile-views strip is now tappable — open the full list of who’s viewed you and when. Still only you can see it.',
+        ],
+      },
+      {
+        heading: 'A real record for every student',
+        items: [
+          'Instructors: tap “View ›” on any student for their full record — attendance week by week, points history, requests and badges, all on one page.',
+          'One tap prints a formal Attendance Record — sessions, check-in times, totals, attendance rate and signature lines — ready to hand to a parent or the dean’s office as paper or PDF.',
+          'New Register export: the classic class-record grid (students × sessions, P/L/A/E/I) as a spreadsheet.',
+          'From a student’s record you can award points, reset their PIN, or archive — everything in one place when someone’s standing at your desk.',
+        ],
+      },
+      {
+        heading: 'Your records are now un-loseable',
+        items: [
+          'Every night the entire class record — points, attendance, sessions, everything — is snapshotted automatically, with two weeks of history kept.',
+          'Removing a student now ARCHIVES them instead of deleting: they vanish from the roster and leaderboard, but every record survives and they can be restored in one tap.',
+          'Permanent deletion still exists, but only for already-archived students — and it makes you type their name first. No more one-tap catastrophes.',
+          'Instructors: a new “Backup all” button downloads the whole term — roster, points ledger, attendance, sessions, requests — as one spreadsheet.',
+        ],
+      },
+      {
+        heading: 'Smoother, snappier everywhere',
+        items: [
+          'Screens now fade and rise gently as you move between them — a small thing that makes the whole app feel more alive.',
+          'Points, level and rank roll up when they change instead of snapping.',
+          'A satisfying check appears when you approve a request, save your profile, or finalise attendance.',
+          'The bottom tabs give a little bounce when tapped. (All of this respects your phone’s “reduce motion” setting.)',
+          'Every risky action — deleting sessions, students, photos, or point awards — now asks you to confirm first, and crashes show a friendly recovery screen instead of a wall of text.',
+        ],
+      },
+    ],
+  },
   {
     version: '2.2.0',
     date: '2026-07-06',
@@ -323,6 +297,33 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
 ]
+
+/**
+ * The 4.0.0 draft — the "Semesters & Subjects" era, built one phase at a time.
+ *
+ * Deliberately NOT in the CHANGELOG array above, so none of it is announced
+ * while the era is still being built: LATEST_VERSION reads CHANGELOG[0], so the
+ * "What's new" sheet can't see this. Keep ADDING sections as each phase lands,
+ * then move the whole entry into the array (with the real ship date) when the
+ * era is ready to announce.
+ */
+export const DRAFT_4_0_0: ChangelogEntry = {
+  version: '4.0.0',
+  date: '2026-08-13', // placeholder — set to the real ship date when announced
+  title: 'Semesters, subjects & a sturdier lock',
+  sections: [
+    {
+      heading: 'Your account got a bouncer 🔒',
+      major: true,
+      items: [
+        'Five wrong PINs in a row and sign-in takes a breather before you can try again — and it gets longer if you keep going. Motivation to remember your PIN.',
+        'New claim tokens are twice as long, so they are far harder to guess. Already have a token? It still works — nothing to redo.',
+        'Claiming an account and resetting a PIN have limits now too: too many wrong codes from one place and it asks you to come back in a few minutes.',
+        'Every claim and PIN reset is written down now, so your instructor can tell the difference between "I forgot my PIN again" and someone actually snooping.',
+      ],
+    },
+  ],
+}
 
 export const LATEST_VERSION = CHANGELOG[0]?.version ?? '0.0.0'
 

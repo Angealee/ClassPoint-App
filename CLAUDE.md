@@ -55,10 +55,11 @@ achievements. Single instructor (the user), students at DCT. Classes started
 ## Changelog workflow
 
 Every user-facing change is announced via `src/lib/changelog.ts` (drives the
-"What's new" sheet; version-gated by localStorage). **Current mode: the 3.0.0 overhaul
-draft.** During overhaul phases, accumulate sections into the exported `DRAFT_3_0_0`
-entry (NOT in the `CHANGELOG` array — invisible to users) and only move it into the
-array as `3.0.0` when the user says the overhaul is ready to announce.
+"What's new" sheet; version-gated by localStorage). **Current mode: the 4.0.0
+"Semesters & Subjects" draft** (3.0.0 shipped 2026-07-19). During overhaul phases,
+accumulate sections into the exported `DRAFT_4_0_0` entry (NOT in the `CHANGELOG`
+array — `LATEST_VERSION` reads `CHANGELOG[0]`, so a draft is invisible to users) and
+only move it into the array as `4.0.0` when the user says the era is ready to announce.
 
 ## Migration workflow
 
@@ -72,7 +73,11 @@ array as `3.0.0` when the user says the overhaul is ready to announce.
   `point_events_category_check` — see 0007/0011 precedent).
 - Manual dashboard steps go in a `── ONE-TIME SETUP ──` header comment (0010 pattern).
   Current manual state: Vault secret `edge_service_key` exists; VAPID keys are set as
-  edge function secrets; pg_cron + pg_net enabled.
+  edge function secrets; pg_cron + pg_net enabled. **Pending since 0026:** set the
+  `ALLOWED_ORIGINS` edge-function secret (comma-separated origins, no trailing slash)
+  and redeploy `claim-token`, `reset-pin`, `send-push`. Until it is set the two public
+  functions stay on the old permissive CORS — by design, so a missing secret can never
+  take the app down.
 - The user pastes migrations whole into the SQL editor — test idempotency by running twice.
 
 ## DB map (migrations 0001–0016 are the source of truth)
@@ -84,6 +89,31 @@ ledger — awards, penalties, and future spending all flow through it), `instruc
 (frozen rank, pg_cron refresh 12:30 + 19:30 Manila), `push_subscriptions`,
 `class_sessions` + `class_session_secrets` + `attendance_records`, `profile_views`,
 `achievements` + `student_achievements`.
+
+Since 0026 (Security): `auth_events` — every claim / PIN-reset attempt (`kind`,
+`success`, `ip`, `user_agent`, `student_id` with no FK, coarse `detail`). It is BOTH
+the audit trail and the rate-limit counter: the two public edge functions count an
+IP's recent failures before touching a token (**30 per 15 min** — deliberately
+generous because a whole class shares one NAT IP; rows with `detail = 'rate_limited'`
+are excluded from the count so retries can't extend a lockout). Instructor-select
+only, no write policy — the functions insert with the service role. Weekly prune cron
+`classpoint-auth-events-prune` (180-day retention). **Ownership move:
+`cp_generate_token` 0002 → 0026** — claim/reset tokens are now 16 hex chars (64 bits);
+EXISTING shorter tokens stay valid, so mixed lengths in `student_secrets` are expected.
+Shared edge helpers live in `supabase/functions/_shared/security.ts` (CORS allowlist
+via the `ALLOWED_ORIGINS` secret, rate limit, logging) — all of it fails OPEN on
+infrastructure errors so a logging or counter failure never blocks a real student.
+`send-push` now rejects any caller that isn't the service role (it previously accepted
+any signed-in student's JWT, since the gateway's `verify_jwt` is satisfied by any valid
+token); it accepts an exact service-key match OR a `service_role` JWT so a rotated
+Vault secret can't silently kill push. Claim/reset error messages are uniform
+("not valid **or** already used/expired") so a guesser can't distinguish token states;
+the archived-student message stays specific because it is only reachable after a valid
+unclaimed token matched. `vercel.json` serves HSTS, `X-Frame-Options: DENY`, nosniff,
+`Referrer-Policy`, and `Permissions-Policy` (`camera=(self)` — the QR scanner needs it).
+**No CSP yet** — deferred by the user; adding one requires moving the inline
+`beforeinstallprompt` script out of `index.html` and allowlisting the Google Fonts and
+Supabase (https + wss) origins.
 
 Since 0024: `attendance_records.synced_late` (offline check-in flag). Offline
 check-in: the QR now encodes `{origin}/scan#CP1|…` so native cameras work (public
@@ -208,7 +238,13 @@ Students: username + PIN → synthetic email `@students.classpoint.app`; onboard
 claim tokens (edge function `claim-token`). Instructors: real email + `is_instructor()`
 allowlist check; sign-in lives at the unlisted route `/macalesideauth`. Student area
 `/app` (`AppLayout`), instructor area `/teach` (`InstructorLayout`); RLS is the real
-security boundary.
+security boundary. Since 0026 **all four** auth forms wire `useLockout` (5 failures →
+60s, doubling, 15m cap): `cp_instr_login`, `cp_student_login`, `cp_claim`,
+`cp_reset_pin`. Only SERVER rejections call `registerFailure()` — a local `validate()`
+typo must not count. This is a speed bump, not a boundary (localStorage is clearable);
+for claim/reset the server-side per-IP limit in `auth_events` is the real gate, and
+failed PASSWORD sign-ins are not server-observable at all (they go straight to GoTrue),
+which is why there is deliberately no server-side failed-login log.
 
 ## Working agreements with the user
 

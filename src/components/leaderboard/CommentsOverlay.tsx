@@ -18,13 +18,27 @@ import {
   type LeaderboardComment,
 } from '@/lib/types'
 
-/** Lanes a pill can fly in. Three reads busy without becoming soup. */
-const LANES = 3
-/** Minimum gap before re-using a lane, so pills never overlap mid-flight. */
-const LANE_GAP_MS = 1800
-/** Base flight time; longer comments get more so they stay readable. */
-const BASE_MS = 13000
-const MS_PER_CHAR = 45
+/**
+ * A single-file ticker: one lane, so comments read cleanly one after another
+ * and never stack. Height stays slim so the podium sits right at the top.
+ */
+const LANES = 1
+const LANE_HEIGHT = 30
+/**
+ * CONSTANT speed for every pill (px per second). This is the anti-overlap
+ * guarantee: because all pills move at the same speed and enter from the same
+ * point, a later pill can never catch an earlier one — the gap between them is
+ * fixed at launch. Slow enough (~20–28s per crossing) to read comfortably.
+ */
+const SPEED_PX_PER_SEC = 30
+/** Visible gap kept between one pill's tail and the next pill's nose. */
+const MIN_GAP_PX = 52
+
+/** Estimate a pill's rendered width from its text, so timing/gaps are right. */
+function estPillWidth(c: LeaderboardComment): number {
+  const chars = (c.displayName?.length ?? 0) + (c.body?.length ?? 0)
+  return 96 + chars * 6.6 // avatar + padding + ~6.6px per char at text-xs
+}
 
 /** Tap-to-fill prompts. A blank box gets far fewer posts than a chip does. */
 const QUICK_CHIPS = [
@@ -101,22 +115,32 @@ export function CommentsOverlay({
   const queueRef = useRef<LeaderboardComment[]>([])
   const laneFreeAtRef = useRef<number[]>(Array(LANES).fill(0))
   const seenRef = useRef<Set<string>>(new Set())
+  // The flight deck — measured so pill duration matches the real width and the
+  // constant-speed math holds on both phone and desktop.
+  const deckRef = useRef<HTMLDivElement>(null)
 
   /** Launch anything queued whose lane has freed up. */
   const drain = useCallback(() => {
     if (reduced) return
     const now = Date.now()
+    const deckW = deckRef.current?.clientWidth || 360
     while (queueRef.current.length > 0) {
-      // Pick the lane that has been free the longest.
+      // Single lane, but keep the loop general: pick the lane free longest.
       let lane = 0
       for (let i = 1; i < LANES; i++) {
         if (laneFreeAtRef.current[i] < laneFreeAtRef.current[lane]) lane = i
       }
-      if (laneFreeAtRef.current[lane] > now) break // every lane still busy — wait
+      if (laneFreeAtRef.current[lane] > now) break // lane still busy — wait
 
       const c = queueRef.current.shift()!
-      const durationMs = BASE_MS + c.body.length * MS_PER_CHAR
-      laneFreeAtRef.current[lane] = now + LANE_GAP_MS
+      const pillW = estPillWidth(c)
+      // Distance = deck width + the pill's own width (enters and exits fully
+      // off-screen). Constant speed → duration scales with that distance.
+      const durationMs = Math.round(((deckW + pillW) / SPEED_PX_PER_SEC) * 1000)
+      // Reserve the lane until this pill's tail + gap has cleared the entry
+      // point, so the next pill never overlaps it.
+      const reserveMs = Math.round(((pillW + MIN_GAP_PX) / SPEED_PX_PER_SEC) * 1000)
+      laneFreeAtRef.current[lane] = now + reserveMs
       setFlying((f) => [...f, { ...c, key: `${c.id}-${now}-${lane}`, lane, durationMs }])
     }
   }, [reduced])
@@ -140,7 +164,9 @@ export function CommentsOverlay({
     [drain],
   )
 
-  // Seed from the last day, oldest-first so they fly in chronological order.
+  // Seed from the last day. The "Recent comments" list shows up to 20, but a
+  // single-file ticker would take minutes to drain 20 — so only the newest few
+  // actually fly on load; the rest just populate the list.
   useEffect(() => {
     let cancelled = false
     listLeaderboardComments(20)
@@ -149,7 +175,8 @@ export function CommentsOverlay({
         setRecent(list)
         for (const c of list) seenRef.current.add(c.id)
         if (!reduced) {
-          queueRef.current.push(...[...list].reverse())
+          // Newest 6, oldest-first so they fly in chronological order.
+          queueRef.current.push(...list.slice(0, 6).reverse())
           drain()
         }
       })
@@ -230,16 +257,17 @@ export function CommentsOverlay({
 
   return (
     <>
-      {/* Flying band — a STICKY strip ABOVE the board. It sits in normal flow
-          (so it never overlaps the podium/crown) and stays pinned below the app
-          header as you scroll the rankings. pointer-events-none so scrolls pass
-          through; student pills re-enable taps to open the sender's profile. */}
+      {/* Slim single-lane ticker directly ABOVE the podium — a thin strip so the
+          podium stays right at the top and the crown is never covered. Pills fly
+          one at a time (constant speed, never stacking). pointer-events-none so
+          scrolls pass through; student pills re-enable taps to open a profile. */}
       {!reduced && (
         <div
-          className="pointer-events-none sticky top-[52px] z-10 mb-1 overflow-hidden md:top-2"
+          ref={deckRef}
+          className="pointer-events-none relative mb-1 overflow-hidden"
           // container-type makes `cqw` in the cp-fly keyframe resolve against
-          // this band's width — that's what tells a pill how far to travel.
-          style={{ height: LANES * 34 + 8, containerType: 'inline-size' }}
+          // this deck's width — that's what tells a pill how far to travel.
+          style={{ height: LANES * LANE_HEIGHT, containerType: 'inline-size' }}
         >
           {flying.map((p) => {
             const tappable = p.studentId !== null && !!onOpenProfile
@@ -250,7 +278,7 @@ export function CommentsOverlay({
                 className="cp-fly absolute whitespace-nowrap"
                 style={
                   {
-                    top: p.lane * 34 + 4,
+                    top: p.lane * LANE_HEIGHT + 2,
                     '--cp-fly-dur': `${p.durationMs}ms`,
                   } as React.CSSProperties
                 }

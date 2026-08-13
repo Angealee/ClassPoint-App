@@ -66,6 +66,8 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE)
 }
 
+const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -73,8 +75,52 @@ function json(body: unknown, status = 200) {
   })
 }
 
+/**
+ * The `role` claim of a bearer the API gateway has ALREADY signature-verified
+ * (this function keeps verify_jwt ON). Reading the payload here is a role check,
+ * not a trust decision — an unsigned or wrongly-signed token never gets this far.
+ */
+function bearerRole(bearer: string): string | null {
+  try {
+    const segment = bearer.split('.')[1]
+    if (!segment) return null
+    const b64 = segment.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
+    const claims = JSON.parse(atob(padded)) as { role?: unknown }
+    return typeof claims.role === 'string' ? claims.role : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Only Postgres may fan out pushes.
+ *
+ * Before this check the gateway's verify_jwt was the ONLY gate — and ANY
+ * signed-in student's token satisfies it, so a student could POST other
+ * students' notification ids to force-dispatch them or burn their retry budget.
+ * The real caller is `cp_push_dispatch` (0017) over pg_net, which sends the
+ * service-role key read from Vault.
+ *
+ * Two accepted forms: an exact match on this function's own service key, or any
+ * service-role JWT. The second is what keeps a rotated Vault secret from
+ * silently killing every push if it wasn't copied into this function's env.
+ */
+function isServiceCaller(req: Request): boolean {
+  const bearer = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+  if (!bearer) return false
+  if (SERVICE_KEY && bearer === SERVICE_KEY) return true
+  return bearerRole(bearer) === 'service_role'
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed.' }, 405)
+  if (!isServiceCaller(req)) {
+    // Loud on purpose: if a Vault/key mismatch ever lands here, the function
+    // logs are where you'd diagnose "pushes stopped arriving".
+    console.error('[send-push] rejected a caller without the service role.')
+    return json({ ok: false, error: 'Forbidden.' }, 403)
+  }
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
     console.error(
       '[send-push] VAPID keys not configured — set VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY secrets.',

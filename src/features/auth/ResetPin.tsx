@@ -4,10 +4,15 @@ import { AuthShell } from './AuthShell'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/lib/auth'
+import { formatCountdown, useLockout } from '@/lib/useLockout'
 
 export function ResetPin() {
   const { resetPin } = useAuth()
   const navigate = useNavigate()
+  // Client-side speed bump over the server's per-IP limit. Only SERVER
+  // rejections count — a local typo caught by validate() below is not an
+  // attempt at anything.
+  const lock = useLockout('cp_reset_pin', { threshold: 5, baseMs: 60_000 })
   const [token, setToken] = useState('')
   const [pin, setPin] = useState('')
   const [pin2, setPin2] = useState('')
@@ -23,6 +28,7 @@ export function ResetPin() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
+    if (lock.locked) return
     const problem = validate()
     if (problem) {
       setError(problem)
@@ -32,9 +38,16 @@ export function ResetPin() {
     setBusy(true)
     const { error } = await resetPin(token.trim(), pin)
     setBusy(false)
-    if (error) setError(error)
-    else navigate('/app', { replace: true })
+    if (error) {
+      lock.registerFailure()
+      setError(error)
+    } else {
+      lock.reset()
+      navigate('/app', { replace: true })
+    }
   }
+
+  const disabled = busy || lock.locked
 
   return (
     <AuthShell
@@ -58,7 +71,8 @@ export function ResetPin() {
           autoCorrect="off"
           spellCheck={false}
           hint="A one-time code from your instructor. Expires after 24 hours."
-          placeholder="e.g. 9F3A1C7B"
+          placeholder="e.g. 9F3A1C7B2D8E406A"
+          disabled={disabled}
           required
         />
         <Input
@@ -79,8 +93,17 @@ export function ResetPin() {
           required
           error={error}
         />
-        <Button type="submit" size="lg" className="w-full" disabled={busy}>
-          {busy ? 'Resetting…' : 'Reset PIN & sign in'}
+        {lock.locked && (
+          <p className="rounded-xl bg-brand-500/10 px-3 py-2 text-sm text-brand-500">
+            Too many attempts. Try again in {formatCountdown(lock.remainingMs)}.
+          </p>
+        )}
+        <Button type="submit" size="lg" className="w-full" disabled={disabled}>
+          {lock.locked
+            ? `Locked · ${formatCountdown(lock.remainingMs)}`
+            : busy
+              ? 'Resetting…'
+              : 'Reset PIN & sign in'}
         </Button>
       </form>
     </AuthShell>

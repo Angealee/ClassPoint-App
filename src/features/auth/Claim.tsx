@@ -4,10 +4,15 @@ import { AuthShell } from './AuthShell'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { USERNAME_RE, useAuth } from '@/lib/auth'
+import { formatCountdown, useLockout } from '@/lib/useLockout'
 
 export function Claim() {
   const { claim } = useAuth()
   const navigate = useNavigate()
+  // Client-side speed bump over the server's per-IP limit. Only SERVER
+  // rejections count — a local typo caught by validate() below is not an
+  // attempt at anything.
+  const lock = useLockout('cp_claim', { threshold: 5, baseMs: 60_000 })
   const [token, setToken] = useState('')
   const [username, setUsername] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -27,6 +32,7 @@ export function Claim() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
+    if (lock.locked) return
     const problem = validate()
     if (problem) {
       setError(problem)
@@ -41,9 +47,16 @@ export function Claim() {
       displayName: displayName.trim() || undefined,
     })
     setBusy(false)
-    if (error) setError(error)
-    else navigate('/app', { replace: true })
+    if (error) {
+      lock.registerFailure()
+      setError(error)
+    } else {
+      lock.reset()
+      navigate('/app', { replace: true })
+    }
   }
+
+  const disabled = busy || lock.locked
 
   return (
     <AuthShell
@@ -66,7 +79,8 @@ export function Claim() {
           autoCapitalize="characters"
           autoCorrect="off"
           spellCheck={false}
-          placeholder="e.g. 9F3A1C7B"
+          placeholder="e.g. 9F3A1C7B2D8E406A"
+          disabled={disabled}
           required
         />
         <Input
@@ -105,8 +119,17 @@ export function Claim() {
           required
           error={error}
         />
-        <Button type="submit" size="lg" className="w-full" disabled={busy}>
-          {busy ? 'Setting up…' : 'Claim & sign in'}
+        {lock.locked && (
+          <p className="rounded-xl bg-brand-500/10 px-3 py-2 text-sm text-brand-500">
+            Too many attempts. Try again in {formatCountdown(lock.remainingMs)}.
+          </p>
+        )}
+        <Button type="submit" size="lg" className="w-full" disabled={disabled}>
+          {lock.locked
+            ? `Locked · ${formatCountdown(lock.remainingMs)}`
+            : busy
+              ? 'Setting up…'
+              : 'Claim & sign in'}
         </Button>
       </form>
     </AuthShell>
