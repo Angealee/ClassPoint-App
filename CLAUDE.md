@@ -90,7 +90,7 @@ only move it into the array as `4.0.0` when the user says the era is ready to an
 - **Migration before client, always.** 0027–0029 add columns the client now selects
   (`sections.semester_id`, `class_sessions.subject_id`, `students.semester_points`,
   `leaderboard_snapshot.semester_points`). Deploying the build first would 400 every
-  read. **Unrun as of 2026-08-13: 0026, 0027, 0028, 0029, 0030.**
+  read. **Unrun as of 2026-08-14: 0026, 0027, 0028, 0029, 0030, 0031.**
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
@@ -101,6 +101,22 @@ ledger — awards, penalties, and future spending all flow through it), `instruc
 (frozen rank, pg_cron refresh 12:30 + 19:30 Manila), `push_subscriptions`,
 `class_sessions` + `class_session_secrets` + `attendance_records`, `profile_views`,
 `achievements` + `student_achievements`.
+
+Since 0031 (Attendance aggregates — the 1000-row truncation fix): PostgREST caps any
+response at 1000 rows and truncates SILENTLY; a two-subject section crosses that in
+`attendance_records` around week 12. Tallies the client only aggregates moved into SQL:
+**`get_section_session_tallies(section_id)`** (per-session status counts, feeds
+`listSessions`) and **`get_section_attendance_stats(section_id, subject_id?)`**
+(per-active-student counts + `penalty_points` via the `penalty_event_id → point_events`
+join — which also replaced the client's full penalty-event scan; doubles as the Phase G
+risk-overview backend). Both plpgsql stable definer, instructor-raise inside, granted to
+authenticated, drop-first. True row-matrix needs page instead: `fetchAllPages` in api.ts
+(fresh builder per page + `.range()`, unique-column order tiebreaker) backs
+`getSectionRegister` and `listMyAttendance` (the printable report's feed). Ride-alongs:
+`student_secrets` reads are scoped `.in('student_id', …)` (chunked in `getSectionStats`,
+which now takes the on-screen `sectionIds`) — the old unfiltered scans shipped every
+semester's claim tokens on every roster/grid open. `supabase/queries/leveling_audit.sql`
+(NOT a migration) is the Phase E rebalance input — run block-by-block.
 
 Since 0030 (Per-subject metrics): **Ownership move `cp_achievement_metrics` 0021 → 0030**
 (drop-first, plus drop-first `get_achievement_progress` and recreated

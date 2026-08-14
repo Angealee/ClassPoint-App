@@ -27,7 +27,8 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
   async function loadStats() {
     setStatsLoading(true)
     try {
-      setStats(await getSectionStats())
+      // Scoped to the sections on screen — see getSectionStats (0031).
+      setStats(await getSectionStats(sections.map((s) => s.id)))
     } catch {
       setStats({})
     } finally {

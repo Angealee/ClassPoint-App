@@ -313,6 +313,13 @@ export const DRAFT_4_0_0: ChangelogEntry = {
   title: 'Semesters, subjects & a sturdier lock',
   sections: [
     {
+      heading: 'Attendance math that stays honest 🧮',
+      items: [
+        'Instructors: attendance stats are now computed in the database instead of on your phone, so show-up rates and the “needs attention” list stay exact no matter how long the semester runs. (The old way silently miscounted once a section passed a thousand records — roughly week 12.)',
+        'Rosters and the section grid load lighter too — the app stops downloading data it never showed.',
+      ],
+    },
+    {
       heading: 'Instructors: fewer taps, nothing buried 🧭',
       major: true,
       items: [

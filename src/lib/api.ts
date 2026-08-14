@@ -350,20 +350,37 @@ export interface SectionStat {
   claimed: number
 }
 
-/** Per-section roster stats (total students + how many have claimed). */
-export async function getSectionStats(): Promise<Record<string, SectionStat>> {
-  const [students, secrets] = await Promise.all([
-    supabase.from('students').select('id, section_id').is('archived_at', null),
-    supabase.from('student_secrets').select('student_id, claimed_at'),
-  ])
+/**
+ * Per-section roster stats (total students + how many have claimed).
+ *
+ * Pass the section ids you're rendering (SectionGrid does) — students AND their
+ * secrets are then scoped to those sections instead of scanning every semester's
+ * roster and shipping every claim token's row over the wire on the instructor's
+ * home screen (0031 ride-along).
+ */
+export async function getSectionStats(sectionIds?: string[]): Promise<Record<string, SectionStat>> {
+  let studentQuery = supabase.from('students').select('id, section_id').is('archived_at', null)
+  if (sectionIds && sectionIds.length > 0) studentQuery = studentQuery.in('section_id', sectionIds)
+  const students = await studentQuery
   if (students.error) throw students.error
-  if (secrets.error) throw secrets.error
+  const rows = students.data ?? []
+  if (rows.length === 0) return {}
 
-  const claimedById = new Map(
-    (secrets.data ?? []).map((s) => [s.student_id as string, !!s.claimed_at]),
-  )
+  // Chunked so the .in() URL stays bounded no matter how large a roster grows.
+  const ids = rows.map((r) => r.id as string)
+  const claimedById = new Map<string, boolean>()
+  const CHUNK = 150
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const { data, error } = await supabase
+      .from('student_secrets')
+      .select('student_id, claimed_at')
+      .in('student_id', ids.slice(i, i + CHUNK))
+    if (error) throw error
+    for (const s of data ?? []) claimedById.set(s.student_id as string, !!s.claimed_at)
+  }
+
   const stats: Record<string, SectionStat> = {}
-  for (const row of students.data ?? []) {
+  for (const row of rows) {
     const id = row.section_id as string
     const stat = (stats[id] ??= { total: 0, claimed: 0 })
     stat.total += 1
@@ -374,17 +391,24 @@ export async function getSectionStats(): Promise<Record<string, SectionStat>> {
 
 /** Students in a section: profiles merged with their secret/token info. */
 export async function listStudents(sectionId: string): Promise<SectionStudent[]> {
-  const [students, secrets] = await Promise.all([
-    supabase
-      .from('students')
-      .select(
-        'id, section_id, full_name, display_name, avatar_url, semester_points, lifetime_points, user_id',
-      )
-      .eq('section_id', sectionId)
-      .is('archived_at', null),
-    supabase.from('student_secrets').select('student_id, claim_token, username, claimed_at'),
-  ])
+  const students = await supabase
+    .from('students')
+    .select(
+      'id, section_id, full_name, display_name, avatar_url, semester_points, lifetime_points, user_id',
+    )
+    .eq('section_id', sectionId)
+    .is('archived_at', null)
   if (students.error) throw students.error
+
+  // Scoped to THIS roster (0031 ride-along) — the old unfiltered fetch shipped
+  // every semester's claim tokens over the wire on every roster open.
+  const secrets = await supabase
+    .from('student_secrets')
+    .select('student_id, claim_token, username, claimed_at')
+    .in(
+      'student_id',
+      (students.data ?? []).map((s) => s.id as string),
+    )
   if (secrets.error) throw secrets.error
 
   const byId = new Map(secrets.data?.map((s) => [s.student_id, s]) ?? [])
@@ -848,19 +872,24 @@ export async function getSectionRegister(sectionId: string): Promise<SectionRegi
 
   const statuses: Record<string, Record<string, AttendanceStatus>> = {}
   if (sessions.length > 0) {
-    const { data: records, error } = await supabase
-      .from('attendance_records')
-      .select('session_id, student_id, status')
-      .in(
-        'session_id',
-        sessions.map((s) => s.id),
-      )
-    if (error) throw error
-    for (const r of (records ?? []) as Array<{
+    // The register genuinely needs every cell, so this pages past the 1000-row
+    // cap instead of aggregating (0031). `id` is the unique order tiebreaker.
+    const records = await fetchAllPages<{
       session_id: string
       student_id: string
       status: AttendanceStatus
-    }>) {
+    }>((from, to) =>
+      supabase
+        .from('attendance_records')
+        .select('session_id, student_id, status')
+        .in(
+          'session_id',
+          sessions.map((s) => s.id),
+        )
+        .order('id')
+        .range(from, to),
+    )
+    for (const r of records) {
       ;(statuses[r.student_id] ??= {})[r.session_id] = r.status
     }
   }
@@ -1137,20 +1166,34 @@ export async function listSessions(sectionId: string): Promise<SessionSummary[]>
   const rows = sessions ?? []
   if (rows.length === 0) return []
 
-  const ids = rows.map((s) => s.id as string)
-  const { data: records, error: recErr } = await supabase
-    .from('attendance_records')
-    .select('session_id, status, synced_late')
-    .in('session_id', ids)
+  // Tallied in SQL (0031): the old `.in(session_ids)` record fetch hit
+  // PostgREST's silent 1000-row cap around week 12 of a two-subject semester,
+  // making late sessions read "0 present". One row per session, never grows.
+  const { data: tallies, error: recErr } = await supabase.rpc('get_section_session_tallies', {
+    p_section_id: sectionId,
+  })
   if (recErr) throw recErr
 
   const tally = new Map<string, ReturnType<typeof emptyTally>>()
-  for (const r of records ?? []) {
-    const t = tally.get(r.session_id as string) ?? emptyTally()
-    t[r.status as AttendanceStatus] += 1
-    t.total += 1
-    if (r.synced_late as boolean) t.syncedLate += 1
-    tally.set(r.session_id as string, t)
+  for (const r of (tallies ?? []) as Array<{
+    session_id: string
+    present: number
+    late: number
+    absent: number
+    excused: number
+    irregular: number
+    total: number
+    synced_late: number
+  }>) {
+    tally.set(r.session_id, {
+      present: r.present,
+      late: r.late,
+      absent: r.absent,
+      excused: r.excused,
+      irregular: r.irregular,
+      total: r.total,
+      syncedLate: r.synced_late,
+    })
   }
 
   return rows.map((s) => {
@@ -1319,91 +1362,49 @@ export async function getAttendanceAnalytics(
   sectionId: string,
   subjectId?: string,
 ): Promise<AttendanceAnalytics> {
-  let sessionQuery = supabase.from('class_sessions').select('id').eq('section_id', sectionId)
-  if (subjectId) sessionQuery = sessionQuery.eq('subject_id', subjectId)
-  const [sessionsRes, studentsRes] = await Promise.all([
-    sessionQuery,
-    supabase
-      .from('students')
-      .select('id, full_name, avatar_url')
-      .eq('section_id', sectionId)
-      .is('archived_at', null),
-  ])
-  if (sessionsRes.error) throw sessionsRes.error
-  if (studentsRes.error) throw studentsRes.error
+  // Aggregated in SQL (0031). The old three-query client version fetched every
+  // attendance record `.in(session_ids)` — silently truncated at PostgREST's
+  // 1000-row cap around week 12 — plus a full penalty-event scan. One row per
+  // active student now, penalties folded in via the penalty_event_id join.
+  const { data, error } = await supabase.rpc('get_section_attendance_stats', {
+    p_section_id: sectionId,
+    p_subject_id: subjectId ?? null,
+  })
+  if (error) throw error
 
-  const roster = (studentsRes.data ?? []) as Array<{
-    id: string
+  const rows = (data ?? []) as Array<{
+    student_id: string
     full_name: string
     avatar_url: string | null
-  }>
-  const base = () =>
-    roster
-      .map((s) => ({
-        studentId: s.id,
-        fullName: s.full_name,
-        avatarUrl: s.avatar_url ?? null,
-        present: 0,
-        late: 0,
-        absent: 0,
-        excused: 0,
-        irregular: 0,
-        counted: 0,
-        rate: null as number | null,
-      }))
-      .sort((a, b) => a.fullName.localeCompare(b.fullName))
-
-  const sessionIds = (sessionsRes.data ?? []).map((s) => s.id as string)
-  if (sessionIds.length === 0 || roster.length === 0) {
-    return { students: base(), penaltyPoints: 0, penalizedStudents: 0 }
-  }
-
-  const { data: records, error } = await supabase
-    .from('attendance_records')
-    .select('student_id, status, penalty_event_id')
-    .in('session_id', sessionIds)
-  if (error) throw error
-  const rows = (records ?? []) as Array<{
-    student_id: string
-    status: AttendanceStatus
-    penalty_event_id: string | null
+    present: number
+    late: number
+    absent: number
+    excused: number
+    irregular: number
+    counted: number
+    penalty_points: number
   }>
 
-  const stats = base()
-  const byId = new Map(stats.map((s) => [s.studentId, s]))
-  const penaltyIds = new Set<string>()
-  for (const r of rows) {
-    const s = byId.get(r.student_id)
-    if (!s) continue // a student who left the section
-    s[r.status] += 1
-    if (r.status !== 'excused' && r.status !== 'irregular') s.counted += 1
-    if (r.penalty_event_id) penaltyIds.add(r.penalty_event_id)
-  }
-  for (const s of stats) {
-    s.rate = s.counted > 0 ? (s.present + s.late) / s.counted : null
-  }
-
-  // Penalty damage. Fetching by student (a short list) instead of by event id
-  // (which grows with every session) keeps the request URL bounded; the
-  // penaltyIds set then narrows it to attendance penalties, excluding the
-  // instructor's manual ones which share the 'penalty' category.
   let penaltyPoints = 0
-  const penalized = new Set<string>()
-  if (penaltyIds.size > 0) {
-    const { data: events, error: evErr } = await supabase
-      .from('point_events')
-      .select('id, points, student_id')
-      .eq('category', 'penalty')
-      .in('student_id', [...byId.keys()])
-    if (evErr) throw evErr
-    for (const e of (events ?? []) as Array<{ id: string; points: number; student_id: string }>) {
-      if (!penaltyIds.has(e.id)) continue
-      penaltyPoints += Math.abs(e.points)
-      penalized.add(e.student_id)
+  let penalizedStudents = 0
+  const students = rows.map((r) => {
+    penaltyPoints += r.penalty_points
+    if (r.penalty_points > 0) penalizedStudents += 1
+    return {
+      studentId: r.student_id,
+      fullName: r.full_name,
+      avatarUrl: r.avatar_url ?? null,
+      present: r.present,
+      late: r.late,
+      absent: r.absent,
+      excused: r.excused,
+      irregular: r.irregular,
+      counted: r.counted,
+      rate: r.counted > 0 ? (r.present + r.late) / r.counted : null,
     }
-  }
+  })
 
-  return { students: stats, penaltyPoints, penalizedStudents: penalized.size }
+  return { students, penaltyPoints, penalizedStudents }
 }
 
 /** Edit a session's saved topic (instructor tweak from the history sheet). */
@@ -1536,14 +1537,6 @@ export async function submitOfflineScan(
 
 /** A student's own attendance history (newest first). */
 export async function listMyAttendance(studentId: string): Promise<MyAttendanceEntry[]> {
-  const { data, error } = await supabase
-    .from('attendance_records')
-    .select(
-      'id, session_id, status, scanned_at, synced_late, class_sessions(topic, started_at, subject_id, subjects(code))',
-    )
-    .eq('student_id', studentId)
-    .order('created_at', { ascending: false })
-  if (error) throw error
   type Row = {
     id: string
     session_id: string
@@ -1557,7 +1550,23 @@ export async function listMyAttendance(studentId: string): Promise<MyAttendanceE
       subjects: { code: string } | { code: string }[] | null
     } | null
   }
-  return ((data ?? []) as unknown as Row[]).map((r) => ({
+  // Grows across semesters and feeds the PRINTABLE report — pages past the
+  // 1000-row cap (0031). `id` breaks created_at ties for stable pagination.
+  const data = await fetchAllPages<Row>((from, to) =>
+    supabase
+      .from('attendance_records')
+      .select(
+        'id, session_id, status, scanned_at, synced_late, class_sessions(topic, started_at, subject_id, subjects(code))',
+      )
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to) as unknown as PromiseLike<{
+      data: Row[] | null
+      error: { message: string } | null
+    }>,
+  )
+  return data.map((r) => ({
     recordId: r.id,
     sessionId: r.session_id,
     subjectId: r.class_sessions?.subject_id ?? null,
@@ -1768,6 +1777,29 @@ async function fetchAllRows<T>(
       .range(from, from + PAGE - 1)
     if (error) throw error
     const rows = (data ?? []) as T[]
+    out.push(...rows)
+    if (rows.length < PAGE) return out
+  }
+}
+
+/**
+ * fetchAllRows for arbitrary queries: the caller builds a FRESH query per page
+ * (supabase builders are single-use) and this loops `.range()` until a short
+ * page. Same 1000-row-cap rationale; the query MUST carry a stable order (add a
+ * unique tiebreaker column) or rows can duplicate/skip across page boundaries.
+ */
+async function fetchAllPages<T>(
+  page: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const PAGE = 1000
+  const out: T[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1)
+    if (error) throw error
+    const rows = data ?? []
     out.push(...rows)
     if (rows.length < PAGE) return out
   }
