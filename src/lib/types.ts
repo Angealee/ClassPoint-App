@@ -260,6 +260,22 @@ export const MAX_REDEEM_POINTS = 50
 /** How many requests a student may have waiting at once (mirrors the RPC). */
 export const MAX_PENDING_REDEMPTIONS = 3
 
+/**
+ * One entry in the instructor-authored price list (0032).
+ *
+ * Tapping one pre-fills a redemption request — it does NOT create a different
+ * kind of record, so approval and the point-locking logic are unchanged.
+ */
+export interface RewardCatalogItem {
+  id: string
+  label: string
+  points: number
+  kind: RedemptionKind
+  sortOrder: number
+  /** Set when retired: keeps past redemptions meaningful, stops offering it. */
+  archivedAt: string | null
+}
+
 /** One request to spend points on a grade. */
 export interface Redemption {
   id: string

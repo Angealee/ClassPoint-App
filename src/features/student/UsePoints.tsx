@@ -8,7 +8,12 @@ import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { TicketIcon, WarningIcon } from '@/components/ui/icons'
-import { cancelRedemption, listMyRedemptions, requestRedemption } from '@/lib/api'
+import {
+  cancelRedemption,
+  listCatalogItems,
+  listMyRedemptions,
+  requestRedemption,
+} from '@/lib/api'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import { supabase, uniqueChannel } from '@/lib/supabase'
@@ -19,6 +24,7 @@ import {
   type Redemption,
   type RedemptionKind,
   type RedemptionStatus,
+  type RewardCatalogItem,
 } from '@/lib/types'
 
 const KINDS: Array<{ value: RedemptionKind; label: string }> = [
@@ -63,6 +69,7 @@ export function UsePoints() {
   const [cancelTarget, setCancelTarget] = useState<Redemption | null>(null)
   const [cancelling, setCancelling] = useState(false)
   const [loadError, setLoadError] = useState(false)
+  const [catalog, setCatalog] = useState<RewardCatalogItem[]>([])
 
   const load = useCallback(async () => {
     if (!studentId) return
@@ -82,6 +89,15 @@ export function UsePoints() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // The price list. Non-fatal: an empty catalog just means the shop doesn't
+  // render and the free-form path is the only way in — which is the pre-0032
+  // behaviour, and exactly what a brand-new install looks like.
+  useEffect(() => {
+    listCatalogItems()
+      .then(setCatalog)
+      .catch(() => setCatalog([]))
+  }, [])
 
   // Page-scoped channel: a decision lands live while this screen is open.
   // Subscribed on mount, removed on unmount — the durable student-self channel
@@ -234,6 +250,54 @@ export function UsePoints() {
         </div>
       </div>
 
+      {/* The shop (0032). Without a price list a student has no way to know what
+          10 points is worth — this is the whole point of the catalog. */}
+      {catalog.length > 0 && (
+        <div>
+          <h2 className="mb-2 px-1 text-sm font-semibold text-muted">What you can get</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {catalog.map((item) => {
+              const affordable = item.points <= available
+              const short = item.points - available
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={!affordable || tooMany}
+                  onClick={() => {
+                    setPoints(item.points)
+                    setKind(item.kind)
+                    setNote('')
+                    setConfirming(true)
+                  }}
+                  className={cn(
+                    'rounded-2xl border p-3 text-left transition-colors',
+                    affordable
+                      ? 'border-line bg-card hover:border-gold-400 hover:bg-card-2'
+                      : // Shown, not hidden: the reward you can't afford yet is
+                        // the reason to keep earning.
+                        'border-dashed border-line bg-card opacity-60',
+                  )}
+                >
+                  <span className="block text-sm font-semibold">{item.label}</span>
+                  <span className="mt-1.5 flex items-baseline gap-1">
+                    <span className="font-display text-lg font-bold text-gold-600 dark:text-gold-400">
+                      {item.points}
+                    </span>
+                    <span className="text-xs text-muted">pts</span>
+                  </span>
+                  {!affordable && (
+                    <span className="mt-0.5 block text-[0.7rem] font-medium text-muted">
+                      {short} more to go
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Request form */}
       <Card className="space-y-4 p-5">
         <div className="flex items-center gap-2">
@@ -241,7 +305,9 @@ export function UsePoints() {
             <TicketIcon className="h-5 w-5" />
           </span>
           <div>
-            <p className="font-display font-bold">New request</p>
+            <p className="font-display font-bold">
+              {catalog.length > 0 ? 'Something else' : 'New request'}
+            </p>
             <p className="text-xs text-muted">Up to {MAX_REDEEM_POINTS} points at a time.</p>
           </div>
         </div>

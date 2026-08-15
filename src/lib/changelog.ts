@@ -323,6 +323,25 @@ export const DRAFT_4_0_0: ChangelogEntry = {
       ],
     },
     {
+      heading: 'Smaller, smoother, kinder 🪶',
+      items: [
+        'Profile pictures are resized on your phone before they upload, so setting one is quick even on bad wifi — and everyone else’s screens load faster too.',
+        'The app now notices new versions on its own instead of waiting for you to happen to reload.',
+        'If you use larger text, a screen reader, or have motion turned down in your phone settings, the app finally respects all of it — pop-ups keep your place, and confirmations get read out.',
+        'Instructors: the live check-in roster is noticeably lighter on the phone during class.',
+      ],
+    },
+    {
+      heading: 'Points now come with a price list 🏷️',
+      major: true,
+      items: [
+        'Use points finally tells you what things cost. Tap a reward and the request fills itself in — no more guessing whether 10 points is a lot or a little.',
+        'Rewards you can’t afford yet still show, greyed out, with how far off you are. That’s the fun part: something to aim at.',
+        'Need something that isn’t on the list? The old “ask for anything” option is still right there underneath.',
+        'Instructors: you set the menu and the prices under Requests → Rewards. Retiring a reward is reversible and never touches requests students already made.',
+      ],
+    },
+    {
       heading: 'Attendance math that stays honest 🧮',
       items: [
         'Instructors: attendance stats are now computed in the database instead of on your phone, so show-up rates and the “needs attention” list stay exact no matter how long the semester runs. (The old way silently miscounted once a section passed a thousand records — roughly week 12.)',

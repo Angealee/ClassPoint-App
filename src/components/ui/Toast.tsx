@@ -49,7 +49,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex flex-col items-center gap-2 px-4">
+      {/* Toast is the app's primary success/error channel (~130 call sites), and
+          it was announcing none of it. `polite` so a confirmation never cuts off
+          whatever the user is currently reading; `atomic` so the whole message
+          is read rather than just the changed words. */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="pointer-events-none fixed inset-x-0 top-3 z-50 flex flex-col items-center gap-2 px-4"
+      >
         <AnimatePresence>
           {toasts.map((t) => (
             <motion.div

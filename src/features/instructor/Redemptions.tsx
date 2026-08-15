@@ -14,9 +14,10 @@ import { supabase, uniqueChannel } from '@/lib/supabase'
 import { cn } from '@/lib/cn'
 import { useInstructor } from './InstructorLayout'
 import { ExcusesInbox } from './ExcusesInbox'
+import { RewardsCatalog } from './RewardsCatalog'
 import type { RedemptionKind, RedemptionRequest, RedemptionStatus, SpenderStat } from '@/lib/types'
 
-type RequestsTab = 'points' | 'excuses'
+type RequestsTab = 'points' | 'excuses' | 'rewards'
 
 const KIND_LABEL: Record<RedemptionKind, string> = {
   quiz: 'Quiz',
@@ -119,16 +120,19 @@ export function Redemptions() {
         <p className="text-sm text-muted">
           {tab === 'points'
             ? 'Students asking to put points toward a grade. Nothing is spent until you approve.'
-            : 'Absence excuses. Tap Excuse once the student presents their admission slip.'}
+            : tab === 'excuses'
+              ? 'Absence excuses. Tap Excuse once the student presents their admission slip.'
+              : 'Your price list — what students can spend points on.'}
         </p>
       </div>
 
-      {/* Tabs — one inbox, two request types. */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Tabs — one inbox, two request types, plus the price list behind them. */}
+      <div className="grid grid-cols-3 gap-2">
         {(
           [
             ['points', 'Points'],
             ['excuses', 'Excuses'],
+            ['rewards', 'Rewards'],
           ] as Array<[RequestsTab, string]>
         ).map(([key, label]) => (
           <button
@@ -146,6 +150,8 @@ export function Redemptions() {
       </div>
 
       {tab === 'excuses' && <ExcusesInbox />}
+
+      {tab === 'rewards' && <RewardsCatalog />}
 
       {tab === 'points' &&
         (loading ? (

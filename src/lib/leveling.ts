@@ -2,12 +2,21 @@
  * ClassPoint leveling math.
  *
  * Rules (confirmed with the instructor):
- *  - EXP is cumulative lifetime points; it never decreases.
+ *  - EXP is the student's points for the CURRENT semester (0029).
  *  - Clearing level 1 -> 2 requires 50 EXP.
  *  - Each subsequent level requires 1.5x the previous requirement, rounded.
  *  - Leftover EXP overflows naturally into the next level.
  *
- * A Postgres function mirrors this so the DB and client always agree.
+ * ⚠ `cp_level()` in migration 0002 MIRRORS these two constants. Change one and
+ * you must change the other in the SAME commit, or a student sees one level on
+ * the dashboard and a different one in their achievement progress.
+ *
+ * A rebalance was proposed and DECLINED (2026-08-14). For the record, since the
+ * data is easy to re-derive and someone will wonder: measured halfway through
+ * the first semester across 208 active students, the median had 22 points, p90
+ * had 40 and the top student 65 — against thresholds of 50 for Level 2 and 125
+ * for Level 3. The instructor reviewed those numbers and the exact point bands
+ * and chose to keep this curve as-is. Don't "fix" it without asking.
  */
 
 const BASE_REQUIREMENT = 50

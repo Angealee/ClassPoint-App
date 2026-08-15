@@ -31,9 +31,17 @@ and the leaderboard **reset each semester**; achievements and the all-time total
 
 ## Conventions (follow these exactly)
 
-- **Data layer:** ALL Supabase calls live in `src/lib/api.ts` (throw on error; map
-  snake_case rows → camelCase app types). Domain types in `src/lib/types.ts`.
-  Components never call `.from()` directly — except Realtime subscriptions.
+- **Data layer:** ALL Supabase calls live under **`src/lib/api/`** — one module per
+  domain (`core` · `attendance` · `backup` · `excuses` · `comments` · `redemptions` ·
+  `notifications`), with shared plumbing (`rpc`, `withAuthRetry`, `oneEmbed`,
+  `fetchAllRows`, `fetchAllPages`) in `api/_internal.ts`. **`src/lib/api.ts` is a barrel**
+  that re-exports them, so every screen still imports from `@/lib/api` and no call site
+  changed. Add a query to the domain module it belongs to, never to the barrel; import
+  `_internal` only from within `api/*`. Calls throw on error and map snake_case rows →
+  camelCase app types. Domain types in `src/lib/types.ts`; DB row types in
+  `src/lib/database.types.ts` (hand-written — see its header for what it does and
+  doesn't catch). Components never call `.from()` directly — except Realtime
+  subscriptions.
 - **State:** no react-query/zustand. Plain Context + async functions. Student-side
   state is centralized in `src/features/student/StudentData.tsx` (realtime channel
   `student-self-${studentId}`, optimistic updates, celebration queues). Instructor
@@ -105,10 +113,9 @@ only move it into the array as `4.0.0` when the user says the era is ready to an
   functions stay on the old permissive CORS — by design, so a missing secret can never
   take the app down.
 - The user pastes migrations whole into the SQL editor — test idempotency by running twice.
-- **Migration before client, always.** 0027–0029 add columns the client now selects
-  (`sections.semester_id`, `class_sessions.subject_id`, `students.semester_points`,
-  `leaderboard_snapshot.semester_points`). Deploying the build first would 400 every
-  read. **Unrun as of 2026-08-14: 0026, 0027, 0028, 0029, 0030, 0031.**
+- **Migration before client, always.** A migration adding a column the client selects
+  must land in the database BEFORE the build that selects it, or every read 400s.
+  **All migrations through 0032 are applied as of 2026-08-14.** Next number: 0033.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
@@ -119,6 +126,31 @@ ledger — awards, penalties, and future spending all flow through it), `instruc
 (frozen rank, pg_cron refresh 12:30 + 19:30 Manila), `push_subscriptions`,
 `class_sessions` + `class_session_secrets` + `attendance_records`, `profile_views`,
 `achievements` + `student_achievements`.
+
+**Leveling curve: DO NOT change without asking.** `cp_level` (owner: 0002, `50 / ×1.5`)
+and its mirror in `src/lib/leveling.ts` stay as they are. A data-backed rebalance to
+`10 / ×1.35` was proposed and **declined by the instructor on 2026-08-14**. The numbers
+behind the proposal, so nobody re-derives them: measured at the first semester's halfway
+point across 208 active students, median 22 pts / p90 40 / top 65, against thresholds of
+50 for Level 2 and 125 for Level 3 — i.e. 90%+ had not levelled up. The instructor
+reviewed the exact point bands and chose to keep the curve. If it is ever revisited,
+`BASE_REQUIREMENT`/`GROWTH` and the pinned ladder in `leveling.test.ts` must change in
+the SAME commit as the migration, or students see one level on the dashboard and another
+in achievement progress.
+
+Since 0032 (Rewards catalog): `reward_catalog_items` (`label`, `points` 1–50, `kind`
+mirroring `point_redemptions.kind`, `sort_order`, `archived_at`) — the instructor's price
+list, fixing an economy that had no prices. **Deliberately NOT semester-scoped**: a price
+list is standing policy, so reprice/retire via `archived_at` rather than recreating it
+each rollover. **The redemption RPCs are untouched** — a catalog tap only pre-fills
+`request_point_redemption`, so 0019/0029's `for update` locking and overspend checks are
+unchanged, and an approved catalog request is indistinguishable downstream from a
+free-form one. Ships EMPTY by design (no seed rows). Retire, never delete: students'
+past redemptions must keep their meaning. `points` is capped at 50 by CHECK because the
+RPC itself refuses more, so a pricier item could be displayed but never requested.
+Student shop = card grid atop `UsePoints` (unaffordable items shown greyed with the gap
+— the reason to keep earning); instructor UI = a third tab on `/teach/redemptions`
+(Points | Excuses | Rewards). **Ownership move: `cp_nightly_backup` 0027 → 0032.**
 
 Since 0031 (Attendance aggregates — the 1000-row truncation fix): PostgREST caps any
 response at 1000 rows and truncates SILENTLY; a two-subject section crosses that in

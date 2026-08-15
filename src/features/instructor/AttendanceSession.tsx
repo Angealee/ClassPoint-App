@@ -637,10 +637,14 @@ export function AttendanceSession({
             const isManual = manualIds.has(r.studentId)
             const flash = flashIds.has(r.studentId)
             return (
-              <motion.div
+              // No `layout` prop: it made framer-motion measure and FLIP EVERY
+              // row on EVERY render, and the elapsed-time clock re-renders this
+              // screen once a second — so a 40-student roster paid 40 layout
+              // measurements per second, on a phone, while it was also decoding
+              // camera frames or driving a projected QR. The list is sorted by
+              // name and never reorders, so the animation bought nothing.
+              <div
                 key={r.studentId}
-                layout
-                transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                 className={cn('transition-colors duration-700', flash && 'bg-emerald-500/10')}
               >
                 <button
@@ -724,7 +728,7 @@ export function AttendanceSession({
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </motion.div>
+              </div>
             )
           })}
         </Card>

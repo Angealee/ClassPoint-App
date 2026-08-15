@@ -4,10 +4,13 @@ import { getLevelProgress, requirementForLevel } from './leveling'
 /**
  * The level ladder, pinned.
  *
- * These numbers MIRROR `cp_level()` in Postgres — if the two disagree, a
- * student's level flickers depending on which side computed it. Era 5.0 Phase E
- * deliberately retunes this curve; when it does, these expectations change in
- * the SAME commit as the migration, never separately.
+ * These numbers MIRROR `cp_level()` in migration 0002 — if the two disagree, a
+ * student's level flickers depending on which side computed it. Any change to
+ * the curve updates these expectations in the SAME commit as the migration,
+ * never separately.
+ *
+ * A rebalance to 10/×1.35 was proposed with real data and DECLINED by the
+ * instructor (2026-08-14) — see the note in leveling.ts.
  */
 describe('requirementForLevel', () => {
   it('starts at 50 and compounds by 1.5, rounded', () => {

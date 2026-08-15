@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
@@ -211,21 +219,34 @@ export function InstructorLayout() {
     navigate('/', { replace: true })
   }
 
+  /**
+   * Memoized: without this, a fresh object every render re-rendered EVERY
+   * instructor screen each time a redemption or excuse row changed anywhere in
+   * the database (those two badge channels fire often). refreshSections and
+   * refreshSemester are plain declarations, so they're intentionally excluded —
+   * they're called from event handlers, never used as effect dependencies.
+   */
+  const contextValue = useMemo(
+    () => ({
+      sections,
+      selectedSectionId,
+      setSelectedSectionId,
+      refreshSections,
+      semester,
+      subjects,
+      sectionSubjects,
+      subjectsForSection,
+      refreshSemester,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sections, selectedSectionId, semester, subjects, sectionSubjects, subjectsForSection],
+  )
+
   if (loading) return <Splash />
 
   return (
     <InstructorContext.Provider
-      value={{
-        sections,
-        selectedSectionId,
-        setSelectedSectionId,
-        refreshSections,
-        semester,
-        subjects,
-        sectionSubjects,
-        subjectsForSection,
-        refreshSemester,
-      }}
+      value={contextValue}
     >
       <Shell
         nav={nav}
