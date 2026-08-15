@@ -10,9 +10,28 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
 import { getLevelProgress } from '@/lib/leveling'
 import { snapshotLabel, timeAgo } from '@/lib/time'
+import { termCalendar, termLabel, termOf, weekOf } from '@/lib/term'
 import { cn } from '@/lib/cn'
 import type { AchievementState, PointEvent } from '@/lib/types'
+import { LiveClassBanner } from './LiveClassBanner'
+import { StreakFlame } from './StreakFlame'
 import { useStudentData } from './StudentData'
+
+/**
+ * "1st Sem AY 2026–2027 · Midterm · Week 9".
+ *
+ * Outside every term — semester break, or a gap the instructor left when moving
+ * dates around a holiday — the semester name stands alone. `weekOf` keeps
+ * counting past the last term (it has no end to clamp to), so showing the week
+ * there would read "Week 25" all through the break; and `termLabel(null)` is
+ * the literal string "Outside term", which is true and unhelpful.
+ */
+function whereWeAre(): string {
+  const now = new Date()
+  const term = termOf(now)
+  const name = termCalendar().semesterName
+  return term ? `${name} · ${termLabel(term)} · Week ${weekOf(now)}` : name
+}
 
 /** Time-of-day greeting for a warmer welcome. */
 function greeting(): string {
@@ -102,11 +121,25 @@ export function Dashboard() {
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
       <motion.div variants={item} className="flex items-center gap-3">
         <Avatar name={me.display_name} url={me.avatar_url} className="h-11 w-11" />
-        <p className="min-w-0 flex-1 text-sm text-muted">
-          {greeting()}, <span className="font-semibold text-ink">{me.display_name}</span> ·{' '}
-          {sectionName(me.section_id)}
-        </p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm text-muted">
+            {greeting()}, <span className="font-semibold text-ink">{me.display_name}</span> ·{' '}
+            {sectionName(me.section_id)}
+          </p>
+          {/* Where you are in the semester. The term drives the excuse window,
+              the grading period and half the app's arithmetic, and until now
+              the student side never named it. */}
+          <p className="truncate text-[0.7rem] text-muted/70">{whereWeAre()}</p>
+        </div>
+        <StreakFlame variant="compact" />
         <LiveBadge live={live} />
+      </motion.div>
+
+      {/* Class is running right now (0033) — renders nothing when it isn't.
+          Sits above the hero because it's the only time-critical thing here:
+          points can be read any time, a check-in window cannot. */}
+      <motion.div variants={item}>
+        <LiveClassBanner />
       </motion.div>
 
       {/* Level / XP hero */}
@@ -190,7 +223,18 @@ export function Dashboard() {
 
       {/* Recent points feed — grouped by day. */}
       <motion.div variants={item}>
-        <h2 className="mb-2 text-sm font-semibold text-muted">Recent points</h2>
+        <div className="mb-2 flex items-baseline justify-between">
+          <h2 className="text-sm font-semibold text-muted">Recent points</h2>
+          {events.length > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate('/app/history')}
+              className="text-xs font-semibold text-brand-500"
+            >
+              See all →
+            </button>
+          )}
+        </div>
         {events.length === 0 ? (
           <Card className="flex flex-col items-center gap-3 p-8 text-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gold-400/15 text-gold-600 dark:text-gold-400">

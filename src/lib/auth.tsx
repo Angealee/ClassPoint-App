@@ -32,6 +32,8 @@ interface AuthContextValue {
   signInInstructor: (email: string, password: string) => Promise<{ error?: string }>
   claim: (input: ClaimInput) => Promise<{ error?: string }>
   resetPin: (token: string, pin: string) => Promise<{ error?: string }>
+  /** Change your own PIN from inside the app (requires the current one). */
+  changePin: (currentPin: string, newPin: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
 
@@ -150,6 +152,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [signInStudent],
   )
 
+  /**
+   * Change the signed-in student's own PIN.
+   *
+   * The current PIN is REQUIRED even though Supabase would let a valid session
+   * set a new password on its own: without it, anyone who picks up an unlocked
+   * phone can lock the owner out of their own account. Re-authenticating is the
+   * check — a failed `signInWithPassword` leaves the existing session alone, so
+   * a wrong guess costs nothing but the error message.
+   */
+  const changePin = useCallback(async (currentPin: string, newPin: string) => {
+    const email = session?.user?.email
+    if (!email) return { error: 'You are not signed in.' }
+    if (newPin.length < 6) return { error: 'Your new PIN must be at least 6 characters.' }
+    if (newPin === currentPin) return { error: 'That is already your PIN.' }
+
+    const { error: reauth } = await supabase.auth.signInWithPassword({
+      email,
+      password: currentPin,
+    })
+    if (reauth) return { error: 'Your current PIN is incorrect.' }
+
+    const { error } = await supabase.auth.updateUser({ password: newPin })
+    if (error) return { error: error.message || "Couldn't change your PIN." }
+    return {}
+  }, [session])
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut()
   }, [])
@@ -164,9 +192,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInInstructor,
       claim,
       resetPin,
+      changePin,
       signOut,
     }),
-    [loading, session, role, signInStudent, signInInstructor, claim, resetPin, signOut],
+    [
+      loading,
+      session,
+      role,
+      signInStudent,
+      signInInstructor,
+      claim,
+      resetPin,
+      changePin,
+      signOut,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

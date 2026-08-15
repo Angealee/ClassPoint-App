@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -20,12 +21,19 @@ import {
   syncOfflineScans,
   type OfflineScanEntry,
 } from '@/lib/offline-scans'
+import { groupByTerm } from '@/lib/term'
 import { OfflineScanCards } from './OfflineScanCards'
 import { AbsenceExcuses } from './AbsenceExcuses'
+import { LiveClassBanner } from './LiveClassBanner'
+import { StreakFlame } from './StreakFlame'
 import type { AttendanceStatus, MyAttendanceEntry, ScanResult } from '@/lib/types'
 
 const entryDate = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''
+
+/** Check-in time, e.g. "9:04 AM". */
+const clockTime = (iso: string) =>
+  iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : ''
 
 function errorText(e: unknown): string {
   const m = (e as { message?: string } | null)?.message
@@ -50,6 +58,7 @@ function isOffline(e: unknown): boolean {
 
 export function Attendance() {
   const { me, syncMyAchievements, attendanceTick } = useStudentData()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [history, setHistory] = useState<MyAttendanceEntry[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -99,6 +108,20 @@ export function Attendance() {
   useEffect(() => {
     if (attendanceTick > 0) void load()
   }, [attendanceTick, load])
+
+  // Arriving from the Dashboard's live-class banner (`?scan=1`): open the
+  // scanner straight away rather than making the student find the button on a
+  // screen they were pushed to. The param is stripped so a back-navigation or a
+  // refresh doesn't re-open it.
+  useEffect(() => {
+    if (searchParams.get('scan') === null) return
+    setSearchParams((p) => {
+      const next = new URLSearchParams(p)
+      next.delete('scan')
+      return next
+    }, { replace: true })
+    openScan()
+  }, [searchParams, setSearchParams])
 
   function openScan() {
     setResult(null)
@@ -233,6 +256,10 @@ export function Attendance() {
         <p className="text-sm text-muted">Scan your instructor’s QR to check in.</p>
       </div>
 
+      {/* Class is running right now (0033). Renders nothing when it isn't, and
+          opens the scanner in place — this screen already owns that sheet. */}
+      <LiveClassBanner onScan={openScan} />
+
       <Button size="lg" className="w-full" onClick={openScan}>
         <ScanIcon className="h-5 w-5" /> Scan attendance
       </Button>
@@ -245,6 +272,10 @@ export function Attendance() {
           void load()
         }}
       />
+
+      {/* The streak, permanently visible (Phase F) — it used to disappear the
+          moment its badge unlocked. */}
+      {history.length > 0 && <StreakFlame />}
 
       {/* Summary */}
       {history.length > 0 && (
@@ -316,27 +347,44 @@ export function Attendance() {
           No classes yet. When your instructor starts a class, scan the QR to check in.
         </Card>
       ) : (
-        <Card className="divide-y divide-line">
-          {history.map((h) => (
-            <div key={h.recordId} className="flex items-center gap-3 p-4">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">
-                  {h.topic || entryDate(h.startedAt) || 'Class'}
-                </p>
-                <p className="flex items-center gap-1.5 text-xs text-muted">
-                  {h.subjectCode ? `${h.subjectCode} · ` : ''}
-                  {entryDate(h.startedAt)}
-                  {h.syncedLate && (
-                    <span className="rounded-full bg-card-2 px-1.5 py-0.5 text-[0.65rem] font-medium">
-                      Offline check-in
-                    </span>
-                  )}
-                </p>
-              </div>
-              <StatusChip status={h.status} />
+        /* Grouped by term (0027 dates, now configured for the student area
+           too). The changelog promised this; until Phase F the history was one
+           undifferentiated list, so a student couldn't tell which absences fell
+           in the term being graded. */
+        <div className="space-y-4">
+          {groupByTerm(history, (h) => h.startedAt).map((g) => (
+            <div key={g.label}>
+              <p className="mb-1.5 px-1 text-[0.7rem] font-semibold uppercase tracking-wider text-muted/80">
+                {g.label}
+              </p>
+              <Card className="divide-y divide-line">
+                {g.items.map((h) => (
+                  <div key={h.recordId} className="flex items-center gap-3 p-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">
+                        {h.topic || entryDate(h.startedAt) || 'Class'}
+                      </p>
+                      <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
+                        {h.subjectCode ? `${h.subjectCode} · ` : ''}
+                        {entryDate(h.startedAt)}
+                        {/* When they actually checked in — the answer to "was I
+                            really marked late?", which used to need the
+                            instructor. */}
+                        {h.scannedAt && <span>· in at {clockTime(h.scannedAt)}</span>}
+                        {h.syncedLate && (
+                          <span className="rounded-full bg-card-2 px-1.5 py-0.5 text-[0.65rem] font-medium">
+                            Offline check-in
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <StatusChip status={h.status} />
+                  </div>
+                ))}
+              </Card>
             </div>
           ))}
-        </Card>
+        </div>
       )}
 
       {/* Scan sheet */}

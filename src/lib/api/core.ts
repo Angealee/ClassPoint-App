@@ -958,12 +958,44 @@ export async function getMyRank(studentId: string): Promise<number | null> {
 }
 
 /** Recent point events for a student (their feed / instructor review). */
-export async function listStudentEvents(studentId: string, limit = 20): Promise<PointEvent[]> {
-  const { data, error } = await supabase
+/** Cursor for `listStudentEvents` — the last row of the page you already have. */
+export interface EventCursor {
+  created_at: string
+  id: string
+}
+
+/**
+ * A student's point ledger, newest first.
+ *
+ * Pass `before` (the last row of the page you're holding) to fetch the next
+ * page. The cursor is KEYSET, not an offset: an offset would silently skip or
+ * repeat a row whenever a new award landed mid-scroll, and awards land while
+ * students are looking at this screen.
+ *
+ * The cursor is compound — `(created_at, id)` — because ordering on a timestamp
+ * alone is not a total order. Two rows sharing a timestamp would make the page
+ * boundary ambiguous, and one of them would vanish from the history.
+ */
+export async function listStudentEvents(
+  studentId: string,
+  limit = 20,
+  before?: EventCursor,
+): Promise<PointEvent[]> {
+  let q = supabase
     .from('point_events')
     .select('id, student_id, points, category, note, created_at')
     .eq('student_id', studentId)
+  if (before) {
+    // Quoted: a timestamptz renders as `…T10:30:00.123+00:00`, and that `+` is
+    // the one character PostgREST's filter grammar would otherwise be free to
+    // read as something else. Quoting makes the value a literal whatever the
+    // encoder does with it.
+    const at = `"${before.created_at}"`
+    q = q.or(`created_at.lt.${at},and(created_at.eq.${at},id.lt.${before.id})`)
+  }
+  const { data, error } = await q
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(limit)
   if (error) throw error
   return data ?? []

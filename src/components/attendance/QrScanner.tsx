@@ -19,6 +19,13 @@ export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const detectedRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
+  // The camera takes a beat to open, and the black square gave no sign anything
+  // was happening — students tapped Scan twice thinking it had failed.
+  const [starting, setStarting] = useState(true)
+  // Torch: only offered when the granted track actually reports the capability.
+  const trackRef = useRef<MediaStreamTrack | null>(null)
+  const [canTorch, setCanTorch] = useState(false)
+  const [torchOn, setTorchOn] = useState(false)
 
   useEffect(() => {
     let stream: MediaStream | null = null
@@ -66,6 +73,7 @@ export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
     async function start() {
       if (!navigator.mediaDevices?.getUserMedia) {
         setError('This device or browser can’t open the camera.')
+        setStarting(false)
         return
       }
       try {
@@ -75,6 +83,7 @@ export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
         })
       } catch {
         setError('Camera access is blocked. Allow the camera for this site, then reopen the scanner.')
+        setStarting(false)
         return
       }
       const video = videoRef.current
@@ -82,6 +91,19 @@ export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
       video.srcObject = stream
       video.setAttribute('playsinline', 'true')
       await video.play().catch(() => {})
+      setStarting(false)
+
+      // Torch is non-standard: it exists on Android Chrome and nowhere else
+      // right now, so it's feature-detected off the live track rather than
+      // sniffed from the user agent. A missing capability just hides the button.
+      const track = stream.getVideoTracks()[0] ?? null
+      trackRef.current = track
+      try {
+        const caps = track?.getCapabilities?.() as { torch?: boolean } | undefined
+        if (caps?.torch) setCanTorch(true)
+      } catch {
+        /* getCapabilities unsupported — no torch button */
+      }
 
       const Ctor = (window as unknown as { BarcodeDetector?: DetectorCtor }).BarcodeDetector
       if (Ctor) {
@@ -106,9 +128,28 @@ export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
     return () => {
       stopped = true
       cancelAnimationFrame(raf)
+      trackRef.current = null
       stream?.getTracks().forEach((t) => t.stop())
     }
   }, [onDetect])
+
+  async function toggleTorch() {
+    const track = trackRef.current
+    if (!track) return
+    const next = !torchOn
+    try {
+      // `torch` isn't in the standard MediaTrackConstraintSet type yet, and it
+      // overlaps the standard shape too little for a direct cast.
+      await track.applyConstraints({
+        advanced: [{ torch: next }],
+      } as unknown as MediaTrackConstraints)
+      setTorchOn(next)
+    } catch {
+      // Some devices advertise torch and then refuse it. Drop the button rather
+      // than leave a control that does nothing.
+      setCanTorch(false)
+    }
+  }
 
   if (error) {
     return (
@@ -128,6 +169,25 @@ export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
         <div className="absolute bottom-6 left-6 h-8 w-8 rounded-bl-lg border-b-4 border-l-4 border-white/90" />
         <div className="absolute bottom-6 right-6 h-8 w-8 rounded-br-lg border-b-4 border-r-4 border-white/90" />
       </div>
+
+      {starting && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 text-sm text-white/80">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          Starting camera…
+        </div>
+      )}
+
+      {canTorch && !starting && (
+        <button
+          type="button"
+          onClick={() => void toggleTorch()}
+          aria-pressed={torchOn}
+          aria-label={torchOn ? 'Turn off flashlight' : 'Turn on flashlight'}
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 text-xs font-semibold text-white backdrop-blur"
+        >
+          {torchOn ? '🔦 Light on' : '🔦 Light'}
+        </button>
+      )}
     </div>
   )
 }

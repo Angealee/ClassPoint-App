@@ -115,7 +115,49 @@ only move it into the array as `4.0.0` when the user says the era is ready to an
 - The user pastes migrations whole into the SQL editor — test idempotency by running twice.
 - **Migration before client, always.** A migration adding a column the client selects
   must land in the database BEFORE the build that selects it, or every read 400s.
-  **All migrations through 0032 are applied as of 2026-08-14.** Next number: 0033.
+  **All migrations through 0032 are applied as of 2026-08-14.**
+  **0033 (`0033_student_presence.sql`) is WRITTEN AND NOT YET APPLIED** — paste it before
+  deploying the current build, or the live-class banner simply never fires (the client
+  degrades quietly; nothing 400s). Next number after it: 0034.
+
+Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
+publication** (guarded 0004 pattern). Safe because the table is already
+`select using (true)` to authenticated and the rotating QR secret lives in the separate,
+unpublished `class_session_secrets`. That subscription is what powers the live-class
+banner. Plus `cp_excuse_nudge()` + daily cron `classpoint-excuse-nudge` at 10:00 UTC
+(18:00 Manila): one push per absence on day 5–6 of 0025's 7-day window, deduped by
+`notifications.url` as an ANTI-JOIN in the driving query (not a per-row check in the
+loop). **The copy states the real deadline DATE, never "2 days left"** — the window
+spans 5–6 days old, so an evening class caught at 5d22h has barely one day, and a
+relative count would be a lie at the edge. A `cancelled` excuse deliberately does NOT
+suppress the nudge (the student withdrew it and can still refile).
+Client: `getActiveSessionForStudent` (skips the secret read that RLS hides from students
+anyway) and `getMySessionStatus` feed `liveSession`/`liveStatus` on StudentData, kept
+current by a `class_sessions` subscription on the durable channel — keyed on the stable
+`me.section_id`, and re-reading rather than patching from the payload (the raw row has no
+`subjects` join, and an `ended_at` UPDATE must CLEAR the banner). `LiveClassBanner`
+mounts on Dashboard (routes to `/app/attendance?scan=1`, which auto-opens the sheet and
+strips the param) and Attendance (opens the sheet in place).
+**`listStudentEvents` gained KEYSET paging** — `before: {created_at, id}`, compound
+because a timestamp alone is not a total order, and quoted in the PostgREST filter
+because a timestamptz renders with a `+`. New student screens: `/app/history`
+(`PointsHistory` — per-week bars, category split, load-older) and `StreakFlame`
+(Dashboard compact + Attendance full). The streak number comes from
+`achievementProgress.streak`, i.e. the DB's `greatest(combined, best-per-subject)` —
+**never recompute it client-side**, a naive local count is combined-only and would
+disagree with every badge. There is no "longest ever" figure because the schema has no
+such metric. `changePin` on AuthContext requires the current PIN (re-auth via
+`signInWithPassword`, which leaves the session intact on failure) so an unlocked phone
+can't lock the owner out. **Scanner manual entry was dropped on purpose:** the QR encodes
+a ~100-char URL + HMAC, so there is nothing on the projector a student could transcribe —
+it needs a short-code feature first.
+
+**The student area now configures the term calendar** (`configureTermCalendar` in
+StudentData's `load()`, from the semester it already fetches). Only InstructorLayout did
+this before, so every student-side week number and term label silently used term.ts's
+hardcoded FALLBACK dates — which happen to match this semester, which is exactly why it
+would have gone unnoticed until the instructor moved a term date around a holiday.
+Student attendance history is grouped by term off the back of it.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

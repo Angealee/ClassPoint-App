@@ -149,6 +149,51 @@ export async function getActiveSession(sectionId: string): Promise<ClassSession 
   return mapSession(data, secret)
 }
 
+/**
+ * The section's active session as a STUDENT sees it (0033).
+ *
+ * Deliberately not `getActiveSession`: that one also reads
+ * `class_session_secrets` for the rotating QR, which RLS hides from students —
+ * so it would fire a guaranteed-empty query on every student app open. A
+ * student never needs the secret; they scan the code off the projector.
+ *
+ * `class_sessions` is readable by any authenticated user (0014) and joined the
+ * realtime publication in 0033, which is what lets the live banner appear the
+ * moment the instructor starts class.
+ */
+export async function getActiveSessionForStudent(
+  sectionId: string,
+): Promise<ClassSession | null> {
+  const { data, error } = await supabase
+    .from('class_sessions')
+    .select(SESSION_COLS)
+    .eq('section_id', sectionId)
+    .eq('status', 'active')
+    .maybeSingle<SessionRow>()
+  if (error) throw error
+  return data ? mapSession(data) : null
+}
+
+/**
+ * This student's own status in one session, or null if they have no record yet
+ * (0033). Used by the live-class banner to stop saying "Scan now" at someone
+ * who already scanned — a whole section seeing a stale prompt every class is
+ * exactly the kind of small lie that teaches people to ignore banners.
+ */
+export async function getMySessionStatus(
+  sessionId: string,
+  studentId: string,
+): Promise<AttendanceStatus | null> {
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .select('status')
+    .eq('session_id', sessionId)
+    .eq('student_id', studentId)
+    .maybeSingle<{ status: AttendanceStatus }>()
+  if (error) throw error
+  return data?.status ?? null
+}
+
 /** A zeroed tally — one counter per status, plus roster total + late-sync count. */
 function emptyTally(): Record<AttendanceStatus, number> & { total: number; syncedLate: number } {
   return { present: 0, late: 0, absent: 0, excused: 0, irregular: 0, total: 0, syncedLate: 0 }

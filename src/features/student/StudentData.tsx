@@ -12,8 +12,10 @@ import { useAuth } from '@/lib/auth'
 import {
   getAchievementProgress,
   getActiveSemester,
+  getActiveSessionForStudent,
   getLeaderboardSnapshot,
   getMyAchievements,
+  getMySessionStatus,
   getMyStudent,
   getUnreadNotificationCount,
   listSections,
@@ -29,6 +31,7 @@ import {
   uploadBannerPhoto,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
+import { configureTermCalendar } from '@/lib/term'
 import { getLevelProgress } from '@/lib/leveling'
 import { useToast } from '@/components/ui/Toast'
 import { initSound, playSound } from '@/lib/sound'
@@ -39,6 +42,8 @@ import type {
   Achievement,
   AchievementProgress,
   AchievementState,
+  AttendanceStatus,
+  ClassSession,
   LeaderboardEntry,
   PointEvent,
   Section,
@@ -96,6 +101,19 @@ interface StudentDataValue {
    * the data.
    */
   attendanceTick: number
+  /**
+   * The student's section's currently-running class, or null (0033). Drives the
+   * live banner on the Dashboard and Attendance screens; kept live by a
+   * `class_sessions` subscription on the durable channel, so it appears the
+   * moment the instructor starts class and clears when they end it.
+   */
+  liveSession: ClassSession | null
+  /**
+   * This student's status in `liveSession`, or null if they haven't been marked
+   * yet. Lets the banner say "You're in" instead of prompting someone who has
+   * already scanned.
+   */
+  liveStatus: AttendanceStatus | null
   /** Raw metric values behind locked achievements' progress bars. */
   achievementProgress: AchievementProgress | null
   /** The achievement to celebrate with the unlock burst right now, or null. */
@@ -152,6 +170,9 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const [achievementsError, setAchievementsError] = useState(false)
   // Increments whenever one of this student's attendance records changes.
   const [attendanceTick, setAttendanceTick] = useState(0)
+  // The section's running class, if any (0033), and our own status in it.
+  const [liveSession, setLiveSession] = useState<ClassSession | null>(null)
+  const [liveStatus, setLiveStatus] = useState<AttendanceStatus | null>(null)
   const [achievementProgress, setAchievementProgress] = useState<AchievementProgress | null>(null)
   // Achievements queued to celebrate, shown one at a time (oldest first).
   const [unlockQueue, setUnlockQueue] = useState<Achievement[]>([])
@@ -320,7 +341,21 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       // an unscoped list fills the leaderboard's view picker with every past
       // semester's sections, each of which renders an empty board.
       const semester = await getActiveSemester().catch(() => null)
-      if (semester) semesterIdRef.current = semester.id
+      if (semester) {
+        semesterIdRef.current = semester.id
+        // Configure the term calendar for the WHOLE student area (Phase F).
+        // InstructorLayout has always done this for /teach, but nothing did it
+        // for /app — so every student-side week number and term label silently
+        // used term.ts's hardcoded fallback dates. That happens to match this
+        // semester, which is exactly why it would have gone unnoticed until the
+        // instructor moved a term date around a holiday.
+        configureTermCalendar({
+          semesterId: semester.id,
+          semesterName: semester.name,
+          startsOn: semester.startsOn,
+          terms: semester.terms,
+        })
+      }
       const [mine, secs, snap] = await Promise.all([
         getMyStudent(user.id),
         listSections(semester?.id),
@@ -355,6 +390,11 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         // Bell badge — independent of the main load; failures just keep the
         // last-known count.
         void getUnreadNotificationCount(mine.id).then(setUnreadCount).catch(() => {})
+        // Is class running right now? Independent of the main load — a failure
+        // just leaves the banner hidden, never blocks the dashboard.
+        void getActiveSessionForStudent(mine.section_id)
+          .then(setLiveSession)
+          .catch(() => {})
         // Independent of the main load — achievements populate the trophy
         // case as soon as they're ready without delaying the dashboard.
         void loadAchievements(mine.id).finally(() => setAchievementsLoading(false))
@@ -390,6 +430,9 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   // collides with the new subscribe and the channel dies, so only a full page
   // refresh would show new points. Keying on the id keeps one durable channel.
   const studentId = me?.id
+  // Also stable (a string, not an object) — it only changes if the instructor
+  // actually moves this student to another section, which SHOULD re-subscribe.
+  const sectionId = me?.section_id
   useEffect(() => {
     if (!studentId) return
     // Heal a rotated/missing push subscription for this device on each open.
@@ -436,6 +479,30 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
           filter: `student_id=eq.${studentId}`,
         },
         () => setAttendanceTick((n) => n + 1),
+      )
+      // Live class awareness (0033). `class_sessions` joined the realtime
+      // publication in that migration; before it, a student could only learn
+      // class had started by being in the room.
+      //
+      // Any event re-reads the active session rather than patching state from
+      // the payload: the payload is the raw row with no `subjects` join, so the
+      // banner would lose its subject name, and an UPDATE that sets ended_at
+      // has to clear the banner. One small query on an event that fires twice a
+      // day is the cheaper correctness.
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'class_sessions',
+          filter: `section_id=eq.${sectionId}`,
+        },
+        () => {
+          if (!sectionId) return
+          void getActiveSessionForStudent(sectionId)
+            .then(setLiveSession)
+            .catch(() => {})
+        },
       )
       .on(
         'postgres_changes',
@@ -539,7 +606,40 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       setLive(false)
       void supabase.removeChannel(channel)
     }
-  }, [studentId, considerLevelUp, considerRankChange, toast, celebrate, loadAchievements])
+  }, [
+    studentId,
+    sectionId,
+    considerLevelUp,
+    considerRankChange,
+    toast,
+    celebrate,
+    loadAchievements,
+  ])
+
+  /**
+   * Keep the banner's "already checked in" state honest.
+   *
+   * Re-runs on `attendanceTick` because the student's own scan is what flips
+   * this, and a scan arrives as an attendance_records change on the durable
+   * channel above — so the banner switches from "Scan now" to "You're in"
+   * without anyone navigating anywhere.
+   */
+  const liveSessionId = liveSession?.id
+  useEffect(() => {
+    if (!liveSessionId || !studentId) {
+      setLiveStatus(null)
+      return
+    }
+    let cancelled = false
+    void getMySessionStatus(liveSessionId, studentId)
+      .then((s) => !cancelled && setLiveStatus(s))
+      .catch(() => {
+        /* non-fatal — the banner just keeps prompting */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [liveSessionId, studentId, attendanceTick])
 
   // Returning to the tab/app: realtime may have been suspended in the
   // background, so pull fresh data to guarantee the score is current.
@@ -774,6 +874,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         achievementsError,
         retryAchievements,
         attendanceTick,
+        liveSession,
+        liveStatus,
         achievementProgress,
         unlockedAchievement,
         clearUnlockedAchievement,

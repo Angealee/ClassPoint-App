@@ -24,7 +24,7 @@ import { useStudentData } from './StudentData'
 import { StudentProfilePreview, type PreviewTarget } from './StudentProfilePreview'
 
 export function Profile() {
-  const { signOut } = useAuth()
+  const { signOut, changePin } = useAuth()
   const {
     loading,
     me,
@@ -59,6 +59,15 @@ export function Profile() {
   const [interests, setInterests] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+
+  // Change-PIN sheet (note: `pinBusy` above is the PINNED-ACHIEVEMENTS flag,
+  // an unrelated meaning of "pin" that already lived on this screen).
+  const [pinOpen, setPinOpen] = useState(false)
+  const [currentPin, setCurrentPin] = useState('')
+  const [newPin, setNewPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [pinSaving, setPinSaving] = useState(false)
+  const [pinError, setPinError] = useState<string | null>(null)
 
   const [pushState, setPushState] = useState<PushState>('default')
   const [pushBusy, setPushBusy] = useState(false)
@@ -118,6 +127,34 @@ export function Profile() {
   async function onSignOut() {
     await signOut()
     navigate('/', { replace: true })
+  }
+
+  function openPin() {
+    setCurrentPin('')
+    setNewPin('')
+    setConfirmPin('')
+    setPinError(null)
+    setPinOpen(true)
+  }
+
+  async function onChangePin(e: FormEvent) {
+    e.preventDefault()
+    setPinError(null)
+    // Checked here as well as in changePin() so the student sees the mismatch
+    // before we spend a round-trip re-authenticating them.
+    if (newPin !== confirmPin) {
+      setPinError("Those two PINs don't match.")
+      return
+    }
+    setPinSaving(true)
+    const { error } = await changePin(currentPin, newPin)
+    setPinSaving(false)
+    if (error) {
+      setPinError(error)
+      return
+    }
+    setPinOpen(false)
+    toast('PIN changed. Use it next time you sign in.', 'success')
   }
 
   function openEdit() {
@@ -437,6 +474,22 @@ export function Profile() {
 
       <InstallButton className="w-full" />
 
+      {/* Change PIN (Phase F). Until now the only way to change a PIN was the
+          forgot-PIN flow, which needs a fresh token from the instructor — so a
+          student who simply wanted a better PIN, or who had shared theirs with
+          a classmate, had to ask for one. */}
+      <button
+        type="button"
+        onClick={openPin}
+        className="flex w-full items-center justify-between rounded-2xl border border-line bg-card px-5 py-4 text-left transition-colors hover:bg-card-2"
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Change PIN</p>
+          <p className="text-xs text-muted">Pick a new PIN for signing in.</p>
+        </div>
+        <span className="shrink-0 text-lg text-muted">›</span>
+      </button>
+
       <button
         type="button"
         onClick={() => setWhatsNewOpen(true)}
@@ -452,6 +505,44 @@ export function Profile() {
       <Button variant="ghost" className="w-full text-muted" onClick={onSignOut}>
         Sign out
       </Button>
+
+      <Sheet open={pinOpen} onClose={() => setPinOpen(false)} title="Change PIN">
+        <form onSubmit={onChangePin} className="space-y-4">
+          <Input
+            label="Current PIN"
+            type="password"
+            value={currentPin}
+            onChange={(e) => setCurrentPin(e.target.value)}
+            placeholder="Your PIN right now"
+            autoComplete="current-password"
+            autoFocus
+            required
+          />
+          <Input
+            label="New PIN"
+            type="password"
+            value={newPin}
+            onChange={(e) => setNewPin(e.target.value)}
+            placeholder="At least 6 characters"
+            hint="At least 6 characters."
+            autoComplete="new-password"
+            required
+          />
+          <Input
+            label="Confirm new PIN"
+            type="password"
+            value={confirmPin}
+            onChange={(e) => setConfirmPin(e.target.value)}
+            placeholder="Type it again"
+            autoComplete="new-password"
+            required
+          />
+          {pinError && <p className="text-sm text-brand-500">{pinError}</p>}
+          <Button type="submit" size="lg" className="w-full" disabled={pinSaving}>
+            {pinSaving ? 'Changing…' : 'Change PIN'}
+          </Button>
+        </form>
+      </Sheet>
 
       <Sheet open={whatsNewOpen} onClose={() => setWhatsNewOpen(false)} title="What's new">
         <ChangelogList entries={CHANGELOG} />

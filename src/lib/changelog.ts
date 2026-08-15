@@ -332,6 +332,32 @@ export const DRAFT_4_0_0: ChangelogEntry = {
       ],
     },
     {
+      heading: 'You’ll know when class starts 🔔',
+      major: true,
+      items: [
+        'The moment your instructor starts class, a banner appears on your dashboard — subject, how long ago it started, and a Scan now button that opens the camera. Once you’ve checked in it flips to “You’re in” instead of nagging you.',
+        'An absence you could still excuse now gets one reminder before the 7-day window shuts, with the actual last date on it. No more finding out it’s too late.',
+        'The scanner tells you it’s starting up instead of showing a black square, and on phones that support it there’s a flashlight button for a dim room.',
+      ],
+    },
+    {
+      heading: 'Your points, the whole story 📈',
+      major: true,
+      items: [
+        'Tap “See all” on your dashboard for the full history: a bar per week so you can see how you’re trending, a breakdown of where points came from — recitation, activities, penalties, spending — and everything loads back to the start of the semester.',
+        'Attendance history is now split by Prelim, Midterm and Finals, so you can see exactly how a term is going while it’s still fixable.',
+        'Each class now shows the time you actually checked in — so “am I really late?” has an answer that isn’t “ask the instructor”.',
+      ],
+    },
+    {
+      heading: 'Your streak stays lit 🔥',
+      items: [
+        'Your attendance streak now lives on your dashboard and attendance screen permanently. It used to vanish the moment you unlocked its badge, which was exactly backwards.',
+        'Your dashboard says where you are in the semester — term and week — instead of leaving you to count.',
+        'You can change your PIN yourself under Profile. No more asking for a reset code just because you wanted a better one.',
+      ],
+    },
+    {
       heading: 'Points now come with a price list 🏷️',
       major: true,
       items: [
