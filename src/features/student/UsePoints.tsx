@@ -62,14 +62,18 @@ export function UsePoints() {
   const [submitting, setSubmitting] = useState(false)
   const [cancelTarget, setCancelTarget] = useState<Redemption | null>(null)
   const [cancelling, setCancelling] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   const load = useCallback(async () => {
     if (!studentId) return
     setLoading(true)
+    setLoadError(false)
     try {
       setHistory(await listMyRedemptions(studentId))
     } catch {
-      /* non-fatal — the page just shows its last-known state */
+      // Without this flag a failed load looked exactly like "you've never spent
+      // points" — same empty state, no way to tell or retry.
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -363,6 +367,13 @@ export function UsePoints() {
         <h2 className="mb-2 px-1 text-sm font-semibold text-muted">History</h2>
         {loading ? (
           <ListSkeleton rows={3} />
+        ) : loadError ? (
+          <Card className="p-6 text-center">
+            <p className="text-sm text-brand-500">Couldn’t load your requests.</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => void load()}>
+              Try again
+            </Button>
+          </Card>
         ) : decided.length === 0 ? (
           <Card className="p-8 text-center text-sm text-muted">
             Nothing yet — your decided requests show up here.

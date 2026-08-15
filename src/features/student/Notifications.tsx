@@ -7,10 +7,10 @@ import { ListSkeleton } from '@/components/ui/Skeleton'
 import {
   BellIcon,
   BoltIcon,
+  CheckIcon,
   StarIcon,
   TicketIcon,
   TrophyIcon,
-  WarningIcon,
 } from '@/components/ui/icons'
 import { listNotifications } from '@/lib/api'
 import { timeAgo } from '@/lib/time'
@@ -32,7 +32,9 @@ const TYPE_META: Record<
   rank: { Icon: TrophyIcon, cls: 'bg-brand-500/10 text-brand-500' },
   achievement: { Icon: TrophyIcon, cls: 'bg-gold-400/15 text-gold-600 dark:text-gold-400' },
   redemption: { Icon: TicketIcon, cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
-  attendance_penalty: { Icon: WarningIcon, cls: 'bg-brand-500/10 text-brand-500' },
+  // Absence penalties arrive as type 'deduct' (0025), not a dedicated type —
+  // the old 'attendance_penalty' key here matched nothing any migration queues.
+  excuse: { Icon: CheckIcon, cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
 }
 const DEFAULT_META = { Icon: BellIcon, cls: 'bg-card-2 text-muted' }
 

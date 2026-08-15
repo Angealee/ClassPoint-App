@@ -16,7 +16,7 @@ import {
   markAttendanceManually,
   resetAttendance,
 } from '@/lib/api'
-import { supabase } from '@/lib/supabase'
+import { supabase, uniqueChannel } from '@/lib/supabase'
 import { initSound, playSound } from '@/lib/sound'
 import {
   QR_STEP_SECONDS,
@@ -210,8 +210,12 @@ export function AttendanceSession({
   // full fetch, and a slow poll backstops a silently-dropped socket (phone sleep,
   // network blip) so the count never stalls.
   useEffect(() => {
-    const channel = supabase
-      .channel(`attendance-${session.id}`)
+    // uniqueChannel, NOT supabase.channel: a repeated topic returns the EXISTING
+    // channel, and `.on()` after subscribe() throws. This screen remounts often
+    // (live → review → back, StrictMode double-mount), and the failure mode is
+    // the worst one available — a live check-in roster that silently stops
+    // updating, masked by the 20s poll below.
+    const channel = uniqueChannel(`attendance-${session.id}`)
       .on(
         'postgres_changes',
         {

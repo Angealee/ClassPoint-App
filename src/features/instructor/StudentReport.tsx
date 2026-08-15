@@ -32,6 +32,7 @@ export function StudentReport() {
   const [student, setStudent] = useState<InstructorStudentDetail | null>(null)
   const [allAttendance, setAllAttendance] = useState<MyAttendanceEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
   // '' = every subject in one register. Chosen on the screen-only toolbar, so a
   // printed record can be scoped to the subject a department actually asked for.
   const [subjectFilter, setSubjectFilter] = useState('')
@@ -48,7 +49,11 @@ export function StudentReport() {
         // Oldest-first for a paper register.
         setAllAttendance([...att].sort((a, b) => a.startedAt.localeCompare(b.startedAt)))
       })
-      .catch(() => {})
+      .catch(() => {
+        // This document goes on PAPER. A swallowed failure printed a report
+        // with no student and fallback term dates, with nothing saying so.
+        if (!cancelled) setLoadFailed(true)
+      })
       .finally(() => !cancelled && setLoading(false))
     return () => {
       cancelled = true
@@ -93,7 +98,9 @@ export function StudentReport() {
   if (!student) {
     return (
       <div style={{ padding: 40, fontFamily: 'sans-serif' }}>
-        That student no longer exists.{' '}
+        {loadFailed
+          ? 'Could not load this record — check your connection and reload before printing.'
+          : 'That student no longer exists.'}{' '}
         <button onClick={() => navigate(-1)} style={{ textDecoration: 'underline' }}>
           Back
         </button>

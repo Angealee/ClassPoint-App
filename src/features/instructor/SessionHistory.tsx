@@ -124,10 +124,14 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
     [analytics],
   )
 
+  /** The subject the screen is currently scoped to, or null for "both". */
+  const activeSubjectCode =
+    sectionSubjects.find((s) => s.id === subjectFilter)?.code ?? null
+
   async function onExport() {
     if (!analytics) return
     try {
-      await exportAttendanceSummary(sectionName, analytics.students)
+      await exportAttendanceSummary(sectionName, analytics.students, activeSubjectCode)
     } catch {
       toast('Could not export.', 'error')
     }
@@ -137,7 +141,13 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
   async function onExportRegister() {
     if (!selectedSectionId) return
     try {
-      await exportSectionRegister(sectionName, await getSectionRegister(selectedSectionId))
+      // Scoped to the same subject as the stats above it — the export used to
+      // contradict the screen it came from.
+      await exportSectionRegister(
+        sectionName,
+        await getSectionRegister(selectedSectionId, subjectFilter || undefined),
+        activeSubjectCode,
+      )
     } catch {
       toast('Could not export the register.', 'error')
     }

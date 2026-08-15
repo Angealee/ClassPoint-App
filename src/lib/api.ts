@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import type { Database } from '@/lib/database.types'
 import { configureTermCalendar } from '@/lib/term'
 import type {
   Semester,
@@ -22,7 +23,6 @@ import type {
   ClassSession,
   LeaderboardComment,
   LeaderboardEntry,
-  LeaderboardRow,
   LeaderboardSnapshot,
   MyAttendanceEntry,
   OfflineScanOutcome,
@@ -91,6 +91,7 @@ export async function getActiveSemester(): Promise<Semester | null> {
   return data ? mapSemester(data) : null
 }
 
+/** RESERVED: the rollover wizard (Era 5.0 Phase I) — no caller until then. */
 export async function listSemesters(): Promise<Semester[]> {
   const { data, error } = await supabase
     .from('semesters')
@@ -103,6 +104,8 @@ export async function listSemesters(): Promise<Semester[]> {
 /**
  * Create a semester with its three terms pre-filled to the six-week defaults.
  * The instructor edits any of the six dates afterwards — holidays move things.
+ *
+ * RESERVED: the rollover wizard (Era 5.0 Phase I) — no caller until then.
  */
 export async function createSemester(name: string, startsOn: string): Promise<Semester> {
   const { data, error } = await supabase
@@ -136,6 +139,7 @@ export async function createSemester(name: string, startsOn: string): Promise<Se
   }
 }
 
+/** RESERVED: the rollover wizard (Era 5.0 Phase I) — no caller until then. */
 export async function renameSemester(id: string, name: string): Promise<void> {
   const { error } = await supabase.from('semesters').update({ name: name.trim() }).eq('id', id)
   if (error) throw error
@@ -256,15 +260,30 @@ export function loadTermCalendar(force = false): Promise<void> {
         terms: semester.terms,
       })
     })
-    .catch(() => {})
+    .catch(() => {
+      // Clear the memo so the NEXT caller retries. Caching the rejected promise
+      // pinned the whole app to term.ts's fallback dates until a full reload —
+      // and the printable report would then quietly print wrong week dividers.
+      termCalendarPromise = null
+    })
   return termCalendarPromise
 }
 
-function mapSection(row: Record<string, unknown>): Section {
+/**
+ * Rows come back typed from the client now (see lib/database.types.ts), so
+ * mappers take the real shape instead of `Record<string, unknown>` + casts.
+ * That's what makes a wrong column name a compile error rather than a 400.
+ */
+type SectionRow = Pick<
+  Database['public']['Tables']['sections']['Row'],
+  'id' | 'name' | 'semester_id'
+>
+
+function mapSection(row: SectionRow): Section {
   return {
-    id: row.id as string,
-    name: row.name as string,
-    semesterId: row.semester_id as string,
+    id: row.id,
+    name: row.name,
+    semesterId: row.semester_id,
   }
 }
 
@@ -322,20 +341,6 @@ export async function deleteSection(id: string): Promise<void> {
  */
 export async function getSectionTotalCounts(): Promise<Record<string, number>> {
   const { data, error } = await supabase.from('students').select('section_id')
-  if (error) throw error
-  const counts: Record<string, number> = {}
-  for (const row of data ?? []) {
-    const id = row.section_id as string
-    counts[id] = (counts[id] ?? 0) + 1
-  }
-  return counts
-}
-
-export async function getSectionCounts(): Promise<Record<string, number>> {
-  const { data, error } = await supabase
-    .from('students')
-    .select('section_id')
-    .is('archived_at', null)
   if (error) throw error
   const counts: Record<string, number> = {}
   for (const row of data ?? []) {
@@ -462,8 +467,7 @@ export async function createStudentsBulk(
  * the action (with a full row snapshot) and refreshes the frozen board.
  */
 export async function archiveStudent(studentId: string): Promise<void> {
-  const { error } = await supabase.rpc('archive_student', { p_student_id: studentId })
-  if (error) throw error
+  await rpc('archive_student', { p_student_id: studentId })
 }
 
 /** Bring an archived student back — they reappear everywhere immediately. */
@@ -537,26 +541,15 @@ export async function awardPoints(args: {
     category: args.category,
     note: args.note?.trim() || null,
   }))
-  const { error } = await supabase.from('point_events').insert(rows)
-  if (error) throw error
+  // Awarding usually happens right after unlocking the phone at the start of
+  // class — exactly when the access token is most likely to be mid-refresh.
+  // Only auth-layer rejections retry, so this cannot double-insert.
+  await withAuthRetry(async () => {
+    const { error } = await supabase.from('point_events').insert(rows)
+    if (error) throw error
+  })
 }
 
-/** All students ranked by THIS SEMESTER's points (live; instructor tools). */
-export async function listLeaderboard(): Promise<LeaderboardRow[]> {
-  const { data, error } = await supabase
-    .from('students')
-    .select('id, display_name, full_name, section_id, semester_points')
-    .is('archived_at', null)
-    .order('semester_points', { ascending: false })
-  if (error) throw error
-  return (data ?? []).map((r) => ({
-    id: r.id as string,
-    display_name: r.display_name as string,
-    full_name: r.full_name as string,
-    section_id: r.section_id as string,
-    points: (r.semester_points as number) ?? 0,
-  }))
-}
 
 /**
  * Recent point awards across all students (instructor review / undo).
@@ -844,13 +837,21 @@ export async function getStudent(studentId: string): Promise<InstructorStudentDe
  * Whole-section attendance register (rows = active-or-recorded students, cols =
  * sessions chronological). Backs the class-record matrix export.
  */
-export async function getSectionRegister(sectionId: string): Promise<SectionRegister> {
+export async function getSectionRegister(
+  sectionId: string,
+  subjectId?: string,
+): Promise<SectionRegister> {
+  // `subjectId` keeps the export honest with the screen it came from: Class
+  // history's subject toggle used to scope every stat on screen and then hand
+  // you a register with both subjects fused into one grid.
+  let sessionQuery = supabase
+    .from('class_sessions')
+    .select('id, topic, started_at, subjects(code)')
+    .eq('section_id', sectionId)
+    .order('started_at', { ascending: true })
+  if (subjectId) sessionQuery = sessionQuery.eq('subject_id', subjectId)
   const [sessionsRes, studentsRes] = await Promise.all([
-    supabase
-      .from('class_sessions')
-      .select('id, topic, started_at')
-      .eq('section_id', sectionId)
-      .order('started_at', { ascending: true }),
+    sessionQuery,
     supabase
       .from('students')
       .select('id, full_name, archived_at')
@@ -863,6 +864,7 @@ export async function getSectionRegister(sectionId: string): Promise<SectionRegi
     id: s.id as string,
     topic: (s.topic as string | null) ?? null,
     startedAt: s.started_at as string,
+    subjectCode: oneEmbed<{ code: string }>(s.subjects)?.code ?? null,
   }))
   const roster = (studentsRes.data ?? []) as Array<{
     id: string
@@ -1060,6 +1062,23 @@ async function getSessionSecret(sessionId: string): Promise<string | undefined> 
  * when a request races its own background token refresh — the hiccup a manual
  * page reload used to clear.
  */
+/**
+ * Call a mutating RPC behind withAuthRetry.
+ *
+ * Safe to apply blanket-wide, including to non-idempotent writes: the retry
+ * fires ONLY on the auth classifications below (401 / PGRST301 / expired JWT /
+ * refresh token). Those are rejections at the auth layer, before PostgREST ever
+ * reaches the table — so the first attempt provably did not run. A dropped
+ * response after a successful commit does NOT match, and rethrows.
+ */
+async function rpc<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T> {
+  return withAuthRetry(async () => {
+    const { data, error } = await supabase.rpc(name, args)
+    if (error) throw error
+    return data as T
+  })
+}
+
 async function withAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn()
@@ -1270,11 +1289,7 @@ export async function updateAttendanceStatus(
   recordId: string,
   status: AttendanceStatus,
 ): Promise<void> {
-  const { error } = await supabase.rpc('set_attendance_status', {
-    p_record_id: recordId,
-    p_status: status,
-  })
-  if (error) throw error
+  await rpc('set_attendance_status', { p_record_id: recordId, p_status: status })
 }
 
 /**
@@ -1313,6 +1328,38 @@ export async function markAttendanceManually(
     { onConflict: 'session_id,student_id' },
   )
   if (error) throw error
+}
+
+/**
+ * Create a missing attendance record on a session that already happened.
+ *
+ * Needed when `end_class_session`'s `on conflict do nothing` skipped someone, or
+ * a student joined the section after the class ran — until now their register
+ * cell stayed blank forever with no in-app way to fill it.
+ *
+ * Two steps ON PURPOSE. The row is inserted as 'excused', the one status that
+ * can never carry a penalty, and the real status is then applied through
+ * `set_attendance_status` — the single path that reconciles the points ledger
+ * (0018/0024). Inserting the final status directly would record the attendance
+ * but silently skip the deduction every other student in that session took.
+ *
+ * If the second step fails, the student is left visibly 'excused' rather than in
+ * a half-written state, and the instructor can simply pick again.
+ */
+export async function createAttendanceRecord(
+  sessionId: string,
+  studentId: string,
+  status: AttendanceStatus,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .insert({ session_id: sessionId, student_id: studentId, status: 'excused' })
+    .select('id')
+    .single()
+  if (error) throw error
+  if (status !== 'excused') {
+    await updateAttendanceStatus(data.id as string, status)
+  }
 }
 
 /** Mark many students at once (e.g. "mark all waiting" present/absent). Upserts
@@ -1461,18 +1508,20 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 /** End a session and auto-mark every non-scanner Absent. */
 export async function endClassSession(sessionId: string): Promise<void> {
-  const { error } = await supabase.rpc('end_class_session', { p_session_id: sessionId })
-  if (error) throw error
+  await rpc('end_class_session', { p_session_id: sessionId })
 }
 
 /** Finalise a session — writes the late/absent penalties into point_events. */
 export async function commitAttendancePenalties(
   sessionId: string,
 ): Promise<{ applied: number; deducted: number }> {
-  const { data, error } = await supabase
-    .rpc('commit_attendance_penalties', { p_session_id: sessionId })
-    .single<{ applied: number; deducted: number }>()
-  if (error) throw error
+  const data = await withAuthRetry(async () => {
+    const res = await supabase
+      .rpc('commit_attendance_penalties', { p_session_id: sessionId })
+      .single<{ applied: number; deducted: number }>()
+    if (res.error) throw res.error
+    return res.data
+  })
   return { applied: data.applied, deducted: data.deducted }
 }
 
@@ -2107,12 +2156,11 @@ export async function decideRedemption(
   approve: boolean,
   note?: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc('decide_point_redemption', {
+  await rpc('decide_point_redemption', {
     p_id: id,
     p_approve: approve,
     p_note: note?.trim() || null,
   })
-  if (error) throw error
 }
 
 /** One student's own request history, newest first. */

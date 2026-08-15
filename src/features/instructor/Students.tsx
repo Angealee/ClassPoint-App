@@ -34,6 +34,8 @@ import {
   grantAchievement,
   listAchievements,
   listArchivedStudents,
+  listSessionAttendance,
+  listSessions,
   listStudents,
   resetStudentPin,
 } from '@/lib/api'
@@ -52,23 +54,6 @@ export function Students() {
 
   // Landing on the section grid; opening a card switches to that section's roster.
   const [openId, setOpenId] = useState<string | null>(null)
-
-  // ?student=<id> (from the record page's Award button) opens that student's
-  // section and pre-ticks them, so the award bar is already up on arrival.
-  const studentParam = searchParams.get('student')
-  useEffect(() => {
-    if (!studentParam) return
-    setSearchParams({}, { replace: true })
-    getStudent(studentParam)
-      .then((s) => {
-        if (!s) return
-        setSelectedSectionId(s.sectionId)
-        setOpenId(s.sectionId)
-        setSelected(new Set([s.id]))
-      })
-      .catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [studentParam])
 
   const [students, setStudents] = useState<SectionStudent[]>([])
   const [loading, setLoading] = useState(true)
@@ -96,6 +81,32 @@ export function Students() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   // The group from the last award, for the "same students again" shortcut.
   const [lastAwarded, setLastAwarded] = useState<string[]>([])
+  // Who actually showed up to this section's most recent class — lets you
+  // reward the room without hunting for names. Empty until it loads; the
+  // selector simply doesn't render then.
+  const [lastSessionAttendees, setLastSessionAttendees] = useState<Set<string>>(new Set())
+
+  // ?student=<id> (from the record page's Award button) opens that student's
+  // section and pre-ticks them, so the award bar is already up on arrival.
+  //
+  // Declared HERE, after the state it touches: when this sat above the
+  // useState calls it still worked (effects run after render), but ESLint was
+  // right to flag reading `setSelected` before its declaration — it's exactly
+  // the shape that breaks the day someone converts it to run during render.
+  const studentParam = searchParams.get('student')
+  useEffect(() => {
+    if (!studentParam) return
+    setSearchParams({}, { replace: true })
+    getStudent(studentParam)
+      .then((s) => {
+        if (!s) return
+        setSelectedSectionId(s.sectionId)
+        setOpenId(s.sectionId)
+        setSelected(new Set([s.id]))
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentParam])
 
   // Students from the last award still on screen (drives the reselect shortcut).
   const reselectable = lastAwarded.filter((id) => students.some((s) => s.id === id))
@@ -154,9 +165,44 @@ export function Students() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openId])
 
+  // Attendees of the most recent ENDED session, for the "select from last class"
+  // shortcut. Non-fatal: a failure just hides that one selector.
+  useEffect(() => {
+    if (!openId) {
+      setLastSessionAttendees(new Set())
+      return
+    }
+    let cancelled = false
+    listSessions(openId)
+      .then(async (sessions) => {
+        const latest = sessions.find((s) => s.status === 'ended') ?? sessions[0]
+        if (!latest || cancelled) return
+        const roster = await listSessionAttendance(latest.id, openId)
+        if (cancelled) return
+        setLastSessionAttendees(
+          new Set(
+            roster
+              .filter((r) => r.status === 'present' || r.status === 'late')
+              .map((r) => r.studentId),
+          ),
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setLastSessionAttendees(new Set())
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [openId])
+
   function openSection(id: string) {
-    setSelectedSectionId(id) // keep Award/Leaderboard in sync
+    setSelectedSectionId(id) // keep Attendance/Leaderboard in sync
     setQuery('')
+    // CRITICAL: ticks are student ids from the section you're leaving. Carrying
+    // them across would dock the award bar over a different roster and award the
+    // WRONG students, with nothing on screen to show whose ids they were.
+    setSelected(new Set())
+    setLastAwarded([])
     setOpenId(id)
   }
 
@@ -170,6 +216,12 @@ export function Students() {
         (s.username ?? '').toLowerCase().includes(q),
     )
   }, [students, query])
+
+  // Bulk-selector inputs. All are scoped to what's currently on screen, so a
+  // search box narrows every one of them.
+  const allFilteredSelected = filtered.length > 0 && filtered.every((s) => selected.has(s.id))
+  const unclaimedIds = filtered.filter((s) => !s.claimed_at).map((s) => s.id)
+  const lastSessionIds = filtered.filter((s) => lastSessionAttendees.has(s.id)).map((s) => s.id)
 
   async function copy(text: string, label: string) {
     try {
@@ -328,7 +380,12 @@ export function Students() {
     <div className="space-y-4">
       <button
         type="button"
-        onClick={() => setOpenId(null)}
+        onClick={() => {
+          // Same reason as openSection: never carry ticks out of a roster.
+          setSelected(new Set())
+          setLastAwarded([])
+          setOpenId(null)
+        }}
         className="flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"
       >
         <ArrowLeftIcon className="h-4 w-4" /> Sections
@@ -422,6 +479,39 @@ export function Students() {
       ) : filtered.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted">No students match “{query}”.</Card>
       ) : (
+        <>
+        {/* Bulk selectors — awarding a whole class is one tap, not forty.
+            All three act on `filtered`, so a search narrows what they pick. */}
+        <div className="flex flex-wrap items-center gap-2 px-1">
+          <button
+            type="button"
+            onClick={() =>
+              setSelected(allFilteredSelected ? new Set() : new Set(filtered.map((s) => s.id)))
+            }
+            className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-brand-500 hover:text-brand-500"
+          >
+            {allFilteredSelected ? 'Clear all' : `Select all (${filtered.length})`}
+          </button>
+          {unclaimedIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelected(new Set(unclaimedIds))}
+              className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-brand-500 hover:text-brand-500"
+            >
+              Select unclaimed ({unclaimedIds.length})
+            </button>
+          )}
+          {lastSessionIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelected(new Set(lastSessionIds))}
+              title="Everyone marked Present or Late in this section's most recent class"
+              className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-brand-500 hover:text-brand-500"
+            >
+              Select from last class ({lastSessionIds.length})
+            </button>
+          )}
+        </div>
         <Card className="divide-y divide-line">
           {filtered.map((s) => {
             const level = getLevelProgress(s.semester_points).level
@@ -524,6 +614,7 @@ export function Students() {
             )
           })}
         </Card>
+        </>
       )}
 
       {/* Re-pick the group you just awarded — e.g. to add a second category. */}

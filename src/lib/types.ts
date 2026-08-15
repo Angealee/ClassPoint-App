@@ -355,7 +355,13 @@ export interface InstructorStudentDetail {
 
 /** Whole-section register: students × sessions grid of statuses. */
 export interface SectionRegister {
-  sessions: Array<{ id: string; topic: string | null; startedAt: string }>
+  sessions: Array<{
+    id: string
+    topic: string | null
+    startedAt: string
+    /** Null when untagged; drives the register's Subject row (0028). */
+    subjectCode: string | null
+  }>
   students: Array<{ id: string; fullName: string }>
   /** statuses[studentId][sessionId] = status (missing = no record). */
   statuses: Record<string, Record<string, AttendanceStatus>>
@@ -537,7 +543,9 @@ export type NotificationType =
   | 'rank'
   | 'achievement'
   | 'redemption'
-  | 'attendance_penalty'
+  // Queued by decide_absence_excuse (0025). Was missing here, so every
+  // admission-slip decision rendered with the generic grey bell.
+  | 'excuse'
   | 'test'
 
 /** One row of the student's notification history (the bell). */

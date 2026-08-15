@@ -44,6 +44,8 @@ export async function exportSessionAttendance(
 export async function exportAttendanceSummary(
   sectionName: string,
   stats: StudentAttendanceStat[],
+  /** Present when the screen was filtered to one subject — tags the filename. */
+  subjectCode?: string | null,
 ): Promise<void> {
   const XLSX = await import('xlsx')
   const data = stats.map((s) => ({
@@ -59,9 +61,7 @@ export async function exportAttendanceSummary(
   const sheet = XLSX.utils.json_to_sheet(data)
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, sheet, 'Summary')
-  const safeSection = (sectionName || 'section').replace(/[^\w-]+/g, '_')
-  const stamp = new Date().toISOString().slice(0, 10)
-  XLSX.writeFile(wb, `classpoint-attendance-summary-${safeSection}-${stamp}.xlsx`)
+  XLSX.writeFile(wb, fileName('attendance-summary', sectionName, subjectCode))
 }
 
 /** One-letter status codes for the register matrix (blank = no record). */
@@ -81,6 +81,8 @@ const STATUS_LETTER: Record<string, string> = {
 export async function exportSectionRegister(
   sectionName: string,
   register: SectionRegister,
+  /** Present when the screen was filtered to one subject — tags the filename. */
+  subjectCode?: string | null,
 ): Promise<void> {
   const XLSX = await import('xlsx')
   const { sessions, students, statuses } = register
@@ -110,10 +112,34 @@ export async function exportSectionRegister(
     return row
   })
 
-  const sheet = XLSX.utils.aoa_to_sheet([dateRow, topicRow, ...body])
+  // Subject row only when the grid actually mixes them — a single-subject
+  // register already says which one in its filename.
+  const mixed = new Set(sessions.map((s) => s.subjectCode ?? '')).size > 1
+  const subjectRow = mixed
+    ? [['', ...sessions.map((s) => s.subjectCode ?? '—'), '', '', '', '']]
+    : []
+
+  const sheet = XLSX.utils.aoa_to_sheet([dateRow, ...subjectRow, topicRow, ...body])
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, sheet, 'Register')
-  const safeSection = (sectionName || 'section').replace(/[^\w-]+/g, '_')
-  const stamp = new Date().toISOString().slice(0, 10)
-  XLSX.writeFile(wb, `classpoint-register-${safeSection}-${stamp}.xlsx`)
+  XLSX.writeFile(wb, fileName('register', sectionName, subjectCode))
+}
+
+/**
+ * `classpoint-<kind>-<section>[-<subject>]-<date>.xlsx`.
+ *
+ * The subject segment matters: exporting both subjects of one section on the
+ * same day used to produce two identically-named files, so the second silently
+ * replaced the first in Downloads.
+ */
+function fileName(kind: string, sectionName: string, subjectCode?: string | null): string {
+  const safe = (v: string) => v.replace(/[^\w-]+/g, '_')
+  const parts = [
+    'classpoint',
+    kind,
+    safe(sectionName || 'section'),
+    ...(subjectCode ? [safe(subjectCode)] : []),
+    new Date().toISOString().slice(0, 10),
+  ]
+  return `${parts.join('-')}.xlsx`
 }

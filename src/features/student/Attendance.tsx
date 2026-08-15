@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { Sheet } from '@/components/ui/Sheet'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ScanIcon, CheckIcon } from '@/components/ui/icons'
@@ -48,7 +49,7 @@ function isOffline(e: unknown): boolean {
 }
 
 export function Attendance() {
-  const { me, syncMyAchievements } = useStudentData()
+  const { me, syncMyAchievements, attendanceTick } = useStudentData()
   const [history, setHistory] = useState<MyAttendanceEntry[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -61,6 +62,7 @@ export function Attendance() {
   // will sync" pane instead of an error.
   const [savedOffline, setSavedOffline] = useState<string | null>(null)
   const [queue, setQueue] = useState<OfflineScanEntry[]>([])
+  const [loadError, setLoadError] = useState(false)
   const handledRef = useRef(false)
 
   const refreshQueue = useCallback(() => setQueue(loadQueue()), [])
@@ -68,10 +70,13 @@ export function Attendance() {
   const load = useCallback(async () => {
     if (!me) return
     setLoading(true)
+    setLoadError(false)
     try {
       setHistory(await listMyAttendance(me.id))
     } catch {
-      /* non-fatal */
+      // A failed fetch used to leave history empty, so the screen said "No
+      // classes yet" — telling a student their whole record didn't exist.
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -87,6 +92,13 @@ export function Attendance() {
     })
     refreshQueue()
   }, [load, refreshQueue])
+
+  // An instructor correcting a status (or committing penalties) now reaches this
+  // screen live — attendance_records has been in the realtime publication since
+  // 0014, but nothing was listening until Phase B.
+  useEffect(() => {
+    if (attendanceTick > 0) void load()
+  }, [attendanceTick, load])
 
   function openScan() {
     setResult(null)
@@ -212,6 +224,9 @@ export function Attendance() {
   }, [history])
 
   return (
+    // Pull-to-refresh: this is the screen where a student most wants to force a
+    // re-check ("did my check-in actually land?").
+    <PullToRefresh onRefresh={load}>
     <div className="space-y-5">
       <div>
         <h1 className="font-display text-xl font-bold">Attendance</h1>
@@ -286,6 +301,16 @@ export function Attendance() {
       {/* History */}
       {loading ? (
         <ListSkeleton rows={4} />
+      ) : loadError ? (
+        <Card className="p-6 text-center">
+          <p className="text-sm text-brand-500">Couldn’t load your attendance.</p>
+          <p className="mt-1 text-xs text-muted">
+            Your record is safe — this is just the connection.
+          </p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => void load()}>
+            Try again
+          </Button>
+        </Card>
       ) : history.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted">
           No classes yet. When your instructor starts a class, scan the QR to check in.
@@ -369,6 +394,7 @@ export function Attendance() {
         )}
       </Sheet>
     </div>
+    </PullToRefresh>
   )
 }
 

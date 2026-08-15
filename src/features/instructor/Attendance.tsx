@@ -28,6 +28,9 @@ const sessionDate = (iso: string) =>
 /** Remembers the last subject started per section, so the picker pre-fills. */
 const LAST_SUBJECT_KEY = 'cp_last_subject_'
 
+/** How many weeks of sessions the Attendance tab shows before "See all". */
+const RECENT_WEEKS = 2
+
 export function Attendance() {
   const { sections, selectedSectionId, setSelectedSectionId, subjectsForSection } = useInstructor()
   const { toast } = useToast()
@@ -88,7 +91,11 @@ export function Attendance() {
           setView('live')
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        // Silently swallowing this told the instructor "no live session" during
+        // a transient blip — inviting them to start a SECOND one mid-class.
+        if (!cancelled) toast('Could not check for a live class — pull to retry.', 'error')
+      })
       .finally(() => !cancelled && setChecking(false))
     void loadHistory()
     return () => {
@@ -153,7 +160,6 @@ export function Attendance() {
       setSession(s)
       setView('live')
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error('[attendance] start failed:', e)
       const msg = (e as { message?: string } | null)?.message
       toast(msg && msg.length <= 160 ? msg : 'Could not start the class. Try again.', 'error')
@@ -196,8 +202,14 @@ export function Attendance() {
     </Select>
   )
 
-  // Newest week first, matching the list's newest-first order.
-  const weeks = useMemo(() => groupByWeek(history, (s) => s.startedAt), [history])
+  // Newest week first, matching the list's newest-first order. Capped at two
+  // weeks so "Recent sessions" stays recent — by finals the full list is 36+
+  // rows, pushing the start-a-class controls off screen. The "See all & stats"
+  // link carries the complete history.
+  const weeks = useMemo(
+    () => groupByWeek(history, (s) => s.startedAt).slice(0, RECENT_WEEKS),
+    [history],
+  )
 
   if (view === 'live' && session) {
     return <AttendanceSession session={session} sectionName={sectionName} onEnd={() => setView('review')} />

@@ -122,7 +122,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         // Surface the real cause for debugging (usually: function not deployed,
         // or JWT verification still ON so the unauthenticated caller is rejected).
-        // eslint-disable-next-line no-console
         console.error('[claim-token] invoke failed:', error)
         return { error: "Couldn't reach the claim service. Ask your instructor to check setup." }
       }
@@ -139,7 +138,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: { token: token.trim(), pin },
       })
       if (error) {
-        // eslint-disable-next-line no-console
         console.error('[reset-pin] invoke failed:', error)
         return { error: "Couldn't reach the reset service. Ask your instructor to check setup." }
       }

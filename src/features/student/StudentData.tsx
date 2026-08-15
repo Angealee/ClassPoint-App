@@ -85,6 +85,17 @@ interface StudentDataValue {
   /** The full catalog merged with the signed-in student's unlock state. */
   achievements: AchievementState[]
   achievementsLoading: boolean
+  /** True when the trophy case failed to load — drives its retry card. */
+  achievementsError: boolean
+  /** Re-fetch the trophy case after a failure. */
+  retryAchievements: () => void
+  /**
+   * Bumps whenever one of this student's attendance records changes (an
+   * instructor correction, a committed penalty). The Attendance screen watches
+   * it and refetches — it owns its own history list, so this is a signal, not
+   * the data.
+   */
+  attendanceTick: number
   /** Raw metric values behind locked achievements' progress bars. */
   achievementProgress: AchievementProgress | null
   /** The achievement to celebrate with the unlock burst right now, or null. */
@@ -138,6 +149,9 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const [live, setLive] = useState(false)
   const [achievements, setAchievements] = useState<AchievementState[]>([])
   const [achievementsLoading, setAchievementsLoading] = useState(true)
+  const [achievementsError, setAchievementsError] = useState(false)
+  // Increments whenever one of this student's attendance records changes.
+  const [attendanceTick, setAttendanceTick] = useState(0)
   const [achievementProgress, setAchievementProgress] = useState<AchievementProgress | null>(null)
   // Achievements queued to celebrate, shown one at a time (oldest first).
   const [unlockQueue, setUnlockQueue] = useState<Achievement[]>([])
@@ -149,8 +163,9 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   // Active semester id, read from callbacks that must not re-create on load.
   // Empty until the first load resolves — the storage keys tolerate that.
   const semesterIdRef = useRef('')
-  // Prevents overlapping loads (resync can race the initial/refresh load).
-  const inFlightRef = useRef(false)
+  // Holds the RUNNING load so overlapping callers await it instead of getting
+  // an instant no-op (see load() — pull-to-refresh depends on this).
+  const inFlightRef = useRef<Promise<void> | null>(null)
   // The away-recap is computed once per app open, not on every visibility refresh.
   const recapCheckedRef = useRef(false)
   // True once the realtime channel has subscribed at least once — a *second*
@@ -226,6 +241,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   /** Refresh the achievement catalog + this student's unlock state/progress. */
   const loadAchievements = useCallback(async (studentId: string) => {
+    setAchievementsError(false)
     try {
       const [list, progress] = await Promise.all([
         getMyAchievements(studentId),
@@ -234,9 +250,19 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       setAchievements(list)
       setAchievementProgress(progress)
     } catch {
-      /* non-fatal — the trophy case just stays on its last-known state */
+      // Surfaced, not swallowed: an empty catalog hides the filter chips, so
+      // the screen used to show "try a different filter" with no filters and
+      // no way back short of reloading the app.
+      setAchievementsError(true)
     }
   }, [])
+
+  /** Retry the trophy case after a failed load (drives its error card). */
+  const retryAchievements = useCallback(() => {
+    if (!me?.id) return
+    setAchievementsLoading(true)
+    void loadAchievements(me.id).finally(() => setAchievementsLoading(false))
+  }, [me?.id, loadAchievements])
 
   /** Queue a celebration for one newly-unlocked achievement, once per code. */
   const celebrate = useCallback((a: Achievement) => {
@@ -281,19 +307,25 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   )
 
   const load = useCallback(async () => {
-    if (!user || inFlightRef.current) return
-    inFlightRef.current = true
+    if (!user) return
+    // Return the RUNNING load rather than resolving instantly: pull-to-refresh
+    // awaits this, and an undefined return snapped the spinner back with
+    // nothing having happened whenever a visibility refresh was already in
+    // flight — which is exactly when the student pulls.
+    if (inFlightRef.current) return inFlightRef.current
+    const run = (async () => {
     setError(false)
     try {
-      const [mine, secs, snap, semester] = await Promise.all([
-        getMyStudent(user.id),
-        listSections(),
-        getLeaderboardSnapshot(),
-        // Also configures term.ts, so the attendance screen's week and term
-        // labels match the instructor's calendar rather than the fallback.
-        getActiveSemester().catch(() => null),
-      ])
+      // The semester resolves first because the section list is scoped to it:
+      // an unscoped list fills the leaderboard's view picker with every past
+      // semester's sections, each of which renders an empty board.
+      const semester = await getActiveSemester().catch(() => null)
       if (semester) semesterIdRef.current = semester.id
+      const [mine, secs, snap] = await Promise.all([
+        getMyStudent(user.id),
+        listSections(semester?.id),
+        getLeaderboardSnapshot(),
+      ])
       setMe(mine)
       setSections(secs)
       setLeaderboard(snap.entries)
@@ -331,8 +363,11 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     } catch {
       setError(true)
     } finally {
-      inFlightRef.current = false
+      inFlightRef.current = null
     }
+    })()
+    inFlightRef.current = run
+    return run
   }, [user, considerLevelUp, considerRankChange, loadAchievements, runAchievementSync])
 
   // Always call the freshest `load` from listeners/callbacks without making the
@@ -385,6 +420,22 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
             considerLevelUp(studentId, rest.semester_points)
           }
         },
+      )
+      // Attendance corrections. attendance_records has been in the realtime
+      // publication since 0014 and the student can read their own rows, but
+      // nothing subscribed — so an instructor fixing a wrong "absent" stayed
+      // invisible until the screen remounted. Bumped through `attendanceTick`
+      // so the Attendance screen can refetch without this provider owning its
+      // history list.
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'attendance_records',
+          filter: `student_id=eq.${studentId}`,
+        },
+        () => setAttendanceTick((n) => n + 1),
       )
       .on(
         'postgres_changes',
@@ -480,7 +531,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
           subscribedOnceRef.current = true
         }
         if (import.meta.env.DEV && status !== 'SUBSCRIBED') {
-          // eslint-disable-next-line no-console
           console.warn('[ClassPoint] realtime channel status:', status)
         }
       })
@@ -721,6 +771,9 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         clearLevelUp,
         achievements,
         achievementsLoading,
+        achievementsError,
+        retryAchievements,
+        attendanceTick,
         achievementProgress,
         unlockedAchievement,
         clearUnlockedAchievement,

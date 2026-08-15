@@ -77,6 +77,8 @@ export function Achievements() {
     me,
     achievements,
     achievementsLoading,
+    achievementsError,
+    retryAchievements,
     achievementProgress,
     setDisplayTitle: equipTitle,
     markAchievementsSeen,
@@ -207,6 +209,17 @@ export function Achievements() {
 
       {achievementsLoading ? (
         <Card className="h-64 animate-pulse bg-card-2" />
+      ) : achievementsError ? (
+        /* Without this the failed load left an empty catalog, which hid the
+           filters above and then said "try a different filter" — with no
+           filters on screen and no way out but reloading the app. */
+        <Card className="p-6 text-center">
+          <p className="text-sm text-brand-500">Couldn’t load your badges.</p>
+          <p className="mt-1 text-xs text-muted">Nothing is lost — this is just the connection.</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={retryAchievements}>
+            Try again
+          </Button>
+        </Card>
       ) : filtered.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted">
           Nothing here — try a different filter.

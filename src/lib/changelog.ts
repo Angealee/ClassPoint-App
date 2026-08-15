@@ -313,6 +313,16 @@ export const DRAFT_4_0_0: ChangelogEntry = {
   title: 'Semesters, subjects & a sturdier lock',
   sections: [
     {
+      heading: 'Fixes you can feel 🩹',
+      items: [
+        'If your attendance or requests fail to load, the app now says so and offers a retry — instead of pretending you have no record at all.',
+        'When your instructor corrects an attendance mark, your screen updates on the spot. No more closing and reopening the app to see it.',
+        'Pull down on Attendance or Use Points to refresh, same as the dashboard.',
+        'Admission-slip decisions finally show the right icon in your notifications.',
+        'Instructors: ticked students no longer follow you into another section (that one could award the wrong class), deducting says "Deduct" and asks first, "Select all" is back, and a session tagged with the wrong subject can be re-tagged.',
+      ],
+    },
+    {
       heading: 'Attendance math that stays honest 🧮',
       items: [
         'Instructors: attendance stats are now computed in the database instead of on your phone, so show-up rates and the “needs attention” list stay exact no matter how long the semester runs. (The old way silently miscounted once a section passed a thousand records — roughly week 12.)',

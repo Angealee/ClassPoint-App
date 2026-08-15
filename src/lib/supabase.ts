@@ -1,4 +1,5 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from './database.types'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -9,17 +10,31 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
  */
 export const isSupabaseConfigured = Boolean(url && anonKey)
 
+/**
+ * Missing env is a DEPLOY failure, not a runtime quirk.
+ *
+ * Previously this warned to the console and then fell through to placeholder
+ * credentials — so a Vercel deploy with a typo'd VITE_SUPABASE_URL booted
+ * normally and failed every single request with an opaque network error, with
+ * nobody looking at the console. In production we now fail loudly and
+ * immediately, which is the difference between a five-minute fix and an
+ * afternoon of debugging "the app is broken".
+ *
+ * Development keeps the soft path: the shell renders, you get a clear warning,
+ * and you can work on UI before wiring a project up.
+ */
 if (!isSupabaseConfigured) {
-  // eslint-disable-next-line no-console
-  console.warn(
-    '[ClassPoint] Supabase env not set. Copy .env.example to .env and add your ' +
-      'VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to enable data features.',
-  )
+  const message =
+    '[ClassPoint] Supabase env not set — VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY ' +
+    'are required. Copy .env.example to .env locally, or set them in the Vercel ' +
+    'project settings and redeploy.'
+  if (import.meta.env.PROD) throw new Error(message)
+  console.warn(message)
 }
 
 // Falls back to harmless placeholders so import-time never throws; any real
 // network call will simply fail until the env is configured.
-export const supabase: SupabaseClient = createClient(
+export const supabase = createClient<Database>(
   url ?? 'http://localhost:54321',
   anonKey ?? 'public-anon-key-placeholder',
   {

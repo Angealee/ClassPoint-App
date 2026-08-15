@@ -45,8 +45,26 @@ and the leaderboard **reset each semester**; achievements and the all-time total
   stay one-tap for speed.
 - **Components:** function components, named exports, PascalCase files. Lazy imports
   destructure the named export: `.then(m => ({ default: m.Foo }))`.
-- **Verify:** `npm run lint` (= `tsc --noEmit`) before every commit. `npm run build`
-  for bundle checks. Heavy libs (`xlsx`, capture libs) only via dynamic `import()`.
+- **Verify: `npm run verify`** — typecheck (`tsc --noEmit`) → ESLint → 77 unit tests →
+  `vite build`, in that order. That one command is the gate before every commit.
+  Individually: `npm run lint` · `npm run lint:eslint` · `npm test` (`test:watch` for
+  TDD) · `npm run build`. Heavy libs (`xlsx`, capture libs) only via dynamic `import()`.
+- **Tests (Era 5.0 Phase C):** Vitest, colocated `*.test.ts` beside the five PURE libs —
+  `qr` (HMAC pinned against an independently-computed value; a drift here would reject
+  every scan), `term` (local-vs-UTC date parsing, week/term boundaries), `leveling`
+  (the ladder is pinned and changes in the SAME commit as any `cp_level` migration),
+  `offline-scans` (the state machine; the load-bearing test is "a transport failure
+  KEEPS the queued proof"), `changelog` (version compare + the draft stays out of the
+  live array). No React/Supabase mocking — that's why these five came first.
+- **ESLint** runs for the first time (`eslint.config.js`, flat config). Deliberately all
+  WARNINGS for now: 47 remain, dominated by react-hooks v7's `set-state-in-effect` and
+  `purity` performance opinions (the purity hits are all `Math.random()` in decorative
+  confetti). It already earned its place by catching a real ordering smell in
+  `Students.tsx`. Tighten to errors once the backlog is read.
+- **Env validation:** missing `VITE_SUPABASE_*` now THROWS in production
+  (`lib/supabase.ts`) instead of falling through to placeholder credentials — a typo'd
+  Vercel env used to boot fine and fail every request with an opaque network error.
+  Dev keeps the soft warning path.
 - **Realtime channel discipline:** one durable channel per student
   (`student-self-*`); page-scoped channels subscribe on mount and are removed on
   unmount; NEVER key channel effects on object identity (use the stable id — see the
@@ -334,6 +352,41 @@ Gotchas:
   import cycle.
 - `npm run lint` (`tsc --noEmit`) misses unused locals; **`npm run build` (`tsc -b`)
   is the stricter gate** — run it before declaring done.
+
+## Era 5.0 Phase B fixes (2026-08-14) — conventions worth keeping
+
+- **Ticks never cross a roster.** `Students.openSection()` and the back button clear
+  `selected`/`lastAwarded`. Carrying them meant the award bar stayed docked over a
+  DIFFERENT section and awarded the wrong students' ids, with nothing on screen to show it.
+- **`AwardBar` labels the real action** ("Deduct −5 from 3"), turns the whole bar red
+  while deducting, and routes any bulk penalty — or a single one over 5 — through
+  ConfirmDialog. Custom points REJECT rather than clamp (typing 500 no longer silently
+  becomes 100). Three bulk selectors live above the roster: all (filtered) / unclaimed /
+  last class's attendees.
+- **`createAttendanceRecord`** (api.ts) fills a missing record two-step ON PURPOSE:
+  insert as `excused` (the one status with no penalty), then apply the real status via
+  `set_attendance_status`, the single path that reconciles the ledger. Inserting the
+  final status directly would record attendance but skip the deduction every other
+  student in that session took.
+- **`withAuthRetry` is safe blanket-wide** and now wraps the mutating calls via the thin
+  `rpc()` helper: it retries ONLY auth-layer rejections (401/PGRST301/JWT/refresh), which
+  are rejected before PostgREST touches the table — so a non-idempotent insert cannot
+  double-fire. A dropped response after a commit does not match and rethrows.
+- **`src/lib/errors.ts`** owns `errorText(e, fallback)` — six identical copies existed.
+  Server messages ≤160 chars are shown verbatim (they're deliberate and useful); longer
+  ones are raw Postgres dumps and fall back.
+- **Student false-empties are gone.** Attendance / UsePoints / Achievements each have an
+  error+retry card; a failed fetch no longer reads as "you have no record". StudentData
+  exposes `achievementsError` + `retryAchievements`, and `attendanceTick` — bumped by a
+  new `attendance_records` subscription on the durable `student-self-*` channel, so an
+  instructor's correction reaches the student live.
+- **`load()` returns the in-flight promise** instead of resolving instantly, or
+  pull-to-refresh snaps back having done nothing. `listSections` on the student side is
+  scoped to the active semester (post-rollover the picker would otherwise list dead
+  semesters' sections). `loadTermCalendar` clears its memo on failure rather than
+  caching the rejection forever.
+- Notification types: `'excuse'` added (0025 queues it), dead `'attendance_penalty'`
+  removed (absence penalties arrive as `'deduct'`).
 
 ## Instructor information architecture (reworked 2026-08-13)
 
