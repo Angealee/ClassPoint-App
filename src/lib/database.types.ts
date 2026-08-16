@@ -30,11 +30,17 @@
  * argument for running the CLI command above when you get a chance.
  *
  * ── PENDING MIGRATIONS ───────────────────────────────────────────────────────
- * Every column and table below marked `PENDING <nnnn>` is written in a migration
- * that has NOT been run against the live database yet (0026–0031 as of
- * 2026-08-14). They're typed because the client already queries them and the
- * build must stay green — but until those migrations are pasted, a query
- * touching one WILL 400 at runtime. Delete the annotations as each lands.
+ * A column or table marked `PENDING <nnnn>` is written in a migration that has
+ * NOT been run against the live database yet. It's typed because the client
+ * already queries it and the build must stay green — but until that migration
+ * is pasted, a query touching it WILL 400 at runtime. Delete the annotation as
+ * each one lands.
+ *
+ * Everything through 0032 is applied (2026-08-14), so those annotations are
+ * gone. Currently pending: **0033** (student presence) and **0034** (instructor
+ * ops). Neither adds a column this file types — both are functions plus a
+ * publication add — so nothing here is marked for them; the failure mode is a
+ * missing RPC at runtime, which these types don't catch anyway.
  *
  * ── SCOPE ────────────────────────────────────────────────────────────────────
  * Tables are typed precisely (that's where a missing column bites). RPC
@@ -61,7 +67,7 @@ export interface Database {
         id: UUID
         name: string
         created_at: Timestamp
-        /** PENDING 0027 */
+        /** 0027 */
         semester_id: UUID
       }>
 
@@ -73,7 +79,7 @@ export interface Database {
         avatar_url: string | null
         /** Career total. Achievements read this (badges are lifetime). */
         lifetime_points: number
-        /** PENDING 0029 — this semester's balance: XP, level, rank, spendable. */
+        /** 0029 — this semester's balance: XP, level, rank, spendable. */
         semester_points: number
         user_id: UUID | null
         created_at: Timestamp
@@ -102,7 +108,7 @@ export interface Database {
         category: 'recitation' | 'activity' | 'penalty' | 'redeem'
         note: string | null
         created_at: Timestamp
-        /** PENDING 0029 — stamped by the trg_stamp_semester trigger. */
+        /** 0029 — stamped by the trg_stamp_semester trigger. */
         semester_id: UUID | null
       }>
 
@@ -113,7 +119,7 @@ export interface Database {
         display_name: string
         section_id: UUID
         lifetime_points: number
-        /** PENDING 0029 — the board ranks on this. */
+        /** 0029 — the board ranks on this. */
         semester_points: number
         rank: number
       }>
@@ -135,7 +141,7 @@ export interface Database {
         penalties_committed: boolean
         created_by: UUID | null
         created_at: Timestamp
-        /** PENDING 0028 — null means "untagged" (predates subjects). */
+        /** 0028 — null means "untagged" (predates subjects). */
         subject_id: UUID | null
       }>
 
@@ -227,7 +233,7 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /** PENDING 0027 — the academic structure. */
+      /** 0027 — the academic structure. */
       semesters: Row<{
         id: UUID
         name: string
@@ -236,7 +242,7 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /** PENDING 0027 — editable prelim/midterm/finals dates. */
+      /** 0027 — editable prelim/midterm/finals dates. */
       semester_terms: Row<{
         id: UUID
         semester_id: UUID
@@ -245,7 +251,7 @@ export interface Database {
         ends_on: string
       }>
 
-      /** PENDING 0027 */
+      /** 0027 */
       subjects: Row<{
         id: UUID
         semester_id: UUID
@@ -254,10 +260,10 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /** PENDING 0027 — which sections take which subject. */
+      /** 0027 — which sections take which subject. */
       section_subjects: Row<{ section_id: UUID; subject_id: UUID }>
 
-      /** PENDING 0032 — the instructor's price list. Ships empty. */
+      /** 0032 — the instructor's price list. Ships empty. */
       reward_catalog_items: Row<{
         id: UUID
         label: string
@@ -296,7 +302,7 @@ export interface Database {
         row_data: unknown
       }>
 
-      /** PENDING 0026 — the auth trail AND the rate-limit counter. */
+      /** 0026 — the auth trail AND the rate-limit counter. */
       auth_events: Row<{
         id: number
         at: Timestamp

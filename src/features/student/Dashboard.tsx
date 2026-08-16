@@ -14,6 +14,7 @@ import { termCalendar, termLabel, termOf, weekOf } from '@/lib/term'
 import { cn } from '@/lib/cn'
 import type { AchievementState, PointEvent } from '@/lib/types'
 import { LiveClassBanner } from './LiveClassBanner'
+import { SemesterEndedBanner } from './SemesterEndedBanner'
 import { StreakFlame } from './StreakFlame'
 import { useStudentData } from './StudentData'
 
@@ -133,6 +134,11 @@ export function Dashboard() {
         </div>
         <StreakFlame variant="compact" />
         <LiveBadge live={live} />
+      </motion.div>
+
+      {/* Read-only, because their semester is over (0035). */}
+      <motion.div variants={item}>
+        <SemesterEndedBanner />
       </motion.div>
 
       {/* Class is running right now (0033) — renders nothing when it isn't.

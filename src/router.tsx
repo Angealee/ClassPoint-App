@@ -67,6 +67,7 @@ const ManageSemesters = lazy(() =>
 const Redemptions = lazy(() =>
   import('@/features/instructor/Redemptions').then((m) => ({ default: m.Redemptions })),
 )
+const Ops = lazy(() => import('@/features/instructor/Ops').then((m) => ({ default: m.Ops })))
 const StudentRecord = lazy(() =>
   import('@/features/instructor/StudentRecord').then((m) => ({ default: m.StudentRecord })),
 )
@@ -140,6 +141,7 @@ export const router = createBrowserRouter([
           { path: 'attendance/session/:sessionId', element: <SessionDetail /> },
           { path: 'redemptions', element: <Redemptions /> },
           { path: 'semesters', element: <ManageSemesters /> },
+          { path: 'ops', element: <Ops /> },
           { path: 'student/:studentId', element: <StudentRecord /> },
           { path: 'history', element: <History /> },
           { path: 'leaderboard', element: <InstructorLeaderboard /> },

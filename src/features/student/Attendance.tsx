@@ -25,6 +25,7 @@ import { groupByTerm } from '@/lib/term'
 import { OfflineScanCards } from './OfflineScanCards'
 import { AbsenceExcuses } from './AbsenceExcuses'
 import { LiveClassBanner } from './LiveClassBanner'
+import { SemesterEndedBanner } from './SemesterEndedBanner'
 import { StreakFlame } from './StreakFlame'
 import type { AttendanceStatus, MyAttendanceEntry, ScanResult } from '@/lib/types'
 
@@ -57,7 +58,7 @@ function isOffline(e: unknown): boolean {
 }
 
 export function Attendance() {
-  const { me, syncMyAchievements, attendanceTick } = useStudentData()
+  const { me, syncMyAchievements, attendanceTick, semesterEnded } = useStudentData()
   const [searchParams, setSearchParams] = useSearchParams()
   const [history, setHistory] = useState<MyAttendanceEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -256,13 +257,21 @@ export function Attendance() {
         <p className="text-sm text-muted">Scan your instructor’s QR to check in.</p>
       </div>
 
+      {/* Read-only, because their semester is over (0035). */}
+      <SemesterEndedBanner />
+
       {/* Class is running right now (0033). Renders nothing when it isn't, and
           opens the scanner in place — this screen already owns that sheet. */}
       <LiveClassBanner onScan={openScan} />
 
-      <Button size="lg" className="w-full" onClick={openScan}>
-        <ScanIcon className="h-5 w-5" /> Scan attendance
-      </Button>
+      {/* Hidden once the semester has ended: scan_attendance refuses these
+          check-ins server-side (0035), so offering the button would only walk
+          the student into a camera and then an error. */}
+      {!semesterEnded && (
+        <Button size="lg" className="w-full" onClick={openScan}>
+          <ScanIcon className="h-5 w-5" /> Scan attendance
+        </Button>
+      )}
 
       {/* Offline check-ins waiting to sync / their outcomes. */}
       <OfflineScanCards

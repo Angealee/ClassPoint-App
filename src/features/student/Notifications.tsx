@@ -35,6 +35,8 @@ const TYPE_META: Record<
   // Absence penalties arrive as type 'deduct' (0025), not a dedicated type —
   // the old 'attendance_penalty' key here matched nothing any migration queues.
   excuse: { Icon: CheckIcon, cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+  // Instructor announcements (0034's send_broadcast).
+  broadcast: { Icon: BellIcon, cls: 'bg-brand-500/10 text-brand-500' },
 }
 const DEFAULT_META = { Icon: BellIcon, cls: 'bg-card-2 text-muted' }
 

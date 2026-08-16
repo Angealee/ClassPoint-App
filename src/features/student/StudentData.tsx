@@ -114,6 +114,15 @@ interface StudentDataValue {
    * already scanned.
    */
   liveStatus: AttendanceStatus | null
+  /**
+   * True when this student's section belongs to a semester that has ENDED
+   * (0035). Their account, points, badges and history all still open — nothing
+   * can change, and `scan_attendance` refuses their check-ins server-side.
+   *
+   * Detected without an extra query: `sections` is already scoped to the active
+   * semester, so a section_id missing from it means the semester moved on.
+   */
+  semesterEnded: boolean
   /** Raw metric values behind locked achievements' progress bars. */
   achievementProgress: AchievementProgress | null
   /** The achievement to celebrate with the unlock burst right now, or null. */
@@ -666,6 +675,11 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     ? leaderboard.find((e) => e.student_id === me.id)?.rank ?? null
     : null
 
+  // Guarded on `sections.length > 0`: mid-load the list is empty, and without
+  // the guard every student would flash "this semester has ended" on open.
+  const semesterEnded =
+    !!me && sections.length > 0 && !sections.some((s) => s.id === me.section_id)
+
   const sectionName = useCallback(
     (id: string) => sections.find((s) => s.id === id)?.name ?? '',
     [sections],
@@ -876,6 +890,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         attendanceTick,
         liveSession,
         liveStatus,
+        semesterEnded,
         achievementProgress,
         unlockedAchievement,
         clearUnlockedAchievement,

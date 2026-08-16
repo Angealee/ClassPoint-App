@@ -299,38 +299,31 @@ export const CHANGELOG: ChangelogEntry[] = [
 ]
 
 /**
- * The 4.0.0 draft — the "Semesters & Subjects" era, built one phase at a time.
+ * The 4.0.0 draft — COMPLETE and ready to announce, but deliberately still a
+ * draft. Every phase of the era has landed; the copy below is final.
  *
- * Deliberately NOT in the CHANGELOG array above, so none of it is announced
- * while the era is still being built: LATEST_VERSION reads CHANGELOG[0], so the
- * "What's new" sheet can't see this. Keep ADDING sections as each phase lands,
- * then move the whole entry into the array (with the real ship date) when the
- * era is ready to announce.
+ * ── HOW TO ANNOUNCE IT ──────────────────────────────────────────────────────
+ * Do this only AFTER migrations 0033, 0034 and 0035 are applied and the build
+ * is deployed. Announcing first would tell students about a live-class banner
+ * and a rollover that the database doesn't have yet.
+ *
+ *   1. Set `date` below to the real ship date.
+ *   2. Move this whole object into the CHANGELOG array as its FIRST element.
+ *   3. Delete this `export const DRAFT_4_0_0` wrapper.
+ *
+ * Why the draft mechanism exists at all: LATEST_VERSION reads CHANGELOG[0], and
+ * the "What's new" sheet is gated on that version against localStorage. An
+ * entry outside the array is invisible to every student, which is what let this
+ * accumulate across nine phases without leaking half-built features.
  */
 export const DRAFT_4_0_0: ChangelogEntry = {
   version: '4.0.0',
   date: '2026-08-13', // placeholder — set to the real ship date when announced
-  title: 'Semesters, subjects & a sturdier lock',
+  title: 'A whole new semester',
+  // Ordered by what a student notices first, not by the order the phases were
+  // built. The two fix-and-polish sections sit at the end: they're real work
+  // and worth saying, but nobody opens "What's new" to read about retry states.
   sections: [
-    {
-      heading: 'Fixes you can feel 🩹',
-      items: [
-        'If your attendance or requests fail to load, the app now says so and offers a retry — instead of pretending you have no record at all.',
-        'When your instructor corrects an attendance mark, your screen updates on the spot. No more closing and reopening the app to see it.',
-        'Pull down on Attendance or Use Points to refresh, same as the dashboard.',
-        'Admission-slip decisions finally show the right icon in your notifications.',
-        'Instructors: ticked students no longer follow you into another section (that one could award the wrong class), deducting says "Deduct" and asks first, "Select all" is back, and a session tagged with the wrong subject can be re-tagged.',
-      ],
-    },
-    {
-      heading: 'Smaller, smoother, kinder 🪶',
-      items: [
-        'Profile pictures are resized on your phone before they upload, so setting one is quick even on bad wifi — and everyone else’s screens load faster too.',
-        'The app now notices new versions on its own instead of waiting for you to happen to reload.',
-        'If you use larger text, a screen reader, or have motion turned down in your phone settings, the app finally respects all of it — pop-ups keep your place, and confirmations get read out.',
-        'Instructors: the live check-in roster is noticeably lighter on the phone during class.',
-      ],
-    },
     {
       heading: 'You’ll know when class starts 🔔',
       major: true,
@@ -355,6 +348,25 @@ export const DRAFT_4_0_0: ChangelogEntry = {
         'Your attendance streak now lives on your dashboard and attendance screen permanently. It used to vanish the moment you unlocked its badge, which was exactly backwards.',
         'Your dashboard says where you are in the semester — term and week — instead of leaving you to count.',
         'You can change your PIN yourself under Profile. No more asking for a reset code just because you wanted a better one.',
+      ],
+    },
+    {
+      heading: 'One semester ends, the next begins 🎓',
+      major: true,
+      items: [
+        'Points, levels and the leaderboard now reset when a new semester starts — everyone gets a fresh race. Your all-time total, your badges, your username and your PIN all carry over untouched.',
+        'Tap "Past" on the leaderboard to see how a finished semester ended, including where you placed.',
+        'If your section isn\'t running any more, your account stays open and read-only: your points, badges and full attendance record are all still there, they just stop changing.',
+        'Instructors: the rollover wizard lives under Semesters. Build the next semester ahead of time — sections, subjects, who moves across — and nothing changes for students until you activate it.',
+      ],
+    },
+    {
+      heading: 'Announcements, and a look under the hood 🛠️',
+      items: [
+        'Your instructor can now send announcements straight to your notifications — class cancelled, room moved, that kind of thing.',
+        'Instructors: a new Ops & trust screen shows whether the nightly backup actually ran, every delete that has ever happened (with the full record of what was removed), recent claim and PIN-reset attempts, and a button to rebuild the leaderboard without waiting for the twice-daily freeze.',
+        'Instructors: a "needs attention" list across every section, ranked by who can still file an excuse — so the top of the list is always someone you can still help today.',
+        'Instructors: a per-term attendance workbook, one sheet per section. Attendance only — points stay out of it.',
       ],
     },
     {
@@ -429,6 +441,25 @@ export const DRAFT_4_0_0: ChangelogEntry = {
         'New claim tokens are twice as long, so they are far harder to guess. Already have a token? It still works — nothing to redo.',
         'Claiming an account and resetting a PIN have limits now too: too many wrong codes from one place and it asks you to come back in a few minutes.',
         'Every claim and PIN reset is written down now, so your instructor can tell the difference between "I forgot my PIN again" and someone actually snooping.',
+      ],
+    },
+    {
+      heading: 'Fixes you can feel 🩹',
+      items: [
+        'If your attendance or requests fail to load, the app now says so and offers a retry — instead of pretending you have no record at all.',
+        'When your instructor corrects an attendance mark, your screen updates on the spot. No more closing and reopening the app to see it.',
+        'Pull down on Attendance or Use Points to refresh, same as the dashboard.',
+        'Admission-slip decisions finally show the right icon in your notifications.',
+        'Instructors: ticked students no longer follow you into another section (that one could award the wrong class), deducting says "Deduct" and asks first, "Select all" is back, and a session tagged with the wrong subject can be re-tagged.',
+      ],
+    },
+    {
+      heading: 'Smaller, smoother, kinder 🪶',
+      items: [
+        'Profile pictures are resized on your phone before they upload, so setting one is quick even on bad wifi — and everyone else’s screens load faster too.',
+        'The app now notices new versions on its own instead of waiting for you to happen to reload.',
+        'If you use larger text, a screen reader, or have motion turned down in your phone settings, the app finally respects all of it — pop-ups keep your place, and confirmations get read out.',
+        'Instructors: the live check-in roster is noticeably lighter on the phone during class.',
       ],
     },
   ],

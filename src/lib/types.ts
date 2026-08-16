@@ -562,6 +562,8 @@ export type NotificationType =
   // Queued by decide_absence_excuse (0025). Was missing here, so every
   // admission-slip decision rendered with the generic grey bell.
   | 'excuse'
+  /** An instructor announcement sent via send_broadcast (0034). */
+  | 'broadcast'
   | 'test'
 
 /** One row of the student's notification history (the bell). */
@@ -575,4 +577,131 @@ export interface AppNotification {
   createdAt: string
   /** Null while unread. */
   readAt: string | null
+}
+
+// ─── Instructor ops (0034) ──────────────────────────────────────────────────
+
+/** One backed-up table's freshness, from `get_backup_health()`. */
+export interface BackupHealth {
+  tableName: string
+  /** Date of the most recent snapshot, or null if the mirror is empty. */
+  lastSnapshot: string | null
+  /** Rows captured in that most recent snapshot. */
+  rowCount: number
+  /** How many distinct daily snapshots are retained (the job keeps 14). */
+  snapshotDays: number
+}
+
+/** One row of the destructive-action audit trail (0023). */
+export interface AuditEntry {
+  id: number
+  at: string
+  actor: string | null
+  action: 'delete' | 'archive' | 'restore' | 'hard_delete' | 'broadcast' | (string & {})
+  tableName: string
+  rowId: string | null
+  studentId: string | null
+  summary: string | null
+  rowData: Record<string, unknown>
+}
+
+/** One claim / PIN-reset attempt from the auth trail (0026). */
+export interface AuthEvent {
+  id: number
+  at: string
+  kind: 'claim' | 'pin_reset' | (string & {})
+  success: boolean
+  ip: string | null
+  userAgent: string | null
+  studentId: string | null
+  detail: string | null
+}
+
+/** Per-section "what needs finishing" signals, from `get_section_overview()`. */
+export interface SectionOverview {
+  sectionId: string
+  lastSessionAt: string | null
+  activeSession: boolean
+  /** Ended sessions set to apply penalties that were never committed. */
+  unfinalized: number
+}
+
+/**
+ * One student on the cross-section risk list (`get_absence_risk()`).
+ *
+ * `actionable` is the count still inside 0025's 7-day excuse window — the
+ * absences the instructor can still do something about today.
+ */
+export interface AbsenceRisk {
+  studentId: string
+  displayName: string
+  fullName: string
+  sectionId: string
+  sectionName: string
+  unexcused: number
+  actionable: number
+  /** Soonest excuse deadline still open, or null when none are actionable. */
+  nextDeadline: string | null
+  lastAbsenceAt: string | null
+}
+
+/**
+ * One student's attendance across a term (`get_term_attendance()`).
+ *
+ * ATTENDANCE ONLY, by the instructor's rule: points are never turned into a
+ * grade, so there is deliberately no points column here.
+ */
+export interface TermAttendanceRow {
+  studentId: string
+  fullName: string
+  displayName: string
+  present: number
+  late: number
+  absent: number
+  excused: number
+  irregular: number
+  /** present + late + absent. Neutral statuses are excluded by design. */
+  counted: number
+  showUpRate: number
+}
+
+// ─── Semester rollover (0035) ───────────────────────────────────────────────
+
+/**
+ * One problem found by the rollover pre-flight.
+ *
+ * `block` items are refused by `set_active_semester` itself — the UI showing
+ * them is a courtesy, the SQL is the gate. `warn` items are the instructor's
+ * call to override (notably `unplaced`: leaving a student behind is often
+ * deliberate — they dropped, transferred or graduated).
+ */
+export interface RolloverCheck {
+  code:
+    | 'active_session'
+    | 'pending_redemption'
+    | 'pending_excuse'
+    | 'uncommitted_penalties'
+    | 'unplaced'
+    | 'no_sections'
+    | (string & {})
+  severity: 'block' | 'warn'
+  count: number
+  detail: string
+}
+
+/**
+ * One row of a past semester's final leaderboard.
+ *
+ * Recomputed from the ledger rather than read from the snapshot (which only
+ * holds the current board), and it includes archived students — they were on
+ * that board when it counted.
+ */
+export interface PastLeaderboardEntry {
+  studentId: string
+  displayName: string
+  sectionId: string
+  sectionName: string
+  points: number
+  rank: number
+  avatarUrl: string | null
 }

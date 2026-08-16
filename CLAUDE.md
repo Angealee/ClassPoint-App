@@ -89,11 +89,19 @@ and the leaderboard **reset each semester**; achievements and the all-time total
 ## Changelog workflow
 
 Every user-facing change is announced via `src/lib/changelog.ts` (drives the
-"What's new" sheet; version-gated by localStorage). **Current mode: the 4.0.0
-"Semesters & Subjects" draft** (3.0.0 shipped 2026-07-19). During overhaul phases,
-accumulate sections into the exported `DRAFT_4_0_0` entry (NOT in the `CHANGELOG`
-array — `LATEST_VERSION` reads `CHANGELOG[0]`, so a draft is invisible to users) and
-only move it into the array as `4.0.0` when the user says the era is ready to announce.
+"What's new" sheet; version-gated by localStorage). During overhaul phases,
+accumulate sections into an exported draft entry (NOT in the `CHANGELOG` array —
+`LATEST_VERSION` reads `CHANGELOG[0]`, so a draft is invisible to users) and only move
+it into the array when the user says the era is ready to announce.
+
+**Current state (Phase J, 2026-08-16): `DRAFT_4_0_0` is COMPLETE and titled
+"A whole new semester".** All nine phases' copy is written and ordered by student
+impact (headline features first; the fix/polish sections last). It is deliberately
+STILL A DRAFT — announcing it while 0033–0035 are unapplied would tell students about
+a live-class banner and a rollover the database doesn't have. **To announce:** set the
+real `date`, move the object into `CHANGELOG` as element 0, delete the
+`export const DRAFT_4_0_0` wrapper. `changelog.test.ts` asserts the draft is NOT in the
+array, so that test must be updated in the same commit as the flip.
 
 ## Migration workflow
 
@@ -116,9 +124,13 @@ only move it into the array as `4.0.0` when the user says the era is ready to an
 - **Migration before client, always.** A migration adding a column the client selects
   must land in the database BEFORE the build that selects it, or every read 400s.
   **All migrations through 0032 are applied as of 2026-08-14.**
-  **0033 (`0033_student_presence.sql`) is WRITTEN AND NOT YET APPLIED** — paste it before
-  deploying the current build, or the live-class banner simply never fires (the client
-  degrades quietly; nothing 400s). Next number after it: 0034.
+  **0033, 0034 and 0035 are WRITTEN AND NOT YET APPLIED.** Paste all three, in order,
+  before deploying the current build. 0033 (`student_presence`) degrades quietly if
+  missing — the live-class banner just never fires. **0034 (`instructor_ops`) and 0035
+  (`rollover`) do NOT: every card on `/teach/ops` and every step of the rollover wizard
+  calls an RPC that won't exist.** 0035 has an ACID TEST in its footer — dress-rehearse
+  on a scratch semester and confirm `semester_points` round-trips exactly before doing
+  the real rollover. Next number: 0036.
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -158,6 +170,82 @@ this before, so every student-side week number and term label silently used term
 hardcoded FALLBACK dates — which happen to match this semester, which is exactly why it
 would have gone unnoticed until the instructor moved a term date around a holiday.
 Student attendance history is grouped by term off the back of it.
+
+Since 0034 (Instructor ops — Phase G): five instructor-gated RPCs, all drop-first +
+granted. `get_backup_health()` reads `pg_class` for schema `backup` rather than a
+hardcoded list, so it can never drift from what `cp_nightly_backup` actually writes.
+`get_section_overview()` (last session, active flag, `unfinalized` = ended sessions with
+`apply_penalties` and no commit). `get_term_attendance(section, term)` — **ATTENDANCE
+ONLY and no computed score, by the instructor's explicit rule: POINTS ARE NEVER TURNED
+INTO A GRADE** (they reach one solely via an individually-approved redemption). Its term
+window is compared in **Manila time** (`at time zone 'Asia/Manila'`), because
+`started_at` is timestamptz against plain `semester_terms` dates and a naive compare
+casts at UTC — which would push a 7am class out of its own term. Its term filter lives
+INSIDE the joined subquery, not the WHERE clause, so a student with no classes that term
+still returns a zero row instead of vanishing. `get_absence_risk()` — cross-section
+unexcused absences with `actionable` = those still inside 0025's 7-day window; the list
+is ordered by what can still be DONE, not by show-up rate. `send_broadcast(title, body,
+url, section_id?)` — one bulk INSERT (not 208 `cp_queue_notification` calls), audit row
+written BEFORE dispatch, then **chunked dispatch at 50** because `cp_push_dispatch` puts
+every id in a single HTTP body and was written for one-or-two-id calls; refuses an empty
+target rather than reporting a cheerful zero. `audit_log_action_check` widened with
+`'broadcast'` (name preserved — Phase I adds `'promote'`/`'semester_activate'`).
+New notification type `'broadcast'`. **There is no trigger on `notifications` inserts** —
+dispatch is always explicit, which is why the chunked call can't double-send.
+Client: `src/lib/api/ops.ts` + `/teach/ops` (`Ops.tsx`, lazy) with RiskOverview,
+Broadcast, AttendanceWorkbook, backup health, leaderboard rebuild, auth events, audit
+log. `OpsButton` sits in Shell's `actions` beside Requests and is **stateless by
+requirement** (that slot mounts twice). `getSectionHeadcounts()` is deliberately NOT
+`getSectionStats` — the latter also chunks through every student's claim token, and a
+recipient count should not pull secrets over the wire. The composer sums headcounts over
+**the instructor's semester-scoped `sections`**, never over every key in the map, or it
+would promise a number `send_broadcast` won't reach.
+
+Since 0035 (Rollover — Phase I): `promote_students(uuid[], section)` (one audit row each),
+`archive_students(uuid[])` (bulk; ONE snapshot refresh at the end, not one per student),
+`get_rollover_preflight(semester)`, `set_active_semester(semester)`,
+`get_semester_leaderboard(semester)`. `audit_log_action_check` widened again with
+`'promote'`/`'semester_activate'` — **it re-lists 0034's `'broadcast'`, since dropping
+and recreating the constraint silently narrows it otherwise.**
+
+**`set_active_semester` discharges the contract written at the foot of 0029:** it BULK
+RECOMPUTES `semester_points` for every student. `cp_recompute_points` is
+active-semester-relative and only fires when a point row changes, so nothing else in the
+system can rebuild that cache for a semester CHANGE — without those lines every student
+keeps last semester's balance as their new spendable points. It also does the **two-step
+is_active flip** (clear, then set), because the partial unique index
+`(is_active) where is_active` would be violated mid-statement by a single UPDATE. The
+blocking pre-flight is re-run INSIDE the function, so a stale UI can't slip a rollover
+past a live class or a pending redemption. `unplaced` is a WARN, not a block (user's
+call — leaving someone behind is often deliberate).
+
+**Ownership move: `scan_attendance` 0023 → 0035** (same signature, plain
+`create or replace`). Body copied forward verbatim plus the **active-semester guard
+deferred from 0028** — it belongs here because a past-semester section could not exist
+until rollover made one possible.
+
+`get_semester_leaderboard` recomputes from `point_events` (the snapshot only ever holds
+the CURRENT board), INCLUDES archived students (they were on that board when it counted),
+and uses **`row_number()` with the same `display_name` tiebreaker as
+`refresh_leaderboard_snapshot`** — `rank()` would produce ties where the live board
+produced a strict order, so a student's remembered "I finished 7th" would disagree with
+their own history. Two plpgsql traps this file documents: a RETURNS TABLE column named
+`count` shadows the aggregate (hence `item_count`), and a loop variable named `id`
+collides with the column (hence `v_id`).
+
+Client: `src/lib/api/rollover.ts`; `SemesterRollover.tsx` (4-step, hosted by a
+`RolloverPanel` in ManageSemesters). **The wizard COMMITS at every step** — sections,
+subjects and promotions are real rows immediately — so it is resumable by construction
+rather than by saving draft state. Section names **start blank** (user's choice: a
+carried-forward or year-bumped suggestion is right for one rollover and wrong for the
+other, and a wrong suggestion here CREATES a section rather than failing). Activation is
+behind the typed-name ConfirmDialog challenge. Student side: `semesterEnded` on
+StudentData — derived, no extra query, from `me.section_id` not being in the
+active-semester `sections` list (guarded on `sections.length > 0`, or it flashes during
+load); `SemesterEndedBanner` on Dashboard + Attendance; the scan button is hidden when
+ended (the RPC refuses anyway); `PastSemesterBoard` is a SHEET, not another option in
+the leaderboard's section picker — that picker chooses sections, and folding a second
+axis into it makes both harder to read.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

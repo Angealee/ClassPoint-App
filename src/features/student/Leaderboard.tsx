@@ -11,6 +11,7 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { getLevelProgress } from '@/lib/leveling'
 import { cn } from '@/lib/cn'
 import type { LeaderboardComment, LeaderboardEntry } from '@/lib/types'
+import { PastSemesterBoard } from './PastSemesterBoard'
 import { useStudentData } from './StudentData'
 import { StudentProfilePreview } from './StudentProfilePreview'
 
@@ -27,6 +28,7 @@ export function Leaderboard() {
   const { loading, leaderboard, capturedAt, me, sections, sectionName, refresh } = useStudentData()
   const [selected, setSelected] = useState<LeaderboardEntry | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
+  const [pastOpen, setPastOpen] = useState(false)
   // Sticky once opened, so the sheet keeps its close animation instead of
   // being yanked out of the tree the moment it's dismissed.
   const [shareMounted, setShareMounted] = useState(false)
@@ -107,6 +109,16 @@ export function Leaderboard() {
             {subtitle}
           </span>
           <SnapshotChip capturedAt={capturedAt} />
+          {/* Past boards (0035). Always available, but it's the students whose
+              own semester ended who most need it — their final rank is the one
+              thing the live board can no longer show them. */}
+          <button
+            type="button"
+            onClick={() => setPastOpen(true)}
+            className="inline-flex shrink-0 items-center rounded-full bg-card-2 px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:text-ink"
+          >
+            Past
+          </button>
           {top.length > 0 && (
             <button
               type="button"
@@ -176,6 +188,8 @@ export function Leaderboard() {
           />
         </Suspense>
       )}
+
+      <PastSemesterBoard open={pastOpen} onClose={() => setPastOpen(false)} />
       </div>
     </PullToRefresh>
   )

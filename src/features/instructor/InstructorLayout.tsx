@@ -16,6 +16,7 @@ import {
   ClockIcon,
   LogOutIcon,
   QrIcon,
+  ShieldIcon,
   TicketIcon,
   TrophyIcon,
   UsersIcon,
@@ -107,6 +108,28 @@ function RedemptionInbox({ count }: { count: number }) {
           {count > 9 ? '9+' : count}
         </motion.span>
       )}
+    </button>
+  )
+}
+
+/**
+ * Ops & trust entry point (0034).
+ *
+ * Stateless BY REQUIREMENT: Shell renders `actions` in both the desktop sidebar
+ * and the mobile header, so this mounts twice. A component in that slot must
+ * never own a subscription or a fetch — see RedemptionInbox above, whose count
+ * lives in the layout for exactly this reason.
+ */
+function OpsButton() {
+  const navigate = useNavigate()
+  return (
+    <button
+      type="button"
+      onClick={() => navigate('/teach/ops')}
+      aria-label="Ops and trust"
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
+    >
+      <ShieldIcon className="h-5 w-5" />
     </button>
   )
 }
@@ -260,6 +283,7 @@ export function InstructorLayout() {
           // single unit instead of spreading them apart.
           <div className="flex items-center gap-2">
             <RedemptionInbox count={pendingRedemptions + pendingExcuses} />
+            <OpsButton />
             <button
               type="button"
               onClick={onSignOut}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -7,15 +7,18 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { ArrowLeftIcon, CheckIcon, PlusIcon, TrashIcon } from '@/components/ui/icons'
 import {
+  createSemester,
   createSubject,
   deleteSubject,
+  listSemesters,
   setSectionSubjects,
   updateSemesterTerm,
   updateSubject,
 } from '@/lib/api'
 import { termLabel, weekOf } from '@/lib/term'
-import type { TermKey } from '@/lib/types'
+import type { Semester, TermKey } from '@/lib/types'
 import { useInstructor } from './InstructorLayout'
+import { SemesterRollover } from './SemesterRollover'
 
 const TERM_ORDER: TermKey[] = ['prelim', 'midterm', 'finals']
 
@@ -165,6 +168,9 @@ export function ManageSemesters() {
           Started {longDate(semester.startsOn)} · currently week {currentWeek}
         </p>
       </div>
+
+      {/* ── Rollover (Phase I) ─────────────────────────────────────────── */}
+      <RolloverPanel />
 
       {/* ── Term dates ─────────────────────────────────────────────────── */}
       <Card className="p-4">
@@ -392,5 +398,141 @@ function BackLink({ onClick }: { onClick: () => void }) {
     >
       <ArrowLeftIcon className="h-4 w-4" /> Students
     </button>
+  )
+}
+
+/**
+ * Rollover entry point (Phase I).
+ *
+ * Lists semesters that exist but aren't active. Creating one does NOT switch to
+ * it — you build it out first and activate at the end of the wizard, which is
+ * what makes the whole thing safe to do gradually in the weeks before a term
+ * ends rather than in one nervous sitting.
+ */
+function RolloverPanel() {
+  const { semester, refreshSemester } = useInstructor()
+  const { toast } = useToast()
+  const [others, setOthers] = useState<Semester[]>([])
+  const [building, setBuilding] = useState<Semester | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [name, setName] = useState('')
+  const [startsOn, setStartsOn] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const all = await listSemesters()
+      setOthers(all.filter((s) => !s.isActive))
+    } catch {
+      /* non-fatal — the panel just stays empty */
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  async function create(e: FormEvent) {
+    e.preventDefault()
+    if (!name.trim() || !startsOn) return
+    setBusy(true)
+    try {
+      const created = await createSemester(name.trim(), startsOn)
+      toast(`${created.name} created. It isn't active yet.`, 'success')
+      setName('')
+      setStartsOn('')
+      setCreating(false)
+      await load()
+      setBuilding(created)
+    } catch {
+      toast('Could not create that semester — is the name already used?', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (building) {
+    return (
+      <Card className="p-4">
+        <button
+          type="button"
+          onClick={() => setBuilding(null)}
+          className="mb-3 text-xs font-semibold text-muted hover:text-ink"
+        >
+          ‹ Back to semesters
+        </button>
+        <SemesterRollover
+          semester={building}
+          onDone={() => {
+            setBuilding(null)
+            void refreshSemester()
+            void load()
+          }}
+        />
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="p-4">
+      <h2 className="font-display text-base font-bold">Next semester</h2>
+      <p className="mt-0.5 text-sm text-muted">
+        Build it ahead of time. Nothing changes for students until you activate it.
+      </p>
+
+      {others.length > 0 && (
+        <ul className="mt-3 divide-y divide-line">
+          {others.map((s) => (
+            <li key={s.id} className="flex items-center gap-3 py-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{s.name}</p>
+                <p className="text-xs text-muted">Starts {longDate(s.startsOn)} · not active</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setBuilding(s)}>
+                Set up
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {creating ? (
+        <form onSubmit={create} className="mt-3 space-y-3">
+          <Input
+            label="Semester name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="2nd Sem AY 2026–2027"
+            required
+          />
+          <Input
+            label="First day"
+            type="date"
+            value={startsOn}
+            onChange={(e) => setStartsOn(e.target.value)}
+            hint="A Monday — week 1 is anchored here. Terms are seeded six weeks apart and stay editable."
+            required
+          />
+          <div className="flex gap-2">
+            <Button variant="ghost" className="flex-1" onClick={() => setCreating(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1" disabled={busy}>
+              {busy ? 'Creating…' : 'Create'}
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <Button variant="outline" className="mt-3 w-full" onClick={() => setCreating(true)}>
+          <PlusIcon className="h-4 w-4" /> New semester
+        </Button>
+      )}
+
+      {semester && (
+        <p className="mt-3 text-xs text-muted">
+          Currently active: <span className="font-semibold text-ink">{semester.name}</span>
+        </p>
+      )}
+    </Card>
   )
 }
