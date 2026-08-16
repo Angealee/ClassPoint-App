@@ -743,6 +743,7 @@ export async function getAchievementProgress(studentId: string): Promise<Achieve
     term_recitations: data.term_recitations ?? null,
     term_early_streak: data.term_early_streak ?? null,
     perfect_terms: data.perfect_terms ?? null,
+    present_streak: data.present_streak ?? null,
   }
 }
 

@@ -577,7 +577,9 @@ export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot> {
   const [snap, meta, avatars] = await Promise.all([
     supabase
       .from('leaderboard_snapshot')
-      .select('student_id, display_name, section_id, semester_points, rank')
+      .select(
+        'student_id, display_name, section_id, semester_points, rank, previous_rank, rank_since',
+      )
       .order('rank'),
     supabase.from('leaderboard_meta').select('captured_at').maybeSingle(),
     // Avatars aren't part of the frozen ranking — merge the current ones in so a
@@ -595,6 +597,10 @@ export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot> {
     points: (e.semester_points as number) ?? 0,
     rank: e.rank as number,
     avatar_url: avatarById.get(e.student_id as string) ?? null,
+    // Defaulted so a client running ahead of migration 0037 simply shows no
+    // arrow and no tenure, rather than rendering `undefined`.
+    previous_rank: (e.previous_rank as number | null) ?? null,
+    rank_since: (e.rank_since as string | null) ?? new Date().toISOString(),
   }))
   return { entries, capturedAt: meta.data?.captured_at ?? null }
 }

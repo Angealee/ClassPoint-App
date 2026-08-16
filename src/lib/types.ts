@@ -76,6 +76,16 @@ export interface LeaderboardEntry {
   rank: number
   /** Merged in live from `students` at read time (the snapshot doesn't store it). */
   avatar_url: string | null
+  /**
+   * Rank at the PREVIOUS refresh, or null if this is their first board (0037).
+   * `previous_rank - rank` is how many places they moved: positive is a climb.
+   */
+  previous_rank: number | null
+  /**
+   * When the current run began, where a run is "held this rank or better".
+   * Climbing keeps it; only dropping resets it. Drives the tenure flame.
+   */
+  rank_since: string
 }
 
 /** A recent point award/penalty as the instructor reviews it (for undo). */
@@ -521,6 +531,12 @@ export type AchievementMetric =
   | 'term_recitations'
   | 'term_early_streak'
   | 'perfect_terms'
+  /**
+   * The STRICT current streak (0036): classes in a row marked present. A late
+   * resets it, unlike `streak`, which only breaks on an absence. Drives the
+   * home-screen flame; no badge uses it.
+   */
+  | 'present_streak'
 
 /** One row of the achievement catalog — the static, shared definition. */
 export interface Achievement {

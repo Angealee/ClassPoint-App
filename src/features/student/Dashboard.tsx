@@ -132,7 +132,6 @@ export function Dashboard() {
               the student side never named it. */}
           <p className="truncate text-[0.7rem] text-muted/70">{whereWeAre()}</p>
         </div>
-        <StreakFlame variant="compact" />
         <LiveBadge live={live} />
       </motion.div>
 
@@ -176,6 +175,14 @@ export function Dashboard() {
             </div>
           </div>
         </Card>
+      </motion.div>
+
+      {/* Attendance streak — full card, not the header chip it used to be.
+          As a chip beside the live badge it was easy to miss entirely, and it
+          rendered nothing at all on a broken streak, so a student who'd slipped
+          saw no prompt to start again. */}
+      <motion.div variants={item}>
+        <StreakFlame />
       </motion.div>
 
       {/* Stat tiles */}

@@ -62,6 +62,9 @@ returns table (
   term_recitations  integer,
   term_early_streak integer,
   perfect_terms     integer,
+  -- NEW in 0036 — the STRICT current streak (see below). Not a badge metric;
+  -- it drives the home-screen flame.
+  present_streak    integer,
   has_events      boolean,
   has_attendance  boolean,
   has_avatar      boolean,
@@ -91,6 +94,7 @@ declare
   v_term_recit  integer;
   v_term_early  integer;
   v_perfect     integer;
+  v_pres_streak integer;
 begin
   -- lifetime_points, NOT semester_points: achievements are lifetime by decision
   -- (0029). A badge earned is a badge kept, and the `level` metric below has to
@@ -185,6 +189,30 @@ begin
         ) s
        group by s.subject_id
     ) t;
+
+  -- ── 0036: the STRICT present-only streak ──────────────────────────────────
+  -- Deliberately harsher than `streak` above, and they answer different
+  -- questions. `streak` is "classes without an absence" — arriving late keeps
+  -- it alive, which is what makes it a fair badge metric. This one is "classes
+  -- in a row marked PRESENT": a late resets it too.
+  --
+  -- Combined across subjects only, NOT greatest(combined, per-subject) like the
+  -- badge streaks. Those use greatest() so nobody's badge progress can regress;
+  -- this number is a live display, and "6 in a row" has to mean six actual
+  -- consecutive classes or it doesn't mean anything.
+  --
+  -- excused/irregular are NEUTRAL: skipped entirely, so a legitimately excused
+  -- class neither breaks the run nor counts toward it.
+  select count(*)::integer into v_pres_streak
+    from (
+      select sum(case when ar.status = 'present' then 0 else 1 end)
+               over (order by cs.started_at desc) as running_not_present
+        from public.attendance_records ar
+        join public.class_sessions cs on cs.id = ar.session_id
+       where ar.student_id = p_student_id
+         and ar.status not in ('excused', 'irregular')
+    ) t
+   where running_not_present = 0;
 
   -- ── 0036: best single term ────────────────────────────────────────────────
   -- Joined on the event's OWN semester_id (0029) as well as the date window, so
@@ -288,6 +316,7 @@ begin
     v_term_recit,
     v_term_early,
     v_perfect,
+    v_pres_streak,
     exists(select 1 from public.point_events where student_id = p_student_id),
     exists(select 1 from public.attendance_records where student_id = p_student_id and scanned_at is not null),
     v_avatar is not null,
@@ -322,7 +351,7 @@ returns table (
   views_received integer, views_given integer, unlocked_count integer, banner_count integer,
   points_spent integer, redemptions_approved integer,
   term_points integer, term_recitations integer, term_early_streak integer,
-  perfect_terms integer
+  perfect_terms integer, present_streak integer
 )
 language plpgsql
 security definer
@@ -340,7 +369,8 @@ begin
     select m.points, m.recitations, m.present_count, m.attended_count, m.streak, m.early_streak,
            m.level, m.rank, m.views_received, m.views_given, m.unlocked_count, m.banner_count,
            m.points_spent, m.redemptions_approved,
-           m.term_points, m.term_recitations, m.term_early_streak, m.perfect_terms
+           m.term_points, m.term_recitations, m.term_early_streak, m.perfect_terms,
+           m.present_streak
       from public.cp_achievement_metrics(p_student_id) m;
 end;
 $$;
@@ -427,7 +457,10 @@ alter table public.achievements
       'points','recitations','present_count','attended_count','streak','early_streak',
       'level','rank','views_received','views_given','unlocked_count','banner_count',
       'points_spent','redemptions_approved',
-      'term_points','term_recitations','term_early_streak','perfect_terms'
+      'term_points','term_recitations','term_early_streak','perfect_terms',
+      -- Allowed as a metric even though no badge uses it today: the constraint
+      -- exists to stop typos, not to encode which metrics happen to be seeded.
+      'present_streak'
     )
   );
 
