@@ -130,7 +130,9 @@ array, so that test must be updated in the same commit as the flip.
   (`rollover`) do NOT: every card on `/teach/ops` and every step of the rollover wizard
   calls an RPC that won't exist.** 0035 has an ACID TEST in its footer — dress-rehearse
   on a scratch semester and confirm `semester_points` round-trips exactly before doing
-  the real rollover. Next number: 0036.
+  the real rollover. **0036 (`term_badges`) is also unapplied**; without it the four new
+  badges simply never unlock and their progress bars read empty (it degrades quietly —
+  the client defaults the missing columns). Next number: 0037.
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -246,6 +248,35 @@ load); `SemesterEndedBanner` on Dashboard + Attendance; the scan button is hidde
 ended (the RPC refuses anyway); `PastSemesterBoard` is a SHEET, not another option in
 the leaderboard's section picker — that picker chooses sections, and folding a second
 axis into it makes both harder to read.
+
+Since 0036 (Per-term badges): **Ownership move `cp_achievement_metrics` 0030 → 0036**
+(return type GROWS by four columns, so drop-first; `get_achievement_progress` also
+drop-first since its type grows too; `sync_achievements` recreated; all re-granted).
+Four new metrics, each the student's **BEST SINGLE TERM** across every term of every
+semester — which is what lets the badges read as "do it in any one term" while still
+unlocking once, ever (`student_achievements` is `unique (student_id, achievement_code)`,
+and achievements stay lifetime per 0029): `term_points` (≥18 — instructor picked the
+hard bar knowingly; on current data that's the top few students), `term_recitations`
+(≥8), `term_early_streak` (≥6), `perfect_terms` (≥1). Badges: `term_ace`,
+`flawless_term`, `term_talker`, `six_sharp`. Term windows read `semester_terms`'
+editable dates and compare in **Manila time** (the 0034 lesson); `term_early_streak`
+uses **gaps-and-islands**, not the trailing-run trick the all-time streaks use, because
+a finished term's best run can sit anywhere inside it. `perfect_terms` requires ≥6
+counted classes so a one-session term can't grant "perfect attendance".
+
+**0036 ships NO BACKFILL, deliberately** — and the reason is worth keeping: a loop
+calling `sync_achievements()` FAILS SILENTLY. That function gates on `is_instructor()`,
+which reads `auth.jwt() ->> 'email'`, and the SQL editor has no JWT — so it raises for
+every student, and the exception handler such a loop needs swallows it into a notice
+while inserting nothing. Inlining the rules instead would duplicate the threshold list.
+Badges already sync lazily (StudentData calls `syncAchievements()` on every app open,
+idempotent, insert-only), which is how 0016 and 0021 worked too.
+Client: `getAchievementProgress` defaults the four new fields with `?? null` so a client
+running ahead of the database degrades to an empty progress bar rather than leaking
+`undefined` through `Record<AchievementMetric, number | null>`. `badgeMotifs.tsx` gained
+art for the four new codes **plus `big_spender` / `high_roller` / `town_crier` /
+`window_shopper`**, which 0021 seeded without motifs and which had been rendering as
+blank gradient frames ever since.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Sheet } from '@/components/ui/Sheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
-import { WarningIcon, XIcon } from '@/components/ui/icons'
+import { WarningIcon } from '@/components/ui/icons'
 import {
   cancelAbsenceExcuse,
   listMyExcuses,
@@ -20,7 +20,6 @@ import {
 } from '@/lib/types'
 
 const DAY_MS = 86_400_000
-const DISMISS_KEY = 'cp_excuse_guide_dismissed_v1'
 
 const sessionDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -30,12 +29,18 @@ function withinWindow(startedAt: string): boolean {
   return Date.now() - new Date(startedAt).getTime() <= EXCUSE_DEADLINE_DAYS * DAY_MS
 }
 
-function loadDismissed(): Set<string> {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(DISMISS_KEY) ?? '[]'))
-  } catch {
-    return new Set()
-  }
+/**
+ * How long is left to file — the one fact that decides whether a row is still
+ * worth acting on.
+ *
+ * Rounds UP on the remaining fraction of a day, so a window with 20 hours left
+ * reads "1 day left" rather than "0 days left" while it is still genuinely open.
+ */
+function deadlineLabel(startedAt: string): string {
+  const msLeft = EXCUSE_DEADLINE_DAYS * DAY_MS - (Date.now() - new Date(startedAt).getTime())
+  if (msLeft <= 0) return 'Window closed'
+  const days = Math.ceil(msLeft / DAY_MS)
+  return days === 1 ? 'Last day to excuse' : `${days} days left to excuse`
 }
 
 function errorText(e: unknown, fallback: string): string {
@@ -60,7 +65,7 @@ export function AbsenceExcuses({
 }) {
   const { toast } = useToast()
   const [excuses, setExcuses] = useState<AbsenceExcuse[]>([])
-  const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissed())
+  const [guideOpen, setGuideOpen] = useState(false)
   const [requestFor, setRequestFor] = useState<MyAttendanceEntry | null>(null)
   const [reason, setReason] = useState('')
   const [hasSlip, setHasSlip] = useState(false)
@@ -124,20 +129,6 @@ export function AbsenceExcuses({
     [history, excuseByRecord],
   )
 
-  // Show the how-to while any actionable absence hasn't been dismissed.
-  const showGuide = actionable.some((h) => !dismissed.has(h.recordId))
-
-  function dismissGuide() {
-    const next = new Set(dismissed)
-    for (const h of actionable) next.add(h.recordId)
-    setDismissed(next)
-    try {
-      localStorage.setItem(DISMISS_KEY, JSON.stringify([...next]))
-    } catch {
-      /* ignore */
-    }
-  }
-
   async function submitRequest() {
     if (!requestFor) return
     setSubmitting(true)
@@ -186,39 +177,53 @@ export function AbsenceExcuses({
 
   return (
     <div className="space-y-3">
-      {/* The DCT-CCS how-to (clear & procedural). */}
-      {showGuide && (
-        <Card className="relative border-brand-500/25 bg-brand-500/[0.04] p-4">
-          <button
-            type="button"
-            onClick={dismissGuide}
-            aria-label="Dismiss"
-            className="absolute right-3 top-3 text-muted transition-colors hover:text-ink"
-          >
-            <XIcon className="h-4 w-4" />
-          </button>
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/12 text-brand-500">
-              <WarningIcon className="h-4.5 w-4.5" />
-            </span>
-            <p className="font-display font-bold">Missed a class?</p>
-          </div>
-          <ol className="mt-3 space-y-1.5 text-sm text-muted">
-            <li>① Get a valid excuse letter.</li>
-            <li>② The Dean’s office validates it.</li>
-            <li>③ They issue your admission slip.</li>
-            <li>④ Present the slip to your instructor.</li>
-          </ol>
-          <p className="mt-2 text-xs text-muted">
-            File your request here so your instructor is ready — you have {EXCUSE_DEADLINE_DAYS} days
-            from the class.
-          </p>
-        </Card>
-      )}
+      {/* The DCT-CCS how-to, collapsed.
+          This used to be a permanently-open card: four numbered steps plus a
+          paragraph, occupying most of a phone screen above the absences it was
+          explaining. It's reference material, not an alert — so it's one line
+          now, and the steps open in a sheet at the moment someone wants them.
+          The old per-student dismissal is gone with it; a single line needs no
+          escape hatch. */}
+      <button
+        type="button"
+        onClick={() => setGuideOpen(true)}
+        className="flex w-full items-center gap-2.5 rounded-xl border border-line px-4 py-3 text-left transition-colors hover:bg-card-2"
+      >
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-500/12 text-brand-500">
+          <WarningIcon className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1 text-[15px] font-medium">How excuses work</span>
+        <span className="shrink-0 text-lg text-muted">›</span>
+      </button>
+
+      <Sheet open={guideOpen} onClose={() => setGuideOpen(false)} title="How excuses work">
+        <ol className="space-y-3">
+          {[
+            'Get a valid excuse letter.',
+            'The Dean’s office validates it.',
+            'They issue your admission slip.',
+            'Present the slip to your instructor.',
+          ].map((step, i) => (
+            <li key={step} className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/12 text-[13px] font-bold text-brand-500">
+                {i + 1}
+              </span>
+              <span className="text-[15px]">{step}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-5 rounded-xl bg-card-2 px-4 py-3 text-[13px] text-muted">
+          File your request here so your instructor is ready — you have{' '}
+          {EXCUSE_DEADLINE_DAYS} days from the class.
+        </p>
+        <Button size="lg" className="mt-5 w-full" onClick={() => setGuideOpen(false)}>
+          Got it
+        </Button>
+      </Sheet>
 
       {/* Actionable absences */}
       <div>
-        <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Absences to resolve</h2>
+        <h2 className="mb-2 px-1 text-[15px] font-semibold text-muted">Absences to resolve</h2>
         <Card className="divide-y divide-line">
           {actionable.map((h) => {
             const excuse = excuseByRecord.get(h.recordId)
@@ -226,10 +231,17 @@ export function AbsenceExcuses({
               <div key={h.recordId} className="p-3.5">
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">
+                    <p className="truncate text-[15px] font-semibold">
                       {h.topic || sessionDate(h.startedAt)}
                     </p>
-                    <p className="text-xs text-muted">{sessionDate(h.startedAt)}</p>
+                    {/* The second line used to repeat the date whenever a
+                        session had no topic — "Aug 15" above "Aug 15". It now
+                        carries the deadline, which is the thing that decides
+                        whether this row is still worth acting on. */}
+                    <p className="text-[13px] text-muted">
+                      {h.topic ? `${sessionDate(h.startedAt)} · ` : ''}
+                      {deadlineLabel(h.startedAt)}
+                    </p>
                   </div>
                   {!excuse && withinWindow(h.startedAt) && (
                     <Button
@@ -305,7 +317,7 @@ export function AbsenceExcuses({
               placeholder="e.g. Was sick, medical certificate available"
               className="w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/40"
             />
-            <p className="mt-1 text-right text-[0.65rem] text-muted">{reason.length}/280</p>
+            <p className="mt-1 text-right text-[12px] text-muted">{reason.length}/280</p>
           </div>
           <div>
             <p className="mb-1.5 text-sm font-medium">Do you already have your admission slip?</p>

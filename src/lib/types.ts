@@ -512,6 +512,15 @@ export type AchievementMetric =
   | 'banner_count'
   | 'points_spent'
   | 'redemptions_approved'
+  /**
+   * Per-term metrics (0036). Each is the student's BEST SINGLE TERM across
+   * every term of every semester — which is what makes the badges read as
+   * "do it in any one term" while still unlocking only once, ever.
+   */
+  | 'term_points'
+  | 'term_recitations'
+  | 'term_early_streak'
+  | 'perfect_terms'
 
 /** One row of the achievement catalog — the static, shared definition. */
 export interface Achievement {

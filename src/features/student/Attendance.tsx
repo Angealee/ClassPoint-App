@@ -212,15 +212,17 @@ export function Attendance() {
   /**
    * Same maths, split per subject (0030). Attendance is subject-scoped, so a
    * perfect record in one class shouldn't be averaged away by a rough one in
-   * another. Sessions that predate subjects group under "Earlier" rather than
-   * being dropped — they happened.
+   * another. Sessions that predate subjects (0028) group into their own bucket
+   * rather than being dropped — they happened. It's labelled "Earlier classes"
+   * rather than "Earlier" so it doesn't sit in the list looking like a subject
+   * code, which is exactly how it read next to "IT 32" and "Elective 1".
    */
   const bySubject = useMemo(() => {
     const groups = new Map<string, { label: string; present: number; late: number; absent: number }>()
     for (const h of history) {
       const key = h.subjectId ?? '__untagged'
       const g = groups.get(key) ?? {
-        label: h.subjectCode ?? 'Earlier',
+        label: h.subjectCode ?? 'Earlier classes',
         present: 0,
         late: 0,
         absent: 0,
@@ -286,46 +288,57 @@ export function Attendance() {
           moment its badge unlocked. */}
       {history.length > 0 && <StreakFlame />}
 
-      {/* Summary */}
+      {/* Summary — ONE card, counts first.
+          The show-up rate used to open this screen as a large brand-red number,
+          which meant the first thing a struggling student saw was their worst
+          figure. It's still here (it's the number that matters for a grade) but
+          as a calm footer line: the counts are what you act on. */}
       {history.length > 0 && (
-        <div className="grid grid-cols-4 gap-3">
-          <Card className="col-span-1 flex flex-col items-center justify-center p-3">
-            <p className="font-display text-2xl font-bold tabular-nums text-brand-500">{stats.rate}%</p>
-            <p className="text-center text-[11px] leading-tight text-muted">Show-up rate</p>
-          </Card>
-          <Card className="col-span-3 grid grid-cols-3 divide-x divide-line p-0">
+        <Card className="p-0">
+          <div className="grid grid-cols-3 divide-x divide-line">
             {(['present', 'late', 'absent'] as const).map((k) => (
-              <div key={k} className="flex flex-col items-center justify-center py-3">
-                <p className={cn('font-display text-xl font-bold tabular-nums', STATUS_META[k].text)}>
+              <div key={k} className="flex flex-col items-center justify-center py-4">
+                <p
+                  className={cn(
+                    'font-display text-3xl font-bold tabular-nums',
+                    STATUS_META[k].text,
+                  )}
+                >
                   {stats[k]}
                 </p>
-                <p className="text-[11px] text-muted">{STATUS_META[k].label}</p>
+                <p className="mt-0.5 text-[13px] text-muted">{STATUS_META[k].label}</p>
               </div>
             ))}
-          </Card>
-        </div>
+          </div>
+          <div className="flex items-baseline justify-between border-t border-line px-4 py-3">
+            <span className="text-[13px] text-muted">Show-up rate</span>
+            <span className="font-display text-lg font-bold tabular-nums">{stats.rate}%</span>
+          </div>
+        </Card>
       )}
 
-      {/* Per-subject split — only worth showing once there's more than one. */}
+      {/* Per-subject split — only worth showing once there's more than one.
+          Two lines per row rather than three columns fighting for width: the
+          subject and its rate on top, the detail underneath in a calmer size. */}
       {bySubject.length > 1 && (
         <Card className="divide-y divide-line p-0">
           {bySubject.map((s) => (
-            <div key={s.key} className="flex items-center gap-3 px-4 py-2.5">
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{s.label}</span>
-              <span className="text-xs text-muted">
+            <div key={s.key} className="px-4 py-3.5">
+              <div className="flex items-baseline gap-3">
+                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{s.label}</span>
+                <span className="font-display text-base font-bold tabular-nums">{s.rate}%</span>
+              </div>
+              <p className="mt-0.5 text-[13px] text-muted">
                 {s.counted} class{s.counted === 1 ? '' : 'es'}
                 {s.absent > 0 && ` · ${s.absent} absent`}
-              </span>
-              <span className="font-display text-sm font-bold tabular-nums text-brand-500">
-                {s.rate}%
-              </span>
+              </p>
             </div>
           ))}
         </Card>
       )}
 
       {stats.neutral > 0 && (
-        <p className="px-1 text-xs text-muted">
+        <p className="px-1 text-[13px] text-muted">
           {stats.excused > 0 && `${stats.excused} excused`}
           {stats.excused > 0 && stats.irregular > 0 && ' · '}
           {stats.irregular > 0 && `${stats.irregular} irregular`} — those classes don’t count
@@ -363,25 +376,31 @@ export function Attendance() {
         <div className="space-y-4">
           {groupByTerm(history, (h) => h.startedAt).map((g) => (
             <div key={g.label}>
-              <p className="mb-1.5 px-1 text-[0.7rem] font-semibold uppercase tracking-wider text-muted/80">
+              <p className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-wider text-muted/80">
                 {g.label}
               </p>
               <Card className="divide-y divide-line">
                 {g.items.map((h) => (
                   <div key={h.recordId} className="flex items-center gap-3 p-4">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">
+                      <p className="truncate text-[15px] font-semibold">
                         {h.topic || entryDate(h.startedAt) || 'Class'}
                       </p>
-                      <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
-                        {h.subjectCode ? `${h.subjectCode} · ` : ''}
-                        {entryDate(h.startedAt)}
-                        {/* When they actually checked in — the answer to "was I
-                            really marked late?", which used to need the
-                            instructor. */}
-                        {h.scannedAt && <span>· in at {clockTime(h.scannedAt)}</span>}
+                      <p className="flex flex-wrap items-center gap-x-1.5 text-[13px] text-muted">
+                        {/* Built from parts and joined once. Concatenating
+                            "x · " fragments left a doubled separator whenever a
+                            middle piece was absent — and the date piece is
+                            absent for every session without a topic, because
+                            the title above already IS the date. */}
+                        {[
+                          h.subjectCode,
+                          h.topic ? entryDate(h.startedAt) : null,
+                          h.scannedAt ? `in at ${clockTime(h.scannedAt)}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                         {h.syncedLate && (
-                          <span className="rounded-full bg-card-2 px-1.5 py-0.5 text-[0.65rem] font-medium">
+                          <span className="rounded-full bg-card-2 px-2 py-0.5 text-[12px] font-medium">
                             Offline check-in
                           </span>
                         )}

@@ -281,6 +281,97 @@ function TrophyCrown(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+/* ── Per-term badges (0036) ─────────────────────────────────────────────── */
+
+/** A term's page with a star on it — "a standout six weeks". */
+function CalendarStar(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 2v2.5M18 2v2.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <rect x="3" y="4" width="18" height="17" rx="3" opacity="0.35" />
+      <path d="M3 9h18" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M12 11.2l1.5 3.1 3.4.5-2.5 2.4.6 3.4-3-1.6-3 1.6.6-3.4-2.5-2.4 3.4-.5z" />
+    </svg>
+  )
+}
+
+/** A term with every box ticked. */
+function CalendarCheck(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 2v2.5M18 2v2.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <rect x="3" y="4" width="18" height="17" rx="3" opacity="0.35" />
+      <path d="M3 9h18" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M8 15.2l2.6 2.6L16.4 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/** Overlapping speech bubbles — the hand goes up, repeatedly. */
+function SpeechBurst(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 6.5A2.5 2.5 0 015.5 4h9A2.5 2.5 0 0117 6.5v5A2.5 2.5 0 0114.5 14H8l-4 3.2V14a1 1 0 01-1-1z" opacity="0.45" />
+      <path d="M9 10.5A2.5 2.5 0 0111.5 8h7A2.5 2.5 0 0121 10.5v4a2.5 2.5 0 01-2.5 2.5H18v3l-3.6-3h-2.9A2.5 2.5 0 019 14.5z" />
+    </svg>
+  )
+}
+
+/** An alarm clock — six mornings, all of them early. */
+function AlarmClock(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2.6 5.4A5 5 0 018 2.6M21.4 5.4A5 5 0 0016 2.6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="13.5" r="8" opacity="0.35" />
+      <path d="M12 8.6v5.2l3.2 2" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6 21l-1.6 1.6M18 21l1.6 1.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/* ── Motifs for four 0021 badges that never got one (they rendered blank) ── */
+
+/** A receipt — your first approved redemption. */
+function Receipt(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M5 2.5h14a1 1 0 011 1v18l-2.6-1.6-2.6 1.6-2.6-1.6-2.6 1.6-2.6-1.6L4 21.5v-18a1 1 0 011-1z" opacity="0.45" />
+      <path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** Dice — the high roller. */
+function Dice(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="4" opacity="0.4" />
+      <circle cx="8.5" cy="8.5" r="1.7" />
+      <circle cx="15.5" cy="8.5" r="1.7" />
+      <circle cx="12" cy="12" r="1.7" />
+      <circle cx="8.5" cy="15.5" r="1.7" />
+      <circle cx="15.5" cy="15.5" r="1.7" />
+    </svg>
+  )
+}
+
+/** A price tag — browsed, then thought better of it. */
+function PriceTag(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M11.6 2.4H20a1.6 1.6 0 011.6 1.6v8.4a2 2 0 01-.6 1.4l-7.6 7.6a2 2 0 01-2.8 0L2.6 13.4a2 2 0 010-2.8l7.6-7.6a2 2 0 011.4-.6z" opacity="0.45" />
+      <circle cx="17" cy="7" r="2.1" />
+    </svg>
+  )
+}
+
 export const BADGE_MOTIFS: Record<string, (props: SVGProps<SVGSVGElement>) => ReactElement> = {
   first_steps: Footprints,
   point_collector: CoinStack,
@@ -317,4 +408,17 @@ export const BADGE_MOTIFS: Record<string, (props: SVGProps<SVGSVGElement>) => Re
   rising_star: ShootingStar,
   team_player: PuzzlePiece,
   class_mvp: TrophyCrown,
+
+  // 0021's four — these were seeded without motifs and rendered as blank
+  // gradient frames in the trophy case until now.
+  big_spender: Receipt,
+  high_roller: Dice,
+  town_crier: Megaphone,
+  window_shopper: PriceTag,
+
+  // Per-term badges (0036).
+  term_ace: CalendarStar,
+  flawless_term: CalendarCheck,
+  term_talker: SpeechBurst,
+  six_sharp: AlarmClock,
 }

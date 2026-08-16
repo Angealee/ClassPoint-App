@@ -735,6 +735,14 @@ export async function getAchievementProgress(studentId: string): Promise<Achieve
     banner_count: data.banner_count,
     points_spent: data.points_spent,
     redemptions_approved: data.redemptions_approved,
+    // Per-term metrics (0036). Defaulted to null rather than read straight
+    // through: if the client is ever ahead of the database, an older
+    // get_achievement_progress simply omits these columns, and `undefined`
+    // would slip past a `Record<_, number | null>` into the progress bars.
+    term_points: data.term_points ?? null,
+    term_recitations: data.term_recitations ?? null,
+    term_early_streak: data.term_early_streak ?? null,
+    perfect_terms: data.perfect_terms ?? null,
   }
 }
 

@@ -343,6 +343,16 @@ export const DRAFT_4_0_0: ChangelogEntry = {
       ],
     },
     {
+      heading: 'Four new badges, one term at a time 🏅',
+      items: [
+        'The old badges reward a whole career. These four are won inside a single six-week term, so there’s always something in reach — even if you’re starting from behind.',
+        'Term Ace: bank 18 points in one term. Deliberately hard. Flawless: get through a term with zero absences.',
+        'Certified Yapper: eight recitation awards in one term. Six Sharp: six classes in a row, on time.',
+        'Win one in any term and it’s yours for good — you don’t lose it when the term ends.',
+        'Four older badges that were showing up blank in the trophy case finally have their artwork.',
+      ],
+    },
+    {
       heading: 'Your streak stays lit 🔥',
       items: [
         'Your attendance streak now lives on your dashboard and attendance screen permanently. It used to vanish the moment you unlocked its badge, which was exactly backwards.',

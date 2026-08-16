@@ -318,8 +318,9 @@ a column the client selects must land *before* the build that selects it.
 | 0033 | student_presence | `class_sessions` realtime + excuse nudge cron |
 | 0034 | instructor_ops | Backup health, broadcast, risk, term attendance |
 | 0035 | rollover | Promote, archive, activate, past leaderboards |
+| 0036 | term_badges | Four badges won inside a single six-week term |
 
-**Applied through 0032** (2026-08-14). **0033, 0034 and 0035 are written and not
+**Applied through 0032** (2026-08-14). **0033 through 0036 are written and not
 yet applied** — see [CLAUDE.md](CLAUDE.md) for what breaks if you deploy without
 them.
 
@@ -327,7 +328,7 @@ them.
 `cp_generate_token` 0002→0026 · `cp_nightly_backup` 0023→0027→0032 ·
 `start_class_session` 0014→0028 · `cp_recompute_points` 0007→0029 ·
 `refresh_leaderboard_snapshot` 0023→0029 · redemption RPCs 0019→0029 ·
-`cp_achievement_metrics` 0021→0030 · `set_attendance_status` 0018→0024 ·
+`cp_achievement_metrics` 0021→0030→0036 · `set_attendance_status` 0018→0024 ·
 `cp_notify_point_event` 0017→0025 · `scan_attendance` 0023→0035.
 
 A return-type change needs `drop function if exists` first, then re-`grant`.
