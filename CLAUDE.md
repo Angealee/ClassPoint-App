@@ -132,7 +132,9 @@ array, so that test must be updated in the same commit as the flip.
   on a scratch semester and confirm `semester_points` round-trips exactly before doing
   the real rollover. **0036 (`term_badges`) is also unapplied**; without it the four new
   badges simply never unlock and their progress bars read empty (it degrades quietly —
-  the client defaults the missing columns). Next number: 0037.
+  the client defaults the missing columns). **0037 (`rank_history`) is unapplied too**;
+  without it `getLeaderboardSnapshot` selects two columns that don't exist and the whole
+  board 400s — this one is LOUD. Next number: 0038.
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -277,6 +279,52 @@ running ahead of the database degrades to an empty progress bar rather than leak
 art for the four new codes **plus `big_spender` / `high_roller` / `town_crier` /
 `window_shopper`**, which 0021 seeded without motifs and which had been rendering as
 blank gradient frames ever since.
+
+Since 0037 (Rank movement + tenure): `leaderboard_snapshot` gains `previous_rank`
+(null until the first refresh after this lands — inventing movement we never recorded
+would put a wrong number on all 208 rows) and `rank_since`. **Ownership move
+`refresh_leaderboard_snapshot` 0029 → 0037, rewritten DELETE+INSERT → UPSERT + sweep**,
+because the old shape destroyed the very rows the new columns must read. The trick that
+makes it one statement: in `on conflict do update`, every SET expression sees the OLD
+row, so `previous_rank = leaderboard_snapshot.rank` works in the same statement that
+overwrites `rank`. Reference it by BARE table name — a schema qualifier is a syntax
+error there. The sweep (`delete … where not exists … archived_at is null`) replaces what
+truncation used to give for free.
+**`rank_since` is "held this rank OR BETTER"** — climbing keeps the run, only dropping
+resets it. Exact-rank tenure was considered and rejected: on a 208-student board settling
+twice daily it reads 0–1 for nearly everyone.
+Client: `RankSignals.tsx` exports `RankDelta` (▲/▼ + places moved) and `RankTenure`
+(🔥 Nd), both rendering NOTHING when there's nothing to say — no arrow on an unchanged
+rank, no flame under a day — so the board doesn't fill with dashes and zeroes.
+**Both are gated behind PodiumBoard's `rankSignals` prop, which callers set only on the
+UNFILTERED view:** a section view renumbers rows by position within the section while
+these columns describe the whole board, so a row would otherwise read "#4 ▲3" without
+having moved on screen. The pinned "your standing" row passes it unconditionally — that
+row is numbered by real global rank.
+
+**The home flame reads `present_streak` (0036), not `streak`.** They answer different
+questions and both are correct: `streak` breaks only on an absence (forgiving, because
+it backs a permanent badge), `present_streak` also breaks on a LATE (strict, because
+it's a live display and "6 in a row" must mean six). It is combined-across-subjects only,
+NOT `greatest(combined, per-subject)` like the badge streaks — those use greatest() so
+badge progress can never regress, which is the wrong trade for a live number.
+**`StreakFlame` now renders at zero** with an unlit flame and a prompt; returning null
+below 1 hid it from exactly the students it was meant to motivate.
+
+Student attendance surfaces (no migration): **`StudentData` now owns the attendance
+history** — loaded OFF the critical path exactly like achievements (`void
+loadAttendance(...)`, never awaited in `load()`), and re-read on `attendanceTick` so an
+instructor's correction reaches every surface from the one subscription. The Dashboard
+`AttendanceTeaser` and `/app/attendance/stats` (`AttendanceStats`, lazy) both read it and
+fire NO query of their own. **`Attendance.tsx` deliberately keeps its own fetch** — it
+owns a loadError/retry state the provider has no business carrying, so it is the one
+screen that queries twice.
+`AttendanceStats` splits from the Attendance TAB by intent: the tab is for DOING (scan,
+resolve an absence, check a recent mark), the stats screen answers "how am I going?" —
+per-term rates, a week-by-week bar chart, punctuality. **Punctuality only counts rows
+with a `scannedAt`**: a record the instructor marked by hand has no check-in moment, and
+averaging it in as "0 minutes" would invent a punctuality the student never showed.
+Per-subject rates stay on the tab only — that cut already exists there.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

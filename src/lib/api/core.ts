@@ -539,13 +539,32 @@ export async function awardPoints(args: {
  * still reads "approved" — a desync with no way to notice. Spending is
  * reviewed and reversed from the Requests screen instead.
  */
-export async function listRecentAwards(limit = 30): Promise<AwardRecord[]> {
-  const { data, error } = await supabase
-    .from('point_events')
-    .select('id, student_id, points, category, note, created_at, students(full_name, section_id)')
-    .neq('category', 'redeem')
+export interface AwardFilters {
+  /** Only this section's students. Omit for every section. */
+  sectionId?: string
+  /** Only this ledger category. Omit for all of them. */
+  category?: PointCategory
+  /** Skip this many rows — offset paging for the load-more button. */
+  offset?: number
+}
+
+export async function listRecentAwards(
+  limit = 30,
+  filters: AwardFilters = {},
+): Promise<AwardRecord[]> {
+  // The embed must be !inner WHEN filtering on it. A plain embed applies the
+  // filter but keeps every parent row, nulling the students object instead of
+  // excluding it — the list would fill with rows reading 'Unknown'.
+  const cols = filters.sectionId
+    ? 'id, student_id, points, category, note, created_at, students!inner(full_name, section_id)'
+    : 'id, student_id, points, category, note, created_at, students(full_name, section_id)'
+  let q = supabase.from('point_events').select(cols).neq('category', 'redeem')
+  if (filters.category) q = q.eq('category', filters.category)
+  if (filters.sectionId) q = q.eq('students.section_id', filters.sectionId)
+  const from = filters.offset ?? 0
+  const { data, error } = await q
     .order('created_at', { ascending: false })
-    .limit(limit)
+    .range(from, from + limit - 1)
   if (error) throw error
   type Row = Omit<AwardRecord, 'student_name' | 'section_id'> & {
     students: { full_name: string; section_id: string } | null

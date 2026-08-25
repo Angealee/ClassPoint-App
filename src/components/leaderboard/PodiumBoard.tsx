@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
 import { CrownIcon } from '@/components/ui/icons'
 import { ConfettiBurst } from '@/components/leaderboard/ConfettiBurst'
+import { RankDelta, RankTenure } from '@/components/leaderboard/RankSignals'
 import { getLevelProgress } from '@/lib/leveling'
 import { cn } from '@/lib/cn'
 import type { LeaderboardEntry } from '@/lib/types'
@@ -25,6 +26,17 @@ interface PodiumBoardProps {
   glow?: boolean
   /** One-shot confetti when the board first appears (on by default). */
   confetti?: boolean
+  /**
+   * Show the rank-movement arrow and tenure flame (0037).
+   *
+   * MUST be false on a filtered view. `previous_rank` and `rank_since` describe
+   * a student's position on the WHOLE board, while a section view renumbers
+   * rows by their position within that section — so a row could read "#4 ▲3"
+   * when the position on screen never moved. Rather than silently mixing two
+   * different rankings, the signals are simply omitted where they can't be
+   * stated truthfully.
+   */
+  rankSignals?: boolean
 }
 
 type Place = 1 | 2 | 3
@@ -74,6 +86,7 @@ export function PodiumBoard({
   onSelect,
   glow = true,
   confetti = true,
+  rankSignals = false,
 }: PodiumBoardProps) {
   const reduced = useReducedMotion() ?? false
   // One-shot celebration when the board first mounts; auto-clears after ~2s.
@@ -121,6 +134,7 @@ export function PodiumBoard({
               isMe={meId === entry.student_id}
               sectionLabel={label(entry.section_id)}
               reduced={reduced}
+              rankSignals={rankSignals}
               onClick={pick?.(entry)}
             />
           ))}
@@ -142,6 +156,7 @@ export function PodiumBoard({
               sectionLabel={label(entry.section_id)}
               index={i}
               reduced={reduced}
+              rankSignals={rankSignals}
               onClick={pick?.(entry)}
             />
           ))}
@@ -160,6 +175,9 @@ export function PodiumBoard({
             sectionLabel={label(pinnedSelf.section_id)}
             index={0}
             reduced={reduced}
+            // Safe even in a section view: this row is numbered by the real
+            // global rank, not a position within the filtered list.
+            rankSignals
             onClick={pick?.(pinnedSelf)}
           />
         </div>
@@ -174,6 +192,7 @@ function PodiumCard({
   isMe,
   sectionLabel,
   reduced,
+  rankSignals,
   onClick,
 }: {
   entry: LeaderboardEntry
@@ -181,6 +200,7 @@ function PodiumCard({
   isMe: boolean
   sectionLabel: string
   reduced: boolean
+  rankSignals?: boolean
   onClick?: () => void
 }) {
   const tier = TIER[place]
@@ -309,6 +329,17 @@ function PodiumCard({
           />
           <span className="text-xs font-medium text-muted">pts</span>
         </div>
+
+        {/* Movement + tenure (0037). Their own centred row rather than the name
+            line: these cards are a third of the screen wide, and the top of the
+            board is exactly where "held #1 for six days" is worth reading. Both
+            render nothing when they have nothing to say, so the row collapses. */}
+        {rankSignals && (
+          <div className="relative z-[1] flex flex-wrap items-center justify-center gap-1">
+            <RankDelta entry={entry} />
+            <RankTenure entry={entry} />
+          </div>
+        )}
       </Card>
 
       {/* Winners' stand — attached to the card; its top border is the platform
@@ -345,6 +376,7 @@ function RestRow({
   sectionLabel,
   index,
   reduced,
+  rankSignals,
   onClick,
 }: {
   entry: LeaderboardEntry
@@ -353,6 +385,7 @@ function RestRow({
   sectionLabel: string
   index: number
   reduced: boolean
+  rankSignals?: boolean
   onClick?: () => void
 }) {
   const level = getLevelProgress(entry.points).level
@@ -395,8 +428,20 @@ function RestRow({
             {entry.display_name}
             {isMe && <span className="text-brand-500"> (you)</span>}
           </p>
-          <p className="truncate text-xs text-muted">
-            {sectionLabel ? `${sectionLabel} · ` : ''}Lv {level}
+          {/* Section + level, then the two movement signals (0037). Both hide
+              themselves when there's nothing to say — no arrow on an unchanged
+              rank, no flame under a day — so this line stays quiet for most
+              rows instead of becoming a column of dashes and zeroes. */}
+          <p className="flex items-center gap-1.5 text-[13px] text-muted">
+            <span className="truncate">
+              {sectionLabel ? `${sectionLabel} · ` : ''}Lv {level}
+            </span>
+            {rankSignals && (
+              <>
+                <RankDelta entry={entry} />
+                <RankTenure entry={entry} />
+              </>
+            )}
           </p>
         </div>
         <span className="relative z-[1] font-display text-base font-bold text-gold-600 dark:text-gold-400">

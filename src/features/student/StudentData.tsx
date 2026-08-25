@@ -18,6 +18,7 @@ import {
   getMySessionStatus,
   getMyStudent,
   getUnreadNotificationCount,
+  listMyAttendance,
   listSections,
   listStudentEvents,
   markNotificationsRead,
@@ -45,6 +46,7 @@ import type {
   AttendanceStatus,
   ClassSession,
   LeaderboardEntry,
+  MyAttendanceEntry,
   PointEvent,
   Section,
   StudentSelf,
@@ -123,6 +125,16 @@ interface StudentDataValue {
    * semester, so a section_id missing from it means the semester moved on.
    */
   semesterEnded: boolean
+  /**
+   * The student's own attendance history, loaded off the critical path (like
+   * achievements) and refreshed whenever attendanceTick bumps.
+   *
+   * Shared by the Dashboard teaser and the detailed stats screen so neither
+   * has to re-query. The Attendance screen deliberately keeps its own fetch:
+   * it owns a loadError/retry state this provider has no business carrying.
+   */
+  attendance: MyAttendanceEntry[]
+  attendanceLoading: boolean
   /** Raw metric values behind locked achievements' progress bars. */
   achievementProgress: AchievementProgress | null
   /** The achievement to celebrate with the unlock burst right now, or null. */
@@ -182,6 +194,9 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   // The section's running class, if any (0033), and our own status in it.
   const [liveSession, setLiveSession] = useState<ClassSession | null>(null)
   const [liveStatus, setLiveStatus] = useState<AttendanceStatus | null>(null)
+  // Attendance history, shared by the Dashboard teaser and the stats screen.
+  const [attendance, setAttendance] = useState<MyAttendanceEntry[]>([])
+  const [attendanceLoading, setAttendanceLoading] = useState(true)
   const [achievementProgress, setAchievementProgress] = useState<AchievementProgress | null>(null)
   // Achievements queued to celebrate, shown one at a time (oldest first).
   const [unlockQueue, setUnlockQueue] = useState<Achievement[]>([])
@@ -270,6 +285,21 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   )
 
   /** Refresh the achievement catalog + this student's unlock state/progress. */
+  /**
+   * Attendance history. Failures leave the last-known list in place and just
+   * stop the spinner: the teaser and stats screen both degrade to showing
+   * nothing rather than claiming a student has no record.
+   */
+  const loadAttendance = useCallback(async (studentId: string) => {
+    try {
+      setAttendance(await listMyAttendance(studentId))
+    } catch {
+      /* keep whatever we had */
+    } finally {
+      setAttendanceLoading(false)
+    }
+  }, [])
+
   const loadAchievements = useCallback(async (studentId: string) => {
     setAchievementsError(false)
     try {
@@ -407,6 +437,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         // Independent of the main load — achievements populate the trophy
         // case as soon as they're ready without delaying the dashboard.
         void loadAchievements(mine.id).finally(() => setAchievementsLoading(false))
+        void loadAttendance(mine.id)
         void runAchievementSync(mine.id)
       }
     } catch {
@@ -417,7 +448,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     })()
     inFlightRef.current = run
     return run
-  }, [user, considerLevelUp, considerRankChange, loadAchievements, runAchievementSync])
+  }, [user, considerLevelUp, considerRankChange, loadAchievements, loadAttendance, runAchievementSync])
 
   // Always call the freshest `load` from listeners/callbacks without making the
   // realtime channel re-subscribe when `load`'s identity changes.
@@ -624,6 +655,18 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     celebrate,
     loadAchievements,
   ])
+
+  /**
+   * Re-read attendance whenever one of this student's records changes.
+   *
+   * `attendanceTick` already fires on the durable channel for exactly this —
+   * an instructor correcting a wrong 'absent' now reaches the Dashboard teaser
+   * and the stats screen live, not just the Attendance tab.
+   */
+  useEffect(() => {
+    if (!studentId || attendanceTick === 0) return
+    void loadAttendance(studentId)
+  }, [studentId, attendanceTick, loadAttendance])
 
   /**
    * Keep the banner's "already checked in" state honest.
@@ -891,6 +934,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         liveSession,
         liveStatus,
         semesterEnded,
+        attendance,
+        attendanceLoading,
         achievementProgress,
         unlockedAchievement,
         clearUnlockedAchievement,

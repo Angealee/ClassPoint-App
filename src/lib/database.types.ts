@@ -122,6 +122,10 @@ export interface Database {
         /** 0029 — the board ranks on this. */
         semester_points: number
         rank: number
+        /** PENDING 0037 — rank at the previous refresh; null on a first board. */
+        previous_rank: number | null
+        /** PENDING 0037 — when the current "this rank or better" run began. */
+        rank_since: Timestamp
       }>
 
       leaderboard_meta: Row<{ id: boolean; captured_at: Timestamp }>

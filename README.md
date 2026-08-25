@@ -242,6 +242,7 @@ screens fetch ad hoc.
 | `/scan` | Public QR landing — captures the proof, then routes by auth |
 | `/app` | Student area (`AppLayout`) |
 | `/app/leaderboard` · `/attendance` · `/points` · `/history` · `/profile` · `/achievements` | Student screens |
+| `/app/attendance/stats` | Detailed attendance stats (terms, weekly trend, punctuality) |
 | `/teach` | Instructor area (`InstructorLayout`) |
 | `/teach/attendance` · `/attendance/session/:id` | Live class |
 | `/teach/history` | Points \| Attendance tabs |
@@ -319,15 +320,16 @@ a column the client selects must land *before* the build that selects it.
 | 0034 | instructor_ops | Backup health, broadcast, risk, term attendance |
 | 0035 | rollover | Promote, archive, activate, past leaderboards |
 | 0036 | term_badges | Four badges won inside a single six-week term |
+| 0037 | rank_history | Rank movement arrows + how long a rank is held |
 
-**Applied through 0032** (2026-08-14). **0033 through 0036 are written and not
+**Applied through 0032** (2026-08-14). **0033 through 0037 are written and not
 yet applied** — see [CLAUDE.md](CLAUDE.md) for what breaks if you deploy without
 them.
 
 **Function ownership moves** (a function has exactly one owning migration):
 `cp_generate_token` 0002→0026 · `cp_nightly_backup` 0023→0027→0032 ·
 `start_class_session` 0014→0028 · `cp_recompute_points` 0007→0029 ·
-`refresh_leaderboard_snapshot` 0023→0029 · redemption RPCs 0019→0029 ·
+`refresh_leaderboard_snapshot` 0023→0029→0037 · redemption RPCs 0019→0029 ·
 `cp_achievement_metrics` 0021→0030→0036 · `set_attendance_status` 0018→0024 ·
 `cp_notify_point_event` 0017→0025 · `scan_attendance` 0023→0035.
 

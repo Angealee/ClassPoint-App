@@ -334,6 +334,14 @@ export const DRAFT_4_0_0: ChangelogEntry = {
       ],
     },
     {
+      heading: 'Know your attendance at a glance 📊',
+      items: [
+        'A new Attendance card on your home screen: your show-up rate, your current streak, and how your last class was marked — so a wrong mark is something you spot, not something you find out about later.',
+        'Tap it for the full picture: your rate broken down by Prelim, Midterm and Finals, a bar per week so you can see whether you are slipping or recovering, and how punctual you have actually been.',
+        'Punctuality is measured from when you scanned against when class started — average minutes in, how many times you made it inside the first two minutes, and your fastest.',
+      ],
+    },
+    {
       heading: 'Your points, the whole story 📈',
       major: true,
       items: [
@@ -355,6 +363,9 @@ export const DRAFT_4_0_0: ChangelogEntry = {
     {
       heading: 'Your streak stays lit 🔥',
       items: [
+        'A fire streak on your home screen: how many classes in a row you’ve been present for. Arrive late and it resets — this one is strict on purpose.',
+        'It shows even at zero now, with a nudge to start one. It used to hide itself until you were already doing well, which helped nobody.',
+        'On the leaderboard, a flame next to anyone holding their rank or better for more than a day — and an arrow showing how many places they moved since the last update.',
         'Your attendance streak now lives on your dashboard and attendance screen permanently. It used to vanish the moment you unlocked its badge, which was exactly backwards.',
         'Your dashboard says where you are in the semester — term and week — instead of leaving you to count.',
         'You can change your PIN yourself under Profile. No more asking for a reset code just because you wanted a better one.',

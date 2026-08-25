@@ -52,6 +52,9 @@ export function InstructorLeaderboard() {
         points: 0,
         avatar_url: c.avatarUrl,
         rank: 0,
+        // Unranked: no movement to report and no run to time.
+        previous_rank: null,
+        rank_since: new Date().toISOString(),
       },
     )
   }
@@ -114,6 +117,8 @@ export function InstructorLeaderboard() {
             entries={visible}
             sectionName={sectionName}
             showSection={filter === 'all'}
+            // Same rule as the student board: only truthful unfiltered.
+            rankSignals={filter === 'all'}
             onSelect={(entry) => setSelected(entry)}
             confetti={false}
           />

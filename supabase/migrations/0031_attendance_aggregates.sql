@@ -13,7 +13,7 @@
 -- Past that line, sessions at the tail of the list tally as "0 present, 0 late,
 -- 0 absent", show-up rates RISE (the denominator shrinks), and "Needs attention"
 -- quietly empties — wrong numbers on the exact screen used to decide who is
--- failing attendance.
+-- failing attendance.a
 --
 -- THE FIX (hybrid, by design):
 --   • Tallies the client only ever aggregates move INTO the database as the two

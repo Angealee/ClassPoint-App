@@ -62,6 +62,10 @@ export function Leaderboard() {
         section_id: '',
         points: 0,
         avatar_url: c.avatarUrl,
+        // Unranked: no movement to report and no run to time, which is exactly
+        // what makes both rank signals render nothing for this target.
+        previous_rank: null,
+        rank_since: new Date().toISOString(),
         rank: 0,
       },
     )
@@ -149,6 +153,11 @@ export function Leaderboard() {
             meId={me?.id}
             sectionName={sectionName}
             showSection={isGlobal}
+            // Global view only: rows are renumbered by section position in a
+            // filtered view, and previous_rank/rank_since describe the whole
+            // board — mixing them would put a movement arrow on a row that
+            // didn't move on screen.
+            rankSignals={isGlobal}
             onSelect={(entry) => setSelected(entry)}
           />
         </CommentsOverlay>

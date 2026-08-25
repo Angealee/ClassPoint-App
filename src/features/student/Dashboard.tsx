@@ -5,13 +5,15 @@ import { XpBar } from '@/components/ui/XpBar'
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
-import { BoltIcon, StarIcon, TicketIcon, TrophyIcon } from '@/components/ui/icons'
+import { BoltIcon, ScanIcon, StarIcon, TicketIcon, TrophyIcon } from '@/components/ui/icons'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
 import { getLevelProgress } from '@/lib/leveling'
 import { snapshotLabel, timeAgo } from '@/lib/time'
 import { termCalendar, termLabel, termOf, weekOf } from '@/lib/term'
 import { cn } from '@/lib/cn'
+import { NEUTRAL_STATUSES } from '@/lib/types'
+import { STATUS_META } from '@/components/attendance/StatusChip'
 import type { AchievementState, PointEvent } from '@/lib/types'
 import { LiveClassBanner } from './LiveClassBanner'
 import { SemesterEndedBanner } from './SemesterEndedBanner'
@@ -183,6 +185,11 @@ export function Dashboard() {
           saw no prompt to start again. */}
       <motion.div variants={item}>
         <StreakFlame />
+      </motion.div>
+
+      {/* Attendance at a glance, tapping through to the detailed stats. */}
+      <motion.div variants={item}>
+        <AttendanceTeaser onOpen={() => navigate('/app/attendance/stats')} />
       </motion.div>
 
       {/* Stat tiles */}
@@ -363,6 +370,57 @@ function FeedRow({ event: e }: { event: PointEvent }) {
         </p>
       </div>
     </div>
+  )
+}
+
+/**
+ * Attendance at a glance, and the way in to the detailed stats.
+ *
+ * Reads from StudentData, which already holds the history for this reason — no
+ * query fires on the Dashboard, and an instructor's correction reaches this card
+ * from the same subscription that updates every other attendance surface.
+ *
+ * Renders nothing until there is a class to report: a card promising "0%" is
+ * worse than no card at all in week one.
+ */
+function AttendanceTeaser({ onOpen }: { onOpen: () => void }) {
+  const { attendance, attendanceLoading, achievementProgress } = useStudentData()
+  const streak = achievementProgress?.present_streak ?? null
+
+  const counted = attendance.filter((h) => !NEUTRAL_STATUSES.includes(h.status))
+  if (attendanceLoading || counted.length === 0) return null
+
+  const showed = counted.filter((h) => h.status === 'present' || h.status === 'late').length
+  const rate = Math.round((showed / counted.length) * 100)
+  // listMyAttendance is newest-first, so the most recent class is index 0.
+  const last = attendance[0]
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 rounded-2xl border border-line bg-card p-4 text-left transition-colors hover:bg-card-2"
+    >
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+        <ScanIcon className="h-5.5 w-5.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-display text-sm font-bold">Attendance</span>
+        <span className="block text-[13px] text-muted">
+          {rate}% show-up
+          {streak !== null && streak > 0 && ` · 🔥 ${streak} in a row`}
+        </span>
+        {last && (
+          <span className="mt-0.5 block text-[13px] text-muted">
+            Last: {last.subjectCode ?? 'class'} —{' '}
+            <span className={STATUS_META[last.status].text}>
+              {STATUS_META[last.status].label}
+            </span>
+          </span>
+        )}
+      </span>
+      <span className="shrink-0 text-lg text-muted">›</span>
+    </button>
   )
 }
 
