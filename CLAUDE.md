@@ -94,14 +94,12 @@ accumulate sections into an exported draft entry (NOT in the `CHANGELOG` array �
 `LATEST_VERSION` reads `CHANGELOG[0]`, so a draft is invisible to users) and only move
 it into the array when the user says the era is ready to announce.
 
-**Current state (Phase J, 2026-08-16): `DRAFT_4_0_0` is COMPLETE and titled
-"A whole new semester".** All nine phases' copy is written and ordered by student
-impact (headline features first; the fix/polish sections last). It is deliberately
-STILL A DRAFT — announcing it while 0033–0035 are unapplied would tell students about
-a live-class banner and a rollover the database doesn't have. **To announce:** set the
-real `date`, move the object into `CHANGELOG` as element 0, delete the
-`export const DRAFT_4_0_0` wrapper. `changelog.test.ts` asserts the draft is NOT in the
-array, so that test must be updated in the same commit as the flip.
+**4.0.0 "A whole new semester" SHIPPED 2026-08-25.** `DRAFT_4_0_0` is gone — the entry
+lives in `CHANGELOG[0]` now. It was CUT DOWN from 19 sections / 72 bullets to **6 / 19**
+before shipping: nobody reads a 72-bullet release note, and roughly half of it was
+instructor-only work that has no business in a student's "What's new". `changelog.test.ts`
+no longer guards a draft; it now asserts the live entry stays under 8 sections and 24
+bullets, so the next era gets trimmed rather than allowed to sprawl.
 
 ## Migration workflow
 
@@ -361,6 +359,49 @@ The feed is FLAT, not grouped by day: across five rows the Today/Yesterday heade
 a line each and say less than the per-row relative time. **`StreakFlame` and the old
 `AttendanceTeaser` are gone from the Dashboard** — their numbers live in the strip now;
 StreakFlame still renders on the Attendance screen.
+
+UI chrome uses ICONS, not emoji (user's call — emoji chrome reads as generic). `FlameIcon`
+and `TargetIcon` in `components/ui/icons.tsx` replaced 🔥 and 🎯 across StreakFlame,
+RankSignals and the Dashboard. **FlameIcon is FILLED, not stroked like every other icon
+in that file**: at the 14–16px these render at, a 1.75px outline leaves no interior and
+the shape reads as a blob. Emoji in student-authored content (comment quick-chips) and
+notification copy is untouched — the objection was to chrome.
+The flicker is a **CSS keyframe (`.cp-flame` / `@keyframes cp-flicker` in index.css),
+not framer-motion**: the leaderboard can render a flame on every visible row, and forty
+JS springs for a decorative wobble is a real cost. `transform-origin: 50% 95%` so it
+stretches upward like a real flame. **Only a HOT streak animates** (≥5 days / ≥5
+classes) — every row moving at once is a wall of motion that stops meaning anything.
+The global reduced-motion block switches it off with everything else.
+
+**The danmaku pill was being clipped**: `LANE_HEIGHT` was 30 but the pill measures 34,
+and the deck is `overflow-hidden` — so every comment lost its top and bottom. Lane is
+now 40 with the pill centred in it (`height: LANE_HEIGHT` + flex centring) rather than
+pinned at `top + 2`, which is what let it ride out of the clip region. Also made more
+legible per the user: 13px text, `bg-card/95`, `shadow-lg`, a 20px avatar, and
+`max-w-[85cqw]` with a truncating body so one long comment cannot stretch the pill past
+a readable width. **The Dashboard hero is no longer a button** — a whole tappable card
+with no obvious affordance was the wrong target; the feed's "See all" is the way in.
+
+**The tab-switch refresh bug (fixed 2026-08-25).** Every return to the tab flashed the
+full-screen skeleton and re-issued nine queries. Cause: `load` was `useCallback`'d on the
+`user` OBJECT. Supabase fires TOKEN_REFRESHED when a backgrounded tab comes back,
+AuthProvider sets a fresh session for it, `user` became a new reference, `load` rebuilt,
+and the mount effect (`setLoading(true)`) re-ran. **Keyed on `user.id` now — the same
+stable-id rule the realtime channels already follow, for exactly the same reason.**
+Also: the visibility handler only refetches after the tab has been hidden longer than
+`STALE_AFTER_MS` (2 min). Realtime keeps the data current for a short glance away, so
+the old unconditional refetch was pure waste. And **the StudentData context value is now
+memoized** (deferred from Phase H): it previously handed every consumer a new object each
+render, so one realtime point event re-rendered every student screen.
+
+Motion vocabulary lives in `src/lib/motion.ts` — `spring`, `ease`, `pageVariants`,
+`listVariants`, `rowVariants`, `pressable`. Instructor picked **"noticeable, with
+character"**: ~300ms, springy, visible movement. `<MotionConfig reducedMotion="user">`
+in App.tsx switches all of it off for motion-sensitive users, so nothing here needs its
+own guard. **The route transition stays a CSS animation (`.cp-route-in`), NOT
+framer-motion** — a lingering transform makes the element a containing block and
+misplaces every `position: fixed` Sheet backdrop. It was retuned 0.18s → 0.3s with a
+slight scale, not replaced.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

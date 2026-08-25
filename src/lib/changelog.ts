@@ -40,6 +40,64 @@ export interface ChangelogEntry {
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.0.0',
+    date: '2026-08-25',
+    title: 'A whole new semester',
+    sections: [
+      {
+        heading: 'You’ll know the moment class starts',
+        major: true,
+        items: [
+          'When your instructor starts class, a banner appears on your home screen — which subject, how long ago, and a Scan now button. Once you’ve checked in it says “You’re in” instead of nagging you.',
+          'An absence you can still excuse now gets one reminder before the 7-day window closes, with the real deadline date on it.',
+          'The scanner tells you it’s starting up instead of showing a black square, and there’s a flashlight for dim rooms.',
+        ],
+      },
+      {
+        heading: 'A home screen that gets to the point',
+        major: true,
+        items: [
+          'Your level and points now sit together at the top — they were always the same number shown twice.',
+          'One strip carries what you actually want to know: your rank and how many places you’ve moved, your streak, and your attendance. Tap any of them to go straight there.',
+          '“Next up” names the closest thing to chase — your next level, or the person one place above you, whichever you can reach first.',
+          'Recent points shows your last five, with See all for everything.',
+        ],
+      },
+      {
+        heading: 'See how your attendance is really going',
+        items: [
+          'A new stats screen: your rate for Prelim, Midterm and Finals separately, a bar for each week so you can see if you’re slipping or recovering, and how punctual you’ve been.',
+          'Punctuality is measured from when you actually scanned — your average minutes in, and how often you made it inside the first two minutes.',
+          'Your attendance history is now grouped by term, and each class shows the time you checked in.',
+        ],
+      },
+      {
+        heading: 'Your points, the whole story',
+        items: [
+          'A full points history: a bar per week showing how you’re trending, and a breakdown of where points came from — recitation, activities, penalties, spending.',
+          'It loads all the way back to the start of the semester instead of stopping at the most recent twenty.',
+        ],
+      },
+      {
+        heading: 'New badges, and a streak that stays lit',
+        items: [
+          'Four badges you win inside a single term: bank 18 points, finish a term with zero absences, get eight recitations, or arrive on time six classes running.',
+          'Win one in any term and it’s yours for good.',
+          'Your streak is now always visible — even at zero, with a nudge to start one. It counts classes you were present for; arriving late resets it.',
+          'On the leaderboard, a flame shows who’s been holding their rank, and arrows show who moved up or down since the last update.',
+        ],
+      },
+      {
+        heading: 'A fresh start each semester',
+        items: [
+          'Points, levels and the leaderboard now reset when a new semester begins — everyone gets a clean race. Your all-time total, badges, username and PIN all carry over.',
+          'Tap “Past” on the leaderboard to see how a finished semester ended, and where you placed.',
+          'Your account also got safer: sign-in slows down after repeated wrong PINs, and you can change your PIN yourself in Profile.',
+        ],
+      },
+    ],
+  },
+  {
     version: '3.0.0',
     date: '2026-07-19',
     title: 'The big one 🚀',
@@ -297,213 +355,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
 ]
-
-/**
- * The 4.0.0 draft — COMPLETE and ready to announce, but deliberately still a
- * draft. Every phase of the era has landed; the copy below is final.
- *
- * ── HOW TO ANNOUNCE IT ──────────────────────────────────────────────────────
- * Do this only AFTER migrations 0033, 0034 and 0035 are applied and the build
- * is deployed. Announcing first would tell students about a live-class banner
- * and a rollover that the database doesn't have yet.
- *
- *   1. Set `date` below to the real ship date.
- *   2. Move this whole object into the CHANGELOG array as its FIRST element.
- *   3. Delete this `export const DRAFT_4_0_0` wrapper.
- *
- * Why the draft mechanism exists at all: LATEST_VERSION reads CHANGELOG[0], and
- * the "What's new" sheet is gated on that version against localStorage. An
- * entry outside the array is invisible to every student, which is what let this
- * accumulate across nine phases without leaking half-built features.
- */
-export const DRAFT_4_0_0: ChangelogEntry = {
-  version: '4.0.0',
-  date: '2026-08-13', // placeholder — set to the real ship date when announced
-  title: 'A whole new semester',
-  // Ordered by what a student notices first, not by the order the phases were
-  // built. The two fix-and-polish sections sit at the end: they're real work
-  // and worth saying, but nobody opens "What's new" to read about retry states.
-  sections: [
-    {
-      heading: 'You’ll know when class starts 🔔',
-      major: true,
-      items: [
-        'The moment your instructor starts class, a banner appears on your dashboard — subject, how long ago it started, and a Scan now button that opens the camera. Once you’ve checked in it flips to “You’re in” instead of nagging you.',
-        'An absence you could still excuse now gets one reminder before the 7-day window shuts, with the actual last date on it. No more finding out it’s too late.',
-        'The scanner tells you it’s starting up instead of showing a black square, and on phones that support it there’s a flashlight button for a dim room.',
-      ],
-    },
-    {
-      heading: 'A home screen that gets to the point 🏠',
-      major: true,
-      items: [
-        'Your level and your points now live together at the top — they were always the same number, shown twice in different places.',
-        'One strip underneath carries the three things you actually want to know: your rank (with how many places you have moved), your streak, and your attendance. Tap any of them to go straight there.',
-        'A "Next up" line names the closest thing to chase — whether that is your next level or the person one place above you, whichever you can reach first.',
-        'Recent points shows the last five, with See all for the full history. Use points, Badges and Stats became three tidy tiles instead of three stacked cards.',
-      ],
-    },
-    {
-      heading: 'Know your attendance at a glance 📊',
-      items: [
-        'A new Attendance card on your home screen: your show-up rate, your current streak, and how your last class was marked — so a wrong mark is something you spot, not something you find out about later.',
-        'Tap it for the full picture: your rate broken down by Prelim, Midterm and Finals, a bar per week so you can see whether you are slipping or recovering, and how punctual you have actually been.',
-        'Punctuality is measured from when you scanned against when class started — average minutes in, how many times you made it inside the first two minutes, and your fastest.',
-      ],
-    },
-    {
-      heading: 'Your points, the whole story 📈',
-      major: true,
-      items: [
-        'Tap “See all” on your dashboard for the full history: a bar per week so you can see how you’re trending, a breakdown of where points came from — recitation, activities, penalties, spending — and everything loads back to the start of the semester.',
-        'Attendance history is now split by Prelim, Midterm and Finals, so you can see exactly how a term is going while it’s still fixable.',
-        'Each class now shows the time you actually checked in — so “am I really late?” has an answer that isn’t “ask the instructor”.',
-      ],
-    },
-    {
-      heading: 'Four new badges, one term at a time 🏅',
-      items: [
-        'The old badges reward a whole career. These four are won inside a single six-week term, so there’s always something in reach — even if you’re starting from behind.',
-        'Term Ace: bank 18 points in one term. Deliberately hard. Flawless: get through a term with zero absences.',
-        'Certified Yapper: eight recitation awards in one term. Six Sharp: six classes in a row, on time.',
-        'Win one in any term and it’s yours for good — you don’t lose it when the term ends.',
-        'Four older badges that were showing up blank in the trophy case finally have their artwork.',
-      ],
-    },
-    {
-      heading: 'Your streak stays lit 🔥',
-      items: [
-        'A fire streak on your home screen: how many classes in a row you’ve been present for. Arrive late and it resets — this one is strict on purpose.',
-        'It shows even at zero now, with a nudge to start one. It used to hide itself until you were already doing well, which helped nobody.',
-        'On the leaderboard, a flame next to anyone holding their rank or better for more than a day — and an arrow showing how many places they moved since the last update.',
-        'Your attendance streak now lives on your dashboard and attendance screen permanently. It used to vanish the moment you unlocked its badge, which was exactly backwards.',
-        'Your dashboard says where you are in the semester — term and week — instead of leaving you to count.',
-        'You can change your PIN yourself under Profile. No more asking for a reset code just because you wanted a better one.',
-      ],
-    },
-    {
-      heading: 'One semester ends, the next begins 🎓',
-      major: true,
-      items: [
-        'Points, levels and the leaderboard now reset when a new semester starts — everyone gets a fresh race. Your all-time total, your badges, your username and your PIN all carry over untouched.',
-        'Tap "Past" on the leaderboard to see how a finished semester ended, including where you placed.',
-        'If your section isn\'t running any more, your account stays open and read-only: your points, badges and full attendance record are all still there, they just stop changing.',
-        'Instructors: the rollover wizard lives under Semesters. Build the next semester ahead of time — sections, subjects, who moves across — and nothing changes for students until you activate it.',
-      ],
-    },
-    {
-      heading: 'Instructors: less hunting, fewer taps 🧰',
-      items: [
-        'Section cards now tell you what needs doing: which class is live, how many finished sessions still have penalties waiting to be committed, and how long since each section last met.',
-        'Recent activity can be filtered by section and by type, and loads older entries instead of stopping at the most recent forty.',
-        'Save your class settings as a preset — late and absent thresholds, penalties, whether penalties apply — and reuse them with one tap next class.',
-        'Pull down to refresh on the sections grid and any roster, same as the student screens.',
-      ],
-    },
-    {
-      heading: 'Announcements, and a look under the hood 🛠️',
-      items: [
-        'Your instructor can now send announcements straight to your notifications — class cancelled, room moved, that kind of thing.',
-        'Instructors: a new Ops & trust screen shows whether the nightly backup actually ran, every delete that has ever happened (with the full record of what was removed), recent claim and PIN-reset attempts, and a button to rebuild the leaderboard without waiting for the twice-daily freeze.',
-        'Instructors: a "needs attention" list across every section, ranked by who can still file an excuse — so the top of the list is always someone you can still help today.',
-        'Instructors: a per-term attendance workbook, one sheet per section. Attendance only — points stay out of it.',
-      ],
-    },
-    {
-      heading: 'Points now come with a price list 🏷️',
-      major: true,
-      items: [
-        'Use points finally tells you what things cost. Tap a reward and the request fills itself in — no more guessing whether 10 points is a lot or a little.',
-        'Rewards you can’t afford yet still show, greyed out, with how far off you are. That’s the fun part: something to aim at.',
-        'Need something that isn’t on the list? The old “ask for anything” option is still right there underneath.',
-        'Instructors: you set the menu and the prices under Requests → Rewards. Retiring a reward is reversible and never touches requests students already made.',
-      ],
-    },
-    {
-      heading: 'Attendance math that stays honest 🧮',
-      items: [
-        'Instructors: attendance stats are now computed in the database instead of on your phone, so show-up rates and the “needs attention” list stay exact no matter how long the semester runs. (The old way silently miscounted once a section passed a thousand records — roughly week 12.)',
-        'Rosters and the section grid load lighter too — the app stops downloading data it never showed.',
-      ],
-    },
-    {
-      heading: 'Instructors: fewer taps, nothing buried 🧭',
-      major: true,
-      items: [
-        'Awarding points moved to where the students already are: open a section, tap the students you want, and the award bar slides up. Ticking several and awarding them in one go still works exactly as before — it’s just fewer screens to get there.',
-        'Class stats are no longer trapped behind a live class. History is its own tab now, holding the points log and the full attendance record side by side.',
-        'The bottom bar is down to four tabs, so everything is a bigger target on a phone.',
-        'Old bookmarks still work — anything pointing at the old Award or Class history addresses lands in the right place.',
-      ],
-    },
-    {
-      heading: 'Prelim, midterm, finals — the app finally knows 📅',
-      major: true,
-      items: [
-        'Your attendance is now grouped by term, not just by week. "Midterm · Week 9" beats squinting at dates.',
-        'Each term has its own real dates, so a suspended class or a moved holiday no longer throws the whole calendar off.',
-        'Instructors: term dates and subjects live in one Semesters screen, and everything else follows them.',
-      ],
-    },
-    {
-      heading: 'Two subjects, two attendance records 📚',
-      major: true,
-      items: [
-        'IT 32 and Elective 1 are tracked separately now. Perfect attendance in one no longer hides a string of absences in the other.',
-        'Your streak and show-up rate are counted per subject — so each class gets its own clean slate.',
-        'Points do NOT split. A point earned in either subject goes into the same pile and spends anywhere. Only attendance cares which class you were in.',
-      ],
-    },
-    {
-      heading: 'Streaks and stats, per subject 🎯',
-      major: true,
-      items: [
-        'Your attendance screen now breaks your show-up rate down by subject, so a rough patch in one class doesn’t quietly drag the other one down with it.',
-        'Streaks got smarter, not stingier: we count your best run whether it’s within one subject or across both, so your streak can only ever look better than before.',
-        'Heads up on "On Time" and "Reliable": those two now measure your strongest subject instead of adding both together, so your progress bar on them may step back a little. Nothing you already unlocked is ever taken away.',
-        'Instructors: Class history has a subject toggle, and the printable record can be filtered to one subject before you print it.',
-      ],
-    },
-    {
-      heading: 'Every semester, a fresh race 🏁',
-      major: true,
-      items: [
-        'Points, level, and the leaderboard now reset when a new semester starts. Nobody has to catch up to a year of someone else’s recitations.',
-        'Your badges are yours forever — achievements never reset, and neither does your all-time total. Check the Profile for both numbers.',
-        'The points you can spend are this semester’s points, so the balance on your screen is always the real one.',
-      ],
-    },
-    {
-      heading: 'Your account got a bouncer 🔒',
-      major: true,
-      items: [
-        'Five wrong PINs in a row and sign-in takes a breather before you can try again — and it gets longer if you keep going. Motivation to remember your PIN.',
-        'New claim tokens are twice as long, so they are far harder to guess. Already have a token? It still works — nothing to redo.',
-        'Claiming an account and resetting a PIN have limits now too: too many wrong codes from one place and it asks you to come back in a few minutes.',
-        'Every claim and PIN reset is written down now, so your instructor can tell the difference between "I forgot my PIN again" and someone actually snooping.',
-      ],
-    },
-    {
-      heading: 'Fixes you can feel 🩹',
-      items: [
-        'If your attendance or requests fail to load, the app now says so and offers a retry — instead of pretending you have no record at all.',
-        'When your instructor corrects an attendance mark, your screen updates on the spot. No more closing and reopening the app to see it.',
-        'Pull down on Attendance or Use Points to refresh, same as the dashboard.',
-        'Admission-slip decisions finally show the right icon in your notifications.',
-        'Instructors: ticked students no longer follow you into another section (that one could award the wrong class), deducting says "Deduct" and asks first, "Select all" is back, and a session tagged with the wrong subject can be re-tagged.',
-      ],
-    },
-    {
-      heading: 'Smaller, smoother, kinder 🪶',
-      items: [
-        'Profile pictures are resized on your phone before they upload, so setting one is quick even on bad wifi — and everyone else’s screens load faster too.',
-        'The app now notices new versions on its own instead of waiting for you to happen to reload.',
-        'If you use larger text, a screen reader, or have motion turned down in your phone settings, the app finally respects all of it — pop-ups keep your place, and confirmations get read out.',
-        'Instructors: the live check-in roster is noticeably lighter on the phone during class.',
-      ],
-    },
-  ],
-}
 
 export const LATEST_VERSION = CHANGELOG[0]?.version ?? '0.0.0'
 

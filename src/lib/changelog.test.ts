@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHANGELOG, DRAFT_4_0_0, LATEST_VERSION, compareVersions } from './changelog'
+import { CHANGELOG, LATEST_VERSION, compareVersions } from './changelog'
 
 /**
  * The What's-New gate. `compareVersions` decides whether a student is shown a
@@ -63,17 +63,22 @@ describe('CHANGELOG integrity', () => {
   })
 })
 
-describe('DRAFT_4_0_0', () => {
-  it('stays OUT of the live changelog until the era is announced', () => {
-    // The whole point of the draft: LATEST_VERSION reads CHANGELOG[0], so an
-    // in-progress era must not be visible to students. If this fails, someone
-    // moved the draft in early.
-    expect(CHANGELOG.some((e) => e.version === DRAFT_4_0_0.version)).toBe(false)
-    expect(compareVersions(DRAFT_4_0_0.version, LATEST_VERSION)).toBe(1)
+describe('the 4.0.0 era, once announced', () => {
+  it('leads the changelog', () => {
+    // DRAFT_4_0_0 is gone: the era shipped, so it lives in CHANGELOG now. This
+    // replaces the old guard that asserted the draft stayed OUT of the array.
+    expect(CHANGELOG[0]?.version).toBe('4.0.0')
+    expect(LATEST_VERSION).toBe('4.0.0')
   })
 
-  it('is shaped like a real entry, so moving it in is a one-line change', () => {
-    expect(DRAFT_4_0_0.sections?.length).toBeGreaterThan(0)
-    expect(DRAFT_4_0_0.title.length).toBeGreaterThan(0)
+  it('stays short enough that a student actually reads it', () => {
+    // The draft reached 19 sections and 72 bullets, which nobody reads. If a
+    // future era drifts back past this, trim it before shipping rather than
+    // raising the numbers.
+    const entry = CHANGELOG[0]
+    const sections = entry?.sections ?? []
+    const bullets = sections.reduce((n, sec) => n + sec.items.length, 0)
+    expect(sections.length).toBeLessThanOrEqual(8)
+    expect(bullets).toBeLessThanOrEqual(24)
   })
 })

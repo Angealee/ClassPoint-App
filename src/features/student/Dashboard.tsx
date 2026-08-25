@@ -19,6 +19,7 @@ import { getLevelProgress } from '@/lib/leveling'
 import { snapshotLabel, timeAgo } from '@/lib/time'
 import { termCalendar, termLabel, termOf, weekOf } from '@/lib/term'
 import { cn } from '@/lib/cn'
+import { listVariants, pressable, rowVariants } from '@/lib/motion'
 import { NEUTRAL_STATUSES } from '@/lib/types'
 import type { LeaderboardEntry, PointEvent } from '@/lib/types'
 import { LiveClassBanner } from './LiveClassBanner'
@@ -303,10 +304,14 @@ export function Dashboard() {
           ) : (
             <Card className="divide-y divide-line">
               {/* Flat, not grouped by day: across five rows, Today/Yesterday
-                  headers cost a line each and say less than the per-row time. */}
-              {events.slice(0, FEED_LIMIT).map((e) => (
-                <FeedRow key={e.id} event={e} />
-              ))}
+                  headers cost a line each and say less than the per-row time.
+                  Rows reveal one after another — five is few enough that the
+                  stagger reads as deliberate rather than slow. */}
+              <motion.div variants={listVariants} initial="hidden" animate="show">
+                {events.slice(0, FEED_LIMIT).map((e) => (
+                  <FeedRow key={e.id} event={e} />
+                ))}
+              </motion.div>
             </Card>
           )}
         </motion.div>
@@ -375,9 +380,10 @@ function StatCell({
   onClick: () => void
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
+      {...pressable}
       className="flex flex-col items-center justify-center px-1 py-4 transition-colors hover:bg-card-2"
     >
       <span className="flex items-center gap-1">
@@ -387,7 +393,7 @@ function StatCell({
       {extra}
       <span className="mt-0.5 text-[13px] font-medium">{label}</span>
       {note && <span className="text-[11px] text-muted/80">{note}</span>}
-    </button>
+    </motion.button>
   )
 }
 
@@ -414,9 +420,10 @@ function ActionTile({
   onClick: () => void
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
+      {...pressable}
       className="relative flex flex-col items-center gap-1.5 rounded-2xl border border-line bg-card p-3 transition-colors hover:bg-card-2"
     >
       {dot && (
@@ -435,7 +442,7 @@ function ActionTile({
       </span>
       <span className="text-[13px] font-semibold leading-tight">{label}</span>
       <span className="text-[11px] leading-tight text-muted/80">{note}</span>
-    </button>
+    </motion.button>
   )
 }
 
@@ -443,7 +450,7 @@ function ActionTile({
 function FeedRow({ event: e }: { event: PointEvent }) {
   const negative = e.points < 0
   return (
-    <div className="flex items-center gap-3 p-4">
+    <motion.div variants={rowVariants} className="flex items-center gap-3 p-4">
       <span
         className={cn(
           'flex h-9 w-11 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold tabular-nums',
@@ -463,7 +470,7 @@ function FeedRow({ event: e }: { event: PointEvent }) {
         <p className="text-[13px] capitalize text-muted">{e.category}</p>
       </div>
       <span className="shrink-0 text-[13px] text-muted">{timeAgo(e.created_at)}</span>
-    </div>
+    </motion.div>
   )
 }
 

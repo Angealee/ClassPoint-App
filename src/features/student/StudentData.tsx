@@ -159,6 +159,13 @@ interface StudentDataValue {
 
 const StudentDataContext = createContext<StudentDataValue | undefined>(undefined)
 
+/**
+ * How long the tab must be hidden before coming back counts as "might have
+ * missed something". Under this, realtime has almost certainly kept up and a
+ * refetch is pure waste.
+ */
+const STALE_AFTER_MS = 2 * 60 * 1000
+
 // Level and rank baselines are SEMESTER-scoped (0029): points reset each
 // semester, so a baseline carried over from the last one would silently suppress
 // every level-up celebration until the student climbed past their old peak.
@@ -366,8 +373,20 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     [celebrate, loadAchievements],
   )
 
+  /**
+   * Keyed on `user.id`, NEVER the user OBJECT — the same rule the realtime
+   * channels follow, and for the same reason.
+   *
+   * Supabase fires TOKEN_REFRESHED whenever a backgrounded tab comes back, and
+   * AuthProvider sets a fresh session object for it. Depending on `user` made
+   * that a new reference, which rebuilt `load`, which re-ran the mount effect
+   * below — so every single tab switch flashed the full-screen skeleton and
+   * re-issued nine queries. The user has not changed; only their access token
+   * has.
+   */
+  const userId = user?.id
   const load = useCallback(async () => {
-    if (!user) return
+    if (!userId) return
     // Return the RUNNING load rather than resolving instantly: pull-to-refresh
     // awaits this, and an undefined return snapped the spinner back with
     // nothing having happened whenever a visibility refresh was already in
@@ -396,7 +415,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         })
       }
       const [mine, secs, snap] = await Promise.all([
-        getMyStudent(user.id),
+        getMyStudent(userId),
         listSections(semester?.id),
         getLeaderboardSnapshot(),
       ])
@@ -448,7 +467,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     })()
     inFlightRef.current = run
     return run
-  }, [user, considerLevelUp, considerRankChange, loadAchievements, loadAttendance, runAchievementSync])
+  }, [userId, considerLevelUp, considerRankChange, loadAchievements, loadAttendance, runAchievementSync])
 
   // Always call the freshest `load` from listeners/callbacks without making the
   // realtime channel re-subscribe when `load`'s identity changes.
@@ -457,6 +476,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     loadRef.current = load
   }, [load])
 
+  // First load only shows the skeleton once per signed-in student. `load` is
+  // now stable across token refreshes, so this fires on sign-in and not again.
   useEffect(() => {
     setLoading(true)
     load().finally(() => setLoading(false))
@@ -693,11 +714,24 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     }
   }, [liveSessionId, studentId, attendanceTick])
 
-  // Returning to the tab/app: realtime may have been suspended in the
-  // background, so pull fresh data to guarantee the score is current.
+  /**
+   * Returning to the tab: refetch only after a REAL absence.
+   *
+   * Realtime keeps this data current while the tab is merely backgrounded, so
+   * refetching on every visibility flip meant nine queries and a full re-render
+   * every time a student glanced at another app and came back. Browsers only
+   * suspend the socket after a while, so a short trip away needs nothing.
+   */
   useEffect(() => {
+    const hiddenSince = { at: 0 }
     const onVisible = () => {
-      if (document.visibilityState === 'visible') void loadRef.current()
+      if (document.visibilityState === 'hidden') {
+        hiddenSince.at = Date.now()
+        return
+      }
+      const away = Date.now() - hiddenSince.at
+      hiddenSince.at = 0
+      if (away > STALE_AFTER_MS) void loadRef.current()
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
@@ -903,50 +937,61 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /**
+   * Memoized: without this the provider handed every consumer a NEW object on
+   * every render, so a single realtime point event re-rendered every student
+   * screen — and this provider holds a dozen pieces of state, several of them
+   * updated by subscriptions.
+   */
+  const value = useMemo<StudentDataValue>(
+    () => ({
+      loading,
+      error,
+      me,
+      sections,
+      leaderboard,
+      capturedAt,
+      events,
+      awayEvents,
+      clearAwayRecap,
+      live,
+      rank,
+      sectionName,
+      refresh: load,
+      saveProfile,
+      saveAvatar,
+      clearAvatar,
+      saveBanner,
+      removeBanner,
+      levelUp,
+      clearLevelUp,
+      achievements,
+      achievementsLoading,
+      achievementsError,
+      retryAchievements,
+      attendanceTick,
+      liveSession,
+      liveStatus,
+      semesterEnded,
+      attendance,
+      attendanceLoading,
+      achievementProgress,
+      unlockedAchievement,
+      clearUnlockedAchievement,
+      syncMyAchievements,
+      hasUnseenAchievements,
+      markAchievementsSeen,
+      setDisplayTitle: setDisplayTitleField,
+      setPinnedAchievements: setPinnedAchievementsField,
+      unreadCount,
+      markAllRead,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loading, error, me, sections, leaderboard, capturedAt, events, awayEvents, clearAwayRecap, live, rank, sectionName, load, saveProfile, saveAvatar, clearAvatar, saveBanner, removeBanner, levelUp, clearLevelUp, achievements, achievementsLoading, achievementsError, retryAchievements, attendanceTick, liveSession, liveStatus, semesterEnded, attendance, attendanceLoading, achievementProgress, unlockedAchievement, clearUnlockedAchievement, syncMyAchievements, hasUnseenAchievements, markAchievementsSeen, setDisplayTitleField, setPinnedAchievementsField, unreadCount, markAllRead],
+  )
+
   return (
-    <StudentDataContext.Provider
-      value={{
-        loading,
-        error,
-        me,
-        sections,
-        leaderboard,
-        capturedAt,
-        events,
-        awayEvents,
-        clearAwayRecap,
-        live,
-        rank,
-        sectionName,
-        refresh: load,
-        saveProfile,
-        saveAvatar,
-        clearAvatar,
-        saveBanner,
-        removeBanner,
-        levelUp,
-        clearLevelUp,
-        achievements,
-        achievementsLoading,
-        achievementsError,
-        retryAchievements,
-        attendanceTick,
-        liveSession,
-        liveStatus,
-        semesterEnded,
-        attendance,
-        attendanceLoading,
-        achievementProgress,
-        unlockedAchievement,
-        clearUnlockedAchievement,
-        syncMyAchievements,
-        hasUnseenAchievements,
-        markAchievementsSeen,
-        setDisplayTitle: setDisplayTitleField,
-        setPinnedAchievements: setPinnedAchievementsField,
-        unreadCount,
-        markAllRead,
-      }}
+    <StudentDataContext.Provider value={value}
     >
       {children}
     </StudentDataContext.Provider>

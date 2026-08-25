@@ -175,12 +175,21 @@
    on navigation but not on same-route re-renders. Reduced-motion users get the
    global near-zero duration below, i.e. effectively no animation. */
 @keyframes cp-route-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
+/* 0.3s with a slight overshoot curve — the instructor chose "noticeable, with
+   character" over the near-invisible 0.18s linear rise this replaced. The tiny
+   scale gives the screen a sense of arriving rather than just fading up. */
 .cp-route-in {
-  animation: cp-route-in 0.18s ease-out;
+  animation: cp-route-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Flying leaderboard comments (danmaku). A pure transform animation so it runs
