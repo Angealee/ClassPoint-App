@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -9,7 +9,17 @@ import { useInstructor } from './InstructorLayout'
 import { deletePointEvent, listRecentAwards } from '@/lib/api'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
-import type { AwardRecord } from '@/lib/types'
+import { Select } from '@/components/ui/Select'
+import type { AwardRecord, PointCategory } from '@/lib/types'
+
+const PAGE = 40
+
+const CATEGORIES: { value: string; label: string }[] = [
+  { value: '', label: 'All types' },
+  { value: 'recitation', label: 'Recitation' },
+  { value: 'activity', label: 'Activity' },
+  { value: 'penalty', label: 'Penalty' },
+]
 
 /** `embedded` hides the page header when rendered inside the History tabs. */
 export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) {
@@ -18,23 +28,56 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
 
   const [records, setRecords] = useState<AwardRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState(false)
   const [target, setTarget] = useState<AwardRecord>()
   const [undoing, setUndoing] = useState(false)
+  // '' = every section / every category.
+  const [sectionFilter, setSectionFilter] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
 
   const sectionName = (id: string) => sections.find((s) => s.id === id)?.name ?? ''
+
+  const filters = useMemo(
+    () => ({
+      sectionId: sectionFilter || undefined,
+      category: (categoryFilter || undefined) as PointCategory | undefined,
+    }),
+    [sectionFilter, categoryFilter],
+  )
 
   const refresh = useCallback(async () => {
     setLoading(true)
     setError(false)
     try {
-      setRecords(await listRecentAwards(40))
+      const first = await listRecentAwards(PAGE, filters)
+      setRecords(first)
+      setHasMore(first.length === PAGE)
     } catch {
       setError(true)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [filters])
+
+  /**
+   * Offset paging is fine here (keyset is not worth it): this list is the
+   * instructor's own recent activity, and a new award landing mid-scroll is
+   * an award they just made themselves.
+   */
+  async function loadMore() {
+    setLoadingMore(true)
+    try {
+      const next = await listRecentAwards(PAGE, { ...filters, offset: records.length })
+      setRecords((prev) => [...prev, ...next])
+      setHasMore(next.length === PAGE)
+    } catch {
+      setError(true)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   useEffect(() => {
     void refresh()
@@ -60,9 +103,40 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
       {!embedded && (
         <div>
           <h1 className="font-display text-xl font-bold">Recent activity</h1>
-          <p className="text-sm text-muted">Last 40 awards & penalties · undo any mistake.</p>
+          <p className="text-sm text-muted">Awards & penalties · undo any mistake.</p>
         </div>
       )}
+
+      {/* Filters. Changing either re-runs the query rather than filtering in
+          memory — the list is paged, so a client-side filter would only ever
+          search the rows already downloaded. */}
+      <div className="flex gap-2">
+        <Select
+          value={sectionFilter}
+          onChange={(e) => setSectionFilter(e.target.value)}
+          aria-label="Filter by section"
+          className="flex-1"
+        >
+          <option value="">All sections</option>
+          {sections.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          aria-label="Filter by type"
+          className="flex-1"
+        >
+          {CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </Select>
+      </div>
 
       {loading ? (
         <ListSkeleton rows={6} />
@@ -75,7 +149,9 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
         </Card>
       ) : records.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted">
-          No awards yet — points you give will appear here.
+          {sectionFilter || categoryFilter
+            ? 'Nothing matches those filters.'
+            : 'No awards yet — points you give will appear here.'}
         </Card>
       ) : (
         <Card className="divide-y divide-line">
@@ -114,6 +190,17 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
             )
           })}
         </Card>
+      )}
+
+      {!loading && !error && hasMore && (
+        <Button
+          variant="outline"
+          className="w-full"
+          disabled={loadingMore}
+          onClick={() => void loadMore()}
+        >
+          {loadingMore ? 'Loading…' : 'Load older'}
+        </Button>
       )}
 
       <ConfirmDialog

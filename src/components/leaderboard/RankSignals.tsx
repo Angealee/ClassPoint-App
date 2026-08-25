@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { FlameIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import type { LeaderboardEntry } from '@/lib/types'
 
@@ -62,7 +62,7 @@ export function RankDelta({
 }
 
 /**
- * "🔥 6d" — days holding this rank or better.
+ * Days holding this rank or better, marked with a flame.
  *
  * Hidden below one full day: on a board that settles twice daily, almost
  * everyone would otherwise carry a meaningless "0d". The flame only animates
@@ -83,23 +83,22 @@ export function RankTenure({
     <span
       title={`Holding rank ${entry.rank} or better for ${days} day${days === 1 ? '' : 's'}`}
       className={cn(
-        'inline-flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[12px] font-bold tabular-nums',
-        hot ? 'bg-orange-500/15 text-orange-500' : 'bg-card-2 text-muted',
+        'inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-bold tabular-nums',
+        hot
+          ? 'bg-orange-500/15 text-orange-500'
+          : 'bg-card-2 text-muted',
         className,
       )}
     >
-      {hot ? (
-        <motion.span
-          aria-hidden
-          animate={{ scale: [1, 1.18, 1] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-          className="inline-block"
-        >
-          🔥
-        </motion.span>
-      ) : (
-        <span aria-hidden>🔥</span>
-      )}
+      <FlameIcon
+        aria-hidden
+        className={cn(
+          'h-3.5 w-3.5 shrink-0',
+          // Only a genuinely long run flickers. Every row animating at once
+          // turns the board into a wall of movement and stops meaning anything.
+          hot ? 'cp-flame' : 'opacity-70',
+        )}
+      />
       {days}d
     </span>
   )

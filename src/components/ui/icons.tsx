@@ -293,3 +293,40 @@ export function ExpandIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+/**
+ * A flame — the attendance/rank streak marker.
+ *
+ * FILLED rather than stroked, unlike the rest of this file: at the 14–16px
+ * these render at, a 1.75px outline leaves almost no interior and the shape
+ * reads as a blob. It replaced a 🔥 emoji, which rendered differently on every
+ * platform and could never be recoloured to match the surrounding pill.
+ *
+ * Add `className="cp-flame"` for the flicker animation (see index.css). The
+ * inner core is a lighter overlay of the same colour, which gives the flame
+ * depth without needing a second fill.
+ */
+export function FlameIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d="M12.8 2.2c-.4-.4-1.1-.2-1.2.4-.3 2-1.2 3.5-2.5 4.9-1.6 1.7-3.1 3.4-3.1 6.1a8 8 0 0 0 16 0c0-3.2-1.7-5-3.3-6.6-.7-.7-1.4-1.4-1.9-2.2-.2-.4-.8-.4-1 0-.4.7-.9 1.3-1.5 1.9.2-1.5 0-2.9-.8-4a6 6 0 0 0-.7-.5Z" />
+      <path
+        d="M12 21.4a3.6 3.6 0 0 1-3.6-3.6c0-1.9 1.3-2.9 2.2-4 .2-.3.6-.3.8 0 .4.6.9 1.1 1.5 1.6 1 .8 2.7 1.4 2.7 2.4a3.6 3.6 0 0 1-3.6 3.6Z"
+        className="text-white/45"
+        fill="currentColor"
+        opacity="0.55"
+      />
+    </svg>
+  )
+}
+
+/** Concentric target — marks the "next thing to chase" line on the dashboard. */
+export function TargetIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4.5" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}

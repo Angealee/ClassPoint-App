@@ -23,7 +23,10 @@ import {
  * and never stack. Height stays slim so the podium sits right at the top.
  */
 const LANES = 1
-const LANE_HEIGHT = 30
+// Tall enough for the whole pill plus breathing room. At 30 the pill was
+// physically taller than its lane, so overflow-hidden sliced the top and
+// bottom off every comment — the bug that made them look cut in half.
+const LANE_HEIGHT = 40
 /**
  * CONSTANT speed for every pill (px per second). This is the anti-overlap
  * guarantee: because all pills move at the same speed and enter from the same
@@ -278,7 +281,12 @@ export function CommentsOverlay({
                 className="cp-fly absolute whitespace-nowrap"
                 style={
                   {
-                    top: p.lane * LANE_HEIGHT + 2,
+                    // Centred in the lane rather than pinned 2px from its
+                    // top, so the pill cannot ride out of the clip region.
+                    top: p.lane * LANE_HEIGHT,
+                    height: LANE_HEIGHT,
+                    display: "flex",
+                    alignItems: "center",
                     '--cp-fly-dur': `${p.durationMs}ms`,
                   } as React.CSSProperties
                 }
@@ -286,10 +294,10 @@ export function CommentsOverlay({
               >
                 <span
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs backdrop-blur-sm',
+                    'inline-flex max-w-[85cqw] items-center gap-2 rounded-full border px-3 py-1.5 text-[13px] shadow-lg backdrop-blur-md',
                     p.studentId === null
-                      ? 'border-brand-500/40 bg-brand-500/15 text-brand-600 dark:text-brand-300'
-                      : 'border-line bg-card/85 text-ink',
+                      ? 'border-brand-500/50 bg-brand-500/25 text-brand-700 dark:text-brand-200'
+                      : 'border-line bg-card/95 text-ink',
                     tappable && 'pointer-events-auto cursor-pointer',
                   )}
                   onClick={tappable ? () => onOpenProfile!(p) : undefined}
@@ -302,11 +310,11 @@ export function CommentsOverlay({
                     <Avatar
                       name={p.displayName}
                       url={p.avatarUrl}
-                      className="h-4 w-4 text-[0.5rem]"
+                      className="h-5 w-5 text-[0.55rem]"
                     />
                   )}
-                  <span className="font-semibold">{p.displayName}</span>
-                  <span className="text-muted">{p.body}</span>
+                  <span className="shrink-0 font-semibold">{p.displayName}</span>
+                  <span className="truncate text-muted">{p.body}</span>
                 </span>
               </div>
             )

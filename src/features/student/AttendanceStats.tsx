@@ -120,7 +120,7 @@ export function AttendanceStats() {
             <p className="font-display text-5xl font-bold tabular-nums">{overall}%</p>
             <p className="mt-1 text-[13px] text-muted">
               Show-up rate across {counted(attendance)} classes
-              {streak !== null && streak > 0 && ` · 🔥 ${streak} in a row`}
+              {streak !== null && streak > 0 && ` · ${streak} in a row`}
             </p>
           </Card>
 

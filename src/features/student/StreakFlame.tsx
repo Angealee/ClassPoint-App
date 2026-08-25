@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { FlameIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { useStudentData } from './StudentData'
 
@@ -44,7 +44,7 @@ export function StreakFlame({ variant = 'full' }: { variant?: 'compact' | 'full'
               : 'bg-card-2 text-muted',
         )}
       >
-        <Flame hot={hot} lit={lit} />
+        <Flame hot={hot} lit={lit} className="h-3.5 w-3.5" />
         {streak}
       </span>
     )
@@ -63,7 +63,7 @@ export function StreakFlame({ variant = 'full' }: { variant?: 'compact' | 'full'
           hot ? 'bg-orange-500/20' : 'bg-card-2',
         )}
       >
-        <Flame hot={hot} lit={lit} />
+        <Flame hot={hot} lit={lit} className="h-6 w-6" />
       </span>
       <div className="min-w-0 flex-1">
         {lit ? (
@@ -90,24 +90,24 @@ export function StreakFlame({ variant = 'full' }: { variant?: 'compact' | 'full'
   )
 }
 
-/** The flame. Greyed when unlit, and only animates when the streak is hot. */
-function Flame({ hot, lit }: { hot: boolean; lit: boolean }) {
-  if (!lit) {
-    return (
-      <span aria-hidden className="opacity-40 grayscale">
-        🔥
-      </span>
-    )
-  }
-  if (!hot) return <span aria-hidden>🔥</span>
+/**
+ * The flame itself.
+ *
+ * An SVG rather than a 🔥 emoji: the emoji renders differently on every
+ * platform, cannot take the surrounding text colour, and sat awkwardly on the
+ * text baseline. This one inherits `currentColor` and flickers via a CSS
+ * keyframe (see `.cp-flame` in index.css), which reduced-motion switches off.
+ */
+function Flame({ hot, lit, className }: { hot: boolean; lit: boolean; className?: string }) {
   return (
-    <motion.span
+    <FlameIcon
       aria-hidden
-      animate={{ scale: [1, 1.15, 1] }}
-      transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-      className="inline-block"
-    >
-      🔥
-    </motion.span>
+      className={cn(
+        className,
+        !lit && 'opacity-30',
+        // Only a hot streak moves — a flicker on "1 in a row" is noise.
+        hot && 'cp-flame',
+      )}
+    />
   )
 }

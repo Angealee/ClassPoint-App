@@ -24,6 +24,7 @@ import {
 import { BadgeArt } from '@/components/achievements/BadgeArt'
 import { useInstructor } from './InstructorLayout'
 import { AwardBar } from './AwardBar'
+import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { SectionGrid } from './SectionGrid'
 import { ArchivedStudentsSheet } from './ArchivedStudentsSheet'
 import {
@@ -377,6 +378,7 @@ export function Students() {
   }
 
   return (
+    <PullToRefresh onRefresh={refresh}>
     <div className="space-y-4">
       <button
         type="button"
@@ -894,5 +896,6 @@ export function Students() {
         />
       )}
     </div>
+    </PullToRefresh>
   )
 }

@@ -4,12 +4,20 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useToast } from '@/components/ui/Toast'
 import { InstallButton } from '@/components/pwa/InstallButton'
 import { CheckIcon, GearIcon, PlusIcon, UsersIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
 import { ManageSections } from './ManageSections'
-import { createSection, getSectionStats, type SectionStat } from '@/lib/api'
+import {
+  createSection,
+  getSectionOverview,
+  getSectionStats,
+  type SectionStat,
+} from '@/lib/api'
+import { timeAgo } from '@/lib/time'
+import type { SectionOverview } from '@/lib/types'
 
 /** Landing grid: pick a section card to open its roster. */
 export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void }) {
@@ -19,6 +27,9 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
 
   const [stats, setStats] = useState<Record<string, SectionStat>>({})
   const [statsLoading, setStatsLoading] = useState(true)
+  // Per-section status signals (0034). Keyed by section id; empty when the
+  // migration hasn't been applied — see loadStats.
+  const [overview, setOverview] = useState<Record<string, SectionOverview>>({})
   const [manageOpen, setManageOpen] = useState(false)
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
@@ -33,6 +44,16 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
       setStats({})
     } finally {
       setStatsLoading(false)
+    }
+
+    // Status signals are a SEPARATE, non-fatal fetch on purpose: get_section_overview
+    // ships in 0034, and until that migration is applied the RPC simply does not
+    // exist. Folding it into the try above would take the whole grid down with it.
+    try {
+      const rows = await getSectionOverview()
+      setOverview(Object.fromEntries(rows.map((r) => [r.sectionId, r])))
+    } catch {
+      setOverview({})
     }
   }
 
@@ -66,6 +87,14 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
   }
 
   return (
+    // Pull-to-refresh: the instructor's equivalent of the student screens —
+    // after ending a class or claiming tokens, this is where you check it landed.
+    <PullToRefresh
+      onRefresh={async () => {
+        await refreshSections()
+        await loadStats()
+      }}
+    >
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-display text-2xl font-bold">Sections</h1>
@@ -119,6 +148,10 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
                       <CheckIcon className="h-3.5 w-3.5 text-gold-500" />
                       {stat.claimed} claimed
                     </p>
+                    {/* Status signals (0034). Each renders only when it has
+                        something to say, and the whole block is absent until
+                        that migration lands — so the card never shows a gap. */}
+                    <SectionSignals info={overview[s.id]} />
                   </>
                 )}
               </Card>
@@ -155,6 +188,57 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
       </div>
 
       <ManageSections open={manageOpen} onClose={() => setManageOpen(false)} />
+    </div>
+    </PullToRefresh>
+  )
+}
+
+/**
+ * Per-section status: live now, unfinished penalties, and how long since the
+ * last class.
+ *
+ * `unfinalized` counts ENDED sessions configured to apply penalties that were
+ * never committed — real unfinished work, because the absences are recorded but
+ * nobody has been docked, so the ledger and the register disagree until you
+ * commit them.
+ */
+function SectionSignals({ info }: { info?: SectionOverview }) {
+  if (!info) return null
+  const bits: React.ReactNode[] = []
+
+  if (info.activeSession) {
+    bits.push(
+      <span
+        key="live"
+        className="inline-flex items-center gap-1 rounded-md bg-brand-500/10 px-1.5 py-0.5 text-[11px] font-bold text-brand-500"
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+        Live
+      </span>,
+    )
+  }
+  if (info.unfinalized > 0) {
+    bits.push(
+      <span
+        key="unfin"
+        title={`${info.unfinalized} ended session(s) with penalties never committed`}
+        className="inline-flex items-center rounded-md bg-gold-400/15 px-1.5 py-0.5 text-[11px] font-bold text-gold-600 dark:text-gold-400"
+      >
+        {info.unfinalized} to finalise
+      </span>,
+    )
+  }
+
+  if (bits.length === 0 && !info.lastSessionAt) return null
+
+  return (
+    <div className="mt-2 space-y-1">
+      {bits.length > 0 && <div className="flex flex-wrap gap-1">{bits}</div>}
+      {info.lastSessionAt && !info.activeSession && (
+        <p className="truncate text-[11px] text-muted/80">
+          Last class {timeAgo(info.lastSessionAt)}
+        </p>
+      )}
     </div>
   )
 }

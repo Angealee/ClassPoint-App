@@ -334,6 +334,16 @@ export const DRAFT_4_0_0: ChangelogEntry = {
       ],
     },
     {
+      heading: 'A home screen that gets to the point 🏠',
+      major: true,
+      items: [
+        'Your level and your points now live together at the top — they were always the same number, shown twice in different places.',
+        'One strip underneath carries the three things you actually want to know: your rank (with how many places you have moved), your streak, and your attendance. Tap any of them to go straight there.',
+        'A "Next up" line names the closest thing to chase — whether that is your next level or the person one place above you, whichever you can reach first.',
+        'Recent points shows the last five, with See all for the full history. Use points, Badges and Stats became three tidy tiles instead of three stacked cards.',
+      ],
+    },
+    {
       heading: 'Know your attendance at a glance 📊',
       items: [
         'A new Attendance card on your home screen: your show-up rate, your current streak, and how your last class was marked — so a wrong mark is something you spot, not something you find out about later.',
@@ -379,6 +389,15 @@ export const DRAFT_4_0_0: ChangelogEntry = {
         'Tap "Past" on the leaderboard to see how a finished semester ended, including where you placed.',
         'If your section isn\'t running any more, your account stays open and read-only: your points, badges and full attendance record are all still there, they just stop changing.',
         'Instructors: the rollover wizard lives under Semesters. Build the next semester ahead of time — sections, subjects, who moves across — and nothing changes for students until you activate it.',
+      ],
+    },
+    {
+      heading: 'Instructors: less hunting, fewer taps 🧰',
+      items: [
+        'Section cards now tell you what needs doing: which class is live, how many finished sessions still have penalties waiting to be committed, and how long since each section last met.',
+        'Recent activity can be filtered by section and by type, and loads older entries instead of stopping at the most recent forty.',
+        'Save your class settings as a preset — late and absent thresholds, penalties, whether penalties apply — and reuse them with one tap next class.',
+        'Pull down to refresh on the sections grid and any roster, same as the student screens.',
       ],
     },
     {

@@ -326,6 +326,42 @@ with a `scannedAt`**: a record the instructor marked by hand has no check-in mom
 averaging it in as "0 minutes" would invent a punctuality the student never showed.
 Per-subject rates stay on the tab only — that cut already exists there.
 
+Instructor workflow QoL (no migration): **`get_section_overview()` is finally wired** —
+SectionGrid cards show a Live pill, an "N to finalise" pill (ended sessions with
+`apply_penalties` and no commit), and "Last class Nd ago". It is fetched in a **separate
+try/catch from `getSectionStats`** on purpose: the RPC ships in 0034, so until that is
+applied the call throws and the signals simply do not render — folding it into the same
+try would take the whole grid down with it.
+`listRecentAwards(limit, filters)` gained section/category filters and offset paging.
+**The embed becomes `students!inner(...)` when filtering by section** — a plain embed
+applies the filter but keeps every parent row with the students object nulled, so the
+list would fill with rows reading "Unknown". Filters re-run the query rather than
+filtering in memory, because the list is paged and a client-side filter would only ever
+search the rows already downloaded.
+`src/lib/session-presets.ts` — saved threshold/penalty sets in localStorage
+(`cp_session_presets_v1`, max 6, save-by-name upserts). localStorage not a table: one
+instructor, personal convenience, and a lost preset costs seconds. **Presets deliberately
+exclude subject and topic** (those change every class). `loadPresets` validates every
+field rather than trusting the store — a hand-edited entry would otherwise put NaN into a
+live session's config. PullToRefresh now wraps SectionGrid and the roster view.
+
+Dashboard rebuild (no migration): the home screen was TEN stacked full-width blocks,
+four of them near-identical row cards in sequence (streak → attendance → use points →
+achievements), with points and rank sitting seventh. Now: greeting → banners → **hero
+carrying level AND points together** (points ARE the XP — showing them in separate cards
+split one idea in half; the hero is tappable to `/app/history`) → a one-line **next
+milestone** → a 3-up **stat strip** (rank / streak / attended, each tappable to the
+screen it summarises) → a 3-up **quick-action tile row** → **five** feed rows + "See
+all". Measured 1054px ≈ 1.3 screens at 375×812, no clipping, no horizontal overflow.
+`NextMilestone` compares points-to-next-level against points-to-overtake-the-rank-above
+and names the SMALLER — always showing the level would hide that one recitation
+sometimes gains a place, which is the more motivating of the two. The rank cell reuses
+`RankDelta` from RankSignals, so it degrades to no arrow until 0037 lands.
+The feed is FLAT, not grouped by day: across five rows the Today/Yesterday headers cost
+a line each and say less than the per-row relative time. **`StreakFlame` and the old
+`AttendanceTeaser` are gone from the Dashboard** — their numbers live in the strip now;
+StreakFlame still renders on the Attendance screen.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained

@@ -18,6 +18,12 @@ import {
   updateSessionSubject,
 } from '@/lib/api'
 import { groupByWeek, termLabel } from '@/lib/term'
+import {
+  deletePreset,
+  loadPresets,
+  savePreset,
+  type SessionPreset,
+} from '@/lib/session-presets'
 import type { ClassSession, SessionSummary } from '@/lib/types'
 
 type View = 'home' | 'live' | 'review'
@@ -51,10 +57,40 @@ export function Attendance() {
   const [absentPenalty, setAbsentPenalty] = useState(5)
   const [applyPenalties, setApplyPenalties] = useState(true)
   const [starting, setStarting] = useState(false)
+  const [presets, setPresets] = useState<SessionPreset[]>(() => loadPresets())
+  const [presetName, setPresetName] = useState('')
+  const [savingPreset, setSavingPreset] = useState(false)
 
   const [history, setHistory] = useState<SessionSummary[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
   const [tagging, setTagging] = useState<string>()
+
+  /** Fill the form from a saved preset. Subject and topic are left alone. */
+  function applyPreset(preset: SessionPreset) {
+    setLateAfter(preset.lateAfterMin)
+    setAbsentAfter(preset.absentAfterMin)
+    setLatePenalty(preset.latePenalty)
+    setAbsentPenalty(preset.absentPenalty)
+    setApplyPenalties(preset.applyPenalties)
+  }
+
+  function onSavePreset() {
+    const name = presetName.trim()
+    if (!name) return
+    setPresets(
+      savePreset({
+        name,
+        lateAfterMin: lateAfter,
+        absentAfterMin: absentAfter,
+        latePenalty,
+        absentPenalty,
+        applyPenalties,
+      }),
+    )
+    setPresetName('')
+    setSavingPreset(false)
+    toast(`Saved “${name}”.`, 'success')
+  }
 
   const loadHistory = useCallback(async () => {
     if (!selectedSectionId) return
@@ -267,6 +303,72 @@ export function Attendance() {
             </div>
           </div>
         )}
+
+        {/* Saved settings. The thresholds and penalties are what you set once
+            and reuse; subject and topic change every class, so a preset
+            deliberately does not touch them. */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Saved settings</span>
+            <button
+              type="button"
+              onClick={() => setSavingPreset((v) => !v)}
+              className="text-xs font-semibold text-brand-500"
+            >
+              {savingPreset ? 'Cancel' : 'Save current'}
+            </button>
+          </div>
+
+          {savingPreset && (
+            <div className="flex gap-2">
+              <Input
+                label=""
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                placeholder="e.g. Strict lecture"
+                className="flex-1"
+              />
+              <Button
+                className="shrink-0 self-end"
+                disabled={!presetName.trim()}
+                onClick={onSavePreset}
+              >
+                Save
+              </Button>
+            </div>
+          )}
+
+          {presets.length === 0 ? (
+            <p className="text-xs text-muted">
+              None yet — set your thresholds below, then tap Save current.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {presets.map((preset) => (
+                <span
+                  key={preset.id}
+                  className="inline-flex items-center overflow-hidden rounded-lg border border-line"
+                >
+                  <button
+                    type="button"
+                    onClick={() => applyPreset(preset)}
+                    className="px-2.5 py-1 text-xs font-medium transition-colors hover:bg-card-2"
+                  >
+                    {preset.name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPresets(deletePreset(preset.id))}
+                    aria-label={`Delete preset ${preset.name}`}
+                    className="border-l border-line px-2 py-1 text-xs text-muted hover:text-brand-500"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
 
         <Input
           label="Topic (optional)"

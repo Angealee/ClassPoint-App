@@ -205,6 +205,29 @@
   will-change: transform;
 }
 
+/* Flame flicker for the streak markers (FlameIcon).
+
+   A CSS keyframe rather than a framer-motion animation on purpose: the
+   leaderboard can render a flame on every visible row, and forty JS-driven
+   springs to make an icon wobble is a real cost for a decorative effect. The
+   reduced-motion block below switches it off along with everything else.
+
+   transform-origin sits at the base so the flame stretches upward the way a
+   real one does, instead of scaling about its middle. */
+@keyframes cp-flicker {
+  0%,
+  100% { transform: scale(1, 1); }
+  25%  { transform: scale(0.96, 1.08); }
+  50%  { transform: scale(1.04, 0.96); }
+  75%  { transform: scale(0.98, 1.05); }
+}
+
+.cp-flame {
+  transform-origin: 50% 95%;
+  animation: cp-flicker 1.7s ease-in-out infinite;
+  will-change: transform;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
