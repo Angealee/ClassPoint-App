@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -59,6 +59,7 @@ function isOffline(e: unknown): boolean {
 
 export function Attendance() {
   const { me, syncMyAchievements, attendanceTick, semesterEnded } = useStudentData()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [history, setHistory] = useState<MyAttendanceEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -310,10 +311,20 @@ export function Attendance() {
               </div>
             ))}
           </div>
-          <div className="flex items-baseline justify-between border-t border-line px-4 py-3">
+          {/* The permanent entry point to the detailed stats screen. Deliberately
+             here rather than on the Dashboard: this row IS the summary the stats
+             screen expands on, and a link here survives any home-screen rebuild. */}
+          <button
+            type="button"
+            onClick={() => navigate('/app/attendance/stats')}
+            className="flex w-full items-baseline justify-between border-t border-line px-4 py-3 text-left transition-colors hover:bg-card-2"
+          >
             <span className="text-[13px] text-muted">Show-up rate</span>
-            <span className="font-display text-lg font-bold tabular-nums">{stats.rate}%</span>
-          </div>
+            <span className="flex items-baseline gap-1.5">
+              <span className="font-display text-lg font-bold tabular-nums">{stats.rate}%</span>
+              <span className="text-[13px] font-semibold text-brand-500">Stats ›</span>
+            </span>
+          </button>
         </Card>
       )}
 

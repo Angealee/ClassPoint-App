@@ -403,6 +403,55 @@ framer-motion** — a lingering transform makes the element a containing block a
 misplaces every `position: fixed` Sheet backdrop. It was retuned 0.18s → 0.3s with a
 slight scale, not replaced.
 
+Era 6.0 Phase 1 — navigation (2026-08-28): **`components/ui/PageHeader.tsx`** replaces
+five near-identical private header/back implementations. Its back is HISTORY-AWARE, not
+`navigate(-1)`: this is an installed PWA entered from push notifications, `/scan` deep
+links and cold launches, where there is often no in-app history to return to. It reads
+react-router's own `history.state.idx` and falls back to a per-screen route when that is
+0. That is the fix for Achievements, which hard-coded `/app/profile` and so sent you to a
+screen you had never visited when you arrived from Home.
+
+**Two screens were orphaned in production** — `/app/history` and `/app/attendance/stats`
+lost their only links when the Dashboard was reverted, and `/teach/semesters` had never
+been linked at all (hiding term dates, subjects and the whole rollover wizard behind a
+typed URL). Links now live where they PERMANENTLY belong, not on the Dashboard: the
+stats screen hangs off the Attendance summary card's show-up-rate row (that row is the
+summary it expands on), the ledger off the Use-points header, and Semesters off a card
+in Ops (it is admin work, beside backup health and the audit log). Putting them back on
+the Dashboard would have thrown them away in the coming home-screen rebuild — and given
+them a second chance to be orphaned.
+
+**`src/lib/routes.test.ts` (7 tests) guards this.** Pure source-text parsing, no mocking,
+in the spirit of the other five pure-lib suites. The screen list is EXPLICIT rather than
+derived from the router: a derived version has to model nested paths, `Navigate`
+redirects and `:param` segments, and gets them wrong in both directions — the first
+attempt invented `/app/semesters` and `/app/ops`. It is verified to actually bite:
+removing the `/app/history` link fails it.
+
+**A tinted `<Card>` USED to silently do nothing — fixed in Era 6.0 Phase 2.**
+Tailwind v4 emits utilities ALPHABETICALLY, and `cn()` was a plain join, so Card’s own
+`bg-card`/`border-line` (later in the sheet) beat a caller’s tint. Measured before the
+fix: `.border-brand-500/30` @24245 < `.border-line` @25819; `.bg-brand-500/8` @28533 <
+`.bg-card` @30742. Four call sites rendered plain (`StudentRecord.tsx:218`,
+`OfflineScanCards.tsx:90`, `SessionHistory.tsx:333`, `SemesterEndedBanner.tsx:23`) —
+including the "unsynced offline check-ins" card, which exists to stand out.
+
+**`src/lib/cn.ts` now uses `tailwind-merge`** (v3; no `clsx` — nothing passes arrays or
+objects, so the signature is unchanged and one dependency does the job). Later classes
+win, which is what every call site already assumed. The census found only ~10 colliding
+sites BECAUSE the naive join had eaten overrides for months, so nobody attempted them.
+`cn.test.ts` pins the behaviour, with the four tint cases as regression tests.
+
+**Known limitation, pinned in that test:** twMerge does NOT recognise Tailwind v4’s
+TRAILING `!` suffix, so `h-9!` is not merged against `h-10` and both survive. Harmless —
+`h-9!` compiles to `height:…!important` and wins regardless of order. Two files use it,
+both for Avatar sizing on the podium. If it ever matters, drop the `!` at those call
+sites rather than configuring twMerge; the `!` only existed to beat the old join.
+
+**`Card` can now own defaults** (padding, elevation). That was blocked before: a `p-4`
+default would have overridden every `p-3` (38 sites) and `p-3.5` (21) caller while
+leaving `p-8` alone. Adding those variants is the next primitive phase.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained

@@ -9,6 +9,7 @@ import { groupByTerm, groupByWeek, termLabel } from '@/lib/term'
 import { NEUTRAL_STATUSES } from '@/lib/types'
 import { cn } from '@/lib/cn'
 import type { MyAttendanceEntry } from '@/lib/types'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useStudentData } from './StudentData'
 
 /** present + late + absent. Neutral statuses are excluded everywhere by rule. */
@@ -92,20 +93,12 @@ export function AttendanceStats() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => navigate('/app')}
-          aria-label="Back"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
-        >
-          &lsaquo;
-        </button>
-        <div>
-          <h1 className="font-display text-xl font-bold">Attendance stats</h1>
-          <p className="text-[13px] text-muted">How your semester is actually going.</p>
-        </div>
-      </div>
+      {/* Arriving here from the Attendance tab now returns there, not to Home. */}
+      <PageHeader
+        title="Attendance stats"
+        subtitle="How your semester is actually going."
+        fallback="/app/attendance"
+      />
 
       {attendanceLoading ? (
         <ListSkeleton rows={5} />

@@ -133,13 +133,12 @@ export function Students() {
     listAchievements()
       .then((all) => setRecognitions(all.filter((a) => a.grantedBy === 'instructor')))
       .catch(() => {
-        /* the grant sheet just stays empty if this fails */
+
       })
   }, [])
 
   const sectionName = sections.find((s) => s.id === openId)?.name ?? ''
 
-  // If the open section disappears (deleted elsewhere), fall back to the grid.
   useEffect(() => {
     if (openId && !sections.some((s) => s.id === openId)) setOpenId(null)
   }, [sections, openId])
@@ -150,7 +149,6 @@ export function Students() {
     setError(undefined)
     try {
       setStudents(await listStudents(openId))
-      // Non-blocking: the "Archived (n)" chip is secondary to the roster.
       void listArchivedStudents(openId)
         .then((list) => setArchivedCount(list.length))
         .catch(() => {})
@@ -163,11 +161,10 @@ export function Students() {
 
   useEffect(() => {
     if (openId) void refresh()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [openId])
 
-  // Attendees of the most recent ENDED session, for the "select from last class"
-  // shortcut. Non-fatal: a failure just hides that one selector.
+
   useEffect(() => {
     if (!openId) {
       setLastSessionAttendees(new Set())

@@ -78,9 +78,8 @@ create table if not exists public.auth_events (
   detail     text
 );
 
--- The rate-limit lookup: failures for one IP inside a short window.
 create index if not exists auth_events_ip_idx on public.auth_events (ip, at desc);
--- The instructor-facing "what happened recently" read.
+
 create index if not exists auth_events_at_idx on public.auth_events (at desc);
 
 alter table public.auth_events enable row level security;
@@ -89,46 +88,12 @@ drop policy if exists auth_events_select on public.auth_events;
 create policy auth_events_select on public.auth_events
   for select to authenticated using (public.is_instructor());
 
--- Reads for the instructor only, and no write policy at all: nothing reachable
--- with an anon or student key may write here.
+
 grant select on public.auth_events to authenticated;
 revoke insert, update, delete on public.auth_events from anon, authenticated;
 
--- The edge functions write these rows with the service role over PostgREST (not
--- through a SECURITY DEFINER function), so unlike audit_log in 0023 this table
--- genuinely needs the grant. Explicit rather than leaning on Supabase's default
--- privileges: if the insert silently failed, the rate limiter would count zero
--- failures forever and quietly stop working.
-grant select, insert, delete on public.auth_events to service_role;
 
--- ----------------------------------------------------------------------------
--- 3. Retention — keep half a year, prune weekly
---    cron.schedule() upserts by job name, so re-running just retargets it.
---    Sunday 18:17 UTC == Monday 02:17 Manila (quiet hour, away from the 02:00
---    nightly backup in 0023).
--- ----------------------------------------------------------------------------
 select cron.schedule(
   'classpoint-auth-events-prune', '17 18 * * 0',
   $$delete from public.auth_events where at < now() - interval '180 days';$$
 );
-
--- ============================================================================
--- Verify (paste after running, twice — this file is idempotent):
---
---   select public.cp_generate_token();          -- expect 16 chars
---   select length(public.cp_generate_token());  -- 16
---
---   -- Existing unclaimed tokens are untouched (mixed lengths are expected and
---   -- fine — the short ones still work, they're just older):
---   select length(claim_token) as len, count(*)
---     from public.student_secrets
---    where claimed_at is null
---    group by 1;
---
---   -- After a few claim attempts (instructor session only):
---   select at, kind, success, ip, detail from public.auth_events
---    order by at desc limit 20;
---
---   select jobname, schedule from cron.job
---    where jobname = 'classpoint-auth-events-prune';
--- ============================================================================

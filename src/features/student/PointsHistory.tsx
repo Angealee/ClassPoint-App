@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -11,6 +10,7 @@ import { timeAgo } from '@/lib/time'
 import { errorText } from '@/lib/errors'
 import { cn } from '@/lib/cn'
 import type { PointCategory, PointEvent } from '@/lib/types'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useStudentData } from './StudentData'
 
 const PAGE = 40
@@ -31,7 +31,6 @@ const CATEGORY_META: Record<PointCategory, { label: string; dot: string; text: s
  * pages back through the whole semester and puts a per-week chart on top.
  */
 export function PointsHistory() {
-  const navigate = useNavigate()
   const { me } = useStudentData()
   const [events, setEvents] = useState<PointEvent[]>([])
   const [loading, setLoading] = useState(true)
@@ -110,7 +109,11 @@ export function PointsHistory() {
   if (loading) {
     return (
       <div className="space-y-5">
-        <Header onBack={() => navigate('/app')} />
+        <PageHeader
+          title="Points history"
+          subtitle="Everything you’ve earned and spent this semester."
+          fallback="/app"
+        />
         <ListSkeleton />
       </div>
     )
@@ -119,7 +122,11 @@ export function PointsHistory() {
   if (error && events.length === 0) {
     return (
       <div className="space-y-5">
-        <Header onBack={() => navigate('/app')} />
+        <PageHeader
+          title="Points history"
+          subtitle="Everything you’ve earned and spent this semester."
+          fallback="/app"
+        />
         <Card className="p-8 text-center">
           <p className="text-sm text-muted">{error}</p>
           <Button variant="outline" className="mt-4" onClick={() => void load()}>
@@ -133,7 +140,11 @@ export function PointsHistory() {
   if (events.length === 0) {
     return (
       <div className="space-y-5">
-        <Header onBack={() => navigate('/app')} />
+        <PageHeader
+          title="Points history"
+          subtitle="Everything you’ve earned and spent this semester."
+          fallback="/app"
+        />
         <Card className="p-8 text-center text-sm text-muted">
           No points yet. They'll appear here the moment your instructor awards them.
         </Card>
@@ -144,7 +155,11 @@ export function PointsHistory() {
   return (
     <PullToRefresh onRefresh={load}>
       <div className="space-y-5">
-        <Header onBack={() => navigate('/app')} />
+        <PageHeader
+          title="Points history"
+          subtitle="Everything you’ve earned and spent this semester."
+          fallback="/app"
+        />
 
         {/* Per-week bars. Height is scaled against the biggest week so the
             shape reads even when the numbers are small — which they are early
@@ -222,24 +237,6 @@ export function PointsHistory() {
   )
 }
 
-function Header({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={onBack}
-        aria-label="Back"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
-      >
-        ‹
-      </button>
-      <div>
-        <h1 className="font-display text-xl font-bold">Points history</h1>
-        <p className="text-sm text-muted">Everything you've earned and spent this semester.</p>
-      </div>
-    </div>
-  )
-}
 
 /**
  * Per-week net points. Bars grow from a shared baseline; negative weeks hang

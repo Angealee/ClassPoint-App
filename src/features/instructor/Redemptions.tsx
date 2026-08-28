@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { SuccessTick } from '@/components/ui/SuccessTick'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { TicketIcon } from '@/components/ui/icons'
 import { decideRedemption, listRedemptions, listTopSpenders } from '@/lib/api'
 import { timeAgo } from '@/lib/time'
@@ -115,16 +116,19 @@ export function Redemptions() {
 
   return (
     <div className="space-y-5 pb-4">
-      <div>
-        <h1 className="font-display text-xl font-bold">Requests</h1>
-        <p className="text-sm text-muted">
-          {tab === 'points'
+      {/* Reached from the header ticket icon, so no tab lights up — by design.
+          The missing back affordance was the bug. */}
+      <PageHeader
+        title="Requests"
+        subtitle={
+          tab === 'points'
             ? 'Students asking to put points toward a grade. Nothing is spent until you approve.'
             : tab === 'excuses'
               ? 'Absence excuses. Tap Excuse once the student presents their admission slip.'
-              : 'Your price list — what students can spend points on.'}
-        </p>
-      </div>
+              : 'Your price list — what students can spend points on.'
+        }
+        fallback="/teach"
+      />
 
       {/* Tabs — one inbox, two request types, plus the price list behind them. */}
       <div className="grid grid-cols-3 gap-2">

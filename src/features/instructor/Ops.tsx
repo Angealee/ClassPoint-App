@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
+import { CalendarIcon } from '@/components/ui/icons'
 import {
   forceLeaderboardRefresh,
   getBackupHealth,
@@ -11,6 +13,7 @@ import {
   listAuditLog,
   listAuthEvents,
 } from '@/lib/api'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { AttendanceWorkbook } from './AttendanceWorkbook'
 import { Broadcast } from './Broadcast'
 import { RiskOverview } from './RiskOverview'
@@ -45,12 +48,15 @@ export function Ops() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="font-display text-xl font-bold">Ops &amp; trust</h1>
-        <p className="text-sm text-muted">
-          What the system has been doing while you weren't looking.
-        </p>
-      </div>
+      {/* Reached from a header icon, so no tab lights up — that is by design
+          (four tabs is the stated limit). The missing back button was the bug. */}
+      <PageHeader
+        title="Ops & trust"
+        subtitle="What the system has been doing while you weren't looking."
+        fallback="/teach"
+      />
+
+      <SemestersCard />
 
       {/* Acting-on-students first, inspection below — the order you'd want on
           a Monday morning. */}
@@ -420,5 +426,35 @@ function ErrorLine({ text, onRetry }: { text: string; onRetry: () => void }) {
         Try again
       </Button>
     </div>
+  )
+}
+
+/**
+ * Entry point to /teach/semesters.
+ *
+ * That route holds term dates, subject creation and the entire semester
+ * rollover wizard — and until now had NO link anywhere in the app, so the only
+ * way in was typing the URL. It lives in Ops because it is admin work: it
+ * belongs beside backup health and the audit log, not in the daily tab bar.
+ */
+function SemestersCard() {
+  const navigate = useNavigate()
+  return (
+    <button
+      type="button"
+      onClick={() => navigate('/teach/semesters')}
+      className="flex w-full items-center gap-3 rounded-2xl border border-line bg-card p-4 text-left transition-colors hover:bg-card-2"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">
+        <CalendarIcon className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">Semester &amp; subjects</span>
+        <span className="block text-[13px] text-muted">
+          Term dates, subjects, and rolling over to a new semester.
+        </span>
+      </span>
+      <span className="shrink-0 text-lg text-muted">›</span>
+    </button>
   )
 }

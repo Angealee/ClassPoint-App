@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
-import { ArrowLeftIcon } from '@/components/ui/icons'
 import { AchievementCard } from '@/components/achievements/AchievementCard'
 import { AchievementDetailSheet } from './AchievementDetailSheet'
 import { getAchievementRarity } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import type { AchievementCategory, AchievementRarity, AchievementState } from '@/lib/types'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useStudentData } from './StudentData'
 
 const CATEGORY_LABELS: Record<AchievementCategory, string> = {
@@ -132,20 +132,13 @@ export function Achievements() {
 
   return (
     <div className="space-y-4 pb-4">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => navigate('/app/profile')}
-          aria-label="Back to profile"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
-        >
-          <ArrowLeftIcon className="h-4 w-4" />
-        </button>
-        <div>
-          <h1 className="font-display text-xl font-bold">Achievements</h1>
-          <p className="text-sm text-muted">{unlockedCount} / {achievements.length} unlocked</p>
-        </div>
-      </div>
+      {/* Back is history-aware: arriving from Home used to dump you on Profile,
+          a screen you had never visited. Profile stays the cold-start fallback. */}
+      <PageHeader
+        title="Achievements"
+        subtitle={`${unlockedCount} / ${achievements.length} unlocked`}
+        fallback="/app/profile"
+      />
 
       {unlockedTitles.length > 0 && (
         <Card className="p-4">

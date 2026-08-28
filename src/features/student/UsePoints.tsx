@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -17,6 +18,7 @@ import {
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import { supabase, uniqueChannel } from '@/lib/supabase'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useStudentData } from './StudentData'
 import {
   MAX_PENDING_REDEMPTIONS,
@@ -55,6 +57,7 @@ function errorText(e: unknown, fallback: string): string {
 
 /** Put your class points toward a grade — request, instructor decides. */
 export function UsePoints() {
+  const navigate = useNavigate()
   const { me, refresh } = useStudentData()
   const { toast } = useToast()
   const studentId = me?.id
@@ -178,10 +181,23 @@ export function UsePoints() {
 
   return (
     <div className="space-y-4 pb-4">
-      <div>
-        <h1 className="font-display text-2xl font-bold">Use points</h1>
-        <p className="text-sm text-muted">Put your points toward a quiz or activity grade.</p>
-      </div>
+      <PageHeader
+        title="Use points"
+        subtitle="Put your points toward a quiz or activity grade."
+        fallback="/app"
+        actions={
+          // The permanent entry to the full ledger. It belongs on the points
+          // surface rather than the Dashboard — this is where someone asking
+          // "where did my points go?" already is, and it survives a home rebuild.
+          <button
+            type="button"
+            onClick={() => navigate('/app/history')}
+            className="shrink-0 text-[13px] font-semibold text-brand-500"
+          >
+            History ›
+          </button>
+        }
+      />
 
       {/* Balance + the spent gauge */}
       <Card className="p-5">
