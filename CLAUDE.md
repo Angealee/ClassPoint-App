@@ -452,6 +452,38 @@ sites rather than configuring twMerge; the `!` only existed to beat the old join
 default would have overridden every `p-3` (38 sites) and `p-3.5` (21) caller while
 leaving `p-8` alone. Adding those variants is the next primitive phase.
 
+Era 6.0 Phase 3 — token layer (additive CSS only). **Semantic role colours are TWO
+tokens per role**, and the split is empirical rather than stylistic: of the 95 `dark:`
+overrides in the app, 87 were five FOREGROUND pairs (`text-gold-600 dark:text-gold-400`
+×39, emerald ×19, brand ×13, gold-700/300 ×11, sky ×5) while `bg-emerald-500` (×24) and
+`bg-sky-500` (×5) carried NO dark variant at all. So `--success` (foreground) is defined
+in BOTH `:root` and `.dark`; `--success-solid` (fill, used as `bg-success-solid/10`) is
+defined ONCE and never flips. Verified in the built CSS: every foreground has 2
+definitions, every solid has 1.
+
+**`--danger` is deliberately NOT brand red** (`#a3161f` vs `#e11d2a`). Brand red is being
+demoted to an accent for nav and identity; if danger shared the hue then a "−5 penalty"
+chip and an active tab would look identical and red would stop meaning "bad".
+
+**The custom size step MUST be named `2xs`** (or `3xs`) — never `tiny`/`xxs`/`micro`.
+tailwind-merge reads `text-<Nxs>` as a FONT SIZE but any other bare word after `text-` as
+a COLOUR, so `cn("text-tiny","text-muted")` silently DROPS the size while
+`cn("text-2xs","text-muted")` keeps both. Measured, and pinned in `cn.test.ts` with the
+`text-tiny` counter-example. Because of that naming, NO `extendTailwindMerge` config is
+needed.
+
+**Never write a Tailwind glob like `zinc-<star>` inside a CSS comment.** The star-slash
+closes the comment early and silently eats the surrounding declarations. Doing exactly
+that in `index.css` gutted the entire `:root` block down to a single token — which would
+have left `--canvas`, `--card`, `--ink`, `--muted` and `--line` UNDEFINED in light mode,
+i.e. light mode completely broken. `npm run verify` passed the whole time; only reading
+the built CSS caught it.
+
+Contrast measured after the change (role foreground on `--card`): light 3.56–7.80, dark
+6.23–12.09. Nothing below 3:1. Light-mode `success` (3.77) and `streak` (3.56) clear the
+bar for the bold/chip text they are used in, but are under 4.5:1 — do not use them for
+body copy in light mode.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained

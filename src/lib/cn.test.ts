@@ -77,6 +77,24 @@ describe('cn', () => {
     expect(out).toContain('h-10') // redundant, but !important still wins
   })
 
+  /**
+   * Why the custom size step is named `2xs` and not `tiny` / `xxs` / `micro`.
+   *
+   * tailwind-merge reads `text-<Nxs>` as a FONT SIZE, but any other bare word
+   * after `text-` as a COLOUR. So a size named `tiny` lands in the colour group
+   * and is silently DROPPED the moment it meets `text-muted` — which is most of
+   * the places a micro-label is used.
+   *
+   * If someone renames the token, this test fails before the app quietly loses
+   * its smallest type.
+   */
+  it('keeps text-2xs as a SIZE, unlike text-tiny which would be eaten', () => {
+    expect(cn('text-2xs', 'text-muted')).toBe('text-2xs text-muted')
+    expect(cn('text-sm', 'text-2xs')).toBe('text-2xs')
+    // The counter-example, pinned so the reason is visible:
+    expect(cn('text-tiny', 'text-muted')).toBe('text-muted')
+  })
+
   it('resolves text size and text colour independently', () => {
     // Same group → later wins.
     expect(cn('text-sm', 'text-xs')).toBe('text-xs')

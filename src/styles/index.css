@@ -32,6 +32,17 @@
   --color-gold-800: #90470e;
   --color-gold-900: #763a0f;
 
+  /* One extra size step BELOW text-xs, for micro-labels (badge counts, eyebrow
+     text). Replaces nine hand-rolled values crowded into a 3.2px band:
+     0.5rem / 0.55 / 0.58 / 0.6 / 0.62 / 0.65 / 0.66 / 0.7rem / 10px.
+
+     MUST be named `2xs` (or `3xs`) and NOT `tiny`/`xxs`/`micro`. tailwind-merge
+     reads `text-<Nxs>` as a FONT SIZE but any other bare word as a COLOUR — so
+     `cn("text-tiny", "text-muted")` silently DROPS the size, while
+     `cn("text-2xs", "text-muted")` correctly keeps both. Verified in cn.test.ts. */
+  --text-2xs: 0.625rem; /* 10px */
+  --text-2xs--line-height: 0.875rem;
+
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
@@ -47,6 +58,41 @@
   --muted: #6b7280;
   --line: #e7e7ec;
   --ring: #e11d2a;
+
+  /* Role colours. TWO per role, and the split is empirical, not stylistic:
+     of the 95 `dark:` overrides in the app, 87 were five FOREGROUND pairs
+     (text-gold-600/dark:text-gold-400 ×39, emerald ×19, brand ×13,
+     gold-700/300 ×11, sky ×5) — while bg-emerald-500 (×24) and bg-sky-500 (×5)
+     carried NO dark variant at all.
+
+     So: a readable foreground must flip between themes; a saturated fill must
+     not. `--x` is the text colour, `--x-solid` is the fill you tint with
+     (`bg-success-solid/10`). Using one token for both is what forced those 87
+     hand-written overrides. */
+  --success: #059669;
+  --warn: #b15a08;
+  --info: #0284c7;
+  --streak: #ea580c;
+
+  /* DANGER IS DELIBERATELY NOT BRAND RED. Brand red is being demoted to an
+     accent (nav, identity); if danger shared that hue then a "−5 penalty" chip
+     and an active tab would look the same, and red would stop meaning "bad".
+     This is a deeper, less saturated red, distinguishable side by side. */
+  --danger: #a3161f;
+
+  /* Fills do not flip — same value in both themes. */
+  --success-solid: #10b981;
+  --warn-solid: #ffba1f;
+  --danger-solid: #cf1727;
+  --info-solid: #0ea5e9;
+  --streak-solid: #f97316;
+
+  /* Podium metals. Bespoke art rather than roles, but they were 14 raw
+     zinc and amber uses with no token behind them. Never write a Tailwind glob
+     like "zinc-<star>" in a CSS comment — the star-slash closes the comment
+     early and silently eats the declarations around it. */
+  --silver: #9ca3af;
+  --bronze: #b45309;
 }
 
 .dark {
@@ -57,6 +103,17 @@
   --muted: #a1a1aa;
   --line: #2a2a32;
   --ring: #f76a72;
+
+  /* Foregrounds lighten so they stay readable on a dark surface. The solids
+     above are intentionally absent here — they must not flip. */
+  --success: #34d399;
+  --warn: #ffcd4a;
+  --danger: #f76a72;
+  --info: #38bdf8;
+  --streak: #fb923c;
+
+  --silver: #d4d4d8;
+  --bronze: #d97706;
 }
 
 @theme inline {
@@ -67,6 +124,19 @@
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-success-solid: var(--success-solid);
+  --color-warn: var(--warn);
+  --color-warn-solid: var(--warn-solid);
+  --color-danger: var(--danger);
+  --color-danger-solid: var(--danger-solid);
+  --color-info: var(--info);
+  --color-info-solid: var(--info-solid);
+  --color-streak: var(--streak);
+  --color-streak-solid: var(--streak-solid);
+  --color-silver: var(--silver);
+  --color-bronze: var(--bronze);
 }
 
 /* ----------------------------------------------------------------------------
