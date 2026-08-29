@@ -46,7 +46,13 @@ and the leaderboard **reset each semester**; achievements and the all-time total
   state is centralized in `src/features/student/StudentData.tsx` (realtime channel
   `student-self-${studentId}`, optimistic updates, celebration queues). Instructor
   screens fetch ad-hoc in the component.
-- **UI:** modals = `src/components/ui/Sheet.tsx` (bottom sheet). Toasts = `useToast()`.
+- **UI primitives live in `src/components/ui/` and are the vocabulary — reach for one
+  before hand-rolling.** Surfaces: `Card` (pad none/tight/default/roomy, `interactive`) ·
+  `Rows` (divided row list) · `StickyBar`. Controls: `Button` (variants incl. `danger`,
+  `loading`, `icon`) · `IconButton` (`label` REQUIRED; see the adjacency rule) ·
+  `SegmentedControl` · `Input` / `Textarea` / `Select`. Content: `EmptyState` ·
+  `ErrorState` · `Chip` (takes a `tone`) · `SectionLabel` · `Stat` · `Meter` · `PersonRow`.
+  Modals = `src/components/ui/Sheet.tsx` (bottom sheet). Toasts = `useToast()`.
   Confirmations = `src/components/ui/ConfirmDialog.tsx` — **every destructive or
   hard-to-undo action must go through it** (deletes, bulk marks, end session, commit
   penalties). The one exception: single-student taps during a LIVE attendance session
@@ -558,6 +564,68 @@ ever typechecked anything, so the first stage of `npm run verify` was theatre. I
 `tsc -b --noEmit`, which immediately caught four files missing an import that the old
 command passed clean. CLAUDE.md previously described this as "misses unused locals" —
 that understated it completely.
+
+Era 6.0 Phase 5 — primitives. Decisions (user, 2026-08-29): **Card `p-4` default + 3
+variants** · **keep icon-button visual size, expand the hit area** · **spinner in slot +
+optional `loadingLabel`** · **build every primitive**, including the two I recommended
+deferring.
+
+**`Card` finally owns a padding default, and the migration is narrower than it looks.**
+Because `cn` is tailwind-merge, the 91 Cards with an explicit `p-*` still win and render
+byte-identically — they are deliberately untouched, and moving them to the `pad` prop is
+cosmetic work for the screen phases. **Only the 30 with NO padding class changed
+behaviour**, and those got `pad="none"`: most are `divide-y` row lists whose rows pad
+themselves, so a default would have stacked two paddings. Variants: `none` · `tight` (p-3)
+· `default` (p-4) · `roomy` (p-5).
+
+**`IconButton` keeps its visual size and grows an invisible 44×44 tap region** via a
+`::before` pseudo-element — most icon buttons were 36px, under the 44px Apple and Google
+both recommend, and scaling them up would have thickened every header and roster row.
+Measured: md renders 36px with a 44×44 hit area, sm 32px with 44×44, lg is already 44 and
+gets none.
+**THE ADJACENCY RULE IS LOAD-BEARING.** Two expanded hit areas overlap when their centres
+are under 44px apart, and in the overlap the later element in DOM order wins — for an
+edit/delete pair that means a tap near the seam hits the wrong one. So a row of `md`
+buttons needs at least `gap-2` (36 + 8 = 44, exactly touching); `sm` needs `gap-3`.
+Tighter groups must pass `expandHitArea={false}`. Every existing group was checked.
+`IconButton`'s `danger` variant rests MUTED and only reddens on hover, which is what the
+call sites already did — a trash icon that shouts before you reach for it makes a roster
+look alarming.
+
+**`EmptyState` and `ErrorState` are separate on purpose.** All 23 `p-8` Cards were empty
+states; 23 files separately hand-rolled a retry affordance. An empty list and a failed
+fetch are NOT the same thing, and conflating them is how a student whose connection
+dropped got told they had no attendance record at all. Both take the sentence as
+`children` rather than a `title` prop, because most of those sentences interpolate
+something and a string prop would need a fragment wrapper at every site.
+
+**`Chip` takes a `tone`, never a colour class** — that is what stops "rejected" and "an
+active nav item" drifting back into the same red. `StatusChip` now maps status → role and
+renders no colour of its own.
+
+**`SegmentedControl` is a real `radiogroup` with `aria-checked`**; the hand-rolled strips
+announced three unrelated buttons with no indication of which view was active. The two
+competing visual languages were unified on FILLED (Requests + ShareSheet), so **History's
+tabs changed from outlined-tint to filled**.
+
+**`Textarea` mirrors `Input`'s API exactly.** No primitive existed; all three sites
+hand-rolled a border and focus ring and two had no error path. Both it and `Input` are
+`text-base` — see the iOS zoom note in Phase 4. **Any new input/textarea/select must be
+`text-base`.**
+
+**Built but NOT adopted, deliberately: `PersonRow` (26 candidate rows), `Stat` (14),
+`Meter` (3).** Their call sites differ in LAYOUT, not just styling, and two UI changes in
+this project have already been reverted for exactly that reason. They land per screen in
+Phases 7–8 where each screen is reviewed. `Stat` is built to COMPOSE — a figure and a
+label, no card, no border, no width — so Phase 6's hero can arrange it rather than
+replace it. `Meter` is not a replacement for `XpBar`: that one is the animated gold hero
+bar and earns its weight as a focal point; `Meter` is a hairline track for proportions
+read at a glance in a list.
+
+Two things left alone that a future sweep should not "fix": **PinnedBadges' 20px Unpin and
+ProfileBanner's 24px Remove-photo** stay bespoke — both are overlay affordances on image
+tiles and both are DESTRUCTIVE, so a 44px tap region invites exactly the accidental taps
+their small size prevents.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
