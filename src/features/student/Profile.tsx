@@ -254,7 +254,7 @@ export function Profile() {
             <div className="min-w-0">
               <p className="truncate font-display text-xl font-bold">{me.display_name}</p>
               {me.display_title && (
-                <p className="truncate text-xs font-semibold text-gold-600 dark:text-gold-400">
+                <p className="truncate text-xs font-semibold text-reward">
                   {me.display_title}
                 </p>
               )}

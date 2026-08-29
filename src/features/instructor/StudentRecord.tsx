@@ -215,7 +215,7 @@ export function StudentRecord() {
       <BackLink onClick={() => navigate('/teach')} />
 
       {student.archivedAt && (
-        <Card className="border-brand-500/30 bg-brand-500/8 p-3 text-center text-sm font-medium text-brand-600 dark:text-brand-400">
+        <Card className="border-brand-500/30 bg-brand-500/8 p-3 text-center text-sm font-medium text-danger">
           Archived — hidden from rosters and the leaderboard.
         </Card>
       )}
@@ -309,7 +309,7 @@ export function StudentRecord() {
                         <p className="flex items-center gap-1.5 text-xs text-muted">
                           {shortDate(a.startedAt)}
                           {a.syncedLate && (
-                            <span className="rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[0.6rem] font-medium text-sky-600 dark:text-sky-400">
+                            <span className="rounded-full bg-info-solid/10 px-1.5 py-0.5 text-[0.6rem] font-medium text-info">
                               Offline
                             </span>
                           )}
@@ -361,7 +361,7 @@ export function StudentRecord() {
                     'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold tabular-nums',
                     e.points < 0
                       ? 'bg-brand-500/10 text-brand-500'
-                      : 'bg-gold-400/15 text-gold-600 dark:text-gold-400',
+                      : 'bg-gold-400/15 text-reward',
                   )}
                 >
                   {e.points < 0 ? e.points : `+${e.points}`}

@@ -174,7 +174,7 @@ export function RewardsCatalog() {
                           {KINDS.find((k) => k.value === item.kind)?.label}
                         </span>
                       </button>
-                      <span className="shrink-0 font-display text-base font-bold text-gold-600 dark:text-gold-400">
+                      <span className="shrink-0 font-display text-base font-bold text-reward">
                         {item.points}
                         <span className="ml-0.5 text-xs font-medium text-muted">pts</span>
                       </span>

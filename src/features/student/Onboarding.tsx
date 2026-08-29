@@ -26,7 +26,7 @@ const STEPS = [
 ]
 
 const TONE = {
-  gold: 'bg-gold-400/15 text-gold-600 dark:text-gold-400',
+  gold: 'bg-gold-400/15 text-reward',
   brand: 'bg-brand-500/10 text-brand-500',
 }
 

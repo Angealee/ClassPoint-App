@@ -33,9 +33,9 @@ const pct = (rate: number | null) => (rate === null ? '—' : `${Math.round(rate
 /** Green ≥85%, gold ≥70%, red below — same language as the status chips. */
 function rateTone(rate: number | null): string {
   if (rate === null) return 'text-muted'
-  if (rate >= 0.85) return 'text-emerald-600 dark:text-emerald-400'
-  if (rate >= AT_RISK_RATE) return 'text-gold-600 dark:text-gold-400'
-  return 'text-brand-600 dark:text-brand-400'
+  if (rate >= 0.85) return 'text-success'
+  if (rate >= AT_RISK_RATE) return 'text-reward'
+  return 'text-danger'
 }
 
 /** The whole term at a glance: every session, plus who's actually showing up. */
@@ -424,9 +424,9 @@ function StudentRow({ stat }: { stat: StudentAttendanceStat }) {
 function SessionTally({ s }: { s: SessionSummary }) {
   return (
     <div className="flex shrink-0 items-center gap-2 text-xs font-semibold tabular-nums">
-      <span className="text-emerald-600 dark:text-emerald-400">{s.present}</span>
-      <span className="text-gold-600 dark:text-gold-400">{s.late}</span>
-      <span className="text-brand-600 dark:text-brand-400">{s.absent}</span>
+      <span className="text-success">{s.present}</span>
+      <span className="text-reward">{s.late}</span>
+      <span className="text-danger">{s.absent}</span>
       {s.excused + s.irregular > 0 && (
         <span className="text-muted">+{s.excused + s.irregular}</span>
       )}
@@ -466,7 +466,7 @@ function TrendBars({ data }: { data: Array<{ week: number; rate: number | null }
                 rate === null
                   ? 'bg-line'
                   : rate >= 0.85
-                    ? 'bg-emerald-500'
+                    ? 'bg-success-solid'
                     : rate >= AT_RISK_RATE
                       ? 'bg-gold-400'
                       : 'bg-brand-500',

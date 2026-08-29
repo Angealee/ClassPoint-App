@@ -13,6 +13,7 @@ import { decideRedemption, listRedemptions, listTopSpenders } from '@/lib/api'
 import { timeAgo } from '@/lib/time'
 import { supabase, uniqueChannel } from '@/lib/supabase'
 import { cn } from '@/lib/cn'
+import { TONE } from '@/lib/tone'
 import { useInstructor } from './InstructorLayout'
 import { ExcusesInbox } from './ExcusesInbox'
 import { RewardsCatalog } from './RewardsCatalog'
@@ -28,10 +29,10 @@ const KIND_LABEL: Record<RedemptionKind, string> = {
 }
 
 const STATUS_META: Record<RedemptionStatus, { label: string; cls: string }> = {
-  pending: { label: 'Waiting', cls: 'bg-gold-400/15 text-gold-700 dark:text-gold-300' },
-  approved: { label: 'Approved', cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
-  rejected: { label: 'Declined', cls: 'bg-brand-500/10 text-brand-600 dark:text-brand-400' },
-  cancelled: { label: 'Cancelled', cls: 'bg-card-2 text-muted' },
+  pending: { label: 'Waiting', cls: TONE.warn.chip },
+  approved: { label: 'Approved', cls: TONE.success.chip },
+  rejected: { label: 'Declined', cls: TONE.danger.chip },
+  cancelled: { label: 'Cancelled', cls: TONE.neutral.chip },
 }
 
 function errorText(e: unknown, fallback: string): string {
@@ -244,7 +245,7 @@ export function Redemptions() {
                     <span className="shrink-0 text-xs text-muted">
                       {s.requests} request{s.requests === 1 ? '' : 's'}
                     </span>
-                    <span className="shrink-0 font-display text-sm font-bold tabular-nums text-gold-600 dark:text-gold-400">
+                    <span className="shrink-0 font-display text-sm font-bold tabular-nums text-reward">
                       {s.spent}
                     </span>
                   </div>

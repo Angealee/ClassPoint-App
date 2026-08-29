@@ -82,7 +82,7 @@ export function RiskOverview() {
       ) : (
         <>
           {actionable.length > 0 && (
-            <p className="mb-3 rounded-xl bg-gold-400/15 px-3 py-2 text-xs text-gold-600 dark:text-gold-400">
+            <p className="mb-3 rounded-xl bg-gold-400/15 px-3 py-2 text-xs text-reward">
               {actionable.length} student{actionable.length === 1 ? '' : 's'} can still
               file an excuse. After the window closes the absence is permanent.
             </p>
@@ -105,7 +105,7 @@ export function RiskOverview() {
                   <p
                     className={cn(
                       'font-display text-sm font-bold tabular-nums',
-                      r.actionable > 0 ? 'text-gold-600 dark:text-gold-400' : 'text-muted',
+                      r.actionable > 0 ? 'text-reward' : 'text-muted',
                     )}
                   >
                     {r.unexcused}

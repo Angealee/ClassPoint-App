@@ -1,54 +1,28 @@
 import type { AttendanceStatus } from '@/lib/types'
 import { cn } from '@/lib/cn'
+import { TONE, type ToneClasses, type ToneName } from '@/lib/tone'
 
 /**
- * One place defining how every attendance status looks.
- *  chip  — soft pill background (the StatusChip below)
- *  dot   — the chip's leading dot
- *  solid — filled style for a *selected* status button (pickers)
- *  text  — bare text colour (tallies, inline emphasis)
+ * How every attendance status looks — now just a mapping of status to ROLE.
+ * The four facets (chip / dot / solid / text) are spread from the shared table
+ * in lib/tone.ts, so this file no longer hand-writes a single colour.
+ *
+ * absent is DANGER, not brand red. It used to be brand-500, which made an
+ * absence chip the same colour as an active nav item and as the "Activities"
+ * points category — brand red meant "bad" and "good" at the same time.
+ *
+ * excused is INFO (calm blue): a legitimate pass, neither reward nor
+ * punishment. irregular is NEUTRAL grey — not part of this session at all.
  */
 export const STATUS_META: Record<
   AttendanceStatus,
-  { label: string; chip: string; dot: string; solid: string; text: string }
+  ToneClasses & { label: string; tone: ToneName }
 > = {
-  present: {
-    label: 'Present',
-    chip: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    dot: 'bg-emerald-500',
-    solid: 'bg-emerald-500 text-white',
-    text: 'text-emerald-600 dark:text-emerald-400',
-  },
-  late: {
-    label: 'Late',
-    chip: 'bg-gold-400/15 text-gold-700 dark:text-gold-300',
-    dot: 'bg-gold-500',
-    solid: 'bg-gold-400 text-brand-950',
-    text: 'text-gold-600 dark:text-gold-400',
-  },
-  absent: {
-    label: 'Absent',
-    chip: 'bg-brand-500/10 text-brand-600 dark:text-brand-400',
-    dot: 'bg-brand-500',
-    solid: 'bg-brand-500 text-white',
-    text: 'text-brand-600 dark:text-brand-400',
-  },
-  // The neutral pair reads calm on purpose — neither reward nor punishment.
-  // Sky = a legitimate pass; grey = "not part of this session at all".
-  excused: {
-    label: 'Excused',
-    chip: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
-    dot: 'bg-sky-500',
-    solid: 'bg-sky-500 text-white',
-    text: 'text-sky-600 dark:text-sky-400',
-  },
-  irregular: {
-    label: 'Irregular',
-    chip: 'bg-card-2 text-muted',
-    dot: 'bg-muted',
-    solid: 'bg-muted text-canvas',
-    text: 'text-muted',
-  },
+  present: { label: 'Present', tone: 'success', ...TONE.success },
+  late: { label: 'Late', tone: 'warn', ...TONE.warn },
+  absent: { label: 'Absent', tone: 'danger', ...TONE.danger },
+  excused: { label: 'Excused', tone: 'info', ...TONE.info },
+  irregular: { label: 'Irregular', tone: 'neutral', ...TONE.neutral },
 }
 
 export function StatusChip({

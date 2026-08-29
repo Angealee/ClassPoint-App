@@ -296,7 +296,7 @@ export function CommentsOverlay({
                   className={cn(
                     'inline-flex max-w-[85cqw] items-center gap-2 rounded-full border px-3 py-1.5 text-[13px] shadow-lg backdrop-blur-md',
                     p.studentId === null
-                      ? 'border-brand-500/50 bg-brand-500/25 text-brand-700 dark:text-brand-200'
+                      ? 'border-accent-solid/50 bg-accent-solid/25 text-accent'
                       : 'border-line bg-card/95 text-ink',
                     tappable && 'pointer-events-auto cursor-pointer',
                   )}

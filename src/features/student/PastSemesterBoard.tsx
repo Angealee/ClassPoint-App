@@ -85,7 +85,7 @@ export function PastSemesterBoard({ open, onClose }: { open: boolean; onClose: (
           {mine && (
             <div className="rounded-xl bg-gold-400/15 p-3">
               <p className="text-xs text-muted">You finished</p>
-              <p className="font-display text-lg font-bold text-gold-600 dark:text-gold-400">
+              <p className="font-display text-lg font-bold text-reward">
                 #{mine.rank} · {mine.points} points
               </p>
             </div>

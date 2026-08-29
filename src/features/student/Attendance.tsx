@@ -441,7 +441,7 @@ export function Attendance() {
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 300, damping: 18 }}
-              className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+              className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-success-solid/12 text-success"
             >
               <CheckIcon className="h-10 w-10" />
             </motion.div>

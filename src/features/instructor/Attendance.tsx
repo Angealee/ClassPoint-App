@@ -504,9 +504,9 @@ export function Attendance() {
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2 text-xs font-semibold tabular-nums">
-                          <span className="text-emerald-600 dark:text-emerald-400">{s.present}</span>
-                          <span className="text-gold-600 dark:text-gold-400">{s.late}</span>
-                          <span className="text-brand-600 dark:text-brand-400">{s.absent}</span>
+                          <span className="text-success">{s.present}</span>
+                          <span className="text-reward">{s.late}</span>
+                          <span className="text-danger">{s.absent}</span>
                           {s.excused + s.irregular > 0 && (
                             <span className="text-muted">+{s.excused + s.irregular}</span>
                           )}

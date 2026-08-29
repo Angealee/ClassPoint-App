@@ -256,12 +256,12 @@ export function AbsenceExcuses({
                     </Button>
                   )}
                   {excuse?.status === 'pending' && (
-                    <span className="shrink-0 rounded-full bg-gold-400/15 px-2.5 py-1 text-xs font-semibold text-gold-700 dark:text-gold-300">
+                    <span className="shrink-0 rounded-full bg-gold-400/15 px-2.5 py-1 text-xs font-semibold text-warn">
                       Waiting
                     </span>
                   )}
                   {excuse?.status === 'rejected' && (
-                    <span className="shrink-0 rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-semibold text-brand-600 dark:text-brand-400">
+                    <span className="shrink-0 rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-semibold text-danger">
                       Rejected
                     </span>
                   )}

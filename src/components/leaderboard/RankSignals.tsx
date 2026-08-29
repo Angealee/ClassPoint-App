@@ -50,7 +50,7 @@ export function RankDelta({
       className={cn(
         'inline-flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[12px] font-bold tabular-nums',
         up
-          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+          ? 'bg-success-solid/10 text-success'
           : 'bg-brand-500/10 text-brand-500',
         className,
       )}
@@ -85,7 +85,7 @@ export function RankTenure({
       className={cn(
         'inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-bold tabular-nums',
         hot
-          ? 'bg-orange-500/15 text-orange-500'
+          ? 'bg-streak-solid/15 text-streak'
           : 'bg-card-2 text-muted',
         className,
       )}

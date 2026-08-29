@@ -17,6 +17,7 @@ import {
 } from '@/lib/api'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
+import { TONE } from '@/lib/tone'
 import { supabase, uniqueChannel } from '@/lib/supabase'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useStudentData } from './StudentData'
@@ -44,10 +45,10 @@ const KIND_LABEL: Record<RedemptionKind, string> = {
 }
 
 const STATUS_META: Record<RedemptionStatus, { label: string; cls: string }> = {
-  pending: { label: 'Waiting', cls: 'bg-gold-400/15 text-gold-700 dark:text-gold-300' },
-  approved: { label: 'Approved', cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
-  rejected: { label: 'Declined', cls: 'bg-brand-500/10 text-brand-600 dark:text-brand-400' },
-  cancelled: { label: 'Cancelled', cls: 'bg-card-2 text-muted' },
+  pending: { label: 'Waiting', cls: TONE.warn.chip },
+  approved: { label: 'Approved', cls: TONE.success.chip },
+  rejected: { label: 'Declined', cls: TONE.danger.chip },
+  cancelled: { label: 'Cancelled', cls: TONE.neutral.chip },
 }
 
 function errorText(e: unknown, fallback: string): string {
@@ -213,7 +214,7 @@ export function UsePoints() {
             <p className="text-xs text-muted">Spent all-time</p>
             <AnimatedNumber
               value={spent}
-              className="font-display text-xl font-bold tabular-nums text-gold-600 dark:text-gold-400"
+              className="font-display text-xl font-bold tabular-nums text-reward"
             />
           </div>
         </div>
@@ -243,7 +244,7 @@ export function UsePoints() {
         </div>
 
         {pendingPoints > 0 && (
-          <p className="mt-2 rounded-lg bg-gold-400/10 px-3 py-2 text-xs font-medium text-gold-700 dark:text-gold-300">
+          <p className="mt-2 rounded-lg bg-gold-400/10 px-3 py-2 text-xs font-medium text-warn">
             {pendingPoints} point{pendingPoints === 1 ? '' : 's'} held by{' '}
             {pending.length} waiting request{pending.length === 1 ? '' : 's'}.
           </p>
@@ -256,7 +257,7 @@ export function UsePoints() {
           <WarningIcon className="h-4.5 w-4.5" />
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-bold text-brand-600 dark:text-brand-400">
+          <p className="text-sm font-bold text-danger">
             Spending points lowers your XP, level and rank
           </p>
           <p className="mt-0.5 text-xs text-muted">
@@ -297,7 +298,7 @@ export function UsePoints() {
                 >
                   <span className="block text-sm font-semibold">{item.label}</span>
                   <span className="mt-1.5 flex items-baseline gap-1">
-                    <span className="font-display text-lg font-bold text-gold-600 dark:text-gold-400">
+                    <span className="font-display text-lg font-bold text-reward">
                       {item.points}
                     </span>
                     <span className="text-xs text-muted">pts</span>
@@ -317,7 +318,7 @@ export function UsePoints() {
       {/* Request form */}
       <Card className="space-y-4 p-5">
         <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gold-400/15 text-gold-600 dark:text-gold-400">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gold-400/15 text-reward">
             <TicketIcon className="h-5 w-5" />
           </span>
           <div>

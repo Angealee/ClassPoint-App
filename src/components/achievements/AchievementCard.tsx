@@ -48,7 +48,7 @@ export function AchievementCard({
           {hideDetails ? 'Secret — keep playing to discover it.' : a.description}
         </p>
         {a.titleText && !hideDetails && (
-          <p className="mt-0.5 truncate text-[0.7rem] font-medium text-gold-600 dark:text-gold-400">
+          <p className="mt-0.5 truncate text-[0.7rem] font-medium text-reward">
             Title: "{a.titleText}"
           </p>
         )}

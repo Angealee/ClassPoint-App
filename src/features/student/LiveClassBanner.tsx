@@ -39,12 +39,12 @@ export function LiveClassBanner({ onScan }: { onScan?: () => void }) {
       animate={{ opacity: 1, y: 0 }}
       className={
         checkedIn
-          ? 'flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3'
+          ? 'flex items-center gap-3 rounded-2xl border border-success-solid/30 bg-success-solid/10 p-3'
           : 'flex items-center gap-3 rounded-2xl border border-brand-500/30 bg-brand-500/10 p-3'
       }
     >
       {checkedIn ? (
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success-solid/20 text-success">
           <CheckIcon className="h-5 w-5" />
         </span>
       ) : (

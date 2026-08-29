@@ -378,7 +378,7 @@ export function SessionDetail() {
 
         <div className="flex flex-wrap gap-2">
           {session.status === 'active' && (
-            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="rounded-full bg-success-solid/10 px-2.5 py-1 text-xs font-semibold text-success">
               Live now
             </span>
           )}
@@ -387,7 +387,7 @@ export function SessionDetail() {
               'rounded-full px-2.5 py-1 text-xs font-semibold',
               session.penaltiesCommitted
                 ? 'bg-card-2 text-muted'
-                : 'bg-gold-400/15 text-gold-700 dark:text-gold-300',
+                : 'bg-gold-400/15 text-warn',
             )}
           >
             {session.penaltiesCommitted ? 'Finalised' : 'Not finalised'}
@@ -425,7 +425,7 @@ export function SessionDetail() {
         Tap any student to correct their status.
         {session.penaltiesCommitted && ' Points are adjusted automatically.'}
         {syncedLateCount > 0 && (
-          <span className="text-sky-600 dark:text-sky-400">
+          <span className="text-info">
             {' '}
             {syncedLateCount} synced from an offline check-in.
           </span>
@@ -457,7 +457,7 @@ export function SessionDetail() {
                   )}
                 </span>
                 {r.syncedLate && (
-                  <span className="shrink-0 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[0.65rem] font-medium text-sky-600 dark:text-sky-400">
+                  <span className="shrink-0 rounded-full bg-info-solid/10 px-1.5 py-0.5 text-[0.65rem] font-medium text-info">
                     Offline
                   </span>
                 )}
@@ -504,7 +504,7 @@ export function SessionDetail() {
         <button
           type="button"
           onClick={() => setConfirmDelete(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium text-brand-600 transition-opacity hover:opacity-80 dark:text-brand-400"
+          className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium text-danger transition-opacity hover:opacity-80"
         >
           <TrashIcon className="h-4 w-4" /> Delete session
         </button>
@@ -552,7 +552,7 @@ export function SessionDetail() {
                 type="button"
                 disabled={saving}
                 onClick={() => setRemoveTarget(picker)}
-                className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium text-brand-600 transition-opacity hover:opacity-80 disabled:opacity-50 dark:text-brand-400"
+                className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium text-danger transition-opacity hover:opacity-80 disabled:opacity-50"
               >
                 <TrashIcon className="h-4 w-4" /> Remove record
               </button>

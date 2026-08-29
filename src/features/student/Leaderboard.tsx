@@ -233,7 +233,7 @@ function YourRankCard({
           <p className="text-[0.58rem] font-semibold uppercase tracking-wider text-muted">
             Your rank
           </p>
-          <p className="font-display text-3xl font-bold leading-none text-gold-600 dark:text-gold-400">
+          <p className="font-display text-3xl font-bold leading-none text-reward">
             #{position}
           </p>
           <RankDelta delta={delta} />
@@ -249,7 +249,7 @@ function YourRankCard({
           <p className="truncate text-xs text-muted">
             {sectionLabel} · Lv {level}
           </p>
-          <p className="truncate text-[0.7rem] font-semibold text-gold-600 dark:text-gold-400">
+          <p className="truncate text-[0.7rem] font-semibold text-reward">
             {toNext
               ? toNext.pts > 0
                 ? `${toNext.pts} pts to #${toNext.pos}`
@@ -258,7 +258,7 @@ function YourRankCard({
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="font-display text-xl font-bold text-gold-600 dark:text-gold-400">
+          <p className="font-display text-xl font-bold text-reward">
             {entry.points}
           </p>
           <p className="text-[0.65rem] uppercase tracking-wider text-muted">pts</p>
@@ -278,7 +278,7 @@ function RankDelta({ delta }: { delta: number | null }) {
   }
   const up = delta > 0
   return (
-    <p className={cn('text-[0.66rem] font-bold', up ? 'text-emerald-500' : 'text-red-500')}>
+    <p className={cn('text-[0.66rem] font-bold', up ? 'text-success' : 'text-danger')}>
       {up ? '▲' : '▼'} {Math.abs(delta)}
     </p>
   )

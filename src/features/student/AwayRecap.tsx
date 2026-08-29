@@ -20,7 +20,7 @@ export function AwayRecap({ events, onClose }: { events: PointEvent[]; onClose: 
         <div
           className={cn(
             'rounded-2xl border p-4 text-center',
-            positive ? 'border-gold-400/40 bg-gold-400/10' : 'border-red-500/30 bg-red-500/10',
+            positive ? 'border-gold-400/40 bg-gold-400/10' : 'border-danger-solid/30 bg-danger-solid/10',
           )}
         >
           <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted">
@@ -29,7 +29,7 @@ export function AwayRecap({ events, onClose }: { events: PointEvent[]; onClose: 
           <p
             className={cn(
               'font-display text-4xl font-bold',
-              positive ? 'text-gold-600 dark:text-gold-400' : 'text-red-500',
+              positive ? 'text-reward' : 'text-danger',
             )}
           >
             {net >= 0 ? `+${net}` : net}
@@ -48,10 +48,10 @@ export function AwayRecap({ events, onClose }: { events: PointEvent[]; onClose: 
                   className={cn(
                     'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold',
                     negative
-                      ? 'bg-red-500/10 text-red-500'
+                      ? 'bg-danger-solid/10 text-danger'
                       : e.category === 'activity'
                         ? 'bg-brand-500/10 text-brand-500'
-                        : 'bg-gold-400/15 text-gold-600 dark:text-gold-400',
+                        : 'bg-gold-400/15 text-reward',
                   )}
                 >
                   {negative ? e.points : `+${e.points}`}

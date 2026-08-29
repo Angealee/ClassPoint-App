@@ -621,14 +621,14 @@ function ActivateStep({ semester, onDone }: { semester: Semester; onDone: () => 
           ))}
           {warnings.map((c) => (
             <div key={c.code} className="mb-2 rounded-xl bg-gold-400/15 px-3 py-2">
-              <p className="text-xs text-gold-600 dark:text-gold-400">
+              <p className="text-xs text-reward">
                 {c.count > 0 ? `${c.count} · ` : ''}
                 {c.detail}
               </p>
             </div>
           ))}
           {checks.length === 0 && (
-            <p className="mb-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-xs text-emerald-600 dark:text-emerald-400">
+            <p className="mb-2 rounded-xl bg-success-solid/10 px-3 py-2 text-xs text-success">
               Everything checks out.
             </p>
           )}

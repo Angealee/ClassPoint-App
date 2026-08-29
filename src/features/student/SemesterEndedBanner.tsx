@@ -21,7 +21,7 @@ export function SemesterEndedBanner() {
 
   return (
     <Card className="border-gold-400/30 bg-gold-400/10 p-4">
-      <p className="font-display text-sm font-bold text-gold-600 dark:text-gold-400">
+      <p className="font-display text-sm font-bold text-reward">
         This semester has ended
       </p>
       <p className="mt-1 text-xs text-muted">

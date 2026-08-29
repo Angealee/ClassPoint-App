@@ -444,7 +444,7 @@ function RestRow({
             )}
           </p>
         </div>
-        <span className="relative z-[1] font-display text-base font-bold text-gold-600 dark:text-gold-400">
+        <span className="relative z-[1] font-display text-base font-bold text-reward">
           {entry.points}
         </span>
       </Card>

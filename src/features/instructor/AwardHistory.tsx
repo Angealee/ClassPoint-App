@@ -163,10 +163,10 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
                   className={cn(
                     'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-display text-sm font-bold',
                     negative
-                      ? 'bg-red-500/10 text-red-500'
+                      ? 'bg-danger-solid/10 text-danger'
                       : r.category === 'activity'
                         ? 'bg-brand-500/10 text-brand-500'
-                        : 'bg-gold-400/15 text-gold-600 dark:text-gold-400',
+                        : 'bg-gold-400/15 text-reward',
                   )}
                 >
                   {negative ? r.points : `+${r.points}`}

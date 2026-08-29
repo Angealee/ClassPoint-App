@@ -166,7 +166,7 @@ export function Achievements() {
                 className={cn(
                   'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                   me?.display_title === a.titleText
-                    ? 'border-gold-400 bg-gold-400/15 text-gold-700 dark:text-gold-300'
+                    ? 'border-gold-400 bg-gold-400/15 text-warn'
                     : 'border-line text-muted hover:text-ink',
                 )}
               >

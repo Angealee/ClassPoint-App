@@ -645,7 +645,7 @@ export function AttendanceSession({
               // name and never reorders, so the animation bought nothing.
               <div
                 key={r.studentId}
-                className={cn('transition-colors duration-700', flash && 'bg-emerald-500/10')}
+                className={cn('transition-colors duration-700', flash && 'bg-success-solid/10')}
               >
                 <button
                   type="button"

@@ -125,7 +125,7 @@ function BackupHealthCard() {
             className={cn(
               'mb-3 rounded-xl px-3 py-2 text-sm font-medium',
               healthy
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                ? 'bg-success-solid/10 text-success'
                 : 'bg-brand-500/10 text-brand-500',
             )}
           >
@@ -278,7 +278,7 @@ function AuthEventsCard() {
                 className={cn(
                   'shrink-0 rounded-md px-1.5 py-0.5 text-[0.65rem] font-semibold',
                   r.success
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    ? 'bg-success-solid/10 text-success'
                     : 'bg-brand-500/10 text-brand-500',
                 )}
               >
@@ -304,8 +304,8 @@ const ACTION_TONE: Record<string, string> = {
   delete: 'bg-brand-500/10 text-brand-500',
   hard_delete: 'bg-brand-500/15 text-brand-500',
   archive: 'bg-card-2 text-muted',
-  restore: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  broadcast: 'bg-gold-400/15 text-gold-600 dark:text-gold-400',
+  restore: 'bg-success-solid/10 text-success',
+  broadcast: 'bg-gold-400/15 text-reward',
 }
 
 function AuditLogCard() {

@@ -1,6 +1,7 @@
 import { Sheet } from '@/components/ui/Sheet'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
 import { cn } from '@/lib/cn'
+import { TONE } from '@/lib/tone'
 import { ACHIEVEMENT_FLAVOR } from './achievementFlavor'
 import type {
   AchievementCategory,
@@ -22,8 +23,8 @@ type Tier = { label: string; cls: string }
 
 /** Rarity tiers (the user's pick): <10% Legendary, <30% Rare, else Common. */
 function tierFor(pct: number): Tier {
-  if (pct < 10) return { label: '✦ Legendary', cls: 'bg-gold-400/15 text-gold-700 dark:text-gold-300' }
-  if (pct < 30) return { label: 'Rare', cls: 'bg-brand-500/10 text-brand-600 dark:text-brand-400' }
+  if (pct < 10) return { label: '✦ Legendary', cls: 'bg-gold-400/15 text-warn' }
+  if (pct < 30) return { label: 'Rare', cls: TONE.accent.chip }
   return { label: 'Common', cls: 'bg-card-2 text-muted' }
 }
 
@@ -115,13 +116,13 @@ export function AchievementDetailSheet({
           )}
 
           {a.titleText && !hidden && (
-            <p className="rounded-full bg-gold-400/15 px-3 py-1 text-xs font-semibold text-gold-700 dark:text-gold-300">
+            <p className="rounded-full bg-gold-400/15 px-3 py-1 text-xs font-semibold text-warn">
               Grants the title “{a.titleText}”
             </p>
           )}
 
           {unlocked ? (
-            <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+            <p className="text-xs font-medium text-success">
               Unlocked {fullDate(a.unlockedAt!)}
             </p>
           ) : label ? (

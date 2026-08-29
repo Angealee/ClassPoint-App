@@ -15,6 +15,7 @@ import {
 import { listNotifications } from '@/lib/api'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
+import { TONE } from '@/lib/tone'
 import { useStudentData } from './StudentData'
 import type { AppNotification } from '@/lib/types'
 import type { ComponentType, SVGProps } from 'react'
@@ -26,19 +27,21 @@ const TYPE_META: Record<
   string,
   { Icon: ComponentType<SVGProps<SVGSVGElement>>; cls: string }
 > = {
-  point: { Icon: BoltIcon, cls: 'bg-gold-400/15 text-gold-600 dark:text-gold-400' },
-  deduct: { Icon: BoltIcon, cls: 'bg-brand-500/10 text-brand-500' },
-  level: { Icon: StarIcon, cls: 'bg-gold-400/15 text-gold-600 dark:text-gold-400' },
-  rank: { Icon: TrophyIcon, cls: 'bg-brand-500/10 text-brand-500' },
-  achievement: { Icon: TrophyIcon, cls: 'bg-gold-400/15 text-gold-600 dark:text-gold-400' },
-  redemption: { Icon: TicketIcon, cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+  point: { Icon: BoltIcon, cls: TONE.reward.chip },
+  // The one negative type here. Absence penalties arrive as 'deduct' too.
+  deduct: { Icon: BoltIcon, cls: TONE.danger.chip },
+  level: { Icon: StarIcon, cls: TONE.reward.chip },
+  // A rank notification is a CLIMB — brand red as a positive accent, not danger.
+  rank: { Icon: TrophyIcon, cls: TONE.accent.chip },
+  achievement: { Icon: TrophyIcon, cls: TONE.reward.chip },
+  redemption: { Icon: TicketIcon, cls: TONE.success.chip },
   // Absence penalties arrive as type 'deduct' (0025), not a dedicated type —
   // the old 'attendance_penalty' key here matched nothing any migration queues.
-  excuse: { Icon: CheckIcon, cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+  excuse: { Icon: CheckIcon, cls: TONE.success.chip },
   // Instructor announcements (0034's send_broadcast).
-  broadcast: { Icon: BellIcon, cls: 'bg-brand-500/10 text-brand-500' },
+  broadcast: { Icon: BellIcon, cls: TONE.accent.chip },
 }
-const DEFAULT_META = { Icon: BellIcon, cls: 'bg-card-2 text-muted' }
+const DEFAULT_META = { Icon: BellIcon, cls: TONE.neutral.chip }
 
 /**
  * The bell's notification history. Opening it marks everything read

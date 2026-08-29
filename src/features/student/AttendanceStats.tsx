@@ -169,7 +169,7 @@ export function AttendanceStats() {
                           className={cn(
                             'w-full rounded-t',
                             w.rate >= 75
-                              ? 'bg-emerald-500'
+                              ? 'bg-success-solid'
                               : w.rate >= 50
                                 ? 'bg-gold-400'
                                 : 'bg-brand-500',

@@ -193,7 +193,7 @@ export function Dashboard() {
         <h2 className="mb-2 text-sm font-semibold text-muted">Recent points</h2>
         {events.length === 0 ? (
           <Card className="flex flex-col items-center gap-3 p-8 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gold-400/15 text-gold-600 dark:text-gold-400">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gold-400/15 text-reward">
               <BoltIcon className="h-6 w-6" />
             </span>
             <p className="text-sm font-medium">No points yet</p>
@@ -289,10 +289,10 @@ function FeedRow({ event: e }: { event: PointEvent }) {
         className={cn(
           'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold',
           negative
-            ? 'bg-red-500/10 text-red-500'
+            ? 'bg-danger-solid/10 text-danger'
             : e.category === 'activity'
               ? 'bg-brand-500/10 text-brand-500'
-              : 'bg-gold-400/15 text-gold-600 dark:text-gold-400',
+              : 'bg-gold-400/15 text-reward',
         )}
       >
         {negative ? e.points : `+${e.points}`}
@@ -320,7 +320,7 @@ function UsePointsTeaser({ balance, onOpen }: { balance: number; onOpen: () => v
       onClick={onOpen}
       className="flex w-full items-center gap-3 rounded-2xl border border-line bg-card p-4 text-left transition-colors hover:bg-card-2"
     >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-400/15 text-gold-600 dark:text-gold-400">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-400/15 text-reward">
         <TicketIcon className="h-5.5 w-5.5" />
       </span>
       <span className="min-w-0 flex-1">
@@ -385,7 +385,7 @@ function StatTile({
         className={cn(
           'mb-2 flex h-9 w-9 items-center justify-center rounded-lg',
           tone === 'gold'
-            ? 'bg-gold-400/15 text-gold-600 dark:text-gold-400'
+            ? 'bg-gold-400/15 text-reward'
             : 'bg-brand-500/10 text-brand-500',
         )}
       >

@@ -9,6 +9,7 @@ import { groupByWeek, weekLabel, termLabel } from '@/lib/term'
 import { timeAgo } from '@/lib/time'
 import { errorText } from '@/lib/errors'
 import { cn } from '@/lib/cn'
+import { TONE } from '@/lib/tone'
 import type { PointCategory, PointEvent } from '@/lib/types'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useStudentData } from './StudentData'
@@ -17,10 +18,10 @@ const PAGE = 40
 
 /** Display metadata per ledger category. Mirrors the Dashboard feed's colours. */
 const CATEGORY_META: Record<PointCategory, { label: string; dot: string; text: string }> = {
-  recitation: { label: 'Recitation', dot: 'bg-gold-400', text: 'text-gold-600 dark:text-gold-400' },
-  activity: { label: 'Activities', dot: 'bg-brand-500', text: 'text-brand-500' },
-  penalty: { label: 'Penalties', dot: 'bg-red-500', text: 'text-red-500' },
-  redeem: { label: 'Spent', dot: 'bg-muted', text: 'text-muted' },
+  recitation: { label: 'Recitation', dot: TONE.reward.dot, text: TONE.reward.text },
+  activity: { label: 'Activities', dot: TONE.accent.dot, text: TONE.accent.text },
+  penalty: { label: 'Penalties', dot: TONE.danger.dot, text: TONE.danger.text },
+  redeem: { label: 'Spent', dot: TONE.neutral.dot, text: TONE.neutral.text },
 }
 
 /**
@@ -173,7 +174,7 @@ export function PointsHistory() {
             <span
               className={cn(
                 'font-display text-lg font-bold tabular-nums',
-                netTotal < 0 ? 'text-red-500' : 'text-ink',
+                netTotal < 0 ? 'text-danger' : 'text-ink',
               )}
             >
               {netTotal > 0 ? `+${netTotal}` : netTotal}
@@ -218,7 +219,7 @@ export function PointsHistory() {
           ))}
         </div>
 
-        {error && <p className="px-1 text-center text-xs text-red-500">{error}</p>}
+        {error && <p className="px-1 text-center text-xs text-danger">{error}</p>}
 
         {hasMore ? (
           <Button
@@ -275,7 +276,7 @@ function WeekChart({
                     initial={{ height: 0 }}
                     animate={{ height: `${downPct}%` }}
                     transition={{ duration: 0.4, ease: 'easeOut' }}
-                    className="w-full rounded-b bg-red-500/70"
+                    className="w-full rounded-b bg-danger-solid/70"
                   />
                 )}
               </div>
@@ -297,10 +298,10 @@ function LedgerRow({ event: e }: { event: PointEvent }) {
         className={cn(
           'flex h-9 w-11 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold tabular-nums',
           negative
-            ? 'bg-red-500/10 text-red-500'
+            ? 'bg-danger-solid/10 text-danger'
             : e.category === 'activity'
               ? 'bg-brand-500/10 text-brand-500'
-              : 'bg-gold-400/15 text-gold-600 dark:text-gold-400',
+              : 'bg-gold-400/15 text-reward',
         )}
       >
         {negative ? e.points : `+${e.points}`}

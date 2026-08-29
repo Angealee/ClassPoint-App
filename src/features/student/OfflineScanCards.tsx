@@ -40,7 +40,7 @@ export function OfflineScanCards({
             >
               <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-gold-400/40 border-t-gold-500" />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-gold-700 dark:text-gold-300">
+                <p className="text-sm font-semibold text-warn">
                   Check-in waiting to sync
                 </p>
                 <p className="text-xs text-muted">
@@ -58,13 +58,13 @@ export function OfflineScanCards({
           return (
             <Card
               key={e.id}
-              className="flex items-center gap-3 border-emerald-500/30 bg-emerald-500/8 p-3.5"
+              className="flex items-center gap-3 border-success-solid/30 bg-success-solid/8 p-3.5"
             >
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success-solid text-xs font-bold text-white">
                 ✓
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                <p className="text-sm font-semibold text-success">
                   {already ? `Already recorded — ${status}` : `Checked in — ${status}`}
                 </p>
                 <p className="truncate text-xs text-muted">
@@ -93,7 +93,7 @@ export function OfflineScanCards({
                 !
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-brand-600 dark:text-brand-400">
+                <p className="text-sm font-semibold text-danger">
                   Couldn't record this check-in
                 </p>
                 <p className="text-xs text-muted">

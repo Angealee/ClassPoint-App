@@ -74,25 +74,50 @@
   --info: #0284c7;
   --streak: #ea580c;
 
-  /* DANGER IS DELIBERATELY NOT BRAND RED. Brand red is being demoted to an
-     accent (nav, identity); if danger shared that hue then a "−5 penalty" chip
-     and an active tab would look the same, and red would stop meaning "bad".
-     This is a deeper, less saturated red, distinguishable side by side. */
-  --danger: #a3161f;
+  /* DANGER IS DELIBERATELY NOT BRAND RED. Brand red is demoted to an accent
+     (nav, identity); if danger shared that hue then a "−5 penalty" chip and an
+     active tab would look the same, and red would stop meaning "bad".
+
+     The first attempt separated them by LIGHTNESS ALONE (#a3161f vs #e11d2a —
+     the same 356 degree hue, just darker). That works on a white card and
+     collapses entirely in dark mode, where a foreground must be LIGHTER than
+     the surface: the dark value shipped as #f76a72, which is brand-400 exactly.
+     Measured CIE76 distance from brand-400: 0.0. The same colour.
+
+     So danger now differs by HUE — crimson ~344 against brand's scarlet 356.
+     Measured: dE 29.6 from brand-600 in light, 15.2 from brand-400 in dark
+     (>10 reads as clearly different at a glance); contrast 8.02 and 6.56. */
+  --danger: #9f1239;
+
+  /* Gold, twice — and they are NOT interchangeable. The census found two gold
+     foreground pairs doing different jobs: gold-600/400 (41 uses) is REWARD —
+     XP, points, level-ups, the numbers a student wants to see go up — while
+     gold-700/300 (11 uses) is WARN, darker because it sits on a gold tint and
+     needs the extra contrast. Measured dE between them: 17.3 light, 13.4 dark. */
+  --reward: #d67c05;
+
+  /* Brand red as a READABLE FOREGROUND — not the same thing as the brand fill.
+     #e11d2a is marginal as text on a dark card, which is exactly why 15 sites
+     carry a hand-written dark:text-brand-400 override. Tokenising the pair makes
+     Phase 6's "demote brand red" a one-line edit here, not another site sweep. */
+  --accent: #c40f1d;
 
   /* Fills do not flip — same value in both themes. */
   --success-solid: #10b981;
   --warn-solid: #ffba1f;
-  --danger-solid: #cf1727;
+  --danger-solid: #d61f4e;
   --info-solid: #0ea5e9;
   --streak-solid: #f97316;
+  --reward-solid: #ffba1f;
+  --accent-solid: #e11d2a;
 
-  /* Podium metals. Bespoke art rather than roles, but they were 14 raw
-     zinc and amber uses with no token behind them. Never write a Tailwind glob
-     like "zinc-<star>" in a CSS comment — the star-slash closes the comment
-     early and silently eats the declarations around it. */
-  --silver: #9ca3af;
-  --bronze: #b45309;
+  /* ⚠ Never write a Tailwind glob with a star inside a CSS comment here. The
+     star-slash sequence closes the comment EARLY and silently swallows the
+     declarations that follow it — doing exactly that once gutted this whole
+     :root block down to a single token, leaving light mode with no --canvas,
+     --card, --ink, --muted or --line. npm run verify passed the entire time;
+     only reading the built CSS caught it. */
+
 }
 
 .dark {
@@ -108,12 +133,11 @@
      above are intentionally absent here — they must not flip. */
   --success: #34d399;
   --warn: #ffcd4a;
-  --danger: #f76a72;
+  --danger: #f1748f;
   --info: #38bdf8;
   --streak: #fb923c;
-
-  --silver: #d4d4d8;
-  --bronze: #d97706;
+  --reward: #ffba1f;
+  --accent: #f76a72;
 }
 
 @theme inline {
@@ -135,8 +159,10 @@
   --color-info-solid: var(--info-solid);
   --color-streak: var(--streak);
   --color-streak-solid: var(--streak-solid);
-  --color-silver: var(--silver);
-  --color-bronze: var(--bronze);
+  --color-reward: var(--reward);
+  --color-reward-solid: var(--reward-solid);
+  --color-accent: var(--accent);
+  --color-accent-solid: var(--accent-solid);
 }
 
 /* ----------------------------------------------------------------------------

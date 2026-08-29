@@ -112,7 +112,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
                 {isMe && <span className="ml-1 text-sm text-brand-500">(you)</span>}
               </p>
               {profile?.display_title && (
-                <p className="truncate text-xs font-semibold text-gold-600 dark:text-gold-400">
+                <p className="truncate text-xs font-semibold text-reward">
                   {profile.display_title}
                 </p>
               )}
@@ -122,7 +122,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
             </div>
             {target.rank != null && (
               <div className="shrink-0 text-right">
-                <p className="font-display text-2xl font-bold text-gold-600 dark:text-gold-400">
+                <p className="font-display text-2xl font-bold text-reward">
                   #{target.rank}
                 </p>
                 <p className="text-[0.65rem] uppercase tracking-wider text-muted">rank</p>
@@ -243,10 +243,10 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
                         className={cn(
                           'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold',
                           negative
-                            ? 'bg-red-500/10 text-red-500'
+                            ? 'bg-danger-solid/10 text-danger'
                             : e.category === 'activity'
                               ? 'bg-brand-500/10 text-brand-500'
-                              : 'bg-gold-400/15 text-gold-600 dark:text-gold-400',
+                              : 'bg-gold-400/15 text-reward',
                         )}
                       >
                         {negative ? e.points : `+${e.points}`}
@@ -299,7 +299,7 @@ function Stat({
         className={cn(
           'mx-auto mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg',
           tone === 'gold'
-            ? 'bg-gold-400/15 text-gold-600 dark:text-gold-400'
+            ? 'bg-gold-400/15 text-reward'
             : 'bg-brand-500/10 text-brand-500',
         )}
       >

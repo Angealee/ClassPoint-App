@@ -38,7 +38,7 @@ export function StreakFlame({ variant = 'full' }: { variant?: 'compact' | 'full'
         className={cn(
           'flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[0.7rem] font-bold tabular-nums',
           hot
-            ? 'bg-orange-500/15 text-orange-500'
+            ? 'bg-streak-solid/15 text-streak'
             : lit
               ? 'bg-card-2 text-ink'
               : 'bg-card-2 text-muted',
@@ -54,13 +54,13 @@ export function StreakFlame({ variant = 'full' }: { variant?: 'compact' | 'full'
     <div
       className={cn(
         'flex items-center gap-3 rounded-2xl border p-4',
-        hot ? 'border-orange-500/30 bg-orange-500/10' : 'border-line bg-card',
+        hot ? 'border-streak-solid/30 bg-streak-solid/10' : 'border-line bg-card',
       )}
     >
       <span
         className={cn(
           'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl',
-          hot ? 'bg-orange-500/20' : 'bg-card-2',
+          hot ? 'bg-streak-solid/20' : 'bg-card-2',
         )}
       >
         <Flame hot={hot} lit={lit} className="h-6 w-6" />
