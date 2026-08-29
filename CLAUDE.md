@@ -59,7 +59,7 @@ and the leaderboard **reset each semester**; achievements and the all-time total
   stay one-tap for speed.
 - **Components:** function components, named exports, PascalCase files. Lazy imports
   destructure the named export: `.then(m => ({ default: m.Foo }))`.
-- **Verify: `npm run verify`** — typecheck (`tsc -b --noEmit`) → ESLint → 112 unit tests →
+- **Verify: `npm run verify`** — typecheck (`tsc -b --noEmit`) → ESLint → 113 unit tests →
   `vite build`, in that order. That one command is the gate before every commit.
   Individually: `npm run lint` · `npm run lint:eslint` · `npm test` (`test:watch` for
   TDD) · `npm run build`. Heavy libs (`xlsx`, capture libs) only via dynamic `import()`.
@@ -740,6 +740,52 @@ is unchanged and dark mode gains the readable foreground those sites never had.
 the brand; the pedestal ink sits on gold), and **`PersonRow` is NOT adopted there** — those
 rows carry medal ramps, an XP ring around the avatar and a place number, which is bespoke
 art rather than the shared row.
+
+Era 6.0 Phase 8 — Profile and UsePoints. Decisions (user, 2026-08-29): **settings get
+their own screen** · **share the profile PIECES, not the screen** · **the spending
+warning folds into the request form**.
+
+**`/app/settings` splits configuration out of Profile.** Profile was doing two unrelated
+jobs at 673 lines — identity (photo, bio, badges, who viewed you) and configuration
+(sounds, vibration, push, test-push, Change PIN, What's new, Sign out) — so the everyday
+question was answered below seven controls a student touches once. Profile is now 428
+lines. Sign out sits alone at the bottom, below everything it could be mistaken for.
+**`routes.test.ts` gained `/app/settings`**, so its single entry point is enforced — this
+is exactly the class of screen that got orphaned twice before.
+
+**Do not rewrite moved copy from memory.** Extracting settings, I retyped `pushHint`'s
+five branches instead of carrying them across, and every one was wrong. The real
+`unsupported` line names the iPhone fix specifically ("add the app to your Home Screen
+first") — iOS only allows web push from an installed PWA, so a bare "not supported" reads
+as "this will never work". Restored verbatim.
+
+**The profile is rendered twice and that is CORRECT** — your own (editable) and someone
+else's (read-only) are genuinely different screens, so Phase 8 shared the pieces rather
+than collapsing them behind a flag. `components/profile/InterestTags.tsx` replaces
+`interestTags` + `splitInterests` (byte-identical bodies under two names) **and the tag
+markup, which was duplicated down to the same class string** — that was the half that
+would have drifted. `StudentProfilePreview`'s private `Stat` became a `StatTile` that
+COMPOSES the shared primitive, which is what `Stat` was built for.
+
+**There was a THIRD copy of the points row**, inline in `StudentProfilePreview`, still
+rendering "activity" in brand red — the exact drift predicted when the first two were
+merged in Phase 7.2. `PointEventRow` now takes **`PublicPointEvent`**, the narrower shape
+it actually reads: asking for `PointEvent` would have locked out the one call site
+rendering someone else's record, which correctly has no `student_id`.
+
+**UsePoints' spending warning moved into the request form**, where the choice is made,
+rather than sitting above a shop the student is still browsing. Safe because the
+`ConfirmDialog` already restates the cost ("your total drops to N — your level and
+leaderboard rank drop with it") — verified before moving it, not assumed.
+
+Role assignment on these screens: `(you)`, the new-badges dot, interest tags, the History
+link and the selected-kind chip are IDENTITY → `accent`; "You only have N available" is a
+validation ERROR → `danger`.
+
+**The secondary student screens still carry brand red** (AbsenceExcuses, Achievements,
+Onboarding, AwayRecap, OfflineScanCards, LiveClassBanner, ScanLanding, and the
+PointsHistory / AttendanceStats chart fills). Only the three stray ERROR messages were
+fixed in Phase 8; the rest is deliberately left for a secondary-screens phase.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
