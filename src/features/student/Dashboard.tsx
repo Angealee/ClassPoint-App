@@ -8,10 +8,11 @@ import { BoltIcon, CheckIcon, TicketIcon } from '@/components/ui/icons'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { Meter } from '@/components/ui/Meter'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
-import { snapshotLabel, timeAgo } from '@/lib/time'
+import { PointEventRow } from '@/components/points/PointEventRow'
+import { snapshotLabel } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import { rateTone, tally } from '@/lib/attendance'
-import type { AchievementState, MyAttendanceEntry, PointEvent } from '@/lib/types'
+import type { AchievementState, MyAttendanceEntry } from '@/lib/types'
 import { useStudentData } from './StudentData'
 import { HomeHero, NextMilestone } from './HomeHero'
 import { LiveClassBanner } from './LiveClassBanner'
@@ -172,7 +173,7 @@ export function Dashboard() {
           ) : (
             <Rows>
               {events.slice(0, FEED_ROWS).map((e) => (
-                <FeedRow key={e.id} event={e} />
+                <PointEventRow key={e.id} event={e} />
               ))}
             </Rows>
           )}
@@ -281,35 +282,6 @@ function AchievementsTeaser({
   )
 }
 
-/** One row in the recent-points feed. */
-function FeedRow({ event: e }: { event: PointEvent }) {
-  const negative = e.points < 0
-  return (
-    <div className="flex items-center gap-3 p-4">
-      <span
-        className={cn(
-          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold',
-          negative
-            ? 'bg-danger-solid/10 text-danger'
-            : e.category === 'activity'
-              ? 'bg-accent-solid/10 text-accent'
-              : 'bg-gold-400/15 text-reward',
-        )}
-      >
-        {negative ? e.points : `+${e.points}`}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">
-          {e.note ?? (negative ? 'Deduction' : 'Class points')}
-        </p>
-        <p className="text-xs capitalize text-muted">
-          {e.category} · {timeAgo(e.created_at)}
-        </p>
-      </div>
-    </div>
-  )
-}
-
 /**
  * Home-screen entry to Use Points. Deliberately a card and not a 5th bottom
  * tab — four is the comfortable limit on a phone.
@@ -326,7 +298,7 @@ function UsePointsTeaser({ balance, onOpen }: { balance: number; onOpen: () => v
             <span className="block font-display text-sm font-bold">Use your points</span>
             <span className="block text-xs text-muted">
               {balance > 0
-                ? `Put some of your ${balance} toward a quiz or activity grade.`
+                ? 'Put points toward a quiz or activity grade.'
                 : 'Earn points first, then cash them in for a better grade.'}
             </span>
           </span>

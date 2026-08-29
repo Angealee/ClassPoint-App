@@ -7,9 +7,9 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { listStudentEvents, type EventCursor } from '@/lib/api'
 import { groupByWeek, weekLabel, termLabel } from '@/lib/term'
-import { timeAgo } from '@/lib/time'
 import { errorText } from '@/lib/errors'
 import { cn } from '@/lib/cn'
+import { PointEventRow } from '@/components/points/PointEventRow'
 import { TONE } from '@/lib/tone'
 import type { PointCategory, PointEvent } from '@/lib/types'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -206,7 +206,7 @@ export function PointsHistory() {
               </p>
               <Rows>
                 {g.items.map((e) => (
-                  <LedgerRow key={e.id} event={e} />
+                  <PointEventRow key={e.id} event={e} compact />
                 ))}
               </Rows>
             </div>
@@ -284,30 +284,4 @@ function WeekChart({
   )
 }
 
-function LedgerRow({ event: e }: { event: PointEvent }) {
-  const negative = e.points < 0
-  return (
-    <div className="flex items-center gap-3 p-4">
-      <span
-        className={cn(
-          'flex h-9 w-11 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold tabular-nums',
-          negative
-            ? 'bg-danger-solid/10 text-danger'
-            : e.category === 'activity'
-              ? 'bg-brand-500/10 text-brand-500'
-              : 'bg-gold-400/15 text-reward',
-        )}
-      >
-        {negative ? e.points : `+${e.points}`}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">
-          {e.note ?? (negative ? 'Deduction' : 'Class points')}
-        </p>
-        <p className="text-xs capitalize text-muted">
-          {e.category} · {timeAgo(e.created_at)}
-        </p>
-      </div>
-    </div>
-  )
-}
+

@@ -211,6 +211,14 @@ export function UsePoints() {
               value={available}
               className="font-display text-3xl font-bold tabular-nums"
             />
+            {/* Without this line "available" looks like a different quantity
+                from the points on every other screen. Showing the subtraction
+                makes it the same number minus something the student asked for. */}
+            {pendingPoints > 0 && (
+              <p className="mt-0.5 text-2xs tabular-nums text-muted">
+                {balance} this semester − {pendingPoints} awaiting a decision
+              </p>
+            )}
           </div>
           <div className="text-right">
             <p className="text-xs text-muted">Spent all-time</p>

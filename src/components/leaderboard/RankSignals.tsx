@@ -40,8 +40,32 @@ export function RankDelta({
   entry: LeaderboardEntry
   className?: string
 }) {
-  const delta = rankDelta(entry)
-  if (delta === null || delta === 0) return null
+  return <RankDeltaValue delta={rankDelta(entry)} className={className} />
+}
+
+/**
+ * The same signal from a raw number, for the ONE place that wants the verbose
+ * form: the viewer's own pinned standing card.
+ *
+ * That card is a single row, not a column, so "new" and "— same" are useful
+ * there — they answer a question the reader is actively asking. On the board
+ * itself the same words would be forty rows of noise, which is why the entry
+ * form above still renders nothing when there is nothing to say.
+ */
+export function RankDeltaValue({
+  delta,
+  verbose = false,
+  className,
+}: {
+  delta: number | null
+  /** Show "new" / "— same" instead of rendering nothing. */
+  verbose?: boolean
+  className?: string
+}) {
+  if (delta === null)
+    return verbose ? <p className="text-2xs font-medium text-muted">new</p> : null
+  if (delta === 0)
+    return verbose ? <p className="text-2xs font-medium text-muted">— same</p> : null
 
   const up = delta > 0
   return (

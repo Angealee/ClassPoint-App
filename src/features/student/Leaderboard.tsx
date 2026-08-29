@@ -1,3 +1,4 @@
+import { RankDeltaValue, rankDelta } from '@/components/leaderboard/RankSignals'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Select } from '@/components/ui/Select'
@@ -9,7 +10,6 @@ import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
 import { CommentsOverlay } from '@/components/leaderboard/CommentsOverlay'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { getLevelProgress } from '@/lib/leveling'
-import { cn } from '@/lib/cn'
 import type { LeaderboardComment, LeaderboardEntry } from '@/lib/types'
 import { PastSemesterBoard } from './PastSemesterBoard'
 import { useStudentData } from './StudentData'
@@ -73,7 +73,23 @@ export function Leaderboard() {
   // Position within the current view: in the global view this is the snapshot
   // rank; in a section view it's the place within that section.
   const myPos = meIdx + 1
-  const delta = useRankDelta(me?.id, view, capturedAt, meEntry ? myPos : null)
+  /**
+   * Rank movement had TWO sources that could disagree on the same screen: the
+   * database's `previous_rank` (0037, server-computed, the same number the board
+   * rows show) and this component's own localStorage tracker.
+   *
+   * The database wins wherever it can answer — that is the global view, where
+   * `myPos` IS the snapshot rank. It is authoritative, survives a new device,
+   * and cannot contradict the arrow on the student's own row above it.
+   *
+   * The local tracker stays for the two cases the database genuinely cannot
+   * answer: a SECTION view, where rows are renumbered by position within the
+   * section and no per-section previous rank exists, and a client running ahead
+   * of migration 0037, where `previous_rank` is null for everyone.
+   */
+  const localDelta = useRankDelta(me?.id, view, capturedAt, meEntry ? myPos : null)
+  const dbDelta = isGlobal && meEntry ? rankDelta(meEntry) : null
+  const delta = dbDelta ?? localDelta
 
   // Gap to the rank directly above — the next spot to chase.
   const above = meEntry && meIdx > 0 ? ranked[meIdx - 1] : null
@@ -234,7 +250,7 @@ function YourRankCard({
           <p className="font-display text-3xl font-bold leading-none text-reward">
             #{position}
           </p>
-          <RankDelta delta={delta} />
+          <RankDeltaValue delta={delta} verbose />
         </div>
         <div className="h-11 w-px shrink-0 bg-line" />
         <Avatar
@@ -263,22 +279,6 @@ function YourRankCard({
         </div>
       </div>
     </button>
-  )
-}
-
-/** ▲/▼ movement since the last settle (or "new" / "no change"). */
-function RankDelta({ delta }: { delta: number | null }) {
-  if (delta == null) {
-    return <p className="text-2xs font-medium text-muted">new</p>
-  }
-  if (delta === 0) {
-    return <p className="text-2xs font-medium text-muted">— same</p>
-  }
-  const up = delta > 0
-  return (
-    <p className={cn('text-2xs font-bold', up ? 'text-success' : 'text-danger')}>
-      {up ? '▲' : '▼'} {Math.abs(delta)}
-    </p>
   )
 }
 
