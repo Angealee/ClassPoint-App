@@ -142,22 +142,32 @@ export function Attendance() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSectionId, loadHistory])
 
-  // Consume ?review=<id> once, then strip it from the URL so a refresh or a
-  // later section switch behaves normally.
-  const reviewConsumedRef = useRef(false)
+  // `?review=<id>` IS the review view — it is no longer consumed and stripped.
+  //
+  // Stripping it looked tidy and cost real work: a refresh, an accidental back,
+  // or a phone locking and reopening dropped the instructor to home, and the
+  // session stayed ended-but-NOT-finalised with penalties never applied. The
+  // only marker was a pill on a card they might not scroll to.
+  //
+  // Now the URL holds the review, so any of those resume exactly where they
+  // were. The ref stops a re-fetch on every render; the param is cleared in
+  // afterReview(), which is the one legitimate exit.
+  const loadedReviewRef = useRef<string | null>(null)
   const reviewParam = searchParams.get('review')
   useEffect(() => {
-    if (!reviewParam || reviewConsumedRef.current) return
-    reviewConsumedRef.current = true
+    if (!reviewParam || loadedReviewRef.current === reviewParam) return
+    loadedReviewRef.current = reviewParam
     getSession(reviewParam)
       .then((full) => {
         if (full) {
           setSession(full)
           setView('review')
+        } else {
+          toast('That session no longer exists.', 'error')
+          setSearchParams({}, { replace: true })
         }
       })
       .catch(() => toast('Could not open that session.', 'error'))
-      .finally(() => setSearchParams({}, { replace: true }))
   }, [reviewParam, setSearchParams, toast])
 
   const thresholdsValid = absentAfter >= lateAfter && lateAfter >= 0 && absentAfter >= 0
@@ -222,6 +232,8 @@ export function Attendance() {
   function afterReview() {
     setSession(null)
     setView('home')
+    loadedReviewRef.current = null
+    setSearchParams({}, { replace: true })
     void loadHistory()
   }
 
@@ -230,7 +242,7 @@ export function Attendance() {
       aria-label="Section"
       value={selectedSectionId}
       onChange={(e) => setSelectedSectionId(e.target.value)}
-      className="max-w-40 font-display font-bold ring-1 ring-brand-500/40"
+      className="max-w-40 font-display font-bold ring-1 ring-accent-solid/40"
     >
       {sections.map((s) => (
         <option key={s.id} value={s.id}>
@@ -250,7 +262,18 @@ export function Attendance() {
   )
 
   if (view === 'live' && session) {
-    return <AttendanceSession session={session} sectionName={sectionName} onEnd={() => setView('review')} />
+    return (
+      <AttendanceSession
+        session={session}
+        sectionName={sectionName}
+        onEnd={() => {
+          // Put the review in the URL as we enter it, so a refresh resumes.
+          loadedReviewRef.current = session.id
+          setView('review')
+          setSearchParams({ review: session.id }, { replace: true })
+        }}
+      />
+    )
   }
   if (view === 'review' && session) {
     return <AttendanceReview session={session} sectionName={sectionName} onDone={afterReview} />
@@ -260,7 +283,7 @@ export function Attendance() {
     <div className="space-y-5">
       {/* Sticky, highlighted section bar — pins under the app header so the
           selected section is always in view and never scrolled past. */}
-      <div className="sticky top-[52px] z-10 -mx-4 -mt-5 border-b border-brand-500/20 bg-canvas/85 px-4 py-3 backdrop-blur-md md:top-0 md:-mx-8 md:mt-0 md:px-8">
+      <div className="sticky top-[52px] z-10 -mx-4 -mt-5 border-b border-accent-solid/20 bg-canvas/85 px-4 py-3 backdrop-blur-md md:top-0 md:-mx-8 md:mt-0 md:px-8">
         <div className="flex items-center justify-between gap-3">
           <h1 className="font-display text-xl font-bold">Attendance</h1>
           {sectionSelect}
@@ -270,7 +293,7 @@ export function Attendance() {
       {/* Start a class */}
       <Card className="space-y-4 p-5">
         <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-solid/10 text-accent">
             <QrIcon className="h-5 w-5" />
           </span>
           <div>
@@ -293,7 +316,7 @@ export function Attendance() {
                     onClick={() => setSubjectId(subject.id)}
                     className={
                       on
-                        ? 'rounded-xl border border-brand-500 bg-brand-500/10 px-3 py-2 text-left text-sm font-semibold text-brand-500'
+                        ? 'rounded-xl border border-accent-solid bg-accent-solid/10 px-3 py-2 text-left text-sm font-semibold text-accent'
                         : 'rounded-xl border border-line px-3 py-2 text-left text-sm font-medium text-muted transition-colors hover:text-ink'
                     }
                   >
@@ -315,7 +338,7 @@ export function Attendance() {
             <button
               type="button"
               onClick={() => setSavingPreset((v) => !v)}
-              className="text-xs font-semibold text-brand-500"
+              className="text-xs font-semibold text-accent"
             >
               {savingPreset ? 'Cancel' : 'Save current'}
             </button>
@@ -362,7 +385,7 @@ export function Attendance() {
                     type="button"
                     onClick={() => setPresets(deletePreset(preset.id))}
                     aria-label={`Delete preset ${preset.name}`}
-                    className="border-l border-line px-2 py-1 text-xs text-muted hover:text-brand-500"
+                    className="border-l border-line px-2 py-1 text-xs text-muted hover:text-accent"
                   >
                     ×
                   </button>
@@ -463,7 +486,7 @@ export function Attendance() {
             <button
               type="button"
               onClick={() => navigate('/teach/history?tab=attendance')}
-              className="text-xs font-semibold text-brand-500 transition-opacity hover:opacity-80"
+              className="text-xs font-semibold text-accent transition-opacity hover:opacity-80"
             >
               See all & stats →
             </button>
@@ -524,7 +547,7 @@ export function Attendance() {
                               type="button"
                               disabled={tagging === s.id}
                               onClick={() => onTagSession(s.id, subject.id)}
-                              className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-muted transition-colors hover:border-brand-500 hover:text-brand-500 disabled:opacity-50"
+                              className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-muted transition-colors hover:border-accent-solid hover:text-accent disabled:opacity-50"
                             >
                               {subject.code}
                             </button>

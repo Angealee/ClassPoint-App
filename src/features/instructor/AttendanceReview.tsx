@@ -1,3 +1,6 @@
+import { IconButton } from '@/components/ui/IconButton'
+import { ArrowLeftIcon } from '@/components/ui/icons'
+import { StatusPicker } from '@/components/attendance/StatusPicker'
 import { StickyBar } from '@/components/ui/StickyBar'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, Rows } from '@/components/ui/Card'
@@ -17,7 +20,6 @@ import {
 import { cn } from '@/lib/cn'
 import type { AttendanceRosterRow, AttendanceStatus, ClassSession } from '@/lib/types'
 
-const ORDER: AttendanceStatus[] = ['present', 'late', 'absent', 'excused', 'irregular']
 /** The three that drive the headline tallies; the neutral pair is summarised. */
 const TALLY_ORDER: AttendanceStatus[] = ['present', 'late', 'absent']
 
@@ -36,6 +38,7 @@ export function AttendanceReview({
   const [loading, setLoading] = useState(true)
   const [apply, setApply] = useState(session.applyPenalties)
   const [committing, setCommitting] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
   const [confirmCommit, setConfirmCommit] = useState(false)
   const [tick, setTick] = useState(false)
 
@@ -116,12 +119,25 @@ export function AttendanceReview({
 
   return (
     <div className="space-y-4 pb-4">
-      <div>
-        <h1 className="font-display text-xl font-bold">Review attendance</h1>
-        <p className="text-sm text-muted">
-          {session.topic ? `${session.topic} · ` : ''}
-          {sectionName} · tap a student to correct their status before finalising.
-        </p>
+      <div className="flex items-start gap-3">
+        {/* Until now this screen had NO way out. The only exits were finalising
+            or navigating away via the tab bar, which abandoned the review
+            silently and left the penalties unapplied. */}
+        <IconButton
+          label="Leave without finalising"
+          variant="outline"
+          round
+          className="mt-0.5"
+          onClick={() => setConfirmLeave(true)}
+          icon={<ArrowLeftIcon className="h-4 w-4" />}
+        />
+        <div className="min-w-0">
+          <h1 className="font-display text-xl font-bold">Review attendance</h1>
+          <p className="text-sm text-muted">
+            {session.topic ? `${session.topic} · ` : ''}
+            {sectionName} · tap a student to correct their status before finalising.
+          </p>
+        </div>
       </div>
 
       {/* Tallies */}
@@ -161,7 +177,7 @@ export function AttendanceReview({
           onClick={toggleApply}
           className={cn(
             'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-            apply ? 'bg-brand-500' : 'bg-line',
+            apply ? 'bg-accent-solid' : 'bg-line',
           )}
         >
           <span
@@ -181,29 +197,11 @@ export function AttendanceReview({
             <div key={r.studentId} className="flex items-center gap-3 p-3.5">
               <Avatar name={r.fullName} url={r.avatarUrl} />
               <p className="min-w-0 flex-1 truncate text-sm font-semibold">{r.fullName}</p>
-              <div className="flex shrink-0 gap-1">
-                {ORDER.map((s) => {
-                  const active = r.status === s
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setStatus(r, s)}
-                      aria-pressed={active}
-                      aria-label={STATUS_META[s].label}
-                      title={STATUS_META[s].label}
-                      className={cn(
-                        'flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors',
-                        active ? STATUS_META[s].solid : 'bg-card-2 text-muted hover:text-ink',
-                      )}
-                    >
-                      {/* Excused/Irregular both start with a letter already in
-                          use, so they get their own initials. */}
-                      {s === 'excused' ? 'E' : s === 'irregular' ? 'I' : STATUS_META[s].label[0]}
-                    </button>
-                  )
-                })}
-              </div>
+              <StatusPicker
+                variant="compact"
+                value={r.status}
+                onPick={(s) => void setStatus(r, s)}
+              />
             </div>
           ))}
         </Rows>
@@ -254,6 +252,36 @@ export function AttendanceReview({
           void onCommit()
         }}
         onClose={() => setConfirmCommit(false)}
+      />
+
+      {/* Leaving before finalising is the quiet failure this whole screen
+          exists to prevent, so it is the one exit that has to be explicit. */}
+      <ConfirmDialog
+        open={confirmLeave}
+        variant="danger"
+        title="Leave without finalising?"
+        message={
+          <>
+            This class stays <span className="font-semibold text-ink">unfinalised</span>. Statuses
+            are saved, but{' '}
+            {apply && deduction > 0 ? (
+              <>
+                the <span className="font-semibold text-ink">−{deduction} points</span> of penalties
+                are NOT applied
+              </>
+            ) : (
+              'nothing is locked in'
+            )}
+            .
+          </>
+        }
+        detail="You can come back from Recent sessions and finish it any time."
+        confirmLabel="Leave for now"
+        onConfirm={() => {
+          setConfirmLeave(false)
+          onDone()
+        }}
+        onClose={() => setConfirmLeave(false)}
       />
 
       <SuccessTick show={tick} onDone={onDone} />

@@ -1,3 +1,4 @@
+import { StatusPicker } from '@/components/attendance/StatusPicker'
 import { StickyBar } from '@/components/ui/StickyBar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
@@ -32,9 +33,6 @@ import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import type { AttendanceRosterRow, AttendanceStatus, ClassSession } from '@/lib/types'
 
-// All five are markable live: mark what you know the moment you know it,
-// rather than remembering to fix it in Review later.
-const ORDER: AttendanceStatus[] = ['present', 'late', 'absent', 'excused', 'irregular']
 /** Show the search/filter bar only once the roster is long enough to warrant it. */
 const SEARCH_THRESHOLD = 8
 
@@ -466,11 +464,11 @@ export function AttendanceSession({
             round
             aria-pressed={soundOn}
             onClick={toggleSound}
-            className={cn(soundOn && 'border-brand-500 bg-brand-500/10 text-brand-500')}
+            className={cn(soundOn && 'border-accent-solid bg-accent-solid/10 text-accent')}
             icon={<SoundIcon className="h-4 w-4" />}
           />
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-brand-500" />
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-solid/10 px-3 py-1 text-xs font-semibold text-accent">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-accent-solid" />
             Live
           </span>
         </div>
@@ -480,7 +478,7 @@ export function AttendanceSession({
       <Card className="relative flex flex-col items-center gap-3 p-6">
         {closed ? (
           <div className="flex flex-col items-center gap-2 py-4 text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-solid/10 text-accent">
               <ClockIcon className="h-7 w-7" />
             </span>
             <p className="font-display text-lg font-bold">Check-in closed</p>
@@ -509,7 +507,7 @@ export function AttendanceSession({
             <div className="w-full max-w-[248px]">
               <div className="h-1 overflow-hidden rounded-full bg-line">
                 <div
-                  className="h-full rounded-full bg-brand-500 transition-[width] duration-1000 ease-linear"
+                  className="h-full rounded-full bg-accent-solid transition-[width] duration-1000 ease-linear"
                   style={{ width: `${(rotateIn / QR_STEP_SECONDS) * 100}%` }}
                 />
               </div>
@@ -576,7 +574,7 @@ export function AttendanceSession({
           <button
             type="button"
             onClick={() => setBulkOpen(true)}
-            className="px-1 text-xs font-semibold text-brand-500 transition-opacity hover:opacity-80"
+            className="px-1 text-xs font-semibold text-accent transition-opacity hover:opacity-80"
           >
             Mark all {waiting.length} waiting →
           </button>
@@ -612,7 +610,7 @@ export function AttendanceSession({
             className={cn(
               'h-11 shrink-0 rounded-xl border px-3 text-sm font-medium transition-colors',
               waitingOnly
-                ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                ? 'border-accent-solid bg-accent-solid/10 text-accent'
                 : 'border-line text-muted hover:text-ink',
             )}
           >
@@ -690,37 +688,13 @@ export function AttendanceSession({
                           Reset) land as tidy rows of three instead of a ragged
                           4-then-1. The rule above separates it from the student
                           row so the buttons don't crowd the name. */}
-                      <div className="mx-3.5 mb-3 grid grid-cols-3 gap-2 border-t border-line pt-3">
-                        {ORDER.map((s) => {
-                          const active = r.status === s
-                          const suggested = !active && s === autoStatus
-                          return (
-                            <button
-                              key={s}
-                              type="button"
-                              onClick={() => mark(r.studentId, s)}
-                              className={cn(
-                                'h-9 rounded-lg px-2 text-sm font-semibold transition-colors',
-                                active
-                                  ? STATUS_META[s].solid
-                                  : 'bg-card-2 text-muted hover:text-ink',
-                                suggested && 'ring-2 ring-brand-500/40',
-                              )}
-                            >
-                              {STATUS_META[s].label}
-                            </button>
-                          )
-                        })}
-                        {r.status && (
-                          <button
-                            type="button"
-                            onClick={() => clearMark(r.studentId)}
-                            className="h-9 rounded-lg px-2 text-sm font-medium text-muted transition-colors hover:bg-card-2 hover:text-ink"
-                          >
-                            Reset
-                          </button>
-                        )}
-                      </div>
+                      <StatusPicker
+                        className="mx-3.5 mb-3 border-t border-line pt-3"
+                        value={r.status}
+                        suggested={autoStatus}
+                        onPick={(s) => mark(r.studentId, s)}
+                        onReset={() => clearMark(r.studentId)}
+                      />
                     </motion.div>
                   )}
                 </AnimatePresence>

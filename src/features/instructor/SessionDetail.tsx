@@ -1,3 +1,4 @@
+import { StatusPicker } from '@/components/attendance/StatusPicker'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -323,8 +324,8 @@ export function SessionDetail() {
                     className={cn(
                       'rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50',
                       subject.id === session.subjectId
-                        ? 'border-brand-500 bg-brand-500/10 text-brand-500'
-                        : 'border-line text-muted hover:border-brand-500 hover:text-brand-500',
+                        ? 'border-accent-solid bg-accent-solid/10 text-accent'
+                        : 'border-line text-muted hover:border-accent-solid hover:text-accent',
                     )}
                   >
                     {subject.code}
@@ -352,7 +353,7 @@ export function SessionDetail() {
               <button
                 type="button"
                 onClick={() => setEditingSubject(true)}
-                className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-brand-500 hover:text-brand-500"
+                className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-accent-solid hover:text-accent"
               >
                 {session.subjectCode ? `Subject: ${session.subjectCode}` : 'No subject — tag it'}
               </button>
@@ -487,7 +488,7 @@ export function SessionDetail() {
               >
                 <Avatar name={r.fullName} url={r.avatarUrl} />
                 <span className="min-w-0 flex-1 truncate text-sm text-muted">{r.fullName}</span>
-                <span className="shrink-0 text-xs font-semibold text-brand-500">Add record</span>
+                <span className="shrink-0 text-xs font-semibold text-accent">Add record</span>
               </button>
             ))}
           </Rows>
@@ -515,31 +516,16 @@ export function SessionDetail() {
       >
         {picker && (
           <div className="space-y-2">
-            {ORDER.map((s) => {
-              const active = picker.status === s
-              const effect = penaltyEffect(picker, s)
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  disabled={saving}
-                  onClick={() => void setStatus(picker, s)}
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors disabled:opacity-60',
-                    active ? 'border-brand-500/40 bg-brand-500/5' : 'border-line hover:bg-card-2',
-                  )}
-                >
-                  <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', STATUS_META[s].dot)} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold">{STATUS_META[s].label}</span>
-                    {effect && (
-                      <span className="block text-xs text-muted">Changing to this {effect}</span>
-                    )}
-                  </span>
-                  {active && <span className="shrink-0 text-xs font-semibold text-brand-500">Current</span>}
-                </button>
-              )
-            })}
+            <StatusPicker
+              variant="list"
+              value={picker.status}
+              disabled={saving}
+              onPick={(s) => void setStatus(picker, s)}
+              describe={(s) => {
+                const effect = penaltyEffect(picker, s)
+                return effect ? `Changing to this ${effect}` : null
+              }}
+            />
             <p className="pt-1 text-xs text-muted">
               Excused and Irregular don’t count for this student — no penalty, and the class is left
               out of their attendance rate and streaks.
