@@ -51,7 +51,7 @@ export function RankDelta({
         'inline-flex shrink-0 items-center gap-0.5 rounded-lg px-1.5 py-0.5 text-xs font-bold tabular-nums',
         up
           ? 'bg-success-solid/10 text-success'
-          : 'bg-brand-500/10 text-brand-500',
+          : 'bg-danger-solid/10 text-danger',
         className,
       )}
     >

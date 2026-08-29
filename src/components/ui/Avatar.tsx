@@ -29,7 +29,12 @@ export function Avatar({ name, url, className, textClassName = 'text-sm' }: Avat
     <span
       className={cn(
         'flex shrink-0 items-center justify-center overflow-hidden rounded-full',
-        'bg-gradient-to-br from-brand-500 to-brand-700 font-display font-bold text-white',
+        // Gold, not brand red. This fallback renders on EVERY roster row,
+        // leaderboard row and comment pill, so with 208 students — most without
+        // a photo — the old brand gradient turned the leaderboard into a column
+        // of forty identical red circles. That was the single largest
+        // concentration of brand red in the app, and it was decoration.
+        'bg-gradient-to-br from-gold-300 to-gold-500 font-display font-bold text-brand-950',
         'h-10 w-10',
         className,
       )}

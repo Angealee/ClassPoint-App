@@ -1,19 +1,24 @@
-import { SectionLabel } from '@/components/ui/SectionLabel'
-import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Card, Rows } from '@/components/ui/Card'
-import { XpBar } from '@/components/ui/XpBar'
-import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
+import { SectionLabel } from '@/components/ui/SectionLabel'
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { Avatar } from '@/components/ui/Avatar'
-import { BoltIcon, StarIcon, TicketIcon, TrophyIcon } from '@/components/ui/icons'
+import { BoltIcon, CheckIcon, TicketIcon } from '@/components/ui/icons'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
+import { Meter } from '@/components/ui/Meter'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
-import { getLevelProgress } from '@/lib/leveling'
 import { snapshotLabel, timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
-import type { AchievementState, PointEvent } from '@/lib/types'
+import { NEUTRAL_STATUSES } from '@/lib/types'
+import type { AchievementState, MyAttendanceEntry, PointEvent } from '@/lib/types'
 import { useStudentData } from './StudentData'
+import { HomeHero, NextMilestone } from './HomeHero'
+import { LiveClassBanner } from './LiveClassBanner'
+import { SemesterEndedBanner } from './SemesterEndedBanner'
+
+/** How many feed rows the home screen shows before "See all". */
+const FEED_ROWS = 5
 
 /** Time-of-day greeting for a warmer welcome. */
 function greeting(): string {
@@ -23,38 +28,13 @@ function greeting(): string {
   return 'Good evening'
 }
 
-/** Group the feed into Today / Yesterday / dated sections (preserving order). */
-function groupByDay(events: PointEvent[]): { label: string; items: PointEvent[] }[] {
-  const today = new Date().toDateString()
-  const yesterday = new Date(Date.now() - 86_400_000).toDateString()
-  const groups: { label: string; items: PointEvent[] }[] = []
-  const byKey = new Map<string, { label: string; items: PointEvent[] }>()
-  for (const e of events) {
-    const key = new Date(e.created_at).toDateString()
-    let group = byKey.get(key)
-    if (!group) {
-      const label =
-        key === today
-          ? 'Today'
-          : key === yesterday
-            ? 'Yesterday'
-            : new Date(e.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-      group = { label, items: [] }
-      byKey.set(key, group)
-      groups.push(group)
-    }
-    group.items.push(e)
-  }
-  return groups
-}
-
 const container = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.06 } },
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
 }
 const item = {
   hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 260, damping: 24 } },
 }
 
 export function Dashboard() {
@@ -66,18 +46,24 @@ export function Dashboard() {
     events,
     live,
     rank,
+    leaderboard,
     capturedAt,
     sectionName,
     refresh,
     achievements,
     hasUnseenAchievements,
+    achievementProgress,
+    attendance,
   } = useStudentData()
 
   if (loading) return <DashboardSkeleton />
 
   if (error) {
     return (
-      <ErrorState onRetry={() => void refresh()} detail="Your points are safe — this is just the connection.">
+      <ErrorState
+        onRetry={() => void refresh()}
+        detail="Your points are safe — this is just the connection."
+      >
         Couldn't load your dashboard.
       </ErrorState>
     )
@@ -85,138 +71,161 @@ export function Dashboard() {
 
   if (!me) {
     return (
-      <EmptyState>We couldn't find your student record. Ask your CEO to check your class list entry.</EmptyState>
+      <EmptyState>
+        We couldn't find your student record. Ask your CEO to check your class list entry.
+      </EmptyState>
     )
   }
 
-  // Level and XP track THIS SEMESTER (0029) — the race restarts each semester so
-  // a new cohort isn't chasing totals banked over previous ones.
-  const progress = getLevelProgress(me.semester_points)
+  // Points needed to pass the student ranked directly above. Null when we can't
+  // tell (unranked, already first, or the board hasn't settled yet) — in which
+  // case NextMilestone falls back to the level, which is always knowable.
+  const above = rank && rank > 1 ? leaderboard.find((e) => e.rank === rank - 1) : undefined
+  const pointsToOvertake = above ? Math.max(1, above.points - me.semester_points + 1) : null
 
   return (
     <PullToRefresh onRefresh={refresh}>
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
-      <motion.div variants={item} className="flex items-center gap-3">
-        <Avatar name={me.display_name} url={me.avatar_url} className="h-11 w-11" />
-        <p className="min-w-0 flex-1 text-sm text-muted">
-          {greeting()}, <span className="font-semibold text-ink">{me.display_name}</span> ·{' '}
-          {sectionName(me.section_id)}
-        </p>
-        <LiveBadge live={live} />
-      </motion.div>
+        <motion.div variants={item} className="flex items-center gap-3">
+          <Avatar name={me.display_name} url={me.avatar_url} className="h-11 w-11" />
+          <p className="min-w-0 flex-1 text-sm text-muted">
+            {greeting()}, <span className="font-semibold text-ink">{me.display_name}</span> ·{' '}
+            {sectionName(me.section_id)}
+          </p>
+          <LiveBadge live={live} />
+        </motion.div>
 
-      {/* Level / XP hero */}
-      <motion.div variants={item}>
-        <Card pad="none" className="overflow-hidden">
-          <div className="relative bg-linear-to-br from-brand-500 to-brand-700 p-5 text-white sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-white/70">Level</p>
-                <p className="font-display text-5xl font-bold leading-none sm:text-6xl">
-                  {progress.level}
-                </p>
-              </div>
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 backdrop-blur">
-                <StarIcon className="h-9 w-9 text-gold-300" />
-              </div>
-            </div>
-            <div className="mt-5">
-              <div className="mb-1.5 flex items-center justify-between text-xs text-white/80">
-                <span>
-                  {progress.expIntoLevel} / {progress.expForLevel} XP
-                </span>
-                <span className="font-semibold text-white">
-                  {progress.expToNext} pts to Level {progress.level + 1}
-                </span>
-              </div>
-              <XpBar value={progress.progressPct} />
-            </div>
-          </div>
-        </Card>
-      </motion.div>
+        {/* Conditional alerts. Both render nothing when they don't apply, so they
+            cost no space on an ordinary day — and Home previously had no
+            live-class signal at all, only a realtime-connection pill. */}
+        <SemesterEndedBanner />
+        <LiveClassBanner onScan={() => navigate('/app/attendance?scan=1')} />
 
-      {/* Stat tiles */}
-      <motion.div variants={item} className="grid grid-cols-2 gap-3">
-        <StatTile
-          icon={<BoltIcon className="h-5 w-5" />}
-          label="This semester"
-          value={
-            <motion.span
-              // The colour/scale pop still fires on change; the number itself
-              // now rolls up via AnimatedNumber instead of snapping.
-              key={me.semester_points}
-              initial={{ scale: 1.35, color: 'var(--color-gold-500)' }}
-              animate={{ scale: 1, color: 'var(--color-ink)' }}
-              transition={{ type: 'spring', stiffness: 500, damping: 18 }}
-              className="inline-block"
-            >
-              <AnimatedNumber value={me.semester_points} />
-            </motion.span>
-          }
-          note={`${me.all_time_points} all-time`}
-          tone="gold"
-        />
-        <StatTile
-          icon={<TrophyIcon className="h-5 w-5" />}
-          label="Overall rank"
-          value={rank ? `#${rank}` : '—'}
-          note={rank ? `as of ${snapshotLabel(capturedAt)}` : 'settles 12:30 & 7:30 PM'}
-          tone="brand"
-        />
-      </motion.div>
-
-      {/* Use points — the only home-screen entry point to /app/points. */}
-      <motion.div variants={item}>
-        <UsePointsTeaser
-          balance={me.semester_points}
-          onOpen={() => navigate('/app/points')}
-        />
-      </motion.div>
-
-      {/* Achievements teaser — the only home-screen entry point to the trophy case. */}
-      {achievements.length > 0 && (
+        {/* The scoreboard: level, points, XP, rank and streak as ONE object. */}
         <motion.div variants={item}>
-          <AchievementsTeaser
-            achievements={achievements}
-            hasUnseen={hasUnseenAchievements}
-            onOpen={() => navigate('/app/achievements')}
+          <HomeHero
+            points={me.semester_points}
+            allTimePoints={me.all_time_points}
+            rank={rank}
+            rankNote={rank ? `as of ${snapshotLabel(capturedAt)}` : undefined}
+            streak={achievementProgress?.present_streak ?? null}
           />
         </motion.div>
-      )}
 
-      {/* Recent points feed — grouped by day. */}
-      <motion.div variants={item}>
-        <SectionLabel>Recent points</SectionLabel>
-        {events.length === 0 ? (
-          <EmptyState
-            icon={
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gold-400/15 text-reward">
-                <BoltIcon className="h-6 w-6" />
-              </span>
-            }
-            description="They'll show up here the moment your instructor awards them. Speak up in class to earn your first!"
-          >
-            No points yet
-          </EmptyState>
-        ) : (
-          <div className="space-y-4">
-            {groupByDay(events).map((group) => (
-              <div key={group.label}>
-                <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted/80">
-                  {group.label}
-                </p>
-                <Rows>
-                  {group.items.map((e) => (
-                    <FeedRow key={e.id} event={e} />
-                  ))}
-                </Rows>
-              </div>
-            ))}
-          </div>
+        <motion.div variants={item}>
+          <NextMilestone points={me.semester_points} pointsToOvertake={pointsToOvertake} />
+        </motion.div>
+
+        <motion.div variants={item}>
+          <AttendanceCard
+            attendance={attendance}
+            onOpen={() => navigate('/app/attendance/stats')}
+          />
+        </motion.div>
+
+        {/* The only home-screen entry point to /app/points. */}
+        <motion.div variants={item}>
+          <UsePointsTeaser balance={me.semester_points} onOpen={() => navigate('/app/points')} />
+        </motion.div>
+
+        {/* The only home-screen entry point to the trophy case. */}
+        {achievements.length > 0 && (
+          <motion.div variants={item}>
+            <AchievementsTeaser
+              achievements={achievements}
+              hasUnseen={hasUnseenAchievements}
+              onOpen={() => navigate('/app/achievements')}
+            />
+          </motion.div>
         )}
-      </motion.div>
+
+        {/* Recent points. FLAT, not grouped by day: across five rows the
+            Today/Yesterday headers cost a line each and say less than the
+            per-row relative time already does. */}
+        <motion.div variants={item}>
+          <SectionLabel
+            action={
+              events.length > FEED_ROWS ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/app/history')}
+                  className="shrink-0 text-xs font-semibold text-accent"
+                >
+                  See all
+                </button>
+              ) : undefined
+            }
+          >
+            Recent points
+          </SectionLabel>
+          {events.length === 0 ? (
+            <EmptyState
+              icon={
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gold-400/15 text-reward">
+                  <BoltIcon className="h-6 w-6" />
+                </span>
+              }
+              description="They'll show up here the moment your instructor awards them. Speak up in class to earn your first!"
+            >
+              No points yet
+            </EmptyState>
+          ) : (
+            <Rows>
+              {events.slice(0, FEED_ROWS).map((e) => (
+                <FeedRow key={e.id} event={e} />
+              ))}
+            </Rows>
+          )}
+        </motion.div>
       </motion.div>
     </PullToRefresh>
+  )
+}
+
+/** present + late + absent. Neutral statuses are excluded everywhere by rule. */
+function counted(items: MyAttendanceEntry[]): number {
+  return items.filter((h) => !NEUTRAL_STATUSES.includes(h.status)).length
+}
+
+/**
+ * Show-up rate at a glance, linking to the full stats screen.
+ *
+ * Reads `attendance` off StudentData, which already loads it off the critical
+ * path — this card fires no query of its own.
+ */
+function AttendanceCard({
+  attendance,
+  onOpen,
+}: {
+  attendance: MyAttendanceEntry[]
+  onOpen: () => void
+}) {
+  const total = counted(attendance)
+  if (total === 0) return null
+
+  const showed = attendance.filter((h) => h.status === 'present' || h.status === 'late').length
+  const pct = Math.round((showed / total) * 100)
+  // Under 70% is the at-risk line the instructor's own screens use.
+  const tone = pct >= 85 ? 'success' : pct >= 70 ? 'warn' : 'danger'
+
+  return (
+    <button type="button" onClick={onOpen} className="block w-full text-left">
+      <Card interactive>
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-success-solid/10 text-success">
+            <CheckIcon className="h-5.5 w-5.5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-sm font-bold">Attendance</p>
+            <p className="text-xs text-muted">
+              {showed} of {total} classes
+            </p>
+          </div>
+          <span className="shrink-0 font-display text-xl font-bold tabular-nums">{pct}%</span>
+        </div>
+        <Meter value={pct} tone={tone} size="sm" label="Show-up rate" className="mt-3" />
+      </Card>
+    </button>
   )
 }
 
@@ -245,32 +254,37 @@ function AchievementsTeaser({
       aria-label="Open achievements"
       className="block w-full text-left"
     >
-      <Card className="flex items-center gap-3 p-4 transition-colors hover:bg-card-2">
-        <div className="flex -space-x-3">
-          {showcase.map((a) => (
-            <BadgeArt
-              key={a.code}
-              code={a.code}
-              category={a.category}
-              state={a.unlockedAt ? 'unlocked' : a.secret ? 'secret' : 'locked'}
-              isTitleGrantor={!!a.titleText}
-              size="sm"
-              className="rounded-2xl ring-2 ring-canvas"
-            />
-          ))}
+      <Card interactive>
+        <div className="flex items-center gap-3">
+          <div className="flex -space-x-3">
+            {showcase.map((a) => (
+              <BadgeArt
+                key={a.code}
+                code={a.code}
+                category={a.category}
+                state={a.unlockedAt ? 'unlocked' : a.secret ? 'secret' : 'locked'}
+                isTitleGrantor={!!a.titleText}
+                size="sm"
+                className="rounded-2xl ring-2 ring-canvas"
+              />
+            ))}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              Achievements
+              {hasUnseen && (
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full bg-accent-solid"
+                  aria-label="New"
+                />
+              )}
+            </p>
+            <p className="text-xs text-muted">
+              {unlocked.length} / {achievements.length} unlocked
+            </p>
+          </div>
+          <span className="shrink-0 text-lg text-muted">›</span>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-2 text-sm font-semibold">
-            Achievements
-            {hasUnseen && (
-              <span className="h-2 w-2 shrink-0 rounded-full bg-brand-500" aria-label="New" />
-            )}
-          </p>
-          <p className="text-xs text-muted">
-            {unlocked.length} / {achievements.length} unlocked
-          </p>
-        </div>
-        <span className="shrink-0 text-lg text-muted">›</span>
       </Card>
     </button>
   )
@@ -287,7 +301,7 @@ function FeedRow({ event: e }: { event: PointEvent }) {
           negative
             ? 'bg-danger-solid/10 text-danger'
             : e.category === 'activity'
-              ? 'bg-brand-500/10 text-brand-500'
+              ? 'bg-accent-solid/10 text-accent'
               : 'bg-gold-400/15 text-reward',
         )}
       >
@@ -311,23 +325,23 @@ function FeedRow({ event: e }: { event: PointEvent }) {
  */
 function UsePointsTeaser({ balance, onOpen }: { balance: number; onOpen: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="flex w-full items-center gap-3 rounded-2xl border border-line bg-card p-4 text-left transition-colors hover:bg-card-2"
-    >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-400/15 text-reward">
-        <TicketIcon className="h-5.5 w-5.5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block font-display text-sm font-bold">Use your points</span>
-        <span className="block text-xs text-muted">
-          {balance > 0
-            ? `Put some of your ${balance} toward a quiz or activity grade.`
-            : 'Earn points first, then cash them in for a better grade.'}
-        </span>
-      </span>
-      <span className="shrink-0 text-xs font-semibold text-brand-500">Open →</span>
+    <button type="button" onClick={onOpen} className="block w-full text-left">
+      <Card interactive>
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-400/15 text-reward">
+            <TicketIcon className="h-5.5 w-5.5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-sm font-bold">Use your points</span>
+            <span className="block text-xs text-muted">
+              {balance > 0
+                ? `Put some of your ${balance} toward a quiz or activity grade.`
+                : 'Earn points first, then cash them in for a better grade.'}
+            </span>
+          </span>
+          <span className="shrink-0 text-lg text-muted">›</span>
+        </div>
+      </Card>
     </button>
   )
 }
@@ -338,14 +352,14 @@ function LiveBadge({ live }: { live: boolean }) {
     <span
       className={cn(
         'flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-2xs font-semibold uppercase tracking-wider',
-        live ? 'bg-brand-500/10 text-brand-500' : 'bg-card-2 text-muted',
+        live ? 'bg-success-solid/10 text-success' : 'bg-card-2 text-muted',
       )}
       title={live ? 'Scores update instantly' : 'Reconnecting…'}
     >
       <span className="relative flex h-2 w-2">
         {live && (
           <motion.span
-            className="absolute inline-flex h-full w-full rounded-full bg-brand-500"
+            className="absolute inline-flex h-full w-full rounded-full bg-success-solid"
             animate={{ scale: [1, 2.2], opacity: [0.7, 0] }}
             transition={{ duration: 1.4, repeat: Infinity, ease: 'easeOut' }}
           />
@@ -353,7 +367,7 @@ function LiveBadge({ live }: { live: boolean }) {
         <span
           className={cn(
             'relative inline-flex h-2 w-2 rounded-full',
-            live ? 'bg-brand-500' : 'bg-muted',
+            live ? 'bg-success-solid' : 'bg-muted',
           )}
         />
       </span>
@@ -362,48 +376,15 @@ function LiveBadge({ live }: { live: boolean }) {
   )
 }
 
-function StatTile({
-  icon,
-  label,
-  value,
-  note,
-  tone,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: React.ReactNode
-  note?: string
-  tone: 'gold' | 'brand'
-}) {
-  return (
-    <Card className="p-4">
-      <div
-        className={cn(
-          'mb-2 flex h-9 w-9 items-center justify-center rounded-lg',
-          tone === 'gold'
-            ? 'bg-gold-400/15 text-reward'
-            : 'bg-brand-500/10 text-brand-500',
-        )}
-      >
-        {icon}
-      </div>
-      <p className="font-display text-2xl font-bold">{value}</p>
-      <p className="text-xs text-muted">{label}</p>
-      {note && <p className="mt-0.5 text-2xs text-muted/80">{note}</p>}
-    </Card>
-  )
-}
-
 function DashboardSkeleton() {
   return (
     <div className="animate-pulse space-y-5">
-      <div className="h-4 w-48 rounded-lg bg-card-2" />
-      <div className="h-44 rounded-2xl bg-card-2" />
-      <div className="grid grid-cols-2 gap-3">
-        <div className="h-24 rounded-2xl bg-card-2" />
-        <div className="h-24 rounded-2xl bg-card-2" />
-      </div>
+      <div className="h-11 w-full rounded-lg bg-card-2" />
       <div className="h-56 rounded-2xl bg-card-2" />
+      <div className="h-4 w-48 rounded-lg bg-card-2" />
+      <div className="h-20 rounded-2xl bg-card-2" />
+      <div className="h-20 rounded-2xl bg-card-2" />
+      <div className="h-64 rounded-2xl bg-card-2" />
     </div>
   )
 }
