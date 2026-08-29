@@ -106,16 +106,34 @@ export function Attendance() {
     }
   }, [selectedSectionId])
 
+  // Which review the URL is currently holding, so it is only fetched once.
+  // Declared here because the section-change effect below has to be able to
+  // clear it.
+  const loadedReviewRef = useRef<string | null>(null)
+  const prevSectionRef = useRef<string | null>(null)
+
   // On section change: resume any active session, else land on the config home.
   //
-  // A pending ?review=<id> deep-link (from the session detail page) owns the
-  // view instead — skip the reset so it isn't stomped back to home/live. Read
-  // from searchParams at run time rather than depending on it: consuming the
-  // param below clears it, and a dep would re-run this and reset the view.
+  // A ?review=<id> in the URL owns the view instead — skip the reset so it isn't
+  // stomped back to home/live. Read from searchParams at run time rather than
+  // depending on it, or this re-runs and resets the view.
   useEffect(() => {
     if (!selectedSectionId) return
     let cancelled = false
-    const pendingReview = !!searchParams.get('review')
+
+    // A review belongs to ONE section. Switching sections while a review is
+    // open has to abandon it — otherwise the review view keeps showing the
+    // PREVIOUS section's session. That became possible only once ?review=
+    // started persisting, so it is guarded here rather than left to chance.
+    const sectionChanged =
+      prevSectionRef.current !== null && prevSectionRef.current !== selectedSectionId
+    prevSectionRef.current = selectedSectionId
+    if (sectionChanged && searchParams.get('review')) {
+      loadedReviewRef.current = null
+      setSearchParams({}, { replace: true })
+    }
+
+    const pendingReview = !sectionChanged && !!searchParams.get('review')
     if (!pendingReview) {
       setView('home')
       setSession(null)
@@ -152,7 +170,6 @@ export function Attendance() {
   // Now the URL holds the review, so any of those resume exactly where they
   // were. The ref stops a re-fetch on every render; the param is cleared in
   // afterReview(), which is the one legitimate exit.
-  const loadedReviewRef = useRef<string | null>(null)
   const reviewParam = searchParams.get('review')
   useEffect(() => {
     if (!reviewParam || loadedReviewRef.current === reviewParam) return
