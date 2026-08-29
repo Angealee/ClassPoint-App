@@ -6,9 +6,11 @@ import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
 import { ProfileBanner } from '@/components/profile/ProfileBanner'
 import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
 import { PinnedBadges } from '@/components/achievements/PinnedBadges'
+import { InterestTags, parseInterests } from '@/components/profile/InterestTags'
+import { Stat } from '@/components/ui/Stat'
+import { PointEventRow } from '@/components/points/PointEventRow'
 import { getPublicProfile, listAchievements, recordProfileView } from '@/lib/api'
 import { getLevelProgress } from '@/lib/leveling'
-import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import type { AchievementState, PublicProfile } from '@/lib/types'
 import { useStudentDataOptional } from './StudentData'
@@ -92,7 +94,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
   // Prefer the live total once loaded (more current than the frozen snapshot).
   const points = profile?.semester_points ?? target?.points ?? 0
   const progress = getLevelProgress(points)
-  const tags = splitInterests(profile?.interests)
+  const tags = parseInterests(profile?.interests)
 
   return (
     <Sheet open={open} onClose={onClose}>
@@ -109,7 +111,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
             <div className="min-w-0 flex-1">
               <p className="truncate font-display text-xl font-bold">
                 {target.display_name}
-                {isMe && <span className="ml-1 text-sm text-brand-500">(you)</span>}
+                {isMe && <span className="ml-1 text-sm text-accent">(you)</span>}
               </p>
               {profile?.display_title && (
                 <p className="truncate text-xs font-semibold text-reward">
@@ -143,18 +145,23 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
 
           {/* Stat tiles */}
           <div className="mt-4 grid grid-cols-3 gap-2.5">
-            <Stat icon={<BoltIcon className="h-4 w-4" />} label="Points" value={String(points)} tone="gold" />
-            <Stat
+            <StatTile
+              icon={<BoltIcon className="h-4 w-4" />}
+              label="Points"
+              value={String(points)}
+              tone="reward"
+            />
+            <StatTile
               icon={<StarIcon className="h-4 w-4" />}
               label="Level"
               value={String(progress.level)}
-              tone="brand"
+              tone="accent"
             />
-            <Stat
+            <StatTile
               icon={<TrophyIcon className="h-4 w-4" />}
               label="Rank"
               value={target.rank != null ? `#${target.rank}` : '—'}
-              tone="brand"
+              tone="accent"
             />
           </div>
 
@@ -205,16 +212,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">
                 Interests
               </p>
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-500"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
+              <InterestTags raw={profile?.interests} />
             </div>
           )}
 
@@ -235,33 +233,9 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
               </div>
             ) : profile && profile.events.length > 0 ? (
               <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
-                {profile.events.map((e) => {
-                  const negative = e.points < 0
-                  return (
-                    <div key={e.id} className="flex items-center gap-3 p-3">
-                      <span
-                        className={cn(
-                          'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold',
-                          negative
-                            ? 'bg-danger-solid/10 text-danger'
-                            : e.category === 'activity'
-                              ? 'bg-brand-500/10 text-brand-500'
-                              : 'bg-gold-400/15 text-reward',
-                        )}
-                      >
-                        {negative ? e.points : `+${e.points}`}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {e.note ?? (negative ? 'Deduction' : 'Class points')}
-                        </p>
-                        <p className="text-xs capitalize text-muted">
-                          {e.category} · {timeAgo(e.created_at)}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                })}
+                {profile.events.map((e) => (
+                  <PointEventRow key={e.id} event={e} compact />
+                ))}
               </div>
             ) : (
               <p className="rounded-xl bg-card-2 px-4 py-3 text-sm text-muted">
@@ -282,7 +256,14 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
   )
 }
 
-function Stat({
+/**
+ * An icon tile wrapping the shared Stat.
+ *
+ * The tile shell (surface, icon chip) is this screen's own; the figure and its
+ * label come from the primitive. `tone` is now a role: gold for the reward
+ * figures, accent for level and rank — identity, not a warning.
+ */
+function StatTile({
   icon,
   label,
   value,
@@ -291,34 +272,21 @@ function Stat({
   icon: React.ReactNode
   label: string
   value: string
-  tone: 'gold' | 'brand'
+  tone: 'reward' | 'accent'
 }) {
   return (
-    <div className="rounded-xl bg-card-2 p-3 text-center">
+    <div className="rounded-xl bg-card-2 p-3">
       <div
         className={cn(
           'mx-auto mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg',
-          tone === 'gold'
-            ? 'bg-gold-400/15 text-reward'
-            : 'bg-brand-500/10 text-brand-500',
+          tone === 'reward' ? 'bg-gold-400/15 text-reward' : 'bg-accent-solid/10 text-accent',
         )}
       >
         {icon}
       </div>
-      <p className="font-display text-lg font-bold leading-none">{value}</p>
-      <p className="mt-1 text-2xs uppercase tracking-wider text-muted">{label}</p>
+      <Stat value={value} label={label} />
     </div>
   )
-}
-
-/** Split a comma-separated interests string into trimmed, non-empty tags. */
-function splitInterests(raw: string | null | undefined): string[] {
-  if (!raw) return []
-  return raw
-    .split(',')
-    .map((t) => t.trim())
-    .filter(Boolean)
-    .slice(0, 12)
 }
 
 /** "March 2026" from an ISO timestamp. */

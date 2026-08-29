@@ -1,5 +1,5 @@
 import { SectionLabel } from '@/components/ui/SectionLabel'
-import { EmptyState } from '@/components/ui/EmptyState'
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Rows } from '@/components/ui/Card'
@@ -208,13 +208,12 @@ export function Achievements() {
         /* Without this the failed load left an empty catalog, which hid the
            filters above and then said "try a different filter" — with no
            filters on screen and no way out but reloading the app. */
-        <Card className="p-6 text-center">
-          <p className="text-sm text-brand-500">Couldn’t load your badges.</p>
-          <p className="mt-1 text-xs text-muted">Nothing is lost — this is just the connection.</p>
-          <Button variant="outline" size="sm" className="mt-3" onClick={retryAchievements}>
-            Try again
-          </Button>
-        </Card>
+        <ErrorState
+          onRetry={retryAchievements}
+          detail="Nothing is lost — this is just the connection."
+        >
+          Couldn’t load your badges.
+        </ErrorState>
       ) : filtered.length === 0 ? (
         <EmptyState>Nothing here — try a different filter.</EmptyState>
       ) : (

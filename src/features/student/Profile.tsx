@@ -14,6 +14,7 @@ import { getLevelProgress } from '@/lib/leveling'
 import { ProfileBanner } from '@/components/profile/ProfileBanner'
 import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
 import { PinnedBadges } from '@/components/achievements/PinnedBadges'
+import { InterestTags, parseInterests } from '@/components/profile/InterestTags'
 import { useStudentData } from './StudentData'
 import { StudentProfilePreview, type PreviewTarget } from './StudentProfilePreview'
 
@@ -205,19 +206,10 @@ export function Profile() {
             </div>
           )}
 
-          {interestTags(me.interests).length > 0 && (
+          {parseInterests(me.interests).length > 0 && (
             <div className="mt-3 rounded-xl bg-card-2 px-4 py-3">
               <p className="mb-2 text-sm text-muted">Interests</p>
-              <div className="flex flex-wrap gap-2">
-                {interestTags(me.interests).map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-500"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
+              <InterestTags raw={me.interests} />
             </div>
           )}
 
@@ -249,13 +241,13 @@ export function Profile() {
               <p className="flex items-center gap-2 text-sm text-muted">
                 Achievements
                 {hasUnseenAchievements && (
-                  <span className="h-2 w-2 rounded-full bg-brand-500" aria-label="New badges" />
+                  <span className="h-2 w-2 rounded-full bg-accent-solid" aria-label="New badges" />
                 )}
               </p>
               <button
                 type="button"
                 onClick={() => navigate('/app/achievements')}
-                className="text-xs font-semibold text-brand-500 transition-opacity hover:opacity-80"
+                className="text-xs font-semibold text-accent transition-opacity hover:opacity-80"
               >
                 {achievements.filter((a) => a.unlockedAt).length}/{achievements.length} · View all →
               </button>
@@ -409,15 +401,6 @@ export function Profile() {
 }
 
 /** Split a comma-separated interests string into trimmed, non-empty tags. */
-function interestTags(raw: string | null): string[] {
-  if (!raw) return []
-  return raw
-    .split(',')
-    .map((t) => t.trim())
-    .filter(Boolean)
-    .slice(0, 12)
-}
-
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl bg-card-2 px-4 py-3">

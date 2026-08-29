@@ -1,6 +1,6 @@
+import { ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useState } from 'react'
 import { Sheet } from '@/components/ui/Sheet'
-import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { Avatar } from '@/components/ui/Avatar'
@@ -94,12 +94,9 @@ export function PastSemesterBoard({ open, onClose }: { open: boolean; onClose: (
           {loading ? (
             <ListSkeleton rows={5} />
           ) : error ? (
-            <div className="flex items-center gap-3">
-              <p className="min-w-0 flex-1 text-sm text-brand-500">{error}</p>
-              <Button variant="outline" size="sm" onClick={() => void load()}>
-                Try again
-              </Button>
-            </div>
+            <ErrorState inline onRetry={() => void load()}>
+              {error}
+            </ErrorState>
           ) : rows.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted">
               No points were recorded that semester.

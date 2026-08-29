@@ -105,7 +105,7 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
       {loading ? (
         <ListSkeleton rows={5} />
       ) : error ? (
-        <p className="py-8 text-center text-sm text-brand-500">
+        <p className="py-8 text-center text-sm text-danger">
           Could not load notifications. Close and try again.
         </p>
       ) : items.length === 0 ? (

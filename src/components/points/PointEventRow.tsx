@@ -1,7 +1,7 @@
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import { TONE } from '@/lib/tone'
-import type { PointEvent } from '@/lib/types'
+import type { PublicPointEvent } from '@/lib/types'
 
 /**
  * One row of the points ledger.
@@ -24,7 +24,13 @@ export function PointEventRow({
   event: e,
   compact = false,
 }: {
-  event: PointEvent
+  /**
+   * Typed as the PUBLIC shape, which is the subset this row actually reads.
+   * `PointEvent` also carries `student_id`, which a row rendering someone
+   * else's profile is deliberately never given — asking for the wider type
+   * would have locked the third call site out of the shared component.
+   */
+  event: PublicPointEvent
   /** Narrower badge, for the denser full-ledger list. */
   compact?: boolean
 }) {

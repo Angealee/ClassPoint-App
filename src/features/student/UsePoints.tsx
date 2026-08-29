@@ -1,5 +1,5 @@
 import { SectionLabel } from '@/components/ui/SectionLabel'
-import { EmptyState } from '@/components/ui/EmptyState'
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -195,7 +195,7 @@ export function UsePoints() {
           <button
             type="button"
             onClick={() => navigate('/app/history')}
-            className="shrink-0 text-sm font-semibold text-brand-500"
+            className="shrink-0 text-sm font-semibold text-accent"
           >
             History ›
           </button>
@@ -261,22 +261,6 @@ export function UsePoints() {
         )}
       </Card>
 
-      {/* The warning — spending is real and it costs rank */}
-      <div className="flex gap-3 rounded-2xl border border-brand-500/25 bg-brand-500/5 p-4">
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500/12 text-brand-500">
-          <WarningIcon className="h-4.5 w-4.5" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-danger">
-            Spending points lowers your XP, level and rank
-          </p>
-          <p className="mt-0.5 text-xs text-muted">
-            It counts exactly like losing points. You’re trading leaderboard standing for a better
-            grade — worth it, but it doesn’t come back.
-          </p>
-        </div>
-      </div>
-
       {/* The shop (0032). Without a price list a student has no way to know what
           10 points is worth — this is the whole point of the catalog. */}
       {catalog.length > 0 && (
@@ -339,6 +323,22 @@ export function UsePoints() {
           </div>
         </div>
 
+        {/* The cost, stated where the choice is made rather than above a shop
+            the student is still browsing. The full wording is repeated in the
+            ConfirmDialog, which is the last point they can back out. */}
+        <div className="flex gap-3 rounded-xl bg-danger-solid/8 p-3">
+          <span className="mt-0.5 shrink-0 text-danger">
+            <WarningIcon className="h-4.5 w-4.5" />
+          </span>
+          <p className="min-w-0 text-xs text-muted">
+            <span className="font-semibold text-danger">
+              Spending lowers your XP, level and rank.
+            </span>{' '}
+            It counts exactly like losing points — you’re trading leaderboard standing for a
+            better grade, and it doesn’t come back.
+          </p>
+        </div>
+
         <div>
           <p className="mb-1.5 text-sm font-medium">What’s it for?</p>
           <div className="grid grid-cols-4 gap-2">
@@ -350,7 +350,7 @@ export function UsePoints() {
                 className={cn(
                   'h-9 rounded-lg text-sm font-semibold transition-colors',
                   kind === k.value
-                    ? 'bg-brand-500 text-white'
+                    ? 'bg-accent-solid text-white'
                     : 'bg-card-2 text-muted hover:text-ink',
                 )}
               >
@@ -396,7 +396,7 @@ export function UsePoints() {
           <p
             className={cn(
               'mt-1.5 text-xs',
-              points > available ? 'font-semibold text-brand-500' : 'text-muted',
+              points > available ? 'font-semibold text-danger' : 'text-muted',
             )}
           >
             {points > available
@@ -461,12 +461,7 @@ export function UsePoints() {
         {loading ? (
           <ListSkeleton rows={3} />
         ) : loadError ? (
-          <Card className="p-6 text-center">
-            <p className="text-sm text-brand-500">Couldn’t load your requests.</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => void load()}>
-              Try again
-            </Button>
-          </Card>
+          <ErrorState onRetry={() => void load()}>Couldn’t load your requests.</ErrorState>
         ) : decided.length === 0 ? (
           <EmptyState>Nothing yet — your decided requests show up here.</EmptyState>
         ) : (
