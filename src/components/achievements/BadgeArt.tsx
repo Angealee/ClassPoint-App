@@ -58,7 +58,7 @@ export function BadgeArt({
         ) : null}
       </div>
       {isTitleGrantor && !locked && (
-        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gold-400 text-[0.6rem] shadow-sm">
+        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gold-400 text-2xs shadow-sm">
           ✦
         </span>
       )}

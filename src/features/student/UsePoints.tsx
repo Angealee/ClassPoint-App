@@ -193,7 +193,7 @@ export function UsePoints() {
           <button
             type="button"
             onClick={() => navigate('/app/history')}
-            className="shrink-0 text-[13px] font-semibold text-brand-500"
+            className="shrink-0 text-sm font-semibold text-brand-500"
           >
             History ›
           </button>
@@ -304,7 +304,7 @@ export function UsePoints() {
                     <span className="text-xs text-muted">pts</span>
                   </span>
                   {!affordable && (
-                    <span className="mt-0.5 block text-[0.7rem] font-medium text-muted">
+                    <span className="mt-0.5 block text-xs font-medium text-muted">
                       {short} more to go
                     </span>
                   )}

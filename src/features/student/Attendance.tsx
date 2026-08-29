@@ -307,7 +307,7 @@ export function Attendance() {
                 >
                   {stats[k]}
                 </p>
-                <p className="mt-0.5 text-[13px] text-muted">{STATUS_META[k].label}</p>
+                <p className="mt-0.5 text-sm text-muted">{STATUS_META[k].label}</p>
               </div>
             ))}
           </div>
@@ -319,10 +319,10 @@ export function Attendance() {
             onClick={() => navigate('/app/attendance/stats')}
             className="flex w-full items-baseline justify-between border-t border-line px-4 py-3 text-left transition-colors hover:bg-card-2"
           >
-            <span className="text-[13px] text-muted">Show-up rate</span>
+            <span className="text-sm text-muted">Show-up rate</span>
             <span className="flex items-baseline gap-1.5">
               <span className="font-display text-lg font-bold tabular-nums">{stats.rate}%</span>
-              <span className="text-[13px] font-semibold text-brand-500">Stats ›</span>
+              <span className="text-sm font-semibold text-brand-500">Stats ›</span>
             </span>
           </button>
         </Card>
@@ -336,10 +336,10 @@ export function Attendance() {
           {bySubject.map((s) => (
             <div key={s.key} className="px-4 py-3.5">
               <div className="flex items-baseline gap-3">
-                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{s.label}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{s.label}</span>
                 <span className="font-display text-base font-bold tabular-nums">{s.rate}%</span>
               </div>
-              <p className="mt-0.5 text-[13px] text-muted">
+              <p className="mt-0.5 text-sm text-muted">
                 {s.counted} class{s.counted === 1 ? '' : 'es'}
                 {s.absent > 0 && ` · ${s.absent} absent`}
               </p>
@@ -349,7 +349,7 @@ export function Attendance() {
       )}
 
       {stats.neutral > 0 && (
-        <p className="px-1 text-[13px] text-muted">
+        <p className="px-1 text-sm text-muted">
           {stats.excused > 0 && `${stats.excused} excused`}
           {stats.excused > 0 && stats.irregular > 0 && ' · '}
           {stats.irregular > 0 && `${stats.irregular} irregular`} — those classes don’t count
@@ -387,17 +387,17 @@ export function Attendance() {
         <div className="space-y-4">
           {groupByTerm(history, (h) => h.startedAt).map((g) => (
             <div key={g.label}>
-              <p className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-wider text-muted/80">
+              <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted/80">
                 {g.label}
               </p>
               <Card className="divide-y divide-line">
                 {g.items.map((h) => (
                   <div key={h.recordId} className="flex items-center gap-3 p-4">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[15px] font-semibold">
+                      <p className="truncate text-sm font-semibold">
                         {h.topic || entryDate(h.startedAt) || 'Class'}
                       </p>
-                      <p className="flex flex-wrap items-center gap-x-1.5 text-[13px] text-muted">
+                      <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-muted">
                         {/* Built from parts and joined once. Concatenating
                             "x · " fragments left a doubled separator whenever a
                             middle piece was absent — and the date piece is
@@ -411,7 +411,7 @@ export function Attendance() {
                           .filter(Boolean)
                           .join(' · ')}
                         {h.syncedLate && (
-                          <span className="rounded-full bg-card-2 px-2 py-0.5 text-[12px] font-medium">
+                          <span className="rounded-full bg-card-2 px-2 py-0.5 text-xs font-medium">
                             Offline check-in
                           </span>
                         )}

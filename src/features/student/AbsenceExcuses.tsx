@@ -192,7 +192,7 @@ export function AbsenceExcuses({
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-500/12 text-brand-500">
           <WarningIcon className="h-4 w-4" />
         </span>
-        <span className="min-w-0 flex-1 text-[15px] font-medium">How excuses work</span>
+        <span className="min-w-0 flex-1 text-sm font-medium">How excuses work</span>
         <span className="shrink-0 text-lg text-muted">›</span>
       </button>
 
@@ -205,14 +205,14 @@ export function AbsenceExcuses({
             'Present the slip to your instructor.',
           ].map((step, i) => (
             <li key={step} className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/12 text-[13px] font-bold text-brand-500">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/12 text-sm font-bold text-brand-500">
                 {i + 1}
               </span>
-              <span className="text-[15px]">{step}</span>
+              <span className="text-sm">{step}</span>
             </li>
           ))}
         </ol>
-        <p className="mt-5 rounded-xl bg-card-2 px-4 py-3 text-[13px] text-muted">
+        <p className="mt-5 rounded-xl bg-card-2 px-4 py-3 text-sm text-muted">
           File your request here so your instructor is ready — you have{' '}
           {EXCUSE_DEADLINE_DAYS} days from the class.
         </p>
@@ -223,7 +223,7 @@ export function AbsenceExcuses({
 
       {/* Actionable absences */}
       <div>
-        <h2 className="mb-2 px-1 text-[15px] font-semibold text-muted">Absences to resolve</h2>
+        <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Absences to resolve</h2>
         <Card className="divide-y divide-line">
           {actionable.map((h) => {
             const excuse = excuseByRecord.get(h.recordId)
@@ -231,14 +231,14 @@ export function AbsenceExcuses({
               <div key={h.recordId} className="p-3.5">
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-semibold">
+                    <p className="truncate text-sm font-semibold">
                       {h.topic || sessionDate(h.startedAt)}
                     </p>
                     {/* The second line used to repeat the date whenever a
                         session had no topic — "Aug 15" above "Aug 15". It now
                         carries the deadline, which is the thing that decides
                         whether this row is still worth acting on. */}
-                    <p className="text-[13px] text-muted">
+                    <p className="text-sm text-muted">
                       {h.topic ? `${sessionDate(h.startedAt)} · ` : ''}
                       {deadlineLabel(h.startedAt)}
                     </p>
@@ -315,9 +315,9 @@ export function AbsenceExcuses({
               onChange={(e) => setReason(e.target.value.slice(0, 280))}
               rows={3}
               placeholder="e.g. Was sick, medical certificate available"
-              className="w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/40"
+              className="w-full rounded-xl border border-line bg-canvas px-3 py-2 text-base outline-none focus:ring-2 focus:ring-brand-500/40"
             />
-            <p className="mt-1 text-right text-[12px] text-muted">{reason.length}/280</p>
+            <p className="mt-1 text-right text-xs text-muted">{reason.length}/280</p>
           </div>
           <div>
             <p className="mb-1.5 text-sm font-medium">Do you already have your admission slip?</p>

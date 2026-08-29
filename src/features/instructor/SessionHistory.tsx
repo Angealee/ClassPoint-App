@@ -221,19 +221,19 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
           <div className="grid grid-cols-3 gap-2">
             <Card className="p-3 text-center">
               <p className="font-display text-xl font-bold tabular-nums">{sessions.length}</p>
-              <p className="text-[0.7rem] text-muted">Sessions</p>
+              <p className="text-xs text-muted">Sessions</p>
             </Card>
             <Card className="p-3 text-center">
               <p className="font-display text-xl font-bold tabular-nums text-brand-500">
                 {analytics?.penaltyPoints ?? 0}
               </p>
-              <p className="text-[0.7rem] text-muted">Points deducted</p>
+              <p className="text-xs text-muted">Points deducted</p>
             </Card>
             <Card className="p-3 text-center">
               <p className="font-display text-xl font-bold tabular-nums">
                 {analytics?.penalizedStudents ?? 0}
               </p>
-              <p className="text-[0.7rem] text-muted">Students hit</p>
+              <p className="text-xs text-muted">Students hit</p>
             </Card>
           </div>
 
@@ -452,7 +452,7 @@ function TrendBars({ data }: { data: Array<{ week: number; rate: number | null }
     <div className="flex items-end gap-2">
       {data.map(({ week, rate }) => (
         <div key={week} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-          <span className="text-[0.65rem] font-semibold tabular-nums text-muted">
+          <span className="text-2xs font-semibold tabular-nums text-muted">
             {rate === null ? '–' : `${Math.round(rate * 100)}%`}
           </span>
           <div
@@ -474,7 +474,7 @@ function TrendBars({ data }: { data: Array<{ week: number; rate: number | null }
               style={{ height: Math.max(MIN_BAR_H, (rate ?? 0) * TRACK_H) }}
             />
           </div>
-          <span className="text-[0.65rem] tabular-nums text-muted">W{week}</span>
+          <span className="text-2xs tabular-nums text-muted">W{week}</span>
         </div>
       ))}
     </div>

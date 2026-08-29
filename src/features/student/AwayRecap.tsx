@@ -23,7 +23,7 @@ export function AwayRecap({ events, onClose }: { events: PointEvent[]; onClose: 
             positive ? 'border-gold-400/40 bg-gold-400/10' : 'border-danger-solid/30 bg-danger-solid/10',
           )}
         >
-          <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted">
+          <p className="text-2xs font-semibold uppercase tracking-wider text-muted">
             Score change
           </p>
           <p

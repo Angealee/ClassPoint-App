@@ -48,7 +48,7 @@ export function RankDelta({
     <span
       title={`${up ? 'Up' : 'Down'} ${Math.abs(delta)} since the last update`}
       className={cn(
-        'inline-flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[12px] font-bold tabular-nums',
+        'inline-flex shrink-0 items-center gap-0.5 rounded-lg px-1.5 py-0.5 text-xs font-bold tabular-nums',
         up
           ? 'bg-success-solid/10 text-success'
           : 'bg-brand-500/10 text-brand-500',
@@ -83,7 +83,7 @@ export function RankTenure({
     <span
       title={`Holding rank ${entry.rank} or better for ${days} day${days === 1 ? '' : 's'}`}
       className={cn(
-        'inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-bold tabular-nums',
+        'inline-flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-0.5 text-xs font-bold tabular-nums',
         hot
           ? 'bg-streak-solid/15 text-streak'
           : 'bg-card-2 text-muted',

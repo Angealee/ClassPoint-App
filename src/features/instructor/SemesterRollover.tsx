@@ -428,7 +428,7 @@ function PromoteStep({ semester, onNext }: { semester: Semester; onNext: () => v
             id="ro-from"
             value={sourceId}
             onChange={(e) => setSourceId(e.target.value)}
-            className="w-full rounded-xl border border-line bg-card px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-line bg-card px-3 py-2 text-base"
           >
             {oldSections.map((s) => (
               <option key={s.id} value={s.id}>
@@ -445,7 +445,7 @@ function PromoteStep({ semester, onNext }: { semester: Semester; onNext: () => v
             id="ro-to"
             value={targetId}
             onChange={(e) => setTargetId(e.target.value)}
-            className="w-full rounded-xl border border-line bg-card px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-line bg-card px-3 py-2 text-base"
           >
             {newSections.map((s) => (
               <option key={s.id} value={s.id}>
@@ -498,7 +498,7 @@ function PromoteStep({ semester, onNext }: { semester: Semester; onNext: () => v
                 >
                   <span
                     className={cn(
-                      'flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded border text-[0.6rem]',
+                      'flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded border text-2xs',
                       picked.has(s.id)
                         ? 'border-brand-500 bg-brand-500 text-white'
                         : 'border-line',

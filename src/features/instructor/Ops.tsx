@@ -276,7 +276,7 @@ function AuthEventsCard() {
             <div key={r.id} className="flex items-center gap-3 py-2">
               <span
                 className={cn(
-                  'shrink-0 rounded-md px-1.5 py-0.5 text-[0.65rem] font-semibold',
+                  'shrink-0 rounded-lg px-1.5 py-0.5 text-2xs font-semibold',
                   r.success
                     ? 'bg-success-solid/10 text-success'
                     : 'bg-brand-500/10 text-brand-500',
@@ -288,8 +288,8 @@ function AuthEventsCard() {
                 {r.kind === 'pin_reset' ? 'PIN reset' : 'Claim'}
                 {r.detail && <span className="text-muted"> · {r.detail}</span>}
               </span>
-              <span className="shrink-0 font-mono text-[0.65rem] text-muted">{r.ip ?? '—'}</span>
-              <span className="shrink-0 text-[0.65rem] text-muted">{timeAgo(r.at)}</span>
+              <span className="shrink-0 font-mono text-2xs text-muted">{r.ip ?? '—'}</span>
+              <span className="shrink-0 text-2xs text-muted">{timeAgo(r.at)}</span>
             </div>
           ))}
         </div>
@@ -379,7 +379,7 @@ function AuditLogCard() {
                 >
                   <span
                     className={cn(
-                      'shrink-0 rounded-md px-1.5 py-0.5 text-[0.65rem] font-semibold',
+                      'shrink-0 rounded-lg px-1.5 py-0.5 text-2xs font-semibold',
                       ACTION_TONE[r.action] ?? 'bg-card-2 text-muted',
                     )}
                   >
@@ -388,13 +388,13 @@ function AuditLogCard() {
                   <span className="min-w-0 flex-1 truncate text-xs">
                     {r.summary ?? r.tableName}
                   </span>
-                  <span className="shrink-0 text-[0.65rem] text-muted">{timeAgo(r.at)}</span>
+                  <span className="shrink-0 text-2xs text-muted">{timeAgo(r.at)}</span>
                 </button>
                 {expanded === r.id && (
                   // The whole deleted row, verbatim. This is the point of the
                   // audit log — knowing something was deleted is far less
                   // useful than knowing exactly what it contained.
-                  <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-card-2 p-3 text-[0.65rem] leading-relaxed">
+                  <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-card-2 p-3 text-2xs leading-relaxed">
                     {JSON.stringify(r.rowData, null, 2)}
                   </pre>
                 )}
@@ -450,7 +450,7 @@ function SemestersCard() {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold">Semester &amp; subjects</span>
-        <span className="block text-[13px] text-muted">
+        <span className="block text-sm text-muted">
           Term dates, subjects, and rolling over to a new semester.
         </span>
       </span>

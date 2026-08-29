@@ -103,7 +103,7 @@ export function AttendanceStats() {
       {attendanceLoading ? (
         <ListSkeleton rows={5} />
       ) : attendance.length === 0 ? (
-        <Card className="p-8 text-center text-[15px] text-muted">
+        <Card className="p-8 text-center text-sm text-muted">
           No classes yet. Once you have checked in a few times, your stats appear here.
         </Card>
       ) : (
@@ -111,7 +111,7 @@ export function AttendanceStats() {
           {/* Headline */}
           <Card className="p-5 text-center">
             <p className="font-display text-5xl font-bold tabular-nums">{overall}%</p>
-            <p className="mt-1 text-[13px] text-muted">
+            <p className="mt-1 text-sm text-muted">
               Show-up rate across {counted(attendance)} classes
               {streak !== null && streak > 0 && ` · ${streak} in a row`}
             </p>
@@ -120,12 +120,12 @@ export function AttendanceStats() {
           {/* Per term */}
           {terms.length > 0 && (
             <div>
-              <h2 className="mb-2 px-1 text-[15px] font-semibold text-muted">By term</h2>
+              <h2 className="mb-2 px-1 text-sm font-semibold text-muted">By term</h2>
               <Card className="divide-y divide-line p-0">
                 {terms.map((t) => (
                   <div key={t.key} className="px-4 py-3.5">
                     <div className="flex items-baseline gap-3">
-                      <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">
                         {t.label}
                       </span>
                       <span className="font-display text-base font-bold tabular-nums">
@@ -140,7 +140,7 @@ export function AttendanceStats() {
                         className="h-full rounded-full bg-brand-500"
                       />
                     </div>
-                    <p className="mt-1.5 text-[13px] text-muted">
+                    <p className="mt-1.5 text-sm text-muted">
                       {t.counted} class{t.counted === 1 ? '' : 'es'}
                       {t.absent > 0 && ` · ${t.absent} absent`}
                     </p>
@@ -153,12 +153,12 @@ export function AttendanceStats() {
           {/* Weekly trend */}
           {weeks.length > 1 && (
             <div>
-              <h2 className="mb-2 px-1 text-[15px] font-semibold text-muted">Week by week</h2>
+              <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Week by week</h2>
               <Card className="p-4">
                 <div className="flex items-end gap-1.5 overflow-x-auto pb-1">
                   {weeks.map((w) => (
                     <div key={w.week} className="flex min-w-7 flex-1 flex-col items-center gap-1">
-                      <span className="text-[12px] font-semibold tabular-nums text-muted">
+                      <span className="text-xs font-semibold tabular-nums text-muted">
                         {w.rate}
                       </span>
                       <div className="flex h-20 w-full items-end">
@@ -176,11 +176,11 @@ export function AttendanceStats() {
                           )}
                         />
                       </div>
-                      <span className="text-[12px] tabular-nums text-muted/70">{w.week}</span>
+                      <span className="text-xs tabular-nums text-muted/70">{w.week}</span>
                     </div>
                   ))}
                 </div>
-                <p className="mt-1 text-center text-[12px] text-muted/70">Class week · % attended</p>
+                <p className="mt-1 text-center text-xs text-muted/70">Class week · % attended</p>
               </Card>
             </div>
           )}
@@ -188,12 +188,12 @@ export function AttendanceStats() {
           {/* Punctuality */}
           {punctuality && (
             <div>
-              <h2 className="mb-2 px-1 text-[15px] font-semibold text-muted">Punctuality</h2>
+              <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Punctuality</h2>
               <Card className="p-0">
                 <div className="grid grid-cols-3 divide-x divide-line">
                   <div className="flex flex-col items-center justify-center py-4">
                     <p className="font-display text-2xl font-bold tabular-nums">{punctuality.avg}</p>
-                    <p className="mt-0.5 text-center text-[13px] text-muted">min after start</p>
+                    <p className="mt-0.5 text-center text-sm text-muted">min after start</p>
                   </div>
                   <div className="flex flex-col items-center justify-center py-4">
                     <p
@@ -204,16 +204,16 @@ export function AttendanceStats() {
                     >
                       {punctuality.onTheDot}
                     </p>
-                    <p className="mt-0.5 text-center text-[13px] text-muted">on the dot</p>
+                    <p className="mt-0.5 text-center text-sm text-muted">on the dot</p>
                   </div>
                   <div className="flex flex-col items-center justify-center py-4">
                     <p className="font-display text-2xl font-bold tabular-nums">
                       {punctuality.best}
                     </p>
-                    <p className="mt-0.5 text-center text-[13px] text-muted">fastest</p>
+                    <p className="mt-0.5 text-center text-sm text-muted">fastest</p>
                   </div>
                 </div>
-                <p className="border-t border-line px-4 py-3 text-[13px] text-muted">
+                <p className="border-t border-line px-4 py-3 text-sm text-muted">
                   Measured from {punctuality.total} scanned check-in
                   {punctuality.total === 1 ? '' : 's'}. Classes your instructor marked by hand are
                   not counted — there is no scan time to measure.

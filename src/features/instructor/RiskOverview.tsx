@@ -110,7 +110,7 @@ export function RiskOverview() {
                   >
                     {r.unexcused}
                   </p>
-                  <p className="text-[0.65rem] text-muted">
+                  <p className="text-2xs text-muted">
                     {r.actionable > 0 ? `${r.actionable} can still excuse` : 'window closed'}
                   </p>
                 </div>

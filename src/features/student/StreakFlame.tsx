@@ -36,7 +36,7 @@ export function StreakFlame({ variant = 'full' }: { variant?: 'compact' | 'full'
       <span
         title={lit ? `${streak} classes in a row, all present` : 'No streak yet'}
         className={cn(
-          'flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[0.7rem] font-bold tabular-nums',
+          'flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-bold tabular-nums',
           hot
             ? 'bg-streak-solid/15 text-streak'
             : lit
@@ -71,7 +71,7 @@ export function StreakFlame({ variant = 'full' }: { variant?: 'compact' | 'full'
             <p className="font-display text-base font-bold">
               {streak} class{streak === 1 ? '' : 'es'} in a row
             </p>
-            <p className="text-[13px] text-muted">
+            <p className="text-sm text-muted">
               {hot
                 ? 'All present, no lates. Don’t break it now.'
                 : 'All present, no lates. Keep it going.'}
@@ -80,7 +80,7 @@ export function StreakFlame({ variant = 'full' }: { variant?: 'compact' | 'full'
         ) : (
           <>
             <p className="font-display text-base font-bold text-muted">No streak yet</p>
-            <p className="text-[13px] text-muted">
+            <p className="text-sm text-muted">
               Be present at your next class to start one. Arriving late resets it.
             </p>
           </>

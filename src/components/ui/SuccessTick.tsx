@@ -30,7 +30,7 @@ export function SuccessTick({ show, onDone }: { show: boolean; onDone: () => voi
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="flex h-24 w-24 items-center justify-center rounded-full bg-success-solid shadow-2xl shadow-emerald-500/40"
+            className="flex h-24 w-24 items-center justify-center rounded-full bg-success-solid shadow-2xl shadow-success-solid/40"
             initial={{ scale: 0.4, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}

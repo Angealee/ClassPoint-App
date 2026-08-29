@@ -230,7 +230,7 @@ function YourRankCard({
     >
       <div className="flex items-center gap-3">
         <div className="w-12 shrink-0 text-center">
-          <p className="text-[0.58rem] font-semibold uppercase tracking-wider text-muted">
+          <p className="text-2xs font-semibold uppercase tracking-wider text-muted">
             Your rank
           </p>
           <p className="font-display text-3xl font-bold leading-none text-reward">
@@ -249,7 +249,7 @@ function YourRankCard({
           <p className="truncate text-xs text-muted">
             {sectionLabel} · Lv {level}
           </p>
-          <p className="truncate text-[0.7rem] font-semibold text-reward">
+          <p className="truncate text-xs font-semibold text-reward">
             {toNext
               ? toNext.pts > 0
                 ? `${toNext.pts} pts to #${toNext.pos}`
@@ -261,7 +261,7 @@ function YourRankCard({
           <p className="font-display text-xl font-bold text-reward">
             {entry.points}
           </p>
-          <p className="text-[0.65rem] uppercase tracking-wider text-muted">pts</p>
+          <p className="text-2xs uppercase tracking-wider text-muted">pts</p>
         </div>
       </div>
     </button>
@@ -271,14 +271,14 @@ function YourRankCard({
 /** ▲/▼ movement since the last settle (or "new" / "no change"). */
 function RankDelta({ delta }: { delta: number | null }) {
   if (delta == null) {
-    return <p className="text-[0.62rem] font-medium text-muted">new</p>
+    return <p className="text-2xs font-medium text-muted">new</p>
   }
   if (delta === 0) {
-    return <p className="text-[0.62rem] font-medium text-muted">— same</p>
+    return <p className="text-2xs font-medium text-muted">— same</p>
   }
   const up = delta > 0
   return (
-    <p className={cn('text-[0.66rem] font-bold', up ? 'text-success' : 'text-danger')}>
+    <p className={cn('text-2xs font-bold', up ? 'text-success' : 'text-danger')}>
       {up ? '▲' : '▼'} {Math.abs(delta)}
     </p>
   )

@@ -416,7 +416,7 @@ export function SessionDetail() {
             <p className={cn('font-display text-xl font-bold tabular-nums', STATUS_META[s].text)}>
               {counts[s]}
             </p>
-            <p className="text-[0.7rem] text-muted">{STATUS_META[s].label}</p>
+            <p className="text-xs text-muted">{STATUS_META[s].label}</p>
           </Card>
         ))}
       </div>
@@ -451,13 +451,13 @@ export function SessionDetail() {
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold">
                   {r.fullName}
                   {r.archived && (
-                    <span className="ml-1.5 rounded-full bg-card-2 px-1.5 py-0.5 text-[0.6rem] font-medium text-muted">
+                    <span className="ml-1.5 rounded-full bg-card-2 px-1.5 py-0.5 text-2xs font-medium text-muted">
                       archived
                     </span>
                   )}
                 </span>
                 {r.syncedLate && (
-                  <span className="shrink-0 rounded-full bg-info-solid/10 px-1.5 py-0.5 text-[0.65rem] font-medium text-info">
+                  <span className="shrink-0 rounded-full bg-info-solid/10 px-1.5 py-0.5 text-2xs font-medium text-info">
                     Offline
                   </span>
                 )}

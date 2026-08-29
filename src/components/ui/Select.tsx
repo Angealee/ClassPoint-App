@@ -18,7 +18,7 @@ export function Select({ label, className, children, id, ...props }: SelectProps
         <select
           id={id}
           className={cn(
-            'h-11 w-full appearance-none rounded-xl border border-line bg-card pl-3.5 pr-10 text-[15px] text-ink',
+            'h-11 w-full appearance-none rounded-xl border border-line bg-card pl-3.5 pr-10 text-base text-ink',
             'transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30',
             className,
           )}

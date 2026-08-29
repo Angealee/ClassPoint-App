@@ -30,7 +30,7 @@ export function PinnedBadges({ achievements, pinnedCodes, editable, onChange, bu
         {pinned.map((a) => (
           <div key={a.code} className="relative flex flex-col items-center gap-1 rounded-xl bg-card-2 p-2">
             <BadgeArt code={a.code} category={a.category} state="unlocked" isTitleGrantor={!!a.titleText} size="sm" />
-            <p className="w-full truncate text-center text-[0.65rem] font-medium text-muted">{a.name}</p>
+            <p className="w-full truncate text-center text-2xs font-medium text-muted">{a.name}</p>
             {editable && onChange && (
               <button
                 type="button"
@@ -52,7 +52,7 @@ export function PinnedBadges({ achievements, pinnedCodes, editable, onChange, bu
             className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-line p-2 text-muted transition-colors hover:border-brand-500/50 hover:text-brand-500 disabled:opacity-50"
           >
             <PlusIcon className="h-5 w-5" />
-            <span className="text-[0.65rem]">Pin a badge</span>
+            <span className="text-2xs">Pin a badge</span>
           </button>
         )}
       </div>

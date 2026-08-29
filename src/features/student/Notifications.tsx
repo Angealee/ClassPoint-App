@@ -152,7 +152,7 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
                           >
                             {n.title}
                           </span>
-                          <span className="shrink-0 text-[0.7rem] text-muted">
+                          <span className="shrink-0 text-xs text-muted">
                             {timeAgo(n.createdAt)}
                           </span>
                         </span>

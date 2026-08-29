@@ -91,7 +91,7 @@ export function Broadcast({ counts }: { counts: Record<string, number> }) {
             id="bc-target"
             value={target}
             onChange={(e) => setTarget(e.target.value)}
-            className="w-full rounded-xl border border-line bg-card px-3 py-2.5 text-sm"
+            className="w-full rounded-xl border border-line bg-card px-3 py-2.5 text-base"
           >
             <option value="">All sections ({allRecipients} students)</option>
             {sections.map((s) => (

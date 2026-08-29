@@ -247,7 +247,7 @@ export function Profile() {
                 className="h-16 w-16 rounded-2xl"
                 textClassName="text-2xl"
               />
-              <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/45 text-[0.7rem] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
+              <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/45 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
                 {uploading ? '…' : 'Change'}
               </span>
             </button>
@@ -572,7 +572,7 @@ export function Profile() {
               onChange={(e) => setBio(e.target.value.slice(0, 160))}
               placeholder="A short line about you — classmates see this on your profile."
               rows={3}
-              className="w-full resize-none rounded-xl border border-line bg-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-muted/70 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              className="w-full resize-none rounded-xl border border-line bg-card px-3.5 py-2.5 text-base text-ink placeholder:text-muted/70 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
             />
             <p className="mt-1.5 text-right text-xs text-muted">{bio.length}/160</p>
           </div>

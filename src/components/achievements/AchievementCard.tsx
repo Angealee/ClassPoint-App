@@ -48,12 +48,12 @@ export function AchievementCard({
           {hideDetails ? 'Secret — keep playing to discover it.' : a.description}
         </p>
         {a.titleText && !hideDetails && (
-          <p className="mt-0.5 truncate text-[0.7rem] font-medium text-reward">
+          <p className="mt-0.5 truncate text-xs font-medium text-reward">
             Title: "{a.titleText}"
           </p>
         )}
         {unlocked ? (
-          <p className="mt-1 text-[0.7rem] text-muted">Unlocked {timeAgo(a.unlockedAt!)}</p>
+          <p className="mt-1 text-xs text-muted">Unlocked {timeAgo(a.unlockedAt!)}</p>
         ) : label ? (
           <div className="mt-1.5">
             <div className="h-1 w-full overflow-hidden rounded-full bg-line">
@@ -62,7 +62,7 @@ export function AchievementCard({
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <p className="mt-1 text-[0.7rem] tabular-nums text-muted">{label}</p>
+            <p className="mt-1 text-xs tabular-nums text-muted">{label}</p>
           </div>
         ) : null}
       </div>

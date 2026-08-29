@@ -205,10 +205,10 @@ export function PointsHistory() {
           {groupByWeek(events, (e) => e.created_at).map((g) => (
             <div key={g.week}>
               <p className="mb-1.5 flex items-baseline gap-2 px-1">
-                <span className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted/80">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted/80">
                   {weekLabel(g.week)}
                 </span>
-                {g.term && <span className="text-[0.65rem] text-muted/60">{termLabel(g.term)}</span>}
+                {g.term && <span className="text-2xs text-muted/60">{termLabel(g.term)}</span>}
               </p>
               <Card className="divide-y divide-line">
                 {g.items.map((e) => (
@@ -260,7 +260,7 @@ function WeekChart({
           const downPct = (Math.abs(w.lost) / peak) * 100
           return (
             <div key={w.week} className="flex min-w-7 flex-1 flex-col items-center gap-1">
-              <span className="text-[0.6rem] font-semibold tabular-nums text-muted">
+              <span className="text-2xs font-semibold tabular-nums text-muted">
                 {w.net > 0 ? `+${w.net}` : w.net !== 0 ? w.net : ''}
               </span>
               {/* Fixed-height track so every bar shares a baseline. */}
@@ -280,12 +280,12 @@ function WeekChart({
                   />
                 )}
               </div>
-              <span className="text-[0.6rem] tabular-nums text-muted/70">{w.week}</span>
+              <span className="text-2xs tabular-nums text-muted/70">{w.week}</span>
             </div>
           )
         })}
       </div>
-      <p className="mt-1 text-center text-[0.65rem] text-muted/70">Class week</p>
+      <p className="mt-1 text-center text-2xs text-muted/70">Class week</p>
     </Card>
   )
 }

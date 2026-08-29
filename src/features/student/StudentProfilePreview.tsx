@@ -125,7 +125,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
                 <p className="font-display text-2xl font-bold text-reward">
                   #{target.rank}
                 </p>
-                <p className="text-[0.65rem] uppercase tracking-wider text-muted">rank</p>
+                <p className="text-2xs uppercase tracking-wider text-muted">rank</p>
               </div>
             )}
           </div>
@@ -306,7 +306,7 @@ function Stat({
         {icon}
       </div>
       <p className="font-display text-lg font-bold leading-none">{value}</p>
-      <p className="mt-1 text-[0.65rem] uppercase tracking-wider text-muted">{label}</p>
+      <p className="mt-1 text-2xs uppercase tracking-wider text-muted">{label}</p>
     </div>
   )
 }

@@ -294,7 +294,7 @@ export function CommentsOverlay({
               >
                 <span
                   className={cn(
-                    'inline-flex max-w-[85cqw] items-center gap-2 rounded-full border px-3 py-1.5 text-[13px] shadow-lg backdrop-blur-md',
+                    'inline-flex max-w-[85cqw] items-center gap-2 rounded-full border px-3 py-1.5 text-sm shadow-lg backdrop-blur-md',
                     p.studentId === null
                       ? 'border-accent-solid/50 bg-accent-solid/25 text-accent'
                       : 'border-line bg-card/95 text-ink',
@@ -303,14 +303,14 @@ export function CommentsOverlay({
                   onClick={tappable ? () => onOpenProfile!(p) : undefined}
                 >
                   {p.studentId === null ? (
-                    <span className="text-[0.6rem] font-bold uppercase tracking-wide">
+                    <span className="text-2xs font-bold uppercase tracking-wide">
                       Instructor
                     </span>
                   ) : (
                     <Avatar
                       name={p.displayName}
                       url={p.avatarUrl}
-                      className="h-5 w-5 text-[0.55rem]"
+                      className="h-5 w-5 text-2xs"
                     />
                   )}
                   <span className="shrink-0 font-semibold">{p.displayName}</span>
@@ -383,11 +383,11 @@ export function CommentsOverlay({
               return (
                 <div key={c.id} className="flex items-center gap-2.5 px-4 py-2.5">
                   {c.studentId === null ? (
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-[0.5rem] font-bold text-brand-500">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-2xs font-bold text-brand-500">
                       IN
                     </span>
                   ) : (
-                    <Avatar name={c.displayName} url={c.avatarUrl} className="h-6 w-6 text-[0.6rem]" />
+                    <Avatar name={c.displayName} url={c.avatarUrl} className="h-6 w-6 text-2xs" />
                   )}
                   {/* Row body opens the sender's profile; Delete stays separate. */}
                   <button
@@ -400,13 +400,13 @@ export function CommentsOverlay({
                       <span className="font-semibold">{c.displayName}</span>{' '}
                       <span className="text-muted">{c.body}</span>
                     </p>
-                    <p className="text-[0.65rem] text-muted">{timeAgo(c.createdAt)}</p>
+                    <p className="text-2xs text-muted">{timeAgo(c.createdAt)}</p>
                   </button>
                   {(isInstructor || (studentId && c.studentId === studentId)) && (
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(c)}
-                      className="shrink-0 text-[0.65rem] font-semibold text-muted transition-colors hover:text-brand-500"
+                      className="shrink-0 text-2xs font-semibold text-muted transition-colors hover:text-brand-500"
                     >
                       Delete
                     </button>

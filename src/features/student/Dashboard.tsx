@@ -206,7 +206,7 @@ export function Dashboard() {
           <div className="space-y-4">
             {groupByDay(events).map((group) => (
               <div key={group.label}>
-                <p className="mb-1.5 px-1 text-[0.7rem] font-semibold uppercase tracking-wider text-muted/80">
+                <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted/80">
                   {group.label}
                 </p>
                 <Card className="divide-y divide-line">
@@ -341,7 +341,7 @@ function LiveBadge({ live }: { live: boolean }) {
   return (
     <span
       className={cn(
-        'flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wider',
+        'flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-2xs font-semibold uppercase tracking-wider',
         live ? 'bg-brand-500/10 text-brand-500' : 'bg-card-2 text-muted',
       )}
       title={live ? 'Scores update instantly' : 'Reconnecting…'}
@@ -393,7 +393,7 @@ function StatTile({
       </div>
       <p className="font-display text-2xl font-bold">{value}</p>
       <p className="text-xs text-muted">{label}</p>
-      {note && <p className="mt-0.5 text-[0.65rem] text-muted/80">{note}</p>}
+      {note && <p className="mt-0.5 text-2xs text-muted/80">{note}</p>}
     </Card>
   )
 }
@@ -401,7 +401,7 @@ function StatTile({
 function DashboardSkeleton() {
   return (
     <div className="animate-pulse space-y-5">
-      <div className="h-4 w-48 rounded bg-card-2" />
+      <div className="h-4 w-48 rounded-lg bg-card-2" />
       <div className="h-44 rounded-2xl bg-card-2" />
       <div className="grid grid-cols-2 gap-3">
         <div className="h-24 rounded-2xl bg-card-2" />

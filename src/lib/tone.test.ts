@@ -30,7 +30,8 @@ const TONES = Object.keys(TONE) as ToneName[]
 
 /** Raw Tailwind palette families. `brand` and `gold` are the app's OWN scales
  *  (declared in @theme), so they are legitimate — these are not. */
-const RAW = /\b(?:bg|text|border|ring|fill|stroke|divide)-(?:emerald|sky|red|orange|zinc|slate|gray|rose|violet|indigo|purple|blue|green|yellow|amber|teal|cyan|lime|fuchsia|pink|stone|neutral)-\d{2,3}\b/
+const RAW =
+  /\b(?:bg|text|border|ring|fill|stroke|divide|shadow)-(?:emerald|sky|red|orange|zinc|slate|gray|rose|violet|indigo|purple|blue|green|yellow|amber|teal|cyan|lime|fuchsia|pink|stone|neutral)-\d{2,3}\b/
 
 /**
  * Deliberate token-free islands, each for a reason that a test must not

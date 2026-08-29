@@ -99,7 +99,7 @@ export function OfflineScanCards({
                 <p className="text-xs text-muted">
                   {(e.outcome && FAIL_REASON[e.outcome]) ?? 'Something went wrong.'}
                 </p>
-                <p className="mt-1.5 rounded-lg bg-card-2 px-2.5 py-1.5 text-[0.7rem] text-muted">
+                <p className="mt-1.5 rounded-lg bg-card-2 px-2.5 py-1.5 text-xs text-muted">
                   Scanned {day(e.capturedAt)}, {time(e.capturedAt)} · show this to your instructor
                   so they can mark you manually.
                 </p>

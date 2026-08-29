@@ -165,7 +165,7 @@ export function PodiumBoard({
 
       {pinnedSelf && (
         <div className="space-y-1 pt-1">
-          <p className="text-center text-[0.65rem] uppercase tracking-wider text-muted">
+          <p className="text-center text-2xs uppercase tracking-wider text-muted">
             your standing
           </p>
           <RestRow
@@ -312,11 +312,11 @@ function PodiumCard({
         </div>
 
         <div className="relative z-[1] w-full min-w-0">
-          <p className="truncate text-[0.78rem] font-semibold sm:text-sm">
+          <p className="truncate text-xs font-semibold sm:text-sm">
             {entry.display_name}
             {isMe && <span className="text-brand-500"> (you)</span>}
           </p>
-          <p className="truncate text-[0.65rem] text-muted sm:text-xs">
+          <p className="truncate text-2xs text-muted sm:text-xs">
             {sectionLabel ? `${sectionLabel} · ` : ''}Lv {level}
           </p>
         </div>
@@ -432,7 +432,7 @@ function RestRow({
               themselves when there's nothing to say — no arrow on an unchanged
               rank, no flame under a day — so this line stays quiet for most
               rows instead of becoming a column of dashes and zeroes. */}
-          <p className="flex items-center gap-1.5 text-[13px] text-muted">
+          <p className="flex items-center gap-1.5 text-sm text-muted">
             <span className="truncate">
               {sectionLabel ? `${sectionLabel} · ` : ''}Lv {level}
             </span>

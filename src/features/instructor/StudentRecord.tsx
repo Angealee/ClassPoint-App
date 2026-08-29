@@ -309,7 +309,7 @@ export function StudentRecord() {
                         <p className="flex items-center gap-1.5 text-xs text-muted">
                           {shortDate(a.startedAt)}
                           {a.syncedLate && (
-                            <span className="rounded-full bg-info-solid/10 px-1.5 py-0.5 text-[0.6rem] font-medium text-info">
+                            <span className="rounded-full bg-info-solid/10 px-1.5 py-0.5 text-2xs font-medium text-info">
                               Offline
                             </span>
                           )}
@@ -443,7 +443,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-card-2 py-2.5">
       <p className="font-display text-lg font-bold tabular-nums">{value}</p>
-      <p className="text-[0.7rem] text-muted">{label}</p>
+      <p className="text-xs text-muted">{label}</p>
     </div>
   )
 }

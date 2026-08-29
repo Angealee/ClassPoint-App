@@ -25,14 +25,14 @@ export function ChangelogList({ entries }: { entries: ChangelogEntry[] }) {
                     <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-brand-500" />
                     <span>{section.heading}</span>
                     {section.major && (
-                      <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wider text-brand-500">
+                      <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-brand-500">
                         Major
                       </span>
                     )}
                   </p>
                   <ul className="mt-2 space-y-2 pl-5">
                     {section.items.map((item, i) => (
-                      <li key={i} className="flex gap-2.5 text-[0.95rem] leading-relaxed text-ink/80">
+                      <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-ink/80">
                         <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-muted" />
                         <span>{item}</span>
                       </li>
