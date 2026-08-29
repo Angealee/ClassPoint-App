@@ -59,7 +59,7 @@ and the leaderboard **reset each semester**; achievements and the all-time total
   stay one-tap for speed.
 - **Components:** function components, named exports, PascalCase files. Lazy imports
   destructure the named export: `.then(m => ({ default: m.Foo }))`.
-- **Verify: `npm run verify`** — typecheck (`tsc -b --noEmit`) → ESLint → 100 unit tests →
+- **Verify: `npm run verify`** — typecheck (`tsc -b --noEmit`) → ESLint → 112 unit tests →
   `vite build`, in that order. That one command is the gate before every commit.
   Individually: `npm run lint` · `npm run lint:eslint` · `npm test` (`test:watch` for
   TDD) · `npm run build`. Heavy libs (`xlsx`, capture libs) only via dynamic `import()`.
@@ -687,6 +687,59 @@ almost certainly this. Inject `*{transition:none!important}` before measuring a 
 flip, or read the custom properties off `documentElement` instead, which are immune.
 Console messages are also buffered PER TAB and survive navigation and a dev-server
 restart — open a fresh tab for a clean read.
+
+Era 6.0 Phase 7 — student screens (Attendance + Leaderboard). Decisions (user,
+2026-08-29): **the Attendance tab is for DOING; analysis moves to the stats screen** ·
+**fix all four duplications** · **Profile and UsePoints get their own phase** (at 673 and
+542 lines they are redesigns, not restyles).
+
+**`src/lib/attendance.ts` is the ONE definition of the show-up rate** — `counts` ·
+`showedUp` · `tally` · `rateOf` · `countedOf` · `rateTone` · `bySubject`. It was computed
+independently in THREE places (`AttendanceStats`, `Attendance`, and the Dashboard card
+added in Phase 6), and it is the figure the instructor's risk screens flag students on.
+It mirrors `get_section_attendance_stats` (0031) and `NEUTRAL_STATUSES` — **if the rule
+changes, the SQL changes in the same commit**, or the student's screen and the
+instructor's workbook disagree about the same class. `attendance.test.ts` (12 tests); the
+load-bearing one is that **excused/irregular leave the DENOMINATOR**, so a medical excuse
+can never lower a rate. `rateTone` bands on **70/85 — the instructor's at-risk line**, not
+a friendlier student-side one.
+
+**The Attendance tab dropped from 9 blocks to 7.** The per-subject split and the
+neutral-statuses note were ANALYSIS on a tab meant for doing (scan, resolve an absence,
+check a recent mark) and moved to `/app/attendance/stats`. The neutral note in particular
+was a loose line under the summary with nothing to relate it to; on the stats screen it
+sits inside the headline card, explaining the rate directly above it.
+
+**`components/points/PointEventRow.tsx` replaces `FeedRow` + `LedgerRow`**, which were
+the same component twice differing only in badge geometry. That cost something real: when
+brand red was demoted, "activity" was fixed in one twin and missed in the other, so **the
+same event rendered in two different colours depending on which screen you opened**. Only
+prop is `compact`.
+
+**Rank movement had two sources that could disagree on one screen.** The DB's
+`previous_rank` (0037, server-computed, what the board rows show) vs `Leaderboard`'s own
+localStorage tracker. **The DB now wins wherever it can answer** — the global view, where
+`myPos` IS the snapshot rank. The local tracker survives ONLY for what the DB cannot
+answer: a SECTION view (rows renumbered within the section; no per-section previous rank
+exists) and a client running ahead of 0037. `RankSignals` exports `RankDeltaValue` for the
+verbose "new" / "— same" form, which is right on one pinned card and would be forty rows
+of noise on the board.
+
+**Points labelling: the problem was never the words, it was two numbers.** The Dashboard
+teaser quoted the full balance and then sent you to a screen showing a smaller one —
+"your 142", then "Available to spend 137" a tap later. The teaser no longer quotes a
+figure it cannot compute (it has no pending-redemption data), and UsePoints now shows the
+subtraction (`142 this semester − 5 awaiting a decision`) so the smaller number reads as
+the same quantity minus something you asked for.
+
+**On the leaderboard every remaining brand red was IDENTITY** — the "you" tint, "(you)",
+the ring on your own row, the Share chip, the wash behind your standing card — so all of
+it is `accent` now. `brand-500` is still the value behind `--accent-solid`, so light mode
+is unchanged and dark mode gains the readable foreground those sites never had.
+**PodiumBoard's focus rings and pedestal ink stay brand deliberately** (a focus ring IS
+the brand; the pedestal ink sits on gold), and **`PersonRow` is NOT adopted there** — those
+rows carry medal ramps, an XP ring around the avatar and a place number, which is bespoke
+art rather than the shared row.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
