@@ -627,6 +627,67 @@ ProfileBanner's 24px Remove-photo** stay bespoke — both are overlay affordance
 tiles and both are DESTRUCTIVE, so a 44px tap region invites exactly the accidental taps
 their small size prevents.
 
+Era 6.0 Phase 6 — student visual direction. Decisions (user, 2026-08-29): **ink
+scoreboard hero** · **gold-tint avatars** · **dark ramp widened to ΔL\* ~6.3** · **all
+four blocks under the hero**.
+
+**The dark ramp was measurably why elevation read flat.** canvas→card was ΔL\* 3.7 — a
+contrast ratio of **1.08**, i.e. a card barely separated from the page it sat on. Now
+`#08080b` → `#18181f` → `#24242e` (ΔL\* 6.3 then 6.1). **`--line` had to move with it**
+(`#2a2a32` → `#2e2e39`): against the new `card-2` the old value sat only ΔL\* 2.8 away,
+close to invisible for a border. Every role foreground stays above 6.1:1 on the new card.
+
+**`--color-plate` / `--color-plate-2` live in the FIXED `@theme` block, not as semantic
+tokens** — the scoreboard is the one element in the app that does NOT flip with the
+theme, and that is precisely what makes it read as an object rather than as another
+card. Anything that reads `plate` must never be given a `.dark` override.
+
+**`HomeHero` replaces the biggest brand-red surface in the app.** The old hero was a
+`from-brand-500 to-brand-700` gradient carrying only the level, while points — the same
+quantity, since **points ARE the XP** — sat in a separate tile below it. Splitting one
+idea across two blocks is what made the old home screen feel like a list of widgets.
+Order inside the hero is deliberate: level is the headline (changes rarely, means most),
+points sit beside it (same number, checked constantly), the XP rail is the bridge showing
+how one becomes the other, and rank + streak are the footer. **It is deliberately NOT a
+button** — a previous version made the whole card tappable, which is a large target with
+no affordance.
+
+**`Avatar`'s initials fallback is gold, not brand red.** It renders on every roster row,
+leaderboard row and comment pill, so with 208 students — most without a photo — the brand
+gradient turned the leaderboard into a column of ~40 identical red circles. That was the
+single largest concentration of brand red left, and it was decoration.
+
+**Contrast on the plate must be measured, not eyeballed.** `text-white/40` on
+`--color-plate` is **3.83:1**, under the 4.5 those `text-2xs` labels need. All translucent
+text on the plate is now `/55` or higher (6.14:1 minimum); only the unlit flame icon stays
+at `/35`, where the 3:1 non-text threshold applies. Blend the alpha over the plate before
+computing — reading the `oklab(… / α)` computed value straight into a contrast formula
+gives nonsense.
+
+Dashboard composition: greeting → banners → scoreboard → next milestone → attendance →
+use points → achievements → **five FLAT feed rows** + "See all". The feed is no longer
+grouped by day: across five rows the Today/Yesterday headers cost a line each and say less
+than the per-row relative time. `NextMilestone` names the SMALLER of points-to-next-level
+and points-to-overtake-the-rank-above — always showing the level would hide that one
+recitation sometimes gains a place.
+**Measured at 375×812: hero 222px and STABLE across 0 / 142 / 1284 points (no layout
+jump); page total 1092px = 1.34 screens; no horizontal overflow.** The rejected rebuild
+measured 1054px, so this is 38px longer but built from seven larger blocks instead of a
+3-up stat strip plus a 3-up tile grid — the complaint then was density, not length.
+
+**`LiveClassBanner` and `SemesterEndedBanner` are back on Home.** They had been mounted
+only on Attendance, so a student on Home during a live class got no signal to go scan —
+`LiveBadge` is realtime CONNECTION status, an entirely different thing. Both render
+nothing when they don't apply.
+
+**Verification note for this environment:** the Browser pane does not composite while
+hidden, so CSS transitions never advance and `getComputedStyle` returns the value from
+BEFORE a theme toggle. A `body` background that appears not to follow `--canvas` is
+almost certainly this. Inject `*{transition:none!important}` before measuring a theme
+flip, or read the custom properties off `documentElement` instead, which are immune.
+Console messages are also buffered PER TAB and survive navigation and a dev-server
+restart — open a fresh tab for a clean read.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
