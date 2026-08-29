@@ -787,6 +787,46 @@ Onboarding, AwayRecap, OfflineScanCards, LiveClassBanner, ScanLanding, and the
 PointsHistory / AttendanceStats chart fills). Only the three stray ERROR messages were
 fixed in Phase 8; the rest is deliberately left for a secondary-screens phase.
 
+Era 6.0 Phase 9 — secondary student screens. Decisions (user, 2026-08-29): **earned
+points go gold** · **unify the rate bands on `rateTone`** · **the live banner is accent,
+not red** · **do the structural work too**.
+
+**Two of these were readability BUGS, not colour preferences.** In `PointsHistory`'s
+weekly chart the EARNED bar was `bg-brand-500` sitting directly above the LOST bar in
+`bg-danger-solid/70` — two near-identical reds, stacked, for opposite meanings. Earned is
+now `reward` gold, which is what points already are in the hero, the XP rail and every
+points figure in the app. And `AttendanceStats`' weekly bars banded at **75/50** with
+green/gold/brand while every other rate bands at **85/70** via `rateTone` — so the same
+student's week could be a different colour depending which screen they opened. One
+function now, app-wide; more weeks read amber, which is accurate rather than harsh.
+
+**`LiveClassBanner` is `accent`, not brand red.** Red beside its green checked-in state
+read as bad/good, but "your class is live, go scan" is an opportunity, not a failure. The
+pulsing ring already carries the urgency.
+
+**A FOURTH copy of the points row lived in `AwayRecap`** — same structure, same stale
+"activity" colour. All four call sites are `PointEventRow` now.
+
+Role assignment on the rest: excuse guidance and its numbered steps are INFORMATIONAL
+(`info` — an explainer, not a warning about the student); the failed offline check-in
+card's frame and "!" badge are `danger` (its body text already was, so the card
+contradicted itself); unread notifications, onboarding, achievement filters and the
+"add photo" / "pin a badge" placeholders are IDENTITY (`accent`); badge progress bars are
+`reward`; withdrawing your own request rests muted and reddens on hover, like every other
+destructive control.
+
+**`Achievements`' filter chips are deliberately NOT a `SegmentedControl`** — I listed
+them as a candidate and was wrong. They wrap and vary in width (categories AND earned
+titles), so an equal-column grid is the wrong shape. Only `AbsenceExcuses`' two-option
+slip toggle actually fits, and that one was migrated.
+
+**Three brand-red uses remain on the entire student side, all correct:** a loading
+spinner's top border and two focus rings. Everything else is a role token.
+
+`ScanLanding` routes an unauthenticated visitor to sign-in regardless of payload, so its
+two button branches cannot be reached in a browser without a login — that migration is
+verified by typecheck and build only.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
