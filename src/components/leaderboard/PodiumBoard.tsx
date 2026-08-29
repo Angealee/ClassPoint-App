@@ -270,7 +270,7 @@ function PodiumCard({
       {/* Sparkles drift up around the champion. */}
       {champ && !reduced && <Sparkles />}
 
-      <Card
+      <Card pad="none"
         className={cn(
           'relative flex flex-col items-center gap-1.5 overflow-hidden border px-2 text-center sm:gap-2 sm:px-3',
           tier.border,

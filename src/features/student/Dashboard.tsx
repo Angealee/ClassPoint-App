@@ -1,10 +1,10 @@
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { XpBar } from '@/components/ui/XpBar'
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
 import { Avatar } from '@/components/ui/Avatar'
-import { Button } from '@/components/ui/Button'
 import { BoltIcon, StarIcon, TicketIcon, TrophyIcon } from '@/components/ui/icons'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
@@ -76,20 +76,15 @@ export function Dashboard() {
 
   if (error) {
     return (
-      <Card className="p-8 text-center">
-        <p className="text-sm text-muted">Couldn't load your dashboard.</p>
-        <Button variant="outline" className="mt-4" onClick={() => void refresh()}>
-          Try again
-        </Button>
-      </Card>
+      <ErrorState onRetry={() => void refresh()} detail="Your points are safe — this is just the connection.">
+        Couldn't load your dashboard.
+      </ErrorState>
     )
   }
 
   if (!me) {
     return (
-      <Card className="p-8 text-center text-sm text-muted">
-        We couldn't find your student record. Ask your CEO to check your class list entry.
-      </Card>
+      <EmptyState>We couldn't find your student record. Ask your CEO to check your class list entry.</EmptyState>
     )
   }
 
@@ -111,7 +106,7 @@ export function Dashboard() {
 
       {/* Level / XP hero */}
       <motion.div variants={item}>
-        <Card className="overflow-hidden">
+        <Card pad="none" className="overflow-hidden">
           <div className="relative bg-linear-to-br from-brand-500 to-brand-700 p-5 text-white sm:p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -192,16 +187,16 @@ export function Dashboard() {
       <motion.div variants={item}>
         <h2 className="mb-2 text-sm font-semibold text-muted">Recent points</h2>
         {events.length === 0 ? (
-          <Card className="flex flex-col items-center gap-3 p-8 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gold-400/15 text-reward">
-              <BoltIcon className="h-6 w-6" />
-            </span>
-            <p className="text-sm font-medium">No points yet</p>
-            <p className="max-w-xs text-xs text-muted">
-              They'll show up here the moment your instructor awards them. Speak up in class to earn
-              your first!
-            </p>
-          </Card>
+          <EmptyState
+            icon={
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gold-400/15 text-reward">
+                <BoltIcon className="h-6 w-6" />
+              </span>
+            }
+            description="They'll show up here the moment your instructor awards them. Speak up in class to earn your first!"
+          >
+            No points yet
+          </EmptyState>
         ) : (
           <div className="space-y-4">
             {groupByDay(events).map((group) => (
@@ -209,7 +204,7 @@ export function Dashboard() {
                 <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted/80">
                   {group.label}
                 </p>
-                <Card className="divide-y divide-line">
+                <Card pad="none" className="divide-y divide-line">
                   {group.items.map((e) => (
                     <FeedRow key={e.id} event={e} />
                   ))}

@@ -1,3 +1,5 @@
+import { EmptyState } from '@/components/ui/EmptyState'
+import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -148,13 +150,11 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
           </Button>
         </Card>
       ) : records.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted">
-          {sectionFilter || categoryFilter
+        <EmptyState>{sectionFilter || categoryFilter
             ? 'Nothing matches those filters.'
-            : 'No awards yet — points you give will appear here.'}
-        </Card>
+            : 'No awards yet — points you give will appear here.'}</EmptyState>
       ) : (
-        <Card className="divide-y divide-line">
+        <Card pad="none" className="divide-y divide-line">
           {records.map((r) => {
             const negative = r.points < 0
             return (
@@ -178,14 +178,12 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
                     {r.note ? ` · ${r.note}` : ''}
                   </p>
                 </div>
-                <button
-                  type="button"
+                                <IconButton
+                  label={`Undo ${r.points} for ${r.student_name}`}
+                  variant="danger"
                   onClick={() => setTarget(r)}
-                  aria-label={`Undo ${r.points} for ${r.student_name}`}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-brand-500/10 hover:text-brand-500"
-                >
-                  <TrashIcon className="h-4.5 w-4.5" />
-                </button>
+                  icon={<TrashIcon className="h-4.5 w-4.5" />}
+                />
               </div>
             )
           })}

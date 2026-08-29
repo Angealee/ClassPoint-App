@@ -1,3 +1,4 @@
+import { IconButton } from '@/components/ui/IconButton'
 import { useEffect, useState } from 'react'
 import { Sheet } from '@/components/ui/Sheet'
 import { Button } from '@/components/ui/Button'
@@ -60,14 +61,12 @@ export function ResetPinSheet({
           </p>
           <div className="flex items-center justify-between rounded-xl border border-line bg-card-2 px-4 py-3">
             <span className="font-mono text-lg font-bold tracking-widest">{token}</span>
-            <button
-              type="button"
+                        <IconButton
+              label="Copy reset code"
+              variant="accent"
               onClick={copy}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-brand-500 hover:bg-brand-500/10"
-              aria-label="Copy reset code"
-            >
-              <CopyIcon className="h-5 w-5" />
-            </button>
+              icon={<CopyIcon className="h-5 w-5" />}
+            />
           </div>
           <Button className="w-full" onClick={onClose}>
             Done

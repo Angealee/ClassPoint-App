@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
@@ -212,9 +213,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
       {loading ? (
         <ListSkeleton rows={6} />
       ) : sessions.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted">
-          No sessions yet. Start a class to build history.
-        </Card>
+        <EmptyState>No sessions yet. Start a class to build history.</EmptyState>
       ) : (
         <>
           {/* Headline numbers */}
@@ -305,7 +304,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
                 ))}
               </div>
             </div>
-            <Card className="divide-y divide-line">
+            <Card pad="none" className="divide-y divide-line">
               {ranked.map((s) => (
                 <StudentRow key={s.studentId} stat={s} />
               ))}
@@ -347,7 +346,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
                     {w.term ? `${termLabel(w.term)} · ` : ''}
                     {w.label}
                   </p>
-                  <Card className="divide-y divide-line">
+                  <Card pad="none" className="divide-y divide-line">
                     {w.items.map((s) => (
                       <div key={s.id}>
                         <button

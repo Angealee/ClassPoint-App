@@ -1,3 +1,5 @@
+import { EmptyState } from '@/components/ui/EmptyState'
+import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
@@ -242,9 +244,7 @@ export function SessionDetail() {
     return (
       <div className="space-y-4">
         <BackLink onClick={() => navigate('/teach/attendance')} />
-        <Card className="p-8 text-center text-sm text-muted">
-          That session no longer exists.
-        </Card>
+        <EmptyState>That session no longer exists.</EmptyState>
       </div>
     )
   }
@@ -253,7 +253,7 @@ export function SessionDetail() {
     return (
       <div className="space-y-4">
         <BackLink onClick={() => navigate('/teach/attendance')} />
-        <Card className="h-24 animate-pulse bg-card-2" />
+        <Card pad="none" className="h-24 animate-pulse bg-card-2" />
         <ListSkeleton rows={6} />
       </div>
     )
@@ -296,17 +296,14 @@ export function SessionDetail() {
                 {sectionName} · {termLabel(termOf(session.startedAt))} · {weekLabel(week)}
               </p>
             </div>
-            <button
-              type="button"
+                        <IconButton
+              label="Edit topic"
               onClick={() => {
                 setTopicDraft(session.topic ?? '')
                 setEditingTopic(true)
               }}
-              aria-label="Edit topic"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-card-2 hover:text-ink"
-            >
-              <PencilIcon className="h-4.5 w-4.5" />
-            </button>
+              icon={<PencilIcon className="h-4.5 w-4.5" />}
+            />
           </div>
         )}
 
@@ -439,7 +436,7 @@ export function SessionDetail() {
             <StatusChip status={g.status} />
             <span className="text-xs tabular-nums text-muted">{g.items.length}</span>
           </div>
-          <Card className="divide-y divide-line">
+          <Card pad="none" className="divide-y divide-line">
             {g.items.map((r) => (
               <button
                 key={r.studentId}
@@ -477,7 +474,7 @@ export function SessionDetail() {
           <p className="mb-2 px-1 text-xs font-semibold text-muted">
             No record ({unmarked.length})
           </p>
-          <Card className="divide-y divide-line">
+          <Card pad="none" className="divide-y divide-line">
             {/* Tappable: a student with no record can now be given one. The
                 picker routes through set_attendance_status, so the points
                 ledger lands exactly as it would have during class. */}

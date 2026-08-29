@@ -224,7 +224,7 @@ export function AbsenceExcuses({
       {/* Actionable absences */}
       <div>
         <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Absences to resolve</h2>
-        <Card className="divide-y divide-line">
+        <Card pad="none" className="divide-y divide-line">
           {actionable.map((h) => {
             const excuse = excuseByRecord.get(h.recordId)
             return (

@@ -1,3 +1,4 @@
+import { IconButton } from '@/components/ui/IconButton'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -124,15 +125,13 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
               )}
 
               {editing ? (
-                <button
-                  type="button"
+                                <IconButton
+                  label="Save name"
                   onClick={() => void saveEdit(s.id)}
                   disabled={busy}
-                  aria-label="Save name"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gold-600 hover:bg-card dark:text-gold-400"
-                >
-                  <CheckIcon className="h-5 w-5" />
-                </button>
+                  className="text-reward hover:bg-card"
+                  icon={<CheckIcon className="h-5 w-5" />}
+                />
               ) : (
                 <button
                   type="button"
@@ -143,16 +142,15 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
                 </button>
               )}
 
-              <button
-                type="button"
+                            <IconButton
+                label={`Delete ${s.name}`}
+                variant="danger"
                 onClick={() => setDeleteTarget({ id: s.id, name: s.name })}
                 disabled={busy || count > 0}
                 title={count > 0 ? 'Remove its students first' : 'Delete section'}
-                aria-label={`Delete ${s.name}`}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-brand-500/10 hover:text-brand-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted"
-              >
-                <TrashIcon className="h-4.5 w-4.5" />
-              </button>
+                className="disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted"
+                icon={<TrashIcon className="h-4.5 w-4.5" />}
+              />
             </div>
           )
         })}

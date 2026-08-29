@@ -1,3 +1,4 @@
+import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -128,7 +129,7 @@ export function RewardsCatalog() {
               No rewards yet. Add one below and it appears on every student’s Use points screen.
             </Card>
           ) : (
-            <Card className="divide-y divide-line">
+            <Card pad="none" className="divide-y divide-line">
               {live.map((item) => (
                 <div key={item.id} className="p-3.5">
                   {editingId === item.id ? (
@@ -178,15 +179,13 @@ export function RewardsCatalog() {
                         {item.points}
                         <span className="ml-0.5 text-xs font-medium text-muted">pts</span>
                       </span>
-                      <button
-                        type="button"
+                                            <IconButton
+                        label={`Retire ${item.label}`}
+                        variant="danger"
                         onClick={() => setRetireTarget(item)}
-                        aria-label={`Retire ${item.label}`}
                         title="Retire (reversible)"
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-brand-500/10 hover:text-brand-500"
-                      >
-                        <TrashIcon className="h-4.5 w-4.5" />
-                      </button>
+                        icon={<TrashIcon className="h-4.5 w-4.5" />}
+                      />
                     </div>
                   )}
                 </div>
@@ -199,7 +198,7 @@ export function RewardsCatalog() {
               <h3 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
                 Retired
               </h3>
-              <Card className="divide-y divide-line">
+              <Card pad="none" className="divide-y divide-line">
                 {retired.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 p-3 opacity-70">
                     <span className="min-w-0 flex-1 truncate text-sm">{item.label}</span>

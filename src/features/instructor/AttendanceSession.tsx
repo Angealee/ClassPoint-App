@@ -1,3 +1,5 @@
+import { EmptyState } from '@/components/ui/EmptyState'
+import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
@@ -455,21 +457,17 @@ export function AttendanceSession({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={toggleSound}
-            aria-pressed={soundOn}
-            aria-label={soundOn ? 'Mute check-in chime' : 'Play a chime on check-in'}
+          <IconButton
+            label={soundOn ? 'Mute check-in chime' : 'Play a chime on check-in'}
             title={soundOn ? 'Check-in chime on' : 'Check-in chime off'}
-            className={cn(
-              'flex h-8 w-8 items-center justify-center rounded-full border transition-colors',
-              soundOn
-                ? 'border-brand-500 bg-brand-500/10 text-brand-500'
-                : 'border-line text-muted hover:text-ink',
-            )}
-          >
-            <SoundIcon className="h-4 w-4" />
-          </button>
+            variant="outline"
+            size="sm"
+            round
+            aria-pressed={soundOn}
+            onClick={toggleSound}
+            className={cn(soundOn && 'border-brand-500 bg-brand-500/10 text-brand-500')}
+            icon={<SoundIcon className="h-4 w-4" />}
+          />
           <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500">
             <span className="h-2 w-2 animate-pulse rounded-full bg-brand-500" />
             Live
@@ -492,14 +490,14 @@ export function AttendanceSession({
           </div>
         ) : (
           <>
-            <button
-              type="button"
+                        <IconButton
+              label="Present QR fullscreen"
+              variant="outline"
+              round
               onClick={() => setPresenting(true)}
-              aria-label="Present QR fullscreen"
-              className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
-            >
-              <ExpandIcon className="h-4 w-4" />
-            </button>
+              className="absolute right-3 top-3"
+              icon={<ExpandIcon className="h-4 w-4" />}
+            />
             <div className="rounded-2xl bg-white p-3 shadow-sm">
               {payload ? (
                 <QrCode value={payload} size={232} />
@@ -565,14 +563,13 @@ export function AttendanceSession({
             >
               Absent
             </Button>
-            <button
-              type="button"
+                        <IconButton
+              label="Cancel"
+              size="sm"
+              round
               onClick={() => setBulkOpen(false)}
-              aria-label="Cancel"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:text-ink"
-            >
-              <XIcon className="h-4 w-4" />
-            </button>
+              icon={<XIcon className="h-4 w-4" />}
+            />
           </div>
         ) : (
           <button
@@ -597,14 +594,14 @@ export function AttendanceSession({
               className="h-11 w-full rounded-xl border border-line bg-card pl-9 pr-9 text-base text-ink placeholder:text-muted/70 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
             />
             {query && (
-              <button
-                type="button"
+                            <IconButton
+                label="Clear search"
+                size="sm"
+                round
                 onClick={() => setQuery('')}
-                aria-label="Clear search"
-                className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:text-ink"
-              >
-                <XIcon className="h-4 w-4" />
-              </button>
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+                icon={<XIcon className="h-4 w-4" />}
+              />
             )}
           </div>
           <button
@@ -625,13 +622,11 @@ export function AttendanceSession({
 
       {/* Roster */}
       {roster.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted">
-          No students in {sectionName} yet — add some in the Students tab.
-        </Card>
+        <EmptyState>No students in {sectionName} yet — add some in the Students tab.</EmptyState>
       ) : visible.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted">No students match that filter.</Card>
+        <EmptyState>No students match that filter.</EmptyState>
       ) : (
-        <Card className="divide-y divide-line">
+        <Card pad="none" className="divide-y divide-line">
           {visible.map((r) => {
             const open = pickerFor === r.studentId
             const isManual = manualIds.has(r.studentId)
@@ -781,14 +776,15 @@ export function AttendanceSession({
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-canvas p-6"
           >
-            <button
-              type="button"
+                        <IconButton
+              label="Exit fullscreen"
+              variant="outline"
+              size="lg"
+              round
               onClick={() => setPresenting(false)}
-              aria-label="Exit fullscreen"
-              className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
-            >
-              <XIcon className="h-6 w-6" />
-            </button>
+              className="absolute right-4 top-4"
+              icon={<XIcon className="h-6 w-6" />}
+            />
             <div className="text-center">
               <p className="font-display text-2xl font-bold">{session.topic || 'Scan to check in'}</p>
               <p className="text-sm text-muted">{sectionName}</p>

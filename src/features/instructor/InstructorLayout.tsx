@@ -1,3 +1,4 @@
+import { IconButton } from '@/components/ui/IconButton'
 import {
   createContext,
   useCallback,
@@ -123,14 +124,13 @@ function RedemptionInbox({ count }: { count: number }) {
 function OpsButton() {
   const navigate = useNavigate()
   return (
-    <button
-      type="button"
+        <IconButton
+      label="Ops and trust"
+      variant="outline"
+      round
       onClick={() => navigate('/teach/ops')}
-      aria-label="Ops and trust"
-      className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
-    >
-      <ShieldIcon className="h-5 w-5" />
-    </button>
+      icon={<ShieldIcon className="h-5 w-5" />}
+    />
   )
 }
 
@@ -284,14 +284,13 @@ export function InstructorLayout() {
           <div className="flex items-center gap-2">
             <RedemptionInbox count={pendingRedemptions + pendingExcuses} />
             <OpsButton />
-            <button
-              type="button"
+                        <IconButton
+              label="Sign out"
+              variant="outline"
+              round
               onClick={onSignOut}
-              aria-label="Sign out"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted hover:text-ink"
-            >
-              <LogOutIcon className="h-5 w-5" />
-            </button>
+              icon={<LogOutIcon className="h-5 w-5" />}
+            />
           </div>
         }
       />

@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
@@ -470,9 +471,7 @@ export function Attendance() {
         {historyLoading ? (
           <ListSkeleton rows={3} />
         ) : history.length === 0 ? (
-          <Card className="p-8 text-center text-sm text-muted">
-            No sessions yet. Start a class to take attendance.
-          </Card>
+          <EmptyState>No sessions yet. Start a class to take attendance.</EmptyState>
         ) : (
           <div className="space-y-4">
             {weeks.map((w) => (
@@ -481,7 +480,7 @@ export function Attendance() {
                   {w.term ? `${termLabel(w.term)} · ` : ''}
                   {w.label}
                 </p>
-                <Card className="divide-y divide-line">
+                <Card pad="none" className="divide-y divide-line">
                   {w.items.map((s) => (
                     <div key={s.id}>
                       <button

@@ -28,14 +28,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           'h-11 w-full rounded-xl border bg-card px-3.5 text-base text-ink',
           'placeholder:text-muted/70 transition-colors',
           'focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30',
-          error ? 'border-brand-500' : 'border-line',
+          error ? 'border-danger' : 'border-line',
           className,
         )}
         aria-invalid={error ? true : undefined}
         {...props}
       />
       {error ? (
-        <p className="mt-1.5 text-sm text-brand-500">{error}</p>
+        <p className="mt-1.5 text-sm text-danger">{error}</p>
       ) : hint ? (
         <p className="mt-1.5 text-sm text-muted">{hint}</p>
       ) : null}

@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -376,9 +377,7 @@ export function Attendance() {
           </Button>
         </Card>
       ) : history.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted">
-          No classes yet. When your instructor starts a class, scan the QR to check in.
-        </Card>
+        <EmptyState>No classes yet. When your instructor starts a class, scan the QR to check in.</EmptyState>
       ) : (
         /* Grouped by term (0027 dates, now configured for the student area
            too). The changelog promised this; until Phase F the history was one
@@ -390,7 +389,7 @@ export function Attendance() {
               <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted/80">
                 {g.label}
               </p>
-              <Card className="divide-y divide-line">
+              <Card pad="none" className="divide-y divide-line">
                 {g.items.map((h) => (
                   <div key={h.recordId} className="flex items-center gap-3 p-4">
                     <div className="min-w-0 flex-1">

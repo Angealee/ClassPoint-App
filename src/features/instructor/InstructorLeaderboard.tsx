@@ -1,5 +1,5 @@
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
-import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotChip } from '@/components/ui/SnapshotStamp'
@@ -106,11 +106,9 @@ export function InstructorLeaderboard() {
       {loading ? (
         <ListSkeleton rows={8} />
       ) : visible.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted">
-          {entries.length === 0
+        <EmptyState>{entries.length === 0
             ? 'No rankings yet — the board settles at 12:30 PM and 7:30 PM.'
-            : 'No students in this section yet.'}
-        </Card>
+            : 'No students in this section yet.'}</EmptyState>
       ) : (
         <CommentsOverlay isInstructor onOpenProfile={openCommenter}>
           <PodiumBoard

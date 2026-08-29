@@ -13,7 +13,7 @@ export function Skeleton({ className }: { className?: string }) {
 /** A card of placeholder rows (avatar + two lines) for roster/leaderboard lists. */
 export function ListSkeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <Card className="divide-y divide-line">
+    <Card pad="none" className="divide-y divide-line">
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="flex items-center gap-3 p-3.5">
           <Skeleton className="h-10 w-10 rounded-full" />

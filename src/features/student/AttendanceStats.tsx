@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -103,9 +104,7 @@ export function AttendanceStats() {
       {attendanceLoading ? (
         <ListSkeleton rows={5} />
       ) : attendance.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted">
-          No classes yet. Once you have checked in a few times, your stats appear here.
-        </Card>
+        <EmptyState>No classes yet. Once you have checked in a few times, your stats appear here.</EmptyState>
       ) : (
         <>
           {/* Headline */}

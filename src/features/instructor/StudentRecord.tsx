@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
@@ -193,7 +194,7 @@ export function StudentRecord() {
     return (
       <div className="space-y-4">
         <BackLink onClick={() => navigate('/teach')} />
-        <Card className="p-8 text-center text-sm text-muted">That student no longer exists.</Card>
+        <EmptyState>That student no longer exists.</EmptyState>
       </div>
     )
   }
@@ -202,7 +203,7 @@ export function StudentRecord() {
     return (
       <div className="space-y-4">
         <BackLink onClick={() => navigate('/teach')} />
-        <Card className="h-28 animate-pulse bg-card-2" />
+        <Card pad="none" className="h-28 animate-pulse bg-card-2" />
         <ListSkeleton rows={6} />
       </div>
     )
@@ -299,7 +300,7 @@ export function StudentRecord() {
                   {w.term ? `${termLabel(w.term)} · ` : ''}
                   {weekLabel(w.week)}
                 </p>
-                <Card className="divide-y divide-line">
+                <Card pad="none" className="divide-y divide-line">
                   {w.items.map((a) => (
                     <div key={a.recordId} className="flex items-center gap-3 p-3">
                       <div className="min-w-0 flex-1">
@@ -353,7 +354,7 @@ export function StudentRecord() {
         {events.length === 0 ? (
           <Card className="p-6 text-center text-sm text-muted">No point activity yet.</Card>
         ) : (
-          <Card className="divide-y divide-line">
+          <Card pad="none" className="divide-y divide-line">
             {events.map((e) => (
               <div key={e.id} className="flex items-center gap-3 p-3">
                 <span
@@ -393,7 +394,7 @@ export function StudentRecord() {
       {redemptions.length > 0 && (
         <div>
           <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Point requests</h2>
-          <Card className="divide-y divide-line">
+          <Card pad="none" className="divide-y divide-line">
             {redemptions.map((r) => (
               <div key={r.id} className="flex items-center gap-3 p-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card-2 font-display text-sm font-bold tabular-nums">

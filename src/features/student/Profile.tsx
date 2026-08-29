@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
@@ -226,11 +227,9 @@ export function Profile() {
       <h1 className="font-display text-2xl font-bold">Profile</h1>
 
       {loading ? (
-        <Card className="h-44 animate-pulse bg-card-2" />
+        <Card pad="none" className="h-44 animate-pulse bg-card-2" />
       ) : !me ? (
-        <Card className="p-8 text-center text-sm text-muted">
-          We couldn't find your student record.
-        </Card>
+        <EmptyState>We couldn't find your student record.</EmptyState>
       ) : (
         <Card className="p-5">
           <div className="flex items-center gap-4">

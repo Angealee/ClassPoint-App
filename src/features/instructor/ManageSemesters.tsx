@@ -1,3 +1,4 @@
+import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
@@ -277,9 +278,10 @@ export function ManageSemesters() {
                     <span className="block font-display text-sm font-bold">{subject.code}</span>
                     <span className="block truncate text-xs text-muted">{subject.name}</span>
                   </button>
-                  <button
-                    type="button"
-                    aria-label={`Remove ${subject.code}`}
+                                    <IconButton
+                    label={`Remove ${subject.code}`}
+                    variant="danger"
+                    size="sm"
                     disabled={busy}
                     onClick={() =>
                       setDeleteTarget({
@@ -287,10 +289,8 @@ export function ManageSemesters() {
                         label: `${subject.code} · ${subject.name}`,
                       })
                     }
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:text-brand-500"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
+                    icon={<TrashIcon className="h-4 w-4" />}
+                  />
                 </div>
               )}
             </li>

@@ -1,3 +1,4 @@
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
@@ -128,12 +129,7 @@ export function PointsHistory() {
           subtitle="Everything you’ve earned and spent this semester."
           fallback="/app"
         />
-        <Card className="p-8 text-center">
-          <p className="text-sm text-muted">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => void load()}>
-            Try again
-          </Button>
-        </Card>
+        <ErrorState onRetry={() => void load()}>{error}</ErrorState>
       </div>
     )
   }
@@ -146,9 +142,7 @@ export function PointsHistory() {
           subtitle="Everything you’ve earned and spent this semester."
           fallback="/app"
         />
-        <Card className="p-8 text-center text-sm text-muted">
-          No points yet. They'll appear here the moment your instructor awards them.
-        </Card>
+        <EmptyState>No points yet. They'll appear here the moment your instructor awards them.</EmptyState>
       </div>
     )
   }
@@ -210,7 +204,7 @@ export function PointsHistory() {
                 </span>
                 {g.term && <span className="text-2xs text-muted/60">{termLabel(g.term)}</span>}
               </p>
-              <Card className="divide-y divide-line">
+              <Card pad="none" className="divide-y divide-line">
                 {g.items.map((e) => (
                   <LedgerRow key={e.id} event={e} />
                 ))}

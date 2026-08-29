@@ -175,7 +175,7 @@ export function AttendanceReview({
       {loading ? (
         <ListSkeleton rows={6} />
       ) : (
-        <Card className="divide-y divide-line">
+        <Card pad="none" className="divide-y divide-line">
           {roster.map((r) => (
             <div key={r.studentId} className="flex items-center gap-3 p-3.5">
               <Avatar name={r.fullName} url={r.avatarUrl} />

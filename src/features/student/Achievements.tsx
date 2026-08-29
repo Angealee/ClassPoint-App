@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
@@ -201,7 +202,7 @@ export function Achievements() {
       )}
 
       {achievementsLoading ? (
-        <Card className="h-64 animate-pulse bg-card-2" />
+        <Card pad="none" className="h-64 animate-pulse bg-card-2" />
       ) : achievementsError ? (
         /* Without this the failed load left an empty catalog, which hid the
            filters above and then said "try a different filter" — with no
@@ -214,9 +215,7 @@ export function Achievements() {
           </Button>
         </Card>
       ) : filtered.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted">
-          Nothing here — try a different filter.
-        </Card>
+        <EmptyState>Nothing here — try a different filter.</EmptyState>
       ) : (
         CATEGORY_ORDER.map((cat) => {
           const list = grouped.get(cat)
@@ -224,7 +223,7 @@ export function Achievements() {
           return (
             <div key={cat}>
               <h2 className="mb-2 px-1 text-sm font-semibold text-muted">{CATEGORY_LABELS[cat]}</h2>
-              <Card className="divide-y divide-line">
+              <Card pad="none" className="divide-y divide-line">
                 {list.map((a) => (
                   <AchievementCard
                     key={a.code}

@@ -1,3 +1,4 @@
+import { IconButton } from '@/components/ui/IconButton'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeftIcon } from '@/components/ui/icons'
@@ -52,14 +53,13 @@ export function PageHeader({
 
   return (
     <div className={cn('flex items-center gap-3', className)}>
-      <button
-        type="button"
+            <IconButton
+        label={backLabel}
+        variant="outline"
+        round
         onClick={goBack}
-        aria-label={backLabel}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
-      >
-        <ArrowLeftIcon className="h-4 w-4" />
-      </button>
+        icon={<ArrowLeftIcon className="h-4 w-4" />}
+      />
       <div className="min-w-0 flex-1">
         <h1 className="truncate font-display text-xl font-bold">{title}</h1>
         {subtitle && <p className="truncate text-sm text-muted">{subtitle}</p>}

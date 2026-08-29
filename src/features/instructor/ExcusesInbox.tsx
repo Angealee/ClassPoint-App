@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -117,10 +118,9 @@ export function ExcusesInbox() {
           Waiting{pending.length > 0 ? ` (${pending.length})` : ''}
         </h2>
         {pending.length === 0 ? (
-          <Card className="flex flex-col items-center gap-2 p-8 text-center">
-            <CheckIcon className="h-7 w-7 text-muted" />
-            <p className="text-sm text-muted">No excuse requests. All caught up.</p>
-          </Card>
+          <EmptyState icon={<CheckIcon />}>
+            No excuse requests. All caught up.
+          </EmptyState>
         ) : (
           <div className="space-y-2">
             {pending.map((r) => (
@@ -181,7 +181,7 @@ export function ExcusesInbox() {
       {decided.length > 0 && (
         <div>
           <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Recent decisions</h2>
-          <Card className="divide-y divide-line">
+          <Card pad="none" className="divide-y divide-line">
             {decided.map((r) => (
               <div key={r.id} className="flex items-center gap-3 p-3.5">
                 <Avatar name={r.studentName} url={r.avatarUrl} className="h-9 w-9" />

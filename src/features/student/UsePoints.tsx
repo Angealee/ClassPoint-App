@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -428,7 +429,7 @@ export function UsePoints() {
       {pending.length > 0 && (
         <div>
           <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Waiting on your instructor</h2>
-          <Card className="divide-y divide-line">
+          <Card pad="none" className="divide-y divide-line">
             {pending.map((r) => (
               <div key={r.id} className="flex items-center gap-3 p-3.5">
                 <RedemptionSummary r={r} />
@@ -458,11 +459,9 @@ export function UsePoints() {
             </Button>
           </Card>
         ) : decided.length === 0 ? (
-          <Card className="p-8 text-center text-sm text-muted">
-            Nothing yet — your decided requests show up here.
-          </Card>
+          <EmptyState>Nothing yet — your decided requests show up here.</EmptyState>
         ) : (
-          <Card className="divide-y divide-line">
+          <Card pad="none" className="divide-y divide-line">
             {decided.map((r) => (
               <div key={r.id} className="p-3.5">
                 <div className="flex items-center gap-3">

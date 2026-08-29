@@ -1,3 +1,5 @@
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
+import { IconButton } from '@/components/ui/IconButton'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
@@ -462,21 +464,24 @@ export function Students() {
       {loading ? (
         <ListSkeleton rows={6} />
       ) : error ? (
-        <Card className="p-6 text-center text-sm text-brand-500">{error}</Card>
+        <ErrorState>{error}</ErrorState>
       ) : students.length === 0 ? (
-        <Card className="p-8 text-center">
-          <p className="text-sm text-muted">No students in {sectionName} yet.</p>
-          <div className="mt-4 flex justify-center gap-3">
-            <Button variant="outline" onClick={() => setAddOpen(true)}>
-              <PlusIcon className="h-5 w-5" /> Add one
-            </Button>
-            <Button variant="outline" onClick={openImport}>
-              <UploadIcon className="h-5 w-5" /> Import a list
-            </Button>
-          </div>
-        </Card>
+        <EmptyState
+          action={
+            <div className="flex justify-center gap-3">
+              <Button variant="outline" icon={<PlusIcon className="h-5 w-5" />} onClick={() => setAddOpen(true)}>
+                Add one
+              </Button>
+              <Button variant="outline" icon={<UploadIcon className="h-5 w-5" />} onClick={openImport}>
+                Import a list
+              </Button>
+            </div>
+          }
+        >
+          No students in {sectionName} yet.
+        </EmptyState>
       ) : filtered.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted">No students match “{query}”.</Card>
+        <EmptyState>No students match “{query}”.</EmptyState>
       ) : (
         <>
         {/* Bulk selectors — awarding a whole class is one tap, not forty.
@@ -511,7 +516,7 @@ export function Students() {
             </button>
           )}
         </div>
-        <Card className="divide-y divide-line">
+        <Card pad="none" className="divide-y divide-line">
           {filtered.map((s) => {
             const level = getLevelProgress(s.semester_points).level
             return (
@@ -561,44 +566,33 @@ export function Students() {
                     </span>
                   </span>
                 </button>
-                <button
-                  type="button"
+                                <IconButton
+                  label={`Grant ${s.full_name} an achievement`}
                   onClick={() => setGrantTarget(s)}
-                  aria-label={`Grant ${s.full_name} an achievement`}
                   title="Grant achievement"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-card-2 hover:text-ink"
-                >
-                  <TrophyIcon className="h-4.5 w-4.5" />
-                </button>
+                  icon={<TrophyIcon className="h-4.5 w-4.5" />}
+                />
                 {s.claimed_at ? (
-                  <button
-                    type="button"
+                                    <IconButton
+                    label={`Reset ${s.full_name}'s PIN`}
                     onClick={() => openReset(s)}
-                    aria-label={`Reset ${s.full_name}'s PIN`}
                     title="Reset PIN"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-card-2 hover:text-ink"
-                  >
-                    <KeyIcon className="h-4.5 w-4.5" />
-                  </button>
+                    icon={<KeyIcon className="h-4.5 w-4.5" />}
+                  />
                 ) : (
-                  <button
-                    type="button"
+                                    <IconButton
+                    label={`Copy ${s.full_name}'s token`}
                     onClick={() => copy(s.claim_token, 'Token copied')}
-                    aria-label={`Copy ${s.full_name}'s token`}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-card-2 hover:text-ink"
-                  >
-                    <CopyIcon className="h-4.5 w-4.5" />
-                  </button>
+                    icon={<CopyIcon className="h-4.5 w-4.5" />}
+                  />
                 )}
-                <button
-                  type="button"
+                                <IconButton
+                  label={`Archive ${s.full_name}`}
+                  variant="danger"
                   onClick={() => setDeleteTarget(s)}
-                  aria-label={`Archive ${s.full_name}`}
                   title="Archive (restorable)"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-brand-500/10 hover:text-brand-500"
-                >
-                  <TrashIcon className="h-4.5 w-4.5" />
-                </button>
+                  icon={<TrashIcon className="h-4.5 w-4.5" />}
+                />
                 {/* Explicit affordance (user's pick): the row itself stays
                     inert so reaching for an icon can't mis-navigate. */}
                 <button
@@ -658,14 +652,12 @@ export function Students() {
             </p>
             <div className="flex items-center justify-between rounded-xl border border-line bg-card-2 px-4 py-3">
               <span className="font-mono text-lg font-bold tracking-widest">{created.token}</span>
-              <button
-                type="button"
+                            <IconButton
+                label="Copy token"
+                variant="accent"
                 onClick={() => copy(created.token, 'Token copied')}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-brand-500 hover:bg-brand-500/10"
-                aria-label="Copy token"
-              >
-                <CopyIcon className="h-5 w-5" />
-              </button>
+                icon={<CopyIcon className="h-5 w-5" />}
+              />
             </div>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setCreated(undefined)}>
@@ -789,14 +781,12 @@ export function Students() {
             </p>
             <div className="flex items-center justify-between rounded-xl border border-line bg-card-2 px-4 py-3">
               <span className="font-mono text-lg font-bold tracking-widest">{resetInfo.token}</span>
-              <button
-                type="button"
+                            <IconButton
+                label="Copy reset code"
+                variant="accent"
                 onClick={() => copy(resetInfo.token, 'Reset code copied')}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-brand-500 hover:bg-brand-500/10"
-                aria-label="Copy reset code"
-              >
-                <CopyIcon className="h-5 w-5" />
-              </button>
+                icon={<CopyIcon className="h-5 w-5" />}
+              />
             </div>
             <Button
               className="w-full"
