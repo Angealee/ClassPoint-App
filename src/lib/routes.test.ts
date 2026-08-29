@@ -53,6 +53,7 @@ const MUST_BE_LINKED = [
   '/app/history',
   '/app/achievements',
   '/app/attendance/stats',
+  '/app/settings',
   // Instructor
   '/teach/ops',
   '/teach/redemptions',
