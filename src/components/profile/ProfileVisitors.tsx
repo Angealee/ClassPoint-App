@@ -76,7 +76,7 @@ export function ProfileVisitors({
             </p>
             <p className="truncate text-xs text-muted">{caption(views)}</p>
           </div>
-          <span className="shrink-0 text-xs font-semibold text-brand-500">See all →</span>
+          <span className="shrink-0 text-xs font-semibold text-accent">See all →</span>
         </button>
       )}
 

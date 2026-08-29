@@ -27,7 +27,7 @@ const STEPS = [
 
 const TONE = {
   gold: 'bg-gold-400/15 text-reward',
-  brand: 'bg-brand-500/10 text-brand-500',
+  brand: 'bg-accent-solid/10 text-accent',
 }
 
 /** First-run intro for new students: points → levels → leaderboard. */
@@ -53,7 +53,7 @@ export function Onboarding({ open, onDone }: { open: boolean; onDone: () => void
               key={i}
               className={cn(
                 'h-1.5 rounded-full transition-all',
-                i === step ? 'w-5 bg-brand-500' : 'w-1.5 bg-line',
+                i === step ? 'w-5 bg-accent-solid' : 'w-1.5 bg-line',
               )}
             />
           ))}

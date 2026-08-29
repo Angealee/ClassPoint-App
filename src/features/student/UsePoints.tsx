@@ -445,7 +445,7 @@ export function UsePoints() {
                 <button
                   type="button"
                   onClick={() => setCancelTarget(r)}
-                  className="shrink-0 text-xs font-semibold text-muted transition-colors hover:text-brand-500"
+                  className="shrink-0 text-xs font-semibold text-muted transition-colors hover:text-danger"
                 >
                   Cancel
                 </button>

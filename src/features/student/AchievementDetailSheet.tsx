@@ -129,7 +129,7 @@ export function AchievementDetailSheet({
             <div className="w-full">
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
                 <div
-                  className="h-full rounded-full bg-brand-500 transition-[width]"
+                  className="h-full rounded-full bg-reward-solid transition-[width]"
                   style={{ width: `${pct}%` }}
                 />
               </div>

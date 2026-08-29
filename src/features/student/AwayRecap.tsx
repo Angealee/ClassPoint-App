@@ -1,6 +1,6 @@
+import { PointEventRow } from '@/components/points/PointEventRow'
 import { Sheet } from '@/components/ui/Sheet'
 import { Button } from '@/components/ui/Button'
-import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import type { PointEvent } from '@/lib/types'
 
@@ -40,33 +40,9 @@ export function AwayRecap({ events, onClose }: { events: PointEvent[]; onClose: 
         </div>
 
         <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
-          {events.map((e) => {
-            const negative = e.points < 0
-            return (
-              <div key={e.id} className="flex items-center gap-3 p-3">
-                <span
-                  className={cn(
-                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold',
-                    negative
-                      ? 'bg-danger-solid/10 text-danger'
-                      : e.category === 'activity'
-                        ? 'bg-brand-500/10 text-brand-500'
-                        : 'bg-gold-400/15 text-reward',
-                  )}
-                >
-                  {negative ? e.points : `+${e.points}`}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {e.note ?? (negative ? 'Deduction' : 'Class points')}
-                  </p>
-                  <p className="text-xs capitalize text-muted">
-                    {e.category} · {timeAgo(e.created_at)}
-                  </p>
-                </div>
-              </div>
-            )
-          })}
+          {events.map((e) => (
+            <PointEventRow key={e.id} event={e} compact />
+          ))}
         </div>
       </div>
 

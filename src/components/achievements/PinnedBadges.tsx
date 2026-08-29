@@ -49,7 +49,7 @@ export function PinnedBadges({ achievements, pinnedCodes, editable, onChange, bu
             type="button"
             onClick={() => setPicking(true)}
             disabled={busy || unlockedUnpinned.length === 0}
-            className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-line p-2 text-muted transition-colors hover:border-brand-500/50 hover:text-brand-500 disabled:opacity-50"
+            className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-line p-2 text-muted transition-colors hover:border-accent-solid/50 hover:text-accent disabled:opacity-50"
           >
             <PlusIcon className="h-5 w-5" />
             <span className="text-2xs">Pin a badge</span>

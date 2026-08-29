@@ -1,3 +1,4 @@
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Textarea } from '@/components/ui/Textarea'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -14,7 +15,6 @@ import {
   setExcuseSlipStatus,
 } from '@/lib/api'
 import { supabase, uniqueChannel } from '@/lib/supabase'
-import { cn } from '@/lib/cn'
 import {
   EXCUSE_DEADLINE_DAYS,
   type AbsenceExcuse,
@@ -191,7 +191,7 @@ export function AbsenceExcuses({
         onClick={() => setGuideOpen(true)}
         className="flex w-full items-center gap-2.5 rounded-xl border border-line px-4 py-3 text-left transition-colors hover:bg-card-2"
       >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-500/12 text-brand-500">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-info-solid/12 text-info">
           <WarningIcon className="h-4 w-4" />
         </span>
         <span className="min-w-0 flex-1 text-sm font-medium">How excuses work</span>
@@ -207,7 +207,7 @@ export function AbsenceExcuses({
             'Present the slip to your instructor.',
           ].map((step, i) => (
             <li key={step} className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/12 text-sm font-bold text-brand-500">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-info-solid/12 text-sm font-bold text-info">
                 {i + 1}
               </span>
               <span className="text-sm">{step}</span>
@@ -263,7 +263,7 @@ export function AbsenceExcuses({
                     </span>
                   )}
                   {excuse?.status === 'rejected' && (
-                    <span className="shrink-0 rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-semibold text-danger">
+                    <span className="shrink-0 rounded-full bg-danger-solid/10 px-2.5 py-1 text-xs font-semibold text-danger">
                       Rejected
                     </span>
                   )}
@@ -282,7 +282,7 @@ export function AbsenceExcuses({
                     <button
                       type="button"
                       onClick={() => setCancelTarget(excuse)}
-                      className="text-xs font-semibold text-muted transition-colors hover:text-brand-500"
+                      className="text-xs font-semibold text-muted transition-colors hover:text-accent"
                     >
                       Cancel
                     </button>
@@ -323,28 +323,15 @@ export function AbsenceExcuses({
           </div>
           <div>
             <p className="mb-1.5 text-sm font-medium">Do you already have your admission slip?</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setHasSlip(false)}
-                className={cn(
-                  'h-10 rounded-xl text-sm font-semibold transition-colors',
-                  !hasSlip ? 'bg-brand-500 text-white' : 'bg-card-2 text-muted',
-                )}
-              >
-                Not yet
-              </button>
-              <button
-                type="button"
-                onClick={() => setHasSlip(true)}
-                className={cn(
-                  'h-10 rounded-xl text-sm font-semibold transition-colors',
-                  hasSlip ? 'bg-brand-500 text-white' : 'bg-card-2 text-muted',
-                )}
-              >
-                Yes, I have it
-              </button>
-            </div>
+            <SegmentedControl
+              label="Do you already have your admission slip?"
+              value={hasSlip ? 'yes' : ('no' as 'yes' | 'no')}
+              onChange={(v) => setHasSlip(v === 'yes')}
+              options={[
+                { value: 'no', label: 'Not yet' },
+                { value: 'yes', label: 'Yes, I have it' },
+              ]}
+            />
           </div>
           <Button
             size="lg"

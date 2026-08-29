@@ -263,7 +263,7 @@ function WeekChart({
                   initial={{ height: 0 }}
                   animate={{ height: `${upPct}%` }}
                   transition={{ duration: 0.4, ease: 'easeOut' }}
-                  className="w-full rounded-t bg-brand-500"
+                  className="w-full rounded-t bg-reward-solid"
                 />
                 {downPct > 0 && (
                   <motion.div

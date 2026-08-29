@@ -209,14 +209,7 @@ export function AttendanceStats() {
                           initial={{ height: 0 }}
                           animate={{ height: `${Math.max(w.rate, 3)}%` }}
                           transition={{ duration: 0.4, ease: 'easeOut' }}
-                          className={cn(
-                            'w-full rounded-t',
-                            w.rate >= 75
-                              ? 'bg-success-solid'
-                              : w.rate >= 50
-                                ? 'bg-gold-400'
-                                : 'bg-brand-500',
-                          )}
+                          className={cn('w-full rounded-t', TONE[rateTone(w.rate)].dot)}
                         />
                       </div>
                       <span className="text-xs tabular-nums text-muted/70">{w.week}</span>

@@ -40,7 +40,7 @@ export function LiveClassBanner({ onScan }: { onScan?: () => void }) {
       className={
         checkedIn
           ? 'flex items-center gap-3 rounded-2xl border border-success-solid/30 bg-success-solid/10 p-3'
-          : 'flex items-center gap-3 rounded-2xl border border-brand-500/30 bg-brand-500/10 p-3'
+          : 'flex items-center gap-3 rounded-2xl border border-accent-solid/30 bg-accent-solid/10 p-3'
       }
     >
       {checkedIn ? (
@@ -48,10 +48,10 @@ export function LiveClassBanner({ onScan }: { onScan?: () => void }) {
           <CheckIcon className="h-5 w-5" />
         </span>
       ) : (
-        <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-500">
+        <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-solid/20 text-accent">
           <QrIcon className="h-5 w-5" />
           {/* Pulsing ring — the one thing on the screen that's happening NOW. */}
-          <span className="absolute inset-0 animate-ping rounded-full bg-brand-500/30" />
+          <span className="absolute inset-0 animate-ping rounded-full bg-accent-solid/30" />
         </span>
       )}
 

@@ -61,7 +61,7 @@ function FilterChip({
       className={cn(
         'shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
         active
-          ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+          ? 'border-accent-solid bg-accent-solid/10 text-accent'
           : 'border-line text-muted hover:text-ink',
       )}
     >
@@ -153,7 +153,7 @@ export function Achievements() {
               className={cn(
                 'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                 !me?.display_title
-                  ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                  ? 'border-accent-solid bg-accent-solid/10 text-accent'
                   : 'border-line text-muted hover:text-ink',
               )}
             >

@@ -127,7 +127,7 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
                     key={n.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className={cn(unread && 'bg-brand-500/5')}
+                    className={cn(unread && 'bg-accent-solid/5')}
                   >
                     <button
                       type="button"
@@ -162,7 +162,7 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
                       </span>
                       {unread && (
                         <span
-                          className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-500"
+                          className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent-solid"
                           aria-label="Unread"
                         />
                       )}

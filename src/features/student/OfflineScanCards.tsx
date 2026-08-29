@@ -87,9 +87,9 @@ export function OfflineScanCards({
 
         // failed
         return (
-          <Card key={e.id} className="border-brand-500/30 bg-brand-500/8 p-3.5">
+          <Card key={e.id} className="border-danger-solid/30 bg-danger-solid/8 p-3.5">
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-danger-solid text-xs font-bold text-white">
                 !
               </span>
               <div className="min-w-0 flex-1">

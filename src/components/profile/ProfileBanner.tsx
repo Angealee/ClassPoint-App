@@ -41,7 +41,7 @@ export function ProfileBanner({ urls, editable, onAdd, onRemove, busy }: Props) 
           onClick={onAdd}
           disabled={busy}
           aria-label="Add photo"
-          className="flex aspect-square items-center justify-center rounded-xl border-2 border-dashed border-line text-muted transition-colors hover:border-brand-500/50 hover:text-brand-500 disabled:opacity-60"
+          className="flex aspect-square items-center justify-center rounded-xl border-2 border-dashed border-line text-muted transition-colors hover:border-accent-solid/50 hover:text-accent disabled:opacity-60"
         >
           {busy ? '…' : <PlusIcon className="h-6 w-6" />}
         </button>

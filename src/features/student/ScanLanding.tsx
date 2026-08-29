@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/Button'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Splash } from '@/components/layout/Splash'
@@ -64,13 +65,9 @@ export function ScanLanding() {
           This link only works from the attendance QR your instructor is showing. Open ClassPoint
           and try the Attendance tab.
         </p>
-        <button
-          type="button"
-          onClick={() => navigate('/app/attendance', { replace: true })}
-          className="mt-2 h-11 rounded-xl bg-brand-500 px-5 text-sm font-medium text-white"
-        >
+        <Button className="mt-2" onClick={() => navigate('/app/attendance', { replace: true })}>
           Open ClassPoint
-        </button>
+        </Button>
       </div>
     )
   }
@@ -82,13 +79,9 @@ export function ScanLanding() {
         <p className="max-w-xs text-sm text-muted">
           Students scan this to check in. You're signed in as the instructor.
         </p>
-        <button
-          type="button"
-          onClick={() => navigate('/teach/attendance', { replace: true })}
-          className="mt-2 h-11 rounded-xl bg-brand-500 px-5 text-sm font-medium text-white"
-        >
+        <Button className="mt-2" onClick={() => navigate('/teach/attendance', { replace: true })}>
           Go to Attendance
-        </button>
+        </Button>
       </div>
     )
   }
