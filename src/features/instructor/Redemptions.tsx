@@ -1,6 +1,8 @@
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Avatar } from '@/components/ui/Avatar'
@@ -133,27 +135,16 @@ export function Redemptions() {
       />
 
       {/* Tabs — one inbox, two request types, plus the price list behind them. */}
-      <div className="grid grid-cols-3 gap-2">
-        {(
-          [
-            ['points', 'Points'],
-            ['excuses', 'Excuses'],
-            ['rewards', 'Rewards'],
-          ] as Array<[RequestsTab, string]>
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setTab(key)}
-            className={cn(
-              'h-10 rounded-xl text-sm font-semibold transition-colors',
-              tab === key ? 'bg-brand-500 text-white' : 'bg-card-2 text-muted hover:text-ink',
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        label="Request type"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: 'points', label: 'Points' },
+          { value: 'excuses', label: 'Excuses' },
+          { value: 'rewards', label: 'Rewards' },
+        ]}
+      />
 
       {tab === 'excuses' && <ExcusesInbox />}
 
@@ -166,9 +157,9 @@ export function Redemptions() {
         <>
           {/* Waiting */}
           <div>
-            <h2 className="mb-2 px-1 text-sm font-semibold text-muted">
+            <SectionLabel>
               Waiting{pending.length > 0 ? ` (${pending.length})` : ''}
-            </h2>
+            </SectionLabel>
             {pending.length === 0 ? (
               <EmptyState icon={<TicketIcon />}>
                 Nothing waiting. All caught up.
@@ -257,8 +248,8 @@ export function Redemptions() {
           {/* Decided */}
           {decided.length > 0 && (
             <div>
-              <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Recent decisions</h2>
-              <Card pad="none" className="divide-y divide-line">
+              <SectionLabel>Recent decisions</SectionLabel>
+              <Rows>
                 {decided.map((r) => (
                   <div key={r.id} className="flex items-center gap-3 p-3.5">
                     <Avatar name={r.studentName} url={r.avatarUrl} className="h-9 w-9" />
@@ -279,7 +270,7 @@ export function Redemptions() {
                     </span>
                   </div>
                 ))}
-              </Card>
+              </Rows>
             </div>
           )}
         </>

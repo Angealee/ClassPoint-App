@@ -1,5 +1,5 @@
 import type { AttendanceStatus } from '@/lib/types'
-import { cn } from '@/lib/cn'
+import { Chip } from '@/components/ui/Chip'
 import { TONE, type ToneClasses, type ToneName } from '@/lib/tone'
 
 /**
@@ -34,15 +34,8 @@ export function StatusChip({
 }) {
   const meta = STATUS_META[status]
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
-        meta.chip,
-        className,
-      )}
-    >
-      <span className={cn('h-1.5 w-1.5 rounded-full', meta.dot)} />
+    <Chip tone={meta.tone} dot className={className}>
       {meta.label}
-    </span>
+    </Chip>
   )
 }

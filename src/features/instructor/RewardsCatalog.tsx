@@ -1,6 +1,6 @@
 import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { ListSkeleton } from '@/components/ui/Skeleton'
@@ -129,7 +129,7 @@ export function RewardsCatalog() {
               No rewards yet. Add one below and it appears on every student’s Use points screen.
             </Card>
           ) : (
-            <Card pad="none" className="divide-y divide-line">
+            <Rows>
               {live.map((item) => (
                 <div key={item.id} className="p-3.5">
                   {editingId === item.id ? (
@@ -190,7 +190,7 @@ export function RewardsCatalog() {
                   )}
                 </div>
               ))}
-            </Card>
+            </Rows>
           )}
 
           {retired.length > 0 && (
@@ -198,7 +198,7 @@ export function RewardsCatalog() {
               <h3 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
                 Retired
               </h3>
-              <Card pad="none" className="divide-y divide-line">
+              <Rows>
                 {retired.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 p-3 opacity-70">
                     <span className="min-w-0 flex-1 truncate text-sm">{item.label}</span>
@@ -213,7 +213,7 @@ export function RewardsCatalog() {
                     </button>
                   </div>
                 ))}
-              </Card>
+              </Rows>
             </div>
           )}
         </>

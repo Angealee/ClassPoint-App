@@ -1,3 +1,4 @@
+import { Textarea } from '@/components/ui/Textarea'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -113,17 +114,14 @@ export function Broadcast({ counts }: { counts: Record<string, number> }) {
         />
 
         <div className="w-full">
-          <label htmlFor="bc-body" className="mb-1.5 block text-sm font-medium text-ink">
-            Message
-          </label>
-          <textarea
+          <Textarea
             id="bc-body"
+            label="Message"
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={3}
             maxLength={BODY_MAX}
             placeholder="No IT 32 tomorrow — we'll cover the missed topic on Friday."
-            className="w-full resize-none rounded-xl border border-line bg-card px-3 py-2.5 text-sm"
           />
           <p className="mt-1 text-xs text-muted">
             {body.length}/{BODY_MAX}

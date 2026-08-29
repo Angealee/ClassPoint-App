@@ -1,7 +1,8 @@
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { XpBar } from '@/components/ui/XpBar'
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
 import { Avatar } from '@/components/ui/Avatar'
@@ -185,7 +186,7 @@ export function Dashboard() {
 
       {/* Recent points feed — grouped by day. */}
       <motion.div variants={item}>
-        <h2 className="mb-2 text-sm font-semibold text-muted">Recent points</h2>
+        <SectionLabel>Recent points</SectionLabel>
         {events.length === 0 ? (
           <EmptyState
             icon={
@@ -204,11 +205,11 @@ export function Dashboard() {
                 <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted/80">
                   {group.label}
                 </p>
-                <Card pad="none" className="divide-y divide-line">
+                <Rows>
                   {group.items.map((e) => (
                     <FeedRow key={e.id} event={e} />
                   ))}
-                </Card>
+                </Rows>
               </div>
             ))}
           </div>

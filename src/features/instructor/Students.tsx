@@ -2,7 +2,7 @@ import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Card } from '@/components/ui/Card'
+import { Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -516,7 +516,7 @@ export function Students() {
             </button>
           )}
         </div>
-        <Card pad="none" className="divide-y divide-line">
+        <Rows>
           {filtered.map((s) => {
             const level = getLevelProgress(s.semester_points).level
             return (
@@ -606,7 +606,7 @@ export function Students() {
               </div>
             )
           })}
-        </Card>
+        </Rows>
         </>
       )}
 

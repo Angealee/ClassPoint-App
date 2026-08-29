@@ -1,5 +1,6 @@
+import { StickyBar } from '@/components/ui/StickyBar'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { SuccessTick } from '@/components/ui/SuccessTick'
@@ -175,7 +176,7 @@ export function AttendanceReview({
       {loading ? (
         <ListSkeleton rows={6} />
       ) : (
-        <Card pad="none" className="divide-y divide-line">
+        <Rows>
           {roster.map((r) => (
             <div key={r.studentId} className="flex items-center gap-3 p-3.5">
               <Avatar name={r.fullName} url={r.avatarUrl} />
@@ -205,10 +206,10 @@ export function AttendanceReview({
               </div>
             </div>
           ))}
-        </Card>
+        </Rows>
       )}
 
-      <div className="sticky bottom-19 z-10 md:bottom-4">
+      <StickyBar>
         <Button
           size="lg"
           className="w-full shadow-lg"
@@ -221,7 +222,7 @@ export function AttendanceReview({
               ? `Apply −${deduction} & finish`
               : 'Save attendance & finish'}
         </Button>
-      </div>
+      </StickyBar>
 
       <ConfirmDialog
         open={confirmCommit}

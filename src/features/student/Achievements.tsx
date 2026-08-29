@@ -1,7 +1,8 @@
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { AchievementCard } from '@/components/achievements/AchievementCard'
@@ -222,8 +223,8 @@ export function Achievements() {
           if (!list || list.length === 0) return null
           return (
             <div key={cat}>
-              <h2 className="mb-2 px-1 text-sm font-semibold text-muted">{CATEGORY_LABELS[cat]}</h2>
-              <Card pad="none" className="divide-y divide-line">
+              <SectionLabel>{CATEGORY_LABELS[cat]}</SectionLabel>
+              <Rows>
                 {list.map((a) => (
                   <AchievementCard
                     key={a.code}
@@ -232,7 +233,7 @@ export function Achievements() {
                     onClick={() => setDetail(a)}
                   />
                 ))}
-              </Card>
+              </Rows>
             </div>
           )
         })

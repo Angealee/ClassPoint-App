@@ -2,7 +2,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Sheet } from '@/components/ui/Sheet'
@@ -436,7 +436,7 @@ export function SessionDetail() {
             <StatusChip status={g.status} />
             <span className="text-xs tabular-nums text-muted">{g.items.length}</span>
           </div>
-          <Card pad="none" className="divide-y divide-line">
+          <Rows>
             {g.items.map((r) => (
               <button
                 key={r.studentId}
@@ -465,7 +465,7 @@ export function SessionDetail() {
                 )}
               </button>
             ))}
-          </Card>
+          </Rows>
         </div>
       ))}
 
@@ -474,7 +474,7 @@ export function SessionDetail() {
           <p className="mb-2 px-1 text-xs font-semibold text-muted">
             No record ({unmarked.length})
           </p>
-          <Card pad="none" className="divide-y divide-line">
+          <Rows>
             {/* Tappable: a student with no record can now be given one. The
                 picker routes through set_attendance_status, so the points
                 ledger lands exactly as it would have during class. */}
@@ -490,7 +490,7 @@ export function SessionDetail() {
                 <span className="shrink-0 text-xs font-semibold text-brand-500">Add record</span>
               </button>
             ))}
-          </Card>
+          </Rows>
         </div>
       )}
 

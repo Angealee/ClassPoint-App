@@ -1,6 +1,7 @@
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Avatar } from '@/components/ui/Avatar'
@@ -114,9 +115,9 @@ export function ExcusesInbox() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="mb-2 px-1 text-sm font-semibold text-muted">
+        <SectionLabel>
           Waiting{pending.length > 0 ? ` (${pending.length})` : ''}
-        </h2>
+        </SectionLabel>
         {pending.length === 0 ? (
           <EmptyState icon={<CheckIcon />}>
             No excuse requests. All caught up.
@@ -180,8 +181,8 @@ export function ExcusesInbox() {
 
       {decided.length > 0 && (
         <div>
-          <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Recent decisions</h2>
-          <Card pad="none" className="divide-y divide-line">
+          <SectionLabel>Recent decisions</SectionLabel>
+          <Rows>
             {decided.map((r) => (
               <div key={r.id} className="flex items-center gap-3 p-3.5">
                 <Avatar name={r.studentName} url={r.avatarUrl} className="h-9 w-9" />
@@ -202,7 +203,7 @@ export function ExcusesInbox() {
                 </span>
               </div>
             ))}
-          </Card>
+          </Rows>
         </div>
       )}
 

@@ -1,7 +1,8 @@
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Avatar } from '@/components/ui/Avatar'
@@ -281,7 +282,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
           {/* Per-student table */}
           <div>
             <div className="mb-2 flex items-center justify-between gap-2 px-1">
-              <h2 className="text-sm font-semibold text-muted">Per student</h2>
+              <SectionLabel className="mb-0">Per student</SectionLabel>
               <div className="flex gap-1">
                 {(
                   [
@@ -304,11 +305,11 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
                 ))}
               </div>
             </div>
-            <Card pad="none" className="divide-y divide-line">
+            <Rows>
               {ranked.map((s) => (
                 <StudentRow key={s.studentId} stat={s} />
               ))}
-            </Card>
+            </Rows>
             <p className="mt-2 px-1 text-xs text-muted">
               Rate = present + late, out of sessions that counted. Excused and irregular sessions
               are left out entirely.
@@ -326,7 +327,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
 
           {/* Sessions by week */}
           <div>
-            <h2 className="mb-2 px-1 text-sm font-semibold text-muted">All sessions</h2>
+            <SectionLabel>All sessions</SectionLabel>
             <div className="space-y-4">
               {untaggedCount > 0 && sectionSubjects.length > 0 && (
                 <Card className="border-gold-400/40 bg-gold-400/10 p-3.5">
@@ -346,7 +347,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
                     {w.term ? `${termLabel(w.term)} · ` : ''}
                     {w.label}
                   </p>
-                  <Card pad="none" className="divide-y divide-line">
+                  <Rows>
                     {w.items.map((s) => (
                       <div key={s.id}>
                         <button
@@ -390,7 +391,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
                         )}
                       </div>
                     ))}
-                  </Card>
+                  </Rows>
                 </div>
               ))}
             </div>

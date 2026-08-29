@@ -1,7 +1,7 @@
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ListSkeleton } from '@/components/ui/Skeleton'
@@ -154,7 +154,7 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
             ? 'Nothing matches those filters.'
             : 'No awards yet — points you give will appear here.'}</EmptyState>
       ) : (
-        <Card pad="none" className="divide-y divide-line">
+        <Rows>
           {records.map((r) => {
             const negative = r.points < 0
             return (
@@ -187,7 +187,7 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
               </div>
             )
           })}
-        </Card>
+        </Rows>
       )}
 
       {!loading && !error && hasMore && (

@@ -1,8 +1,9 @@
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -272,7 +273,7 @@ export function UsePoints() {
           10 points is worth — this is the whole point of the catalog. */}
       {catalog.length > 0 && (
         <div>
-          <h2 className="mb-2 px-1 text-sm font-semibold text-muted">What you can get</h2>
+          <SectionLabel>What you can get</SectionLabel>
           <div className="grid grid-cols-2 gap-3">
             {catalog.map((item) => {
               const affordable = item.points <= available
@@ -428,8 +429,8 @@ export function UsePoints() {
       {/* Waiting */}
       {pending.length > 0 && (
         <div>
-          <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Waiting on your instructor</h2>
-          <Card pad="none" className="divide-y divide-line">
+          <SectionLabel>Waiting on your instructor</SectionLabel>
+          <Rows>
             {pending.map((r) => (
               <div key={r.id} className="flex items-center gap-3 p-3.5">
                 <RedemptionSummary r={r} />
@@ -442,13 +443,13 @@ export function UsePoints() {
                 </button>
               </div>
             ))}
-          </Card>
+          </Rows>
         </div>
       )}
 
       {/* History */}
       <div>
-        <h2 className="mb-2 px-1 text-sm font-semibold text-muted">History</h2>
+        <SectionLabel>History</SectionLabel>
         {loading ? (
           <ListSkeleton rows={3} />
         ) : loadError ? (
@@ -461,7 +462,7 @@ export function UsePoints() {
         ) : decided.length === 0 ? (
           <EmptyState>Nothing yet — your decided requests show up here.</EmptyState>
         ) : (
-          <Card pad="none" className="divide-y divide-line">
+          <Rows>
             {decided.map((r) => (
               <div key={r.id} className="p-3.5">
                 <div className="flex items-center gap-3">
@@ -474,7 +475,7 @@ export function UsePoints() {
                 )}
               </div>
             ))}
-          </Card>
+          </Rows>
         )}
       </div>
 

@@ -1,7 +1,8 @@
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -456,7 +457,7 @@ export function Attendance() {
         <div className="mb-2 flex items-center justify-between gap-2 px-1">
           <div className="flex items-center gap-2">
             <CalendarIcon className="h-4 w-4 text-muted" />
-            <h2 className="text-sm font-semibold text-muted">Recent sessions</h2>
+            <SectionLabel className="mb-0">Recent sessions</SectionLabel>
           </div>
           {history.length > 0 && (
             <button
@@ -480,7 +481,7 @@ export function Attendance() {
                   {w.term ? `${termLabel(w.term)} · ` : ''}
                   {w.label}
                 </p>
-                <Card pad="none" className="divide-y divide-line">
+                <Rows>
                   {w.items.map((s) => (
                     <div key={s.id}>
                       <button
@@ -532,7 +533,7 @@ export function Attendance() {
                       )}
                     </div>
                   ))}
-                </Card>
+                </Rows>
               </div>
             ))}
           </div>

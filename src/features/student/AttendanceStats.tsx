@@ -1,3 +1,4 @@
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -119,7 +120,7 @@ export function AttendanceStats() {
           {/* Per term */}
           {terms.length > 0 && (
             <div>
-              <h2 className="mb-2 px-1 text-sm font-semibold text-muted">By term</h2>
+              <SectionLabel>By term</SectionLabel>
               <Card className="divide-y divide-line p-0">
                 {terms.map((t) => (
                   <div key={t.key} className="px-4 py-3.5">
@@ -152,7 +153,7 @@ export function AttendanceStats() {
           {/* Weekly trend */}
           {weeks.length > 1 && (
             <div>
-              <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Week by week</h2>
+              <SectionLabel>Week by week</SectionLabel>
               <Card className="p-4">
                 <div className="flex items-end gap-1.5 overflow-x-auto pb-1">
                   {weeks.map((w) => (
@@ -187,7 +188,7 @@ export function AttendanceStats() {
           {/* Punctuality */}
           {punctuality && (
             <div>
-              <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Punctuality</h2>
+              <SectionLabel>Punctuality</SectionLabel>
               <Card className="p-0">
                 <div className="grid grid-cols-3 divide-x divide-line">
                   <div className="flex flex-col items-center justify-center py-4">

@@ -1,7 +1,8 @@
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -268,7 +269,7 @@ export function StudentRecord() {
       {/* Attendance */}
       <div>
         <div className="mb-2 flex items-center justify-between px-1">
-          <h2 className="text-sm font-semibold text-muted">Attendance</h2>
+          <SectionLabel className="mb-0">Attendance</SectionLabel>
           {stats.rate !== null && (
             <span className="text-sm font-bold tabular-nums text-brand-500">
               {stats.rate}% · {stats.present}P {stats.late}L {stats.absent}A
@@ -300,7 +301,7 @@ export function StudentRecord() {
                   {w.term ? `${termLabel(w.term)} · ` : ''}
                   {weekLabel(w.week)}
                 </p>
-                <Card pad="none" className="divide-y divide-line">
+                <Rows>
                   {w.items.map((a) => (
                     <div key={a.recordId} className="flex items-center gap-3 p-3">
                       <div className="min-w-0 flex-1">
@@ -319,7 +320,7 @@ export function StudentRecord() {
                       <StatusChip status={a.status} />
                     </div>
                   ))}
-                </Card>
+                </Rows>
               </div>
             ))}
           </div>
@@ -350,11 +351,11 @@ export function StudentRecord() {
 
       {/* Points ledger */}
       <div>
-        <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Recent points</h2>
+        <SectionLabel>Recent points</SectionLabel>
         {events.length === 0 ? (
           <Card className="p-6 text-center text-sm text-muted">No point activity yet.</Card>
         ) : (
-          <Card pad="none" className="divide-y divide-line">
+          <Rows>
             {events.map((e) => (
               <div key={e.id} className="flex items-center gap-3 p-3">
                 <span
@@ -386,15 +387,15 @@ export function StudentRecord() {
                 {loadingMore ? 'Loading…' : 'Load more'}
               </button>
             )}
-          </Card>
+          </Rows>
         )}
       </div>
 
       {/* Redemptions */}
       {redemptions.length > 0 && (
         <div>
-          <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Point requests</h2>
-          <Card pad="none" className="divide-y divide-line">
+          <SectionLabel>Point requests</SectionLabel>
+          <Rows>
             {redemptions.map((r) => (
               <div key={r.id} className="flex items-center gap-3 p-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card-2 font-display text-sm font-bold tabular-nums">
@@ -412,7 +413,7 @@ export function StudentRecord() {
                 </span>
               </div>
             ))}
-          </Card>
+          </Rows>
         </div>
       )}
 

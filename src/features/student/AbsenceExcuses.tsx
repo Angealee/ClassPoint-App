@@ -1,5 +1,7 @@
+import { Textarea } from '@/components/ui/Textarea'
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Card } from '@/components/ui/Card'
+import { Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Sheet } from '@/components/ui/Sheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -223,8 +225,8 @@ export function AbsenceExcuses({
 
       {/* Actionable absences */}
       <div>
-        <h2 className="mb-2 px-1 text-sm font-semibold text-muted">Absences to resolve</h2>
-        <Card pad="none" className="divide-y divide-line">
+        <SectionLabel>Absences to resolve</SectionLabel>
+        <Rows>
           {actionable.map((h) => {
             const excuse = excuseByRecord.get(h.recordId)
             return (
@@ -295,7 +297,7 @@ export function AbsenceExcuses({
               </div>
             )
           })}
-        </Card>
+        </Rows>
       </div>
 
       {/* Request sheet */}
@@ -310,12 +312,12 @@ export function AbsenceExcuses({
           </p>
           <div>
             <p className="mb-1.5 text-sm font-medium">Reason</p>
-            <textarea
+            <Textarea
               value={reason}
               onChange={(e) => setReason(e.target.value.slice(0, 280))}
               rows={3}
               placeholder="e.g. Was sick, medical certificate available"
-              className="w-full rounded-xl border border-line bg-canvas px-3 py-2 text-base outline-none focus:ring-2 focus:ring-brand-500/40"
+              className="bg-canvas"
             />
             <p className="mt-1 text-right text-xs text-muted">{reason.length}/280</p>
           </div>

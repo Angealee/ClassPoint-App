@@ -1,9 +1,9 @@
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { useEffect, useRef, useState } from 'react'
 import { Sheet } from '@/components/ui/Sheet'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { DownloadIcon } from '@/components/ui/icons'
-import { cn } from '@/lib/cn'
 import { CARD_H, CARD_W, ShareCard, type ShareVariant } from './ShareCard'
 import type { LeaderboardEntry } from '@/lib/types'
 
@@ -130,26 +130,15 @@ export function ShareSheet({
     <Sheet open={open} onClose={onClose} title="Share the board">
       <div className="space-y-4">
         {/* Style picker */}
-        <div className="grid grid-cols-2 gap-2">
-          {(
-            [
-              ['podium', 'Podium'],
-              ['list', 'Top 10'],
-            ] as Array<[ShareVariant, string]>
-          ).map(([v, label]) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setVariant(v)}
-              className={cn(
-                'h-10 rounded-xl text-sm font-semibold transition-colors',
-                variant === v ? 'bg-brand-500 text-white' : 'bg-card-2 text-muted hover:text-ink',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Share style"
+          value={variant}
+          onChange={setVariant}
+          options={[
+            { value: 'podium', label: 'Podium' },
+            { value: 'list', label: 'Top 10' },
+          ]}
+        />
 
         {/* Live preview — exactly what gets exported, just scaled down. */}
         {hasEntries ? (

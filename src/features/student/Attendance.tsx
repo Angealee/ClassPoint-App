@@ -2,7 +2,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { Sheet } from '@/components/ui/Sheet'
@@ -389,7 +389,7 @@ export function Attendance() {
               <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted/80">
                 {g.label}
               </p>
-              <Card pad="none" className="divide-y divide-line">
+              <Rows>
                 {g.items.map((h) => (
                   <div key={h.recordId} className="flex items-center gap-3 p-4">
                     <div className="min-w-0 flex-1">
@@ -419,7 +419,7 @@ export function Attendance() {
                     <StatusChip status={h.status} />
                   </div>
                 ))}
-              </Card>
+              </Rows>
             </div>
           ))}
         </div>

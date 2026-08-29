@@ -1,6 +1,6 @@
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { cn } from '@/lib/cn'
 import { AwardHistory } from './AwardHistory'
 import { SessionHistory } from './SessionHistory'
 
@@ -39,29 +39,15 @@ export function History() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        {(
-          [
-            ['points', 'Points'],
-            ['attendance', 'Attendance'],
-          ] as Array<[HistoryTab, string]>
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            aria-pressed={tab === key}
-            onClick={() => select(key)}
-            className={cn(
-              'rounded-xl border py-2 text-sm font-semibold transition-colors',
-              tab === key
-                ? 'border-brand-500 bg-brand-500/10 text-brand-500'
-                : 'border-line text-muted hover:text-ink',
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        label="History view"
+        value={tab}
+        onChange={select}
+        options={[
+          { value: 'points', label: 'Points' },
+          { value: 'attendance', label: 'Attendance' },
+        ]}
+      />
 
       {tab === 'points' ? <AwardHistory embedded /> : <SessionHistory embedded />}
     </div>

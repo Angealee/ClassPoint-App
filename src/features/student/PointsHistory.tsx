@@ -1,7 +1,7 @@
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { ListSkeleton } from '@/components/ui/Skeleton'
@@ -204,11 +204,11 @@ export function PointsHistory() {
                 </span>
                 {g.term && <span className="text-2xs text-muted/60">{termLabel(g.term)}</span>}
               </p>
-              <Card pad="none" className="divide-y divide-line">
+              <Rows>
                 {g.items.map((e) => (
                   <LedgerRow key={e.id} event={e} />
                 ))}
-              </Card>
+              </Rows>
             </div>
           ))}
         </div>

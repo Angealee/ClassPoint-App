@@ -1,9 +1,10 @@
+import { StickyBar } from '@/components/ui/StickyBar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Avatar } from '@/components/ui/Avatar'
@@ -626,7 +627,7 @@ export function AttendanceSession({
       ) : visible.length === 0 ? (
         <EmptyState>No students match that filter.</EmptyState>
       ) : (
-        <Card pad="none" className="divide-y divide-line">
+        <Rows>
           {visible.map((r) => {
             const open = pickerFor === r.studentId
             const isManual = manualIds.has(r.studentId)
@@ -726,10 +727,10 @@ export function AttendanceSession({
               </div>
             )
           })}
-        </Card>
+        </Rows>
       )}
 
-      <div className="sticky bottom-19 z-10 md:bottom-4">
+      <StickyBar>
         <AnimatePresence mode="wait" initial={false}>
           {confirmEnd ? (
             <motion.div
@@ -765,7 +766,7 @@ export function AttendanceSession({
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </StickyBar>
 
       {/* Fullscreen "present" QR — scan from a projector / shared screen */}
       <AnimatePresence>

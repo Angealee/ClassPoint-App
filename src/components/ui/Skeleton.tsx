@@ -1,4 +1,4 @@
-import { Card } from '@/components/ui/Card'
+import { Rows } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 
 /** A single shimmering placeholder block. */
@@ -13,7 +13,7 @@ export function Skeleton({ className }: { className?: string }) {
 /** A card of placeholder rows (avatar + two lines) for roster/leaderboard lists. */
 export function ListSkeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <Card pad="none" className="divide-y divide-line">
+    <Rows>
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="flex items-center gap-3 p-3.5">
           <Skeleton className="h-10 w-10 rounded-full" />
@@ -24,6 +24,6 @@ export function ListSkeleton({ rows = 5 }: { rows?: number }) {
           <Skeleton className="h-4 w-8" />
         </div>
       ))}
-    </Card>
+    </Rows>
   )
 }

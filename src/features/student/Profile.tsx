@@ -1,3 +1,4 @@
+import { Textarea } from '@/components/ui/Textarea'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -562,16 +563,13 @@ export function Profile() {
             required
           />
           <div className="w-full">
-            <label htmlFor="profile-bio" className="mb-1.5 block text-sm font-medium text-ink">
-              Bio
-            </label>
-            <textarea
+            <Textarea
               id="profile-bio"
+              label="Bio"
               value={bio}
               onChange={(e) => setBio(e.target.value.slice(0, 160))}
               placeholder="A short line about you — classmates see this on your profile."
               rows={3}
-              className="w-full resize-none rounded-xl border border-line bg-card px-3.5 py-2.5 text-base text-ink placeholder:text-muted/70 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
             />
             <p className="mt-1.5 text-right text-xs text-muted">{bio.length}/160</p>
           </div>
