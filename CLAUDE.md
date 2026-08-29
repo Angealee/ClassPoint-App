@@ -827,6 +827,52 @@ spinner's top border and two focus rings. Everything else is a role token.
 two button branches cannot be reached in a browser without a login — that migration is
 verified by typecheck and build only.
 
+Era 6.0 Phase 10 — the live-class flow. Decisions (user, 2026-08-30): **one status
+picker with several densities** · **keep `?review=` in the URL AND warn before leaving
+uncommitted** · **this phase is the four live-class screens only** (the other 18
+instructor files are a separate phase).
+
+**THE REVIEW TRAP WAS REAL.** `?review=<id>` deep-linked into the review view and was
+then consumed and STRIPPED — the code called that "so a refresh behaves normally", but
+normal there meant losing the review. A refresh, an accidental back, or a phone locking
+mid-review dropped the instructor to home and left the session **ended-but-not-finalised
+with penalties never applied**, the only marker being a pill on a card they might not
+scroll to. The param now IS the view: written on entry, held for the duration, cleared
+only in `afterReview()`.
+
+**`AttendanceReview` had NO WAY OUT** — no back button, no header affordance. The only
+exits were finalising or navigating away via the tab bar, which abandoned the review
+silently. It now has a back button behind a ConfirmDialog that names what leaving costs
+("the −N points of penalties are NOT applied") — the treatment every other destructive
+action already gets.
+
+**Making the param persist introduced a regression I then had to fix**, worth recording
+because the same shape will recur: a review belongs to ONE section, but the
+section-change effect skipped its reset whenever the param was present, so switching
+sections mid-review kept showing the PREVIOUS section's session. The effect now
+distinguishes a genuine section change (abandon the review, clear the param) from a cold
+deep-link (keep it). **When a URL param starts persisting, audit every effect that reads
+it as a one-shot.**
+
+**`components/attendance/StatusPicker.tsx` replaces three implementations** of the
+identical task, each with its own copy of the status ORDER and its own selected-state
+rule: `grid` (labelled buttons 3-up + Reset — the live screen), `compact` (five letter
+squares — the review roster), `list` (full rows with a points-effect line — the
+session-detail sheet). **The densities stay different on purpose**: five labels beside a
+name is too wide for the review roster, and the live screen is used under time pressure
+where initials are the wrong thing to decode. Only the duplication went.
+
+34 identity/selected sites on these screens moved to `accent` — the live-session banner,
+the "Live" pill, chosen subject chips, the penalties switch, the QR rotation bar, inline
+links. **Two brand-red uses remain and both are correct:** a focus ring, and
+`accent-brand-500`, which is the CSS `accent-color` on a native checkbox (same category
+as a focus ring — and renaming it would read as `accent-accent-solid`).
+
+**Not verifiable in this environment:** the review-trap fix needs an instructor login and
+a real ended session, so it is verified by typecheck, build and static reading only. It
+is the highest-value change in the phase and the one most worth exercising on a real
+class.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
