@@ -146,7 +146,7 @@ export function Leaderboard() {
                 setShareMounted(true)
                 setShareOpen(true)
               }}
-              className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-semibold text-brand-500 transition-opacity hover:opacity-80"
+              className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-solid/10 px-2.5 py-1 text-xs font-semibold text-accent transition-opacity hover:opacity-80"
             >
               <ShareIcon className="h-3.5 w-3.5" /> Share
             </button>
@@ -240,7 +240,7 @@ function YourRankCard({
       type="button"
       onClick={onClick}
       aria-label="View your profile"
-      className="block w-full overflow-hidden rounded-2xl border border-gold-400/40 bg-linear-to-r from-brand-500/10 via-card to-gold-400/10 p-3.5 text-left transition-transform active:scale-[0.99]"
+      className="block w-full overflow-hidden rounded-2xl border border-gold-400/40 bg-linear-to-r from-accent-solid/10 via-card to-gold-400/10 p-3.5 text-left transition-transform active:scale-[0.99]"
     >
       <div className="flex items-center gap-3">
         <div className="w-12 shrink-0 text-center">

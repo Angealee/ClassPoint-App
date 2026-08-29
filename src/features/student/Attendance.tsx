@@ -1,4 +1,4 @@
-import { EmptyState } from '@/components/ui/EmptyState'
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { Sheet } from '@/components/ui/Sheet'
 import { ListSkeleton } from '@/components/ui/Skeleton'
-import { ScanIcon, CheckIcon } from '@/components/ui/icons'
+import { ScanIcon, CheckIcon, WarningIcon } from '@/components/ui/icons'
 import { QrScanner } from '@/components/attendance/QrScanner'
 import { StatusChip, STATUS_META } from '@/components/attendance/StatusChip'
 import { useStudentData } from '@/features/student/StudentData'
@@ -293,15 +293,12 @@ export function Attendance() {
       {loading ? (
         <ListSkeleton rows={4} />
       ) : loadError ? (
-        <Card className="p-6 text-center">
-          <p className="text-sm text-brand-500">Couldn’t load your attendance.</p>
-          <p className="mt-1 text-xs text-muted">
-            Your record is safe — this is just the connection.
-          </p>
-          <Button variant="outline" size="sm" className="mt-3" onClick={() => void load()}>
-            Try again
-          </Button>
-        </Card>
+        <ErrorState
+          onRetry={() => void load()}
+          detail="Your record is safe — this is just the connection."
+        >
+          Couldn’t load your attendance.
+        </ErrorState>
       ) : history.length === 0 ? (
         <EmptyState>No classes yet. When your instructor starts a class, scan the QR to check in.</EmptyState>
       ) : (
@@ -383,8 +380,8 @@ export function Attendance() {
           </div>
         ) : error ? (
           <div className="space-y-4 py-2 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-500/10 text-2xl">
-              ⚠️
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-danger-solid/10 text-danger">
+              <WarningIcon className="h-7 w-7" />
             </div>
             <p className="text-sm text-ink">{error}</p>
             <div className="flex gap-3">

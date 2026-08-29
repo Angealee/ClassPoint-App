@@ -289,7 +289,7 @@ function PodiumCard({
           </div>
         )}
         {/* "You" tint. */}
-        {isMe && <div className="pointer-events-none absolute inset-0 bg-brand-500/10" />}
+        {isMe && <div className="pointer-events-none absolute inset-0 bg-accent-solid/10" />}
 
         {/* Gold XP ring around the avatar shows level progress. */}
         <div
@@ -314,7 +314,7 @@ function PodiumCard({
         <div className="relative z-[1] w-full min-w-0">
           <p className="truncate text-xs font-semibold sm:text-sm">
             {entry.display_name}
-            {isMe && <span className="text-brand-500"> (you)</span>}
+            {isMe && <span className="text-accent"> (you)</span>}
           </p>
           <p className="truncate text-2xs text-muted sm:text-xs">
             {sectionLabel ? `${sectionLabel} · ` : ''}Lv {level}
@@ -415,10 +415,10 @@ function RestRow({
         className={cn(
           'relative flex items-center gap-3 overflow-hidden p-3 transition-colors',
           onClick && 'hover:bg-card-2',
-          isMe && 'ring-1 ring-brand-500/40',
+          isMe && 'ring-1 ring-accent-solid/40',
         )}
       >
-        {isMe && <div className="pointer-events-none absolute inset-0 bg-brand-500/10" />}
+        {isMe && <div className="pointer-events-none absolute inset-0 bg-accent-solid/10" />}
         <span className="relative z-[1] w-6 text-center font-display text-base font-bold text-muted">
           {place}
         </span>
@@ -426,7 +426,7 @@ function RestRow({
         <div className="relative z-[1] min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">
             {entry.display_name}
-            {isMe && <span className="text-brand-500"> (you)</span>}
+            {isMe && <span className="text-accent"> (you)</span>}
           </p>
           {/* Section + level, then the two movement signals (0037). Both hide
               themselves when there's nothing to say — no arrow on an unchanged
