@@ -8,24 +8,14 @@ import { Button } from '@/components/ui/Button'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { STATUS_META } from '@/components/attendance/StatusChip'
 import { groupByTerm, groupByWeek, termLabel } from '@/lib/term'
-import { NEUTRAL_STATUSES } from '@/lib/types'
+import { bySubject, countedOf as counted, counts, rateOf, rateTone, tally } from '@/lib/attendance'
+import { Rows } from '@/components/ui/Card'
+import { Meter } from '@/components/ui/Meter'
+import { TONE } from '@/lib/tone'
 import { cn } from '@/lib/cn'
-import type { MyAttendanceEntry } from '@/lib/types'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useStudentData } from './StudentData'
 
-/** present + late + absent. Neutral statuses are excluded everywhere by rule. */
-function counted(items: MyAttendanceEntry[]): number {
-  return items.filter((h) => !NEUTRAL_STATUSES.includes(h.status)).length
-}
-
-/** Show-up rate: present or late, over the classes that counted. */
-function rateOf(items: MyAttendanceEntry[]): number {
-  const c = counted(items)
-  if (c === 0) return 0
-  const showed = items.filter((h) => h.status === 'present' || h.status === 'late').length
-  return Math.round((showed / c) * 100)
-}
 
 /**
  * The detailed attendance read.
@@ -75,7 +65,7 @@ export function AttendanceStats() {
    * punctuality the student never demonstrated.
    */
   const punctuality = useMemo(() => {
-    const scanned = attendance.filter((h) => h.scannedAt && !NEUTRAL_STATUSES.includes(h.status))
+    const scanned = attendance.filter((h) => h.scannedAt && counts(h.status))
     if (scanned.length === 0) return null
     const mins = scanned.map((h) =>
       Math.max(0, (new Date(h.scannedAt as string).getTime() - new Date(h.startedAt).getTime()) / 60000),
@@ -91,6 +81,8 @@ export function AttendanceStats() {
   }, [attendance])
 
   const overall = useMemo(() => rateOf(attendance), [attendance])
+  const subjects = useMemo(() => bySubject(attendance), [attendance])
+  const { neutral, excused, irregular } = useMemo(() => tally(attendance), [attendance])
   const streak = achievementProgress?.present_streak ?? null
 
   return (
@@ -109,19 +101,71 @@ export function AttendanceStats() {
       ) : (
         <>
           {/* Headline */}
-          <Card className="p-5 text-center">
-            <p className="font-display text-5xl font-bold tabular-nums">{overall}%</p>
+          <Card pad="roomy" className="text-center">
+            <p
+              className={cn(
+                'font-display text-5xl font-bold tabular-nums',
+                TONE[rateTone(overall)].text,
+              )}
+            >
+              {overall}%
+            </p>
             <p className="mt-1 text-sm text-muted">
               Show-up rate across {counted(attendance)} classes
               {streak !== null && streak > 0 && ` · ${streak} in a row`}
             </p>
+            {/* Moved here from the Attendance tab, where it sat as a loose line
+                under the summary with nothing to relate it to. This is the
+                screen that explains the rate, so the exclusion belongs here. */}
+            {neutral > 0 && (
+              <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
+                {excused > 0 && `${excused} excused`}
+                {excused > 0 && irregular > 0 && ' · '}
+                {irregular > 0 && `${irregular} irregular`} — those classes don't count for or
+                against you.
+              </p>
+            )}
           </Card>
+
+          {/* Per subject (0030). Attendance is subject-scoped, so a perfect
+              record in one class shouldn't be averaged away by a rough one in
+              another. Only worth showing once there IS more than one. */}
+          {subjects.length > 1 && (
+            <div>
+              <SectionLabel>By subject</SectionLabel>
+              <Rows>
+                {subjects.map((sub) => (
+                  <div key={sub.key} className="px-4 py-3.5">
+                    <div className="flex items-baseline gap-3">
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                        {sub.label}
+                      </span>
+                      <span className="font-display text-base font-bold tabular-nums">
+                        {sub.rate}%
+                      </span>
+                    </div>
+                    <Meter
+                      value={sub.rate}
+                      tone={rateTone(sub.rate)}
+                      size="sm"
+                      label={`${sub.label} show-up rate`}
+                      className="mt-2"
+                    />
+                    <p className="mt-1.5 text-sm text-muted">
+                      {sub.counted} class{sub.counted === 1 ? '' : 'es'}
+                      {sub.absent > 0 && ` · ${sub.absent} absent`}
+                    </p>
+                  </div>
+                ))}
+              </Rows>
+            </div>
+          )}
 
           {/* Per term */}
           {terms.length > 0 && (
             <div>
               <SectionLabel>By term</SectionLabel>
-              <Card className="divide-y divide-line p-0">
+              <Rows>
                 {terms.map((t) => (
                   <div key={t.key} className="px-4 py-3.5">
                     <div className="flex items-baseline gap-3">
@@ -132,21 +176,20 @@ export function AttendanceStats() {
                         {t.rate}%
                       </span>
                     </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-card-2">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${t.rate}%` }}
-                        transition={{ duration: 0.5, ease: 'easeOut' }}
-                        className="h-full rounded-full bg-brand-500"
-                      />
-                    </div>
+                    <Meter
+                      value={t.rate}
+                      tone={rateTone(t.rate)}
+                      size="sm"
+                      label={`${t.label} show-up rate`}
+                      className="mt-2"
+                    />
                     <p className="mt-1.5 text-sm text-muted">
                       {t.counted} class{t.counted === 1 ? '' : 'es'}
                       {t.absent > 0 && ` · ${t.absent} absent`}
                     </p>
                   </div>
                 ))}
-              </Card>
+              </Rows>
             </div>
           )}
 

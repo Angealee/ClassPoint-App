@@ -10,7 +10,7 @@ import { Meter } from '@/components/ui/Meter'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
 import { snapshotLabel, timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
-import { NEUTRAL_STATUSES } from '@/lib/types'
+import { rateTone, tally } from '@/lib/attendance'
 import type { AchievementState, MyAttendanceEntry, PointEvent } from '@/lib/types'
 import { useStudentData } from './StudentData'
 import { HomeHero, NextMilestone } from './HomeHero'
@@ -182,11 +182,6 @@ export function Dashboard() {
   )
 }
 
-/** present + late + absent. Neutral statuses are excluded everywhere by rule. */
-function counted(items: MyAttendanceEntry[]): number {
-  return items.filter((h) => !NEUTRAL_STATUSES.includes(h.status)).length
-}
-
 /**
  * Show-up rate at a glance, linking to the full stats screen.
  *
@@ -200,13 +195,9 @@ function AttendanceCard({
   attendance: MyAttendanceEntry[]
   onOpen: () => void
 }) {
-  const total = counted(attendance)
-  if (total === 0) return null
-
-  const showed = attendance.filter((h) => h.status === 'present' || h.status === 'late').length
-  const pct = Math.round((showed / total) * 100)
-  // Under 70% is the at-risk line the instructor's own screens use.
-  const tone = pct >= 85 ? 'success' : pct >= 70 ? 'warn' : 'danger'
+  const t = tally(attendance)
+  if (t.counted === 0) return null
+  const showed = t.present + t.late
 
   return (
     <button type="button" onClick={onOpen} className="block w-full text-left">
@@ -218,12 +209,12 @@ function AttendanceCard({
           <div className="min-w-0 flex-1">
             <p className="font-display text-sm font-bold">Attendance</p>
             <p className="text-xs text-muted">
-              {showed} of {total} classes
+              {showed} of {t.counted} classes
             </p>
           </div>
-          <span className="shrink-0 font-display text-xl font-bold tabular-nums">{pct}%</span>
+          <span className="shrink-0 font-display text-xl font-bold tabular-nums">{t.rate}%</span>
         </div>
-        <Meter value={pct} tone={tone} size="sm" label="Show-up rate" className="mt-3" />
+        <Meter value={t.rate} tone={rateTone(t.rate)} size="sm" label="Show-up rate" className="mt-3" />
       </Card>
     </button>
   )

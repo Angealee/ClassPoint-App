@@ -23,12 +23,14 @@ import {
   type OfflineScanEntry,
 } from '@/lib/offline-scans'
 import { groupByTerm } from '@/lib/term'
+import { rateTone, tally } from '@/lib/attendance'
+import { TONE } from '@/lib/tone'
 import { OfflineScanCards } from './OfflineScanCards'
 import { AbsenceExcuses } from './AbsenceExcuses'
 import { LiveClassBanner } from './LiveClassBanner'
 import { SemesterEndedBanner } from './SemesterEndedBanner'
 import { StreakFlame } from './StreakFlame'
-import type { AttendanceStatus, MyAttendanceEntry, ScanResult } from '@/lib/types'
+import type { MyAttendanceEntry, ScanResult } from '@/lib/types'
 
 const entryDate = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''
@@ -194,62 +196,7 @@ export function Attendance() {
     [syncMyAchievements, refreshQueue],
   )
 
-  const stats = useMemo(() => {
-    const s: Record<AttendanceStatus, number> = {
-      present: 0,
-      late: 0,
-      absent: 0,
-      excused: 0,
-      irregular: 0,
-    }
-    for (const h of history) s[h.status] += 1
-    // Excused/irregular classes don't count for you at all, so they're out of
-    // the denominator — they can't drag the rate down.
-    const counted = s.present + s.late + s.absent
-    const rate = counted ? Math.round(((s.present + s.late) / counted) * 100) : 0
-    const neutral = s.excused + s.irregular
-    return { ...s, total: history.length, counted, neutral, rate }
-  }, [history])
-
-  /**
-   * Same maths, split per subject (0030). Attendance is subject-scoped, so a
-   * perfect record in one class shouldn't be averaged away by a rough one in
-   * another. Sessions that predate subjects (0028) group into their own bucket
-   * rather than being dropped — they happened. It's labelled "Earlier classes"
-   * rather than "Earlier" so it doesn't sit in the list looking like a subject
-   * code, which is exactly how it read next to "IT 32" and "Elective 1".
-   */
-  const bySubject = useMemo(() => {
-    const groups = new Map<string, { label: string; present: number; late: number; absent: number }>()
-    for (const h of history) {
-      const key = h.subjectId ?? '__untagged'
-      const g = groups.get(key) ?? {
-        label: h.subjectCode ?? 'Earlier classes',
-        present: 0,
-        late: 0,
-        absent: 0,
-      }
-      if (h.status === 'present') g.present += 1
-      else if (h.status === 'late') g.late += 1
-      else if (h.status === 'absent') g.absent += 1
-      groups.set(key, g)
-    }
-    return [...groups.entries()]
-      .map(([key, g]) => {
-        const counted = g.present + g.late + g.absent
-        return {
-          key,
-          label: g.label,
-          counted,
-          rate: counted ? Math.round(((g.present + g.late) / counted) * 100) : 0,
-          absent: g.absent,
-        }
-      })
-      // Untagged last; otherwise alphabetical by subject code.
-      .sort((a, b) =>
-        a.key === '__untagged' ? 1 : b.key === '__untagged' ? -1 : a.label.localeCompare(b.label),
-      )
-  }, [history])
+  const stats = useMemo(() => tally(history), [history])
 
   return (
     // Pull-to-refresh: this is the screen where a student most wants to force a
@@ -322,41 +269,20 @@ export function Attendance() {
           >
             <span className="text-sm text-muted">Show-up rate</span>
             <span className="flex items-baseline gap-1.5">
-              <span className="font-display text-lg font-bold tabular-nums">{stats.rate}%</span>
-              <span className="text-sm font-semibold text-brand-500">Stats ›</span>
+              <span
+                className={cn(
+                  'font-display text-lg font-bold tabular-nums',
+                  TONE[rateTone(stats.rate)].text,
+                )}
+              >
+                {stats.rate}%
+              </span>
+              <span className="text-sm font-semibold text-accent">Stats ›</span>
             </span>
           </button>
         </Card>
       )}
 
-      {/* Per-subject split — only worth showing once there's more than one.
-          Two lines per row rather than three columns fighting for width: the
-          subject and its rate on top, the detail underneath in a calmer size. */}
-      {bySubject.length > 1 && (
-        <Card className="divide-y divide-line p-0">
-          {bySubject.map((s) => (
-            <div key={s.key} className="px-4 py-3.5">
-              <div className="flex items-baseline gap-3">
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{s.label}</span>
-                <span className="font-display text-base font-bold tabular-nums">{s.rate}%</span>
-              </div>
-              <p className="mt-0.5 text-sm text-muted">
-                {s.counted} class{s.counted === 1 ? '' : 'es'}
-                {s.absent > 0 && ` · ${s.absent} absent`}
-              </p>
-            </div>
-          ))}
-        </Card>
-      )}
-
-      {stats.neutral > 0 && (
-        <p className="px-1 text-sm text-muted">
-          {stats.excused > 0 && `${stats.excused} excused`}
-          {stats.excused > 0 && stats.irregular > 0 && ' · '}
-          {stats.irregular > 0 && `${stats.irregular} irregular`} — those classes don’t count
-          against you.
-        </p>
-      )}
 
       {/* Absence-excuse flow (DCT-CCS admission slip) — sits above history. */}
       {!loading && me && (
