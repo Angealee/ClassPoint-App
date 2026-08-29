@@ -53,7 +53,7 @@ and the leaderboard **reset each semester**; achievements and the all-time total
   stay one-tap for speed.
 - **Components:** function components, named exports, PascalCase files. Lazy imports
   destructure the named export: `.then(m => ({ default: m.Foo }))`.
-- **Verify: `npm run verify`** — typecheck (`tsc --noEmit`) → ESLint → 77 unit tests →
+- **Verify: `npm run verify`** — typecheck (`tsc -b --noEmit`) → ESLint → 100 unit tests →
   `vite build`, in that order. That one command is the gate before every commit.
   Individually: `npm run lint` · `npm run lint:eslint` · `npm test` (`test:watch` for
   TDD) · `npm run build`. Heavy libs (`xlsx`, capture libs) only via dynamic `import()`.
@@ -461,9 +461,10 @@ in BOTH `:root` and `.dark`; `--success-solid` (fill, used as `bg-success-solid/
 defined ONCE and never flips. Verified in the built CSS: every foreground has 2
 definitions, every solid has 1.
 
-**`--danger` is deliberately NOT brand red** (`#a3161f` vs `#e11d2a`). Brand red is being
-demoted to an accent for nav and identity; if danger shared the hue then a "−5 penalty"
-chip and an active tab would look identical and red would stop meaning "bad".
+**`--danger` is deliberately NOT brand red.** Brand red is demoted to an accent for nav
+and identity; if danger shared the hue then a "−5 penalty" chip and an active tab would
+look identical and red would stop meaning "bad". **Phase 3's first attempt at this was
+WRONG and Phase 4 fixed it** — see the danger-by-hue note below.
 
 **The custom size step MUST be named `2xs`** (or `3xs`) — never `tiny`/`xxs`/`micro`.
 tailwind-merge reads `text-<Nxs>` as a FONT SIZE but any other bare word after `text-` as
@@ -482,7 +483,81 @@ the built CSS caught it.
 Contrast measured after the change (role foreground on `--card`): light 3.56–7.80, dark
 6.23–12.09. Nothing below 3:1. Light-mode `success` (3.77) and `streak` (3.56) clear the
 bar for the bold/chip text they are used in, but are under 4.5:1 — do not use them for
-body copy in light mode.
+body copy in light mode. `reward` (3.11 light) is the same value the app already used as
+`text-gold-600` in 41 places, so it is not a regression — same rule applies.
+
+Era 6.0 Phase 4 — mechanical migrations. Decisions (user, 2026-08-29): **full brand-red
+demotion** · sub-12px band collapses to **two EXISTING steps** · **13→14, forms→16,
+rest→14** · **radius strays now, the rule applied later**.
+
+**`--danger` now differs from brand by HUE, not lightness — and Phase 3 shipped it
+wrong.** `#a3161f` vs `#e11d2a` is the same 356° hue at different lightness. That reads
+as "deeper red" on a white card and collapses completely in dark mode, where a foreground
+must be LIGHTER than the surface: the dark value shipped as `#f76a72`, which **is
+`--color-brand-400` exactly — measured CIE76 ΔE 0.0**. Danger and brand were the same
+colour in dark mode, so the demotion was impossible until this was fixed. The pair is now
+crimson ~344° (`#9f1239` / `#f1748f`): ΔE 29.6 from brand-600 light, 15.2 from brand-400
+dark (>10 = clearly different at a glance), contrast 8.02 / 6.56. **Pick role colours by
+measuring ΔE and contrast, not by eye** — the eye cannot tell 356° from 356°.
+
+**`src/lib/tone.ts` is the ONE definition of what a role looks like** — four facets per
+role (`chip` soft tinted pill · `dot` · `solid` filled selected-control · `text` bare
+foreground). Four files had grown their own copy of the same recipe and two were
+byte-identical. Every value must be a **complete literal string**: Tailwind's scanner
+cannot see `bg-${role}-solid/10`, so an interpolated class generates no CSS and the
+element renders with no background — which looks like a layout bug, not a colour one.
+`tone.test.ts` pins that.
+
+**Two roles the census added:** `--reward` (the `gold-600/400` pair — XP, points, levels;
+**41 uses, the largest colour pair in the app**) and `--accent` (`brand-600/400`, the
+readable brand foreground). They are NOT the same as `--warn` and `--danger`: reward vs
+warn are both gold but ΔE 17.3/13.4 apart, and warn is darker because it sits on a gold
+tint. `--accent` exists so Phase 6's "demote brand red" is a one-line token edit rather
+than another 15-site sweep.
+
+**Role assignment is by MEANING, and brand red used to mean both things at once.**
+`bg-brand-500/10` was simultaneously the `absent` chip, the rank-climb notification, and
+the "Activities" points category. Now: **danger** = loss/rejection/error only (absent,
+rejected, declined, deduct, penalties, failed check-in, sub-70% show-up, destructive
+buttons); **accent** = identity and positive brand (rank climb, broadcast, the "Rare"
+rarity tier, the instructor's own comment pill). Two sites are arguably `warn` instead and
+are flagged in the Phase 4 report: the "Archived" banner on StudentRecord and the
+"Spending points lowers your XP" caution on UsePoints.
+
+**`--silver` / `--bronze` were REMOVED — they were dead tokens I added in Phase 3** on
+the theory they backed "14 raw zinc and amber uses". They do not: PodiumBoard's medal
+ramps are two-stop gradients (`from-zinc-200 to-zinc-500`) plus the ink that sits on them,
+which a flat token cannot express, and the only other consumer is ShareCard, a deliberate
+token-free island. Zero possible consumers.
+
+**Three deliberate token-free art islands, listed in `tone.test.ts` and not to be
+"fixed":** `ShareCard` (inline styles + hard-coded palette, because `var(--x)` does not
+resolve inside modern-screenshot's cloned capture context — tokenising it exports a black
+or transparent image), `PodiumBoard` (medal ramps), `BadgeArt` (rarity gradients).
+
+**Type scale: 104 arbitrary sizes → 5 named steps, zero remaining.** 11.2px rounds UP to
+`text-xs` rather than down to `text-2xs`, so nothing shrinks meaningfully; the nine micro
+values (8–10.56px, all inside 2.5px) collapse to `text-2xs`; 13px and 15px body text →
+`text-sm`. **Every FORM CONTROL is `text-base` (16px) — that is a behaviour fix, not a
+type choice:** below 16px iOS Safari zooms the viewport on focus and never zooms back.
+The plan named four fields (the `text-[15px]` ones); there are **eight** — four were
+already on `text-sm`, which is 14px and zooms identically, including the student-facing
+excuse-reason textarea. Any new input/textarea/select must be `text-base`.
+
+**Radius: the rule is written but only chrome was migrated.** `rounded-lg` inline chips /
+`rounded-xl` cards, buttons, inputs / `rounded-2xl` sheets, hero / `rounded-full` pills.
+**Chart geometry is deliberately outside the rule** — a bar 6–10px wide cannot carry an
+8px corner without deforming, so SessionHistory's track and bars, AttendanceStats' and
+PointsHistory's `rounded-t`/`-b`, and SemesterRollover's 18px checkbox keep small radii.
+(One "stray" the census counted was `const rounded = useTransform(...)` — a JS variable.)
+
+**`npm run lint` was a NO-OP and has been since it was written.** It ran `tsc --noEmit`
+against the root `tsconfig.json`, which is `"files": []` plus project references — bare
+`tsc --noEmit` resolves **zero files** and always exits 0. Only `npm run build`'s `tsc -b`
+ever typechecked anything, so the first stage of `npm run verify` was theatre. It is now
+`tsc -b --noEmit`, which immediately caught four files missing an import that the old
+command passed clean. CLAUDE.md previously described this as "misses unused locals" —
+that understated it completely.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
@@ -749,8 +824,10 @@ Gotchas:
   rank so a tapped visitor row opens their profile. VisitorsSheet bubbles the row
   up via `onOpenViewer` (Profile owns the preview) to avoid a component→feature
   import cycle.
-- `npm run lint` (`tsc --noEmit`) misses unused locals; **`npm run build` (`tsc -b`)
-  is the stricter gate** — run it before declaring done.
+- **`npm run lint` used to typecheck NOTHING** (bare `tsc --noEmit` against a
+  references-only tsconfig resolves zero files and always exits 0). Fixed in Era 6.0
+  Phase 4 to `tsc -b --noEmit`. If a typecheck ever passes suspiciously fast on a
+  suspiciously broken file, check that the command is `-b`.
 
 ## Era 5.0 Phase B fixes (2026-08-14) — conventions worth keeping
 
