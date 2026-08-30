@@ -59,7 +59,7 @@ and the leaderboard **reset each semester**; achievements and the all-time total
   stay one-tap for speed.
 - **Components:** function components, named exports, PascalCase files. Lazy imports
   destructure the named export: `.then(m => ({ default: m.Foo }))`.
-- **Verify: `npm run verify`** — typecheck (`tsc -b --noEmit`) → ESLint → 113 unit tests →
+- **Verify: `npm run verify`** — typecheck (`tsc -b --noEmit`) → ESLint → 114 unit tests →
   `vite build`, in that order. That one command is the gate before every commit.
   Individually: `npm run lint` · `npm run lint:eslint` · `npm test` (`test:watch` for
   TDD) · `npm run build`. Heavy libs (`xlsx`, capture libs) only via dynamic `import()`.
@@ -912,10 +912,44 @@ in it is genuinely about students — the six sheets are modal flows off the ros
 separate concern — and it carries the bulk-award flow, which is the worst place to take
 structural risk for a code-organisation win.
 
-**What is left is the shared chrome and auth layer**, and most of it is CORRECT brand
-usage: `Shell`'s active nav, `Button`'s primary variant, focus rings, `Spinner`, the
-logo, `Landing`, the auth screens, the PWA prompts. A chrome phase should confirm rather
-than convert.
+**What is left is the shared chrome and auth layer** — handled in Phase 12 below.
+
+Era 6.0 Phase 12 — chrome and auth. Decision (user, 2026-08-30): **everything through the
+token, including the chrome.** This closes the era: **every screen in the app is on the
+semantic layer.**
+
+**`--accent-solid` IS `brand-500`, so this is a ZERO-PIXEL change** — verified in the
+browser, the primary button still computes `rgb(225,29,42)`. What it buys is one knob:
+retuning `--accent` now moves every brand-coloured surface including the nav and the
+primary button, rather than most of them. **The `brand-*` scale is now the raw palette
+that `--accent` and `--ring` are DEFINED from, and is referenced nowhere else.**
+
+**All four auth error messages were in brand red** — sign-in failures, invalid claim
+tokens, expired reset codes, rate-limit warnings. On the screens where an error matters
+most, because the person reading it cannot get in. Now `danger`.
+
+**Focus styling uses `--ring`, not `--accent`.** That token already drives the global
+`:focus-visible` rule in index.css; component focus rings were duplicating the intent
+with a raw scale value, so they now share it. `accent-brand-500` (the CSS `accent-color`
+on a native checkbox) became `accent-[var(--color-accent-solid)]` — `accent-accent-solid`
+is valid but unreadable.
+
+**`tone.test.ts` now pins brand red to the token layer.** Nothing visibly breaks when
+someone types `bg-brand-500` instead of `bg-accent-solid`; it just quietly opts that
+element out of the accent. **The first version of the pattern enumerated utility prefixes
+and silently missed `border-t-brand-500`** — found by injecting one and watching the test
+pass, so it now matches the scale itself and catches every prefix. `brand-950` is exempt:
+it is the near-black ink that sits ON gold, not a use of brand red.
+
+`SegmentedControl`'s active tab moved to `accent` so every selected control agrees — the
+primitive had been disagreeing with the call sites it replaced. Three hand-rolled primary
+buttons (PWA install, update prompt, comment Send) adopted `Button`; Send gained a real
+loading state.
+
+**Era 6.0 is complete. Nothing in the app has been seen rendered on an authenticated
+screen** — all twelve phases are verified by typecheck, build, tests and targeted
+browser measurement of unauthenticated surfaces only. The agreed next step is a guided
+verification pass on a real device before any feature work.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
