@@ -116,6 +116,40 @@ describe('attendance status roles', () => {
   })
 })
 
+/**
+ * Brand red is DEFINED in the token layer and referenced nowhere else.
+ *
+ * `--accent` and `--ring` are built from the brand scale, so `bg-accent-solid`
+ * and `bg-brand-500` render identically — which is exactly why this needs a
+ * test rather than a convention. Nothing visibly breaks when someone types the
+ * raw scale; it just quietly opts that one element out of the accent, so
+ * retuning `--accent` later leaves it behind.
+ *
+ * `brand-950` is exempt: it is the near-black ink that sits ON gold surfaces
+ * (the gold Button variant, the podium pedestal), not a use of brand red.
+ *
+ * The pattern deliberately does NOT enumerate utility prefixes. The first
+ * version listed them (`bg|text|border|…`) and silently missed
+ * `border-t-brand-500` in Spinner — verified by injecting one and watching the
+ * test pass. Matching the scale itself catches every prefix, present and future.
+ */
+const RAW_BRAND = /-brand-(?:50|[1-9]00)\b/
+
+describe('brand red lives in the token layer only', () => {
+  it('is never referenced directly by a component', () => {
+    const offenders: string[] = []
+    for (const f of FILES) {
+      for (const [i, line] of readFileSync(f, 'utf8').split('\n').entries()) {
+        // Skip prose: several comments quote the old classes as history.
+        const code = line.replace(/^\s*(\*|\/\/).*/, '')
+        const hit = code.match(RAW_BRAND)
+        if (hit) offenders.push(`${f.replace(SRC, 'src')}:${i + 1}  ${hit[0]}`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})
+
 describe('no raw palette leaks', () => {
   it('every file outside the art islands uses role tokens only', () => {
     const offenders: string[] = []
