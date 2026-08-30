@@ -111,7 +111,7 @@ export function PullToRefresh({
         >
           <svg
             viewBox="0 0 24 24"
-            className="h-4 w-4 text-brand-500"
+            className="h-4 w-4 text-accent"
             fill="none"
             stroke="currentColor"
             strokeWidth="2.5"

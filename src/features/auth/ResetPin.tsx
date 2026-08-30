@@ -56,7 +56,7 @@ export function ResetPin() {
       footer={
         <>
           Remembered it?{' '}
-          <Link to="/signin" className="font-semibold text-brand-500 hover:underline">
+          <Link to="/signin" className="font-semibold text-accent hover:underline">
             Sign in
           </Link>
         </>
@@ -94,7 +94,7 @@ export function ResetPin() {
           error={error}
         />
         {lock.locked && (
-          <p className="rounded-xl bg-brand-500/10 px-3 py-2 text-sm text-brand-500">
+          <p className="rounded-xl bg-danger-solid/10 px-3 py-2 text-sm text-danger">
             Too many attempts. Try again in {formatCountdown(lock.remainingMs)}.
           </p>
         )}

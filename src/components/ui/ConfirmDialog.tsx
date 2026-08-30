@@ -89,7 +89,7 @@ export function ConfirmDialog({
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
-              className="h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm outline-none placeholder:text-muted/50 focus:ring-2 focus:ring-brand-500/40"
+              className="h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm outline-none placeholder:text-muted/50 focus:ring-2 focus:ring-ring/40"
             />
           </div>
         )}

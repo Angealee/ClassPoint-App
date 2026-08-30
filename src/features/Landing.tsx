@@ -61,7 +61,7 @@ export function Landing() {
             <Logo className="h-20 w-20" />
           </div>
           <h1 className="font-display text-4xl font-bold leading-tight">
-            Turn class points into <span className="text-brand-500">XP</span>.
+            Turn class points into <span className="text-accent">XP</span>.
           </h1>
           <p className="mx-auto mt-3 max-w-md text-muted">
             A pointing/leveling system for the classroom. Earn points in class, level up, and climb the
@@ -83,7 +83,7 @@ export function Landing() {
             onClick={() => navigate('/claim')}
             className="text-sm text-muted hover:text-ink"
           >
-            First time? <span className="font-semibold text-brand-500">Claim your account</span>
+            First time? <span className="font-semibold text-accent">Claim your account</span>
           </button>
           <InstallButton className="mt-1 w-full" />
         </motion.div>
@@ -97,7 +97,7 @@ export function Landing() {
               transition={{ duration: 0.4, delay: 0.2 + i * 0.08 }}
               className="rounded-2xl border border-line bg-card p-4"
             >
-              <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">
+              <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-accent-solid/10 text-accent">
                 <Icon className="h-5 w-5" />
               </div>
               <p className="font-display font-semibold">{title}</p>

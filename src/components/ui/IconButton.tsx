@@ -63,7 +63,7 @@ const VARIANTS: Record<IconButtonVariant, string> = {
   outline: 'border border-line text-muted hover:text-ink',
   danger: 'text-muted hover:bg-danger-solid/10 hover:text-danger',
   accent: 'text-accent hover:bg-accent-solid/10',
-  solid: 'bg-brand-500 text-white hover:bg-brand-600',
+  solid: 'bg-accent-solid text-white hover:brightness-110',
 }
 
 export function IconButton({

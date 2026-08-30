@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/Button'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
@@ -48,13 +49,9 @@ export function UpdatePrompt() {
         >
           <div className="flex items-center gap-3 rounded-2xl border border-line bg-card p-3 pl-4 shadow-xl">
             <p className="flex-1 text-sm font-medium">New version available</p>
-            <button
-              type="button"
-              onClick={() => void updateServiceWorker(true)}
-              className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-600"
-            >
+            <Button size="sm" onClick={() => void updateServiceWorker(true)}>
               Reload
-            </button>
+            </Button>
             <button
               type="button"
               onClick={() => setNeedRefresh(false)}

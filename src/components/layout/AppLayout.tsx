@@ -45,7 +45,7 @@ function NotificationBell() {
             initial={{ scale: 0.5 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 600, damping: 18 }}
-            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 text-2xs font-bold tabular-nums text-white ring-2 ring-canvas"
+            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-solid px-1 text-2xs font-bold tabular-nums text-white ring-2 ring-canvas"
           >
             {unreadCount > 9 ? '9+' : unreadCount}
           </motion.span>

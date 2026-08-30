@@ -472,7 +472,7 @@ export function Attendance() {
             type="checkbox"
             checked={applyPenalties}
             onChange={(e) => setApplyPenalties(e.target.checked)}
-            className="h-5 w-5 shrink-0 accent-brand-500"
+            className="h-5 w-5 shrink-0 accent-[var(--color-accent-solid)]"
           />
         </label>
 

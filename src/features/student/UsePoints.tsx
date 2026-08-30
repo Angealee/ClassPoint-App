@@ -382,7 +382,7 @@ export function UsePoints() {
                   Math.min(MAX_REDEEM_POINTS, Math.max(1, parseInt(e.target.value, 10) || 1)),
                 )
               }
-              className="h-11 min-w-0 flex-1 rounded-xl border border-line bg-canvas text-center font-display text-xl font-bold tabular-nums outline-none focus:ring-2 focus:ring-brand-500/40"
+              className="h-11 min-w-0 flex-1 rounded-xl border border-line bg-canvas text-center font-display text-xl font-bold tabular-nums outline-none focus:ring-2 focus:ring-ring/40"
             />
             <button
               type="button"

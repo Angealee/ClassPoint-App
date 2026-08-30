@@ -590,7 +590,7 @@ export function AttendanceSession({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search students"
               aria-label="Search students"
-              className="h-11 w-full rounded-xl border border-line bg-card pl-9 pr-9 text-base text-ink placeholder:text-muted/70 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              className="h-11 w-full rounded-xl border border-line bg-card pl-9 pr-9 text-base text-ink placeholder:text-muted/70 transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30"
             />
             {query && (
                             <IconButton

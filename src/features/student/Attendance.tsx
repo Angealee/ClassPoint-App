@@ -352,7 +352,7 @@ export function Attendance() {
       <Sheet open={scanOpen} onClose={closeScan} title="Scan attendance">
         {submitting ? (
           <div className="flex flex-col items-center gap-3 py-10 text-sm text-muted">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-brand-500" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-accent-solid" />
             Checking you in…
           </div>
         ) : result ? (

@@ -22,10 +22,10 @@ export function ChangelogList({ entries }: { entries: ChangelogEntry[] }) {
               {entry.sections.map((section, si) => (
                 <div key={si}>
                   <p className="flex items-center gap-2 text-base font-bold">
-                    <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-brand-500" />
+                    <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-accent-solid" />
                     <span>{section.heading}</span>
                     {section.major && (
-                      <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-brand-500">
+                      <span className="rounded-full bg-accent-solid/15 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-accent">
                         Major
                       </span>
                     )}
@@ -45,7 +45,7 @@ export function ChangelogList({ entries }: { entries: ChangelogEntry[] }) {
             <ul className="mt-3 space-y-3">
               {entry.items?.map((item, i) => (
                 <li key={i} className="flex gap-2.5 text-base leading-relaxed">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-solid" />
                   <span>{item}</span>
                 </li>
               ))}

@@ -18,7 +18,7 @@ export function RouteError() {
 
   return (
     <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-canvas px-6 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/10 font-display text-2xl font-bold text-brand-500">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-solid/10 font-display text-2xl font-bold text-accent">
         !
       </div>
       <div>
@@ -32,7 +32,7 @@ export function RouteError() {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="h-11 rounded-xl bg-brand-500 px-5 text-sm font-medium text-white transition-transform active:scale-[0.98]"
+          className="h-11 rounded-xl bg-accent-solid px-5 text-sm font-medium text-white transition-transform active:scale-[0.98]"
         >
           Reload
         </button>

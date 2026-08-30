@@ -67,7 +67,7 @@ export function Shell({
                 cn(
                   'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-brand-500/10 text-brand-500'
+                    ? 'bg-accent-solid/10 text-accent'
                     : 'text-muted hover:bg-card-2 hover:text-ink',
                 )
               }
@@ -78,11 +78,11 @@ export function Shell({
                     <Icon
                       className={cn(
                         'h-5 w-5',
-                        isActive && 'drop-shadow-[0_0_6px_var(--color-brand-500)]',
+                        isActive && 'drop-shadow-[0_0_6px_var(--color-accent-solid)]',
                       )}
                     />
                     {dot && (
-                      <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-brand-500 ring-2 ring-canvas" />
+                      <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-accent-solid ring-2 ring-canvas" />
                     )}
                   </span>
                   {label}
@@ -131,7 +131,7 @@ export function Shell({
                   className={({ isActive }) =>
                     cn(
                       'flex flex-col items-center gap-1 rounded-xl py-1.5 text-xs font-medium transition-colors',
-                      isActive ? 'text-brand-500' : 'text-muted hover:text-ink',
+                      isActive ? 'text-accent' : 'text-muted hover:text-ink',
                     )
                   }
                 >
@@ -146,11 +146,11 @@ export function Shell({
                         <Icon
                           className={cn(
                             'h-6 w-6',
-                            isActive && 'drop-shadow-[0_0_6px_var(--color-brand-500)]',
+                            isActive && 'drop-shadow-[0_0_6px_var(--color-accent-solid)]',
                           )}
                         />
                         {dot && (
-                          <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-brand-500 ring-2 ring-canvas" />
+                          <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-accent-solid ring-2 ring-canvas" />
                         )}
                       </motion.span>
                       {label}

@@ -41,7 +41,7 @@ export function SignIn() {
       footer={
         <>
           First time?{' '}
-          <Link to="/claim" className="font-semibold text-brand-500 hover:underline">
+          <Link to="/claim" className="font-semibold text-accent hover:underline">
             Claim your account
           </Link>
         </>
@@ -49,9 +49,9 @@ export function SignIn() {
     >
       <Link
         to="/claim"
-        className="mb-4 flex items-center gap-3 rounded-xl border border-brand-500/30 bg-brand-500/5 p-3 text-left transition-colors hover:bg-brand-500/10"
+        className="mb-4 flex items-center gap-3 rounded-xl border border-accent-solid/30 bg-accent-solid/5 p-3 text-left transition-colors hover:bg-accent-solid/10"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-500/10 text-brand-500">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-solid/10 text-accent">
           <TicketIcon className="h-5 w-5" />
         </span>
         <span className="min-w-0">
@@ -88,12 +88,12 @@ export function SignIn() {
           error={error}
         />
         <div className="-mt-1 text-right">
-          <Link to="/reset" className="text-sm font-medium text-brand-500 hover:underline">
+          <Link to="/reset" className="text-sm font-medium text-accent hover:underline">
             Forgot your PIN?
           </Link>
         </div>
         {lock.locked && (
-          <p className="rounded-xl bg-brand-500/10 px-3 py-2 text-sm text-brand-500">
+          <p className="rounded-xl bg-danger-solid/10 px-3 py-2 text-sm text-danger">
             Too many attempts. Try again in {formatCountdown(lock.remainingMs)}.
           </p>
         )}

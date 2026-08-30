@@ -134,7 +134,7 @@ export function Profile() {
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
               aria-label="Change profile picture"
-              className="group relative rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 disabled:opacity-60"
+              className="group relative rounded-2xl focus:outline-none focus:ring-2 focus:ring-ring/40 disabled:opacity-60"
             >
               <Avatar
                 name={me.display_name}

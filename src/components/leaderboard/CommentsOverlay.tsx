@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/Button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Avatar } from '@/components/ui/Avatar'
 import { useToast } from '@/components/ui/Toast'
@@ -352,16 +353,16 @@ export function CommentsOverlay({
                   : 'You’re out of comments for today'
             }
             disabled={!isInstructor && left === 0}
-            className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-card px-3 text-sm outline-none placeholder:text-muted focus:ring-2 focus:ring-brand-500/40 disabled:opacity-60"
+            className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-card px-3 text-sm outline-none placeholder:text-muted focus:ring-2 focus:ring-ring/40 disabled:opacity-60"
           />
-          <button
-            type="button"
+          <Button
+            className="h-10 shrink-0"
             onClick={() => void send()}
             disabled={!canSend}
-            className="h-10 shrink-0 rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white transition-opacity disabled:opacity-40"
+            loading={sending}
           >
-            {sending ? '…' : 'Send'}
-          </button>
+            Send
+          </Button>
         </div>
 
         <p className="px-1 text-xs text-muted">
@@ -383,7 +384,7 @@ export function CommentsOverlay({
               return (
                 <div key={c.id} className="flex items-center gap-2.5 px-4 py-2.5">
                   {c.studentId === null ? (
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-2xs font-bold text-brand-500">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-solid/15 text-2xs font-bold text-accent">
                       IN
                     </span>
                   ) : (
@@ -406,7 +407,7 @@ export function CommentsOverlay({
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(c)}
-                      className="shrink-0 text-2xs font-semibold text-muted transition-colors hover:text-brand-500"
+                      className="shrink-0 text-2xs font-semibold text-muted transition-colors hover:text-accent"
                     >
                       Delete
                     </button>

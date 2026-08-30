@@ -44,7 +44,7 @@ export function InstructorSignIn() {
         </Link>
       }
     >
-      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">
+      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-accent-solid/10 text-accent">
         <ShieldIcon className="h-6 w-6" />
       </div>
       <form onSubmit={onSubmit} className="space-y-4">
@@ -71,7 +71,7 @@ export function InstructorSignIn() {
           error={error}
         />
         {lock.locked && (
-          <p className="rounded-xl bg-brand-500/10 px-3 py-2 text-sm text-brand-500">
+          <p className="rounded-xl bg-danger-solid/10 px-3 py-2 text-sm text-danger">
             Too many attempts. Try again in {formatCountdown(lock.remainingMs)}.
           </p>
         )}

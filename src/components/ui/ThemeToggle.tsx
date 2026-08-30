@@ -24,7 +24,7 @@ export function ThemeToggle({ className }: { className?: string }) {
         transition={{ type: 'spring', stiffness: 500, damping: 32 }}
         className={cn(
           'flex h-7 w-7 items-center justify-center rounded-full text-sm shadow-sm',
-          isDark ? 'ml-auto bg-brand-500 text-white' : 'mr-auto bg-gold-400 text-brand-950',
+          isDark ? 'ml-auto bg-accent-solid text-white' : 'mr-auto bg-gold-400 text-brand-950',
         )}
       >
         {isDark ? '🌙' : '☀️'}

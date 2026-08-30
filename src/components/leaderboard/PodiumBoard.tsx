@@ -243,7 +243,7 @@ function PodiumCard({
         'relative flex flex-1 flex-col',
         champ ? 'max-w-[12rem]' : 'max-w-[10rem]',
         activate &&
-          'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50',
+          'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
       )}
     >
       {/* Spotlight flash on tap. */}
@@ -408,7 +408,7 @@ function RestRow({
       }}
       className={cn(
         onClick &&
-          'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50',
+          'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
       )}
     >
       <Card

@@ -8,7 +8,7 @@ export function Spinner({ className }: { className?: string }) {
       aria-label="Loading"
       className={cn(
         'inline-block h-6 w-6 animate-spin rounded-full border-2',
-        'border-line border-t-brand-500',
+        'border-line border-t-accent-solid',
         className,
       )}
     />

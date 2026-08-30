@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/Button'
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Logo } from '@/components/ui/Logo'
@@ -54,13 +55,9 @@ export function InstallPrompt() {
               </p>
             </div>
             {!iosHint && (
-              <button
-                type="button"
-                onClick={() => void install()}
-                className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-600"
-              >
+              <Button size="sm" onClick={() => void install()}>
                 Install
-              </button>
+              </Button>
             )}
             <button
               type="button"
