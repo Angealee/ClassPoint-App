@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/ui/PageHeader'
 import { StatusPicker } from '@/components/attendance/StatusPicker'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
@@ -13,7 +14,6 @@ import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { StatusChip, STATUS_META } from '@/components/attendance/StatusChip'
 import {
-  ArrowLeftIcon,
   DownloadIcon,
   PencilIcon,
   TrashIcon,
@@ -244,7 +244,7 @@ export function SessionDetail() {
   if (notFound) {
     return (
       <div className="space-y-4">
-        <BackLink onClick={() => navigate('/teach/attendance')} />
+        <PageHeader title="Class details" fallback="/teach/attendance" />
         <EmptyState>That session no longer exists.</EmptyState>
       </div>
     )
@@ -253,7 +253,7 @@ export function SessionDetail() {
   if (loading || !session) {
     return (
       <div className="space-y-4">
-        <BackLink onClick={() => navigate('/teach/attendance')} />
+        <PageHeader title="Class details" fallback="/teach/attendance" />
         <Card pad="none" className="h-24 animate-pulse bg-card-2" />
         <ListSkeleton rows={6} />
       </div>
@@ -264,7 +264,11 @@ export function SessionDetail() {
 
   return (
     <div className="space-y-4 pb-4">
-      <BackLink onClick={() => navigate('/teach/attendance')} />
+      <PageHeader
+        title={sessionDate(session.startedAt)}
+        subtitle={`${sectionName} · ${weekLabel(week)}`}
+        fallback="/teach/attendance"
+      />
 
       {/* Header */}
       <Card className="space-y-3 p-5">
@@ -598,14 +602,4 @@ export function SessionDetail() {
   )
 }
 
-function BackLink({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-ink"
-    >
-      <ArrowLeftIcon className="h-4 w-4" /> Attendance
-    </button>
-  )
-}
+

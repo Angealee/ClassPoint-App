@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Card, Rows } from '@/components/ui/Card'
@@ -125,9 +126,9 @@ export function RewardsCatalog() {
       ) : (
         <>
           {live.length === 0 ? (
-            <Card className="p-6 text-center text-sm text-muted">
+            <EmptyState>
               No rewards yet. Add one below and it appears on every student’s Use points screen.
-            </Card>
+            </EmptyState>
           ) : (
             <Rows>
               {live.map((item) => (

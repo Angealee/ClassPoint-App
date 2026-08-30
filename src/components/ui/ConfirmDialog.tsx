@@ -64,14 +64,14 @@ export function ConfirmDialog({
     <Sheet open={open} onClose={busy ? () => {} : onClose}>
       <div className="flex flex-col items-center gap-3 pb-1 text-center">
         {danger && (
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-500/12 text-brand-500">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-danger-solid/12 text-danger">
             <WarningIcon className="h-6 w-6" />
           </span>
         )}
         <h2 className="font-display text-lg font-bold">{title}</h2>
         <p className="text-sm text-muted">{message}</p>
         {detail && (
-          <p className="w-full rounded-xl border border-brand-500/25 bg-brand-500/8 px-3 py-2 text-xs font-medium text-brand-500">
+          <p className="w-full rounded-xl border border-danger-solid/25 bg-danger-solid/8 px-3 py-2 text-xs font-medium text-danger">
             {detail}
           </p>
         )}

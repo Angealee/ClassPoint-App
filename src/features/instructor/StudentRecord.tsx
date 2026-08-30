@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/ui/PageHeader'
 import { TONE } from '@/lib/tone'
 import { rateTone } from '@/lib/attendance'
 import { SectionLabel } from '@/components/ui/SectionLabel'
@@ -13,7 +14,6 @@ import { useToast } from '@/components/ui/Toast'
 import { StatusChip } from '@/components/attendance/StatusChip'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
 import {
-  ArrowLeftIcon,
   BoltIcon,
   DownloadIcon,
   KeyIcon,
@@ -196,7 +196,7 @@ export function StudentRecord() {
   if (notFound) {
     return (
       <div className="space-y-4">
-        <BackLink onClick={() => navigate('/teach')} />
+        <PageHeader title="Student record" fallback="/teach" />
         <EmptyState>That student no longer exists.</EmptyState>
       </div>
     )
@@ -205,7 +205,7 @@ export function StudentRecord() {
   if (loading || !student) {
     return (
       <div className="space-y-4">
-        <BackLink onClick={() => navigate('/teach')} />
+        <PageHeader title="Student record" fallback="/teach" />
         <Card pad="none" className="h-28 animate-pulse bg-card-2" />
         <ListSkeleton rows={6} />
       </div>
@@ -216,7 +216,11 @@ export function StudentRecord() {
 
   return (
     <div className="space-y-5 pb-4">
-      <BackLink onClick={() => navigate('/teach')} />
+      <PageHeader
+        title={student.fullName}
+        subtitle={`${sectionName}${student.username ? ` · @${student.username}` : ' · not claimed'}`}
+        fallback="/teach"
+      />
 
       {student.archivedAt && (
         <Card className="border-danger-solid/30 bg-danger-solid/8 p-3 text-center text-sm font-medium text-danger">
@@ -226,21 +230,22 @@ export function StudentRecord() {
 
       {/* Header */}
       <Card className="p-5">
+        {/* The name and section now title the screen via PageHeader, so this
+            card is the avatar and the four figures — one heading per screen
+            rather than a back link above a second copy of the same name. */}
         <div className="flex items-center gap-4">
-          <Avatar name={student.fullName} url={student.avatarUrl} className="h-16 w-16 rounded-2xl" textClassName="text-2xl" />
-          <div className="min-w-0">
-            <h1 className="truncate font-display text-xl font-bold">{student.fullName}</h1>
-            <p className="text-sm text-muted">
-              {sectionName}
-              {student.username ? ` · @${student.username}` : ' · not claimed'}
-            </p>
+          <Avatar
+            name={student.fullName}
+            url={student.avatarUrl}
+            className="h-14 w-14 rounded-2xl"
+            textClassName="text-xl"
+          />
+          <div className="grid min-w-0 flex-1 grid-cols-4 gap-2 text-center">
+            <Stat label="This sem" value={String(student.semesterPoints)} />
+            <Stat label="All-time" value={String(student.lifetimePoints)} />
+            <Stat label="Level" value={String(level)} />
+            <Stat label="Rank" value={rank ? `#${rank}` : '—'} />
           </div>
-        </div>
-        <div className="mt-4 grid grid-cols-4 gap-2 text-center">
-          <Stat label="This sem" value={String(student.semesterPoints)} />
-          <Stat label="All-time" value={String(student.lifetimePoints)} />
-          <Stat label="Level" value={String(level)} />
-          <Stat label="Rank" value={rank ? `#${rank}` : '—'} />
         </div>
       </Card>
 
@@ -299,7 +304,7 @@ export function StudentRecord() {
           </Card>
         )}
         {attendance.length === 0 ? (
-          <Card className="p-6 text-center text-sm text-muted">No sessions yet.</Card>
+          <EmptyState>No sessions yet.</EmptyState>
         ) : (
           <div className="space-y-3">
             {weeks.map((w) => (
@@ -360,7 +365,7 @@ export function StudentRecord() {
       <div>
         <SectionLabel>Recent points</SectionLabel>
         {events.length === 0 ? (
-          <Card className="p-6 text-center text-sm text-muted">No point activity yet.</Card>
+          <EmptyState>No point activity yet.</EmptyState>
         ) : (
           <Rows>
             {events.map((e) => (
@@ -457,14 +462,3 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-function BackLink({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-ink"
-    >
-      <ArrowLeftIcon className="h-4 w-4" /> Students
-    </button>
-  )
-}

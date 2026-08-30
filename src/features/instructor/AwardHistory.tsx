@@ -1,7 +1,7 @@
-import { EmptyState } from '@/components/ui/EmptyState'
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Card, Rows } from '@/components/ui/Card'
+import { Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ListSkeleton } from '@/components/ui/Skeleton'
@@ -143,12 +143,7 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
       {loading ? (
         <ListSkeleton rows={6} />
       ) : error ? (
-        <Card className="p-6 text-center">
-          <p className="text-sm text-accent">Could not load activity.</p>
-          <Button variant="outline" className="mt-4" onClick={() => void refresh()}>
-            Try again
-          </Button>
-        </Card>
+        <ErrorState onRetry={() => void refresh()}>Could not load activity.</ErrorState>
       ) : records.length === 0 ? (
         <EmptyState>{sectionFilter || categoryFilter
             ? 'Nothing matches those filters.'

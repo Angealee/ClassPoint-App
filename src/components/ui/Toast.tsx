@@ -24,12 +24,12 @@ const ToastContext = createContext<ToastContextValue | undefined>(undefined)
 
 const toneStyles: Record<ToastTone, string> = {
   success: 'border-gold-400/40 bg-card text-ink',
-  error: 'border-brand-500/50 bg-card text-ink',
+  error: 'border-danger-solid/50 bg-card text-ink',
   info: 'border-line bg-card text-ink',
 }
 const toneDot: Record<ToastTone, string> = {
   success: 'bg-gold-400',
-  error: 'bg-brand-500',
+  error: 'bg-danger-solid',
   info: 'bg-muted',
 }
 

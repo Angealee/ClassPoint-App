@@ -1,12 +1,12 @@
+import { PageHeader } from '@/components/ui/PageHeader'
 import { IconButton } from '@/components/ui/IconButton'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
-import { ArrowLeftIcon, CheckIcon, PlusIcon, TrashIcon } from '@/components/ui/icons'
+import { CheckIcon, PlusIcon, TrashIcon } from '@/components/ui/icons'
 import {
   createSemester,
   createSubject,
@@ -38,7 +38,6 @@ const longDate = (iso: string) =>
  * a date here re-labels every week and term chip in the instructor area.
  */
 export function ManageSemesters() {
-  const navigate = useNavigate()
   const { toast } = useToast()
   const { semester, subjects, sections, sectionSubjects, refreshSemester } = useInstructor()
 
@@ -66,7 +65,7 @@ export function ManageSemesters() {
   if (!semester) {
     return (
       <div className="space-y-4 pb-4">
-        <BackLink onClick={() => navigate('/teach')} />
+        <PageHeader title="Semesters" fallback="/teach" />
         <Card className="p-5 text-sm text-muted">
           No active semester yet. Run migration 0027 to set one up.
         </Card>
@@ -161,10 +160,14 @@ export function ManageSemesters() {
 
   return (
     <div className="space-y-5 pb-4">
-      <BackLink onClick={() => navigate('/teach')} />
+      <PageHeader
+        title={semester.name}
+        subtitle="Term dates, subjects, and the rollover to next semester."
+        fallback="/teach"
+      />
 
       <div>
-        <h1 className="font-display text-xl font-bold">{semester.name}</h1>
+
         <p className="text-sm text-muted">
           Started {longDate(semester.startsOn)} · currently week {currentWeek}
         </p>
@@ -386,18 +389,6 @@ export function ManageSemesters() {
         onConfirm={() => deleteTarget && onDeleteSubject(deleteTarget.id)}
       />
     </div>
-  )
-}
-
-function BackLink({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-ink"
-    >
-      <ArrowLeftIcon className="h-4 w-4" /> Students
-    </button>
   )
 }
 
