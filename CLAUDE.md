@@ -873,6 +873,50 @@ a real ended session, so it is verified by typecheck, build and static reading o
 is the highest-value change in the phase and the one most worth exercising on a real
 class.
 
+Era 6.0 Phase 11 — the remaining 18 instructor screens. Decisions (user, 2026-08-30):
+**adopt `PageHeader`** · **leave `Students.tsx`'s structure alone, restyle only** · **all
+22 files in one phase**.
+
+**Two rate bugs, not colour preferences.** `StudentRecord` rendered the show-up RATE in
+permanent brand red regardless of value — **a student at 100% showed red**. And
+`SessionHistory` carried a FIFTH rate-banding implementation: the same 85/70 thresholds,
+but taking a 0–1 rate, returning a class string, and using reward-gold in the middle band
+where every other rate uses warn. Both now go through `rateTone`. **Any new rate display
+must use `lib/attendance`'s `rateTone`** — that is now five separate copies caught.
+
+**The three private `BackLink`s are gone.** They were byte-identical except the label word
+and each hard-coded its destination, so arriving at a student record from History dumped
+you on the roster. `PageHeader`'s back is history-aware. **Its doc comment already CLAIMED
+it had replaced them** — that had never happened, which is a reminder that a comment
+describing intent reads exactly like a comment describing fact.
+
+Each of the three had an `<h1>` in a card directly below the back link, so the header
+absorbs it — one heading per screen. `StudentRecord`'s header card became the avatar
+beside its four figures; `SessionDetail` is titled by the DATE, leaving the card's
+editable topic to be content rather than a second screen name.
+
+**`ConfirmDialog`'s `danger` variant and `Toast`'s `error` tone were still brand red** —
+and by convention *every* destructive action in this app routes through ConfirmDialog, so
+its warning icon and detail box were the single most important "this is dangerous"
+surface in the app, wearing the brand colour. Same for every error toast across ~130 call
+sites. **`Toast`'s success tone stays GOLD deliberately**: gold is this app's colour for
+good things (points, XP, badges), which is identity rather than an oversight.
+
+Other role calls: `AwardBar`'s penalty mode is `danger` (the bar deliberately turns red
+while deducting, and a deduction is a loss); `Ops`' rate-limit notice is `warn`, not
+danger, because its own copy says the failures are "usually a shared wifi, not an attack";
+`Ops`' `delete`/`hard_delete` audit chips are danger.
+
+**`Students.tsx` (888 lines) keeps its structure on purpose.** Unlike Profile, everything
+in it is genuinely about students — the six sheets are modal flows off the roster, not a
+separate concern — and it carries the bulk-award flow, which is the worst place to take
+structural risk for a code-organisation win.
+
+**What is left is the shared chrome and auth layer**, and most of it is CORRECT brand
+usage: `Shell`'s active nav, `Button`'s primary variant, focus rings, `Spinner`, the
+logo, `Landing`, the auth screens, the PWA prompts. A chrome phase should confirm rather
+than convert.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
