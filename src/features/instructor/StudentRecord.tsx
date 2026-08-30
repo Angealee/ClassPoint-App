@@ -1,3 +1,5 @@
+import { TONE } from '@/lib/tone'
+import { rateTone } from '@/lib/attendance'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -217,7 +219,7 @@ export function StudentRecord() {
       <BackLink onClick={() => navigate('/teach')} />
 
       {student.archivedAt && (
-        <Card className="border-brand-500/30 bg-brand-500/8 p-3 text-center text-sm font-medium text-danger">
+        <Card className="border-danger-solid/30 bg-danger-solid/8 p-3 text-center text-sm font-medium text-danger">
           Archived — hidden from rosters and the leaderboard.
         </Card>
       )}
@@ -271,7 +273,7 @@ export function StudentRecord() {
         <div className="mb-2 flex items-center justify-between px-1">
           <SectionLabel className="mb-0">Attendance</SectionLabel>
           {stats.rate !== null && (
-            <span className="text-sm font-bold tabular-nums text-brand-500">
+            <span className={cn('text-sm font-bold tabular-nums', TONE[rateTone(stats.rate)].text)}>
               {stats.rate}% · {stats.present}P {stats.late}L {stats.absent}A
             </span>
           )}
@@ -284,7 +286,12 @@ export function StudentRecord() {
                 <span className="text-xs text-muted">
                   {s.counted} counted{s.absent > 0 && ` · ${s.absent}A`}
                 </span>
-                <span className="font-display text-sm font-bold tabular-nums text-brand-500">
+                <span
+                  className={cn(
+                    'font-display text-sm font-bold tabular-nums',
+                    s.rate === null ? 'text-muted' : TONE[rateTone(s.rate)].text,
+                  )}
+                >
                   {s.rate === null ? '—' : `${s.rate}%`}
                 </span>
               </div>
@@ -362,7 +369,7 @@ export function StudentRecord() {
                   className={cn(
                     'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold tabular-nums',
                     e.points < 0
-                      ? 'bg-brand-500/10 text-brand-500'
+                      ? 'bg-danger-solid/10 text-danger'
                       : 'bg-gold-400/15 text-reward',
                   )}
                 >
@@ -382,7 +389,7 @@ export function StudentRecord() {
                 type="button"
                 onClick={() => void onLoadMoreEvents()}
                 disabled={loadingMore}
-                className="w-full py-3 text-center text-xs font-semibold text-brand-500 transition-colors hover:bg-card-2 disabled:opacity-60"
+                className="w-full py-3 text-center text-xs font-semibold text-accent transition-colors hover:bg-card-2 disabled:opacity-60"
               >
                 {loadingMore ? 'Loading…' : 'Load more'}
               </button>

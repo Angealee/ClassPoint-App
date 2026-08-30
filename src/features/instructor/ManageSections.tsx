@@ -136,7 +136,7 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
                 <button
                   type="button"
                   onClick={() => startEdit(s.id, s.name)}
-                  className="rounded-lg px-2 py-1 text-xs font-medium text-brand-500 hover:underline"
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-accent hover:underline"
                 >
                   Rename
                 </button>

@@ -1,3 +1,4 @@
+import { ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
@@ -126,7 +127,7 @@ function BackupHealthCard() {
               'mb-3 rounded-xl px-3 py-2 text-sm font-medium',
               healthy
                 ? 'bg-success-solid/10 text-success'
-                : 'bg-brand-500/10 text-brand-500',
+                : 'bg-danger-solid/10 text-danger',
             )}
           >
             {healthy
@@ -147,7 +148,7 @@ function BackupHealthCard() {
                   <span
                     className={cn(
                       'shrink-0 text-xs font-semibold tabular-nums',
-                      isStale ? 'text-brand-500' : 'text-muted',
+                      isStale ? 'text-danger' : 'text-muted',
                     )}
                   >
                     {r.lastSnapshot ?? 'never'}
@@ -255,7 +256,7 @@ function AuthEventsCard() {
       </div>
 
       {hot.length > 0 && (
-        <p className="mb-3 rounded-xl bg-brand-500/10 px-3 py-2 text-xs text-brand-500">
+        <p className="mb-3 rounded-xl bg-warn-solid/10 px-3 py-2 text-xs text-warn">
           {hot.map(([ip, n]) => `${ip}: ${n} failures`).join(' · ')} in the last 15
           minutes. The limiter blocks at 30 — a whole class shares one network
           address, so this is usually a shared wifi, not an attack.
@@ -279,7 +280,7 @@ function AuthEventsCard() {
                   'shrink-0 rounded-lg px-1.5 py-0.5 text-2xs font-semibold',
                   r.success
                     ? 'bg-success-solid/10 text-success'
-                    : 'bg-brand-500/10 text-brand-500',
+                    : 'bg-danger-solid/10 text-danger',
                 )}
               >
                 {r.success ? 'ok' : 'fail'}
@@ -301,8 +302,8 @@ function AuthEventsCard() {
 /* ── Audit log ───────────────────────────────────────────────────────────── */
 
 const ACTION_TONE: Record<string, string> = {
-  delete: 'bg-brand-500/10 text-brand-500',
-  hard_delete: 'bg-brand-500/15 text-brand-500',
+  delete: 'bg-danger-solid/10 text-danger',
+  hard_delete: 'bg-danger-solid/15 text-danger',
   archive: 'bg-card-2 text-muted',
   restore: 'bg-success-solid/10 text-success',
   broadcast: 'bg-gold-400/15 text-reward',
@@ -420,12 +421,9 @@ function AuditLogCard() {
 
 function ErrorLine({ text, onRetry }: { text: string; onRetry: () => void }) {
   return (
-    <div className="flex items-center gap-3">
-      <p className="min-w-0 flex-1 text-sm text-brand-500">{text}</p>
-      <Button variant="outline" size="sm" onClick={onRetry}>
-        Try again
-      </Button>
-    </div>
+    <ErrorState inline onRetry={onRetry}>
+      {text}
+    </ErrorState>
   )
 }
 
@@ -445,7 +443,7 @@ function SemestersCard() {
       onClick={() => navigate('/teach/semesters')}
       className="flex w-full items-center gap-3 rounded-2xl border border-line bg-card p-4 text-left transition-colors hover:bg-card-2"
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-solid/10 text-accent">
         <CalendarIcon className="h-5 w-5" />
       </span>
       <span className="min-w-0 flex-1">

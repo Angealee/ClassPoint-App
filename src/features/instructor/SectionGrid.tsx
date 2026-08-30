@@ -87,8 +87,8 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
               onClick={() => onOpen(s.id)}
               className="group text-left"
             >
-              <Card className="h-full p-4 transition-colors hover:border-brand-500/60 hover:bg-card-2">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 font-display text-lg font-bold text-brand-500">
+              <Card className="h-full p-4 transition-colors hover:border-accent-solid/60 hover:bg-card-2">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-accent-solid/10 font-display text-lg font-bold text-accent">
                   {s.name.replace(/[^0-9]/g, '') || s.name[0]?.toUpperCase()}
                 </div>
                 <p className="truncate font-display text-lg font-bold">{s.name}</p>
@@ -134,7 +134,7 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="flex min-h-[7.5rem] flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-line text-muted transition-colors hover:border-brand-500/60 hover:text-brand-500"
+            className="flex min-h-[7.5rem] flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-line text-muted transition-colors hover:border-accent-solid/60 hover:text-accent"
           >
             <PlusIcon className="h-6 w-6" />
             <span className="text-sm font-semibold">New section</span>

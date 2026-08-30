@@ -1,3 +1,5 @@
+import { TONE } from '@/lib/tone'
+import { rateTone } from '@/lib/attendance'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -32,12 +34,15 @@ const shortDate = (iso: string) =>
 
 const pct = (rate: number | null) => (rate === null ? '—' : `${Math.round(rate * 100)}%`)
 
-/** Green ≥85%, gold ≥70%, red below — same language as the status chips. */
-function rateTone(rate: number | null): string {
-  if (rate === null) return 'text-muted'
-  if (rate >= 0.85) return 'text-success'
-  if (rate >= AT_RISK_RATE) return 'text-reward'
-  return 'text-danger'
+/**
+ * Colour for a 0–1 show-up rate, via the shared band in lib/attendance.
+ *
+ * This file used to carry its own copy: same 85/70 thresholds, but taking a
+ * 0–1 rate, returning a class string, and using reward-gold in the middle band
+ * where every other rate in the app uses warn.
+ */
+function rateClass(rate: number | null): string {
+  return rate === null ? 'text-muted' : TONE[rateTone(rate * 100)].text
 }
 
 /** The whole term at a glance: every session, plus who's actually showing up. */
@@ -176,7 +181,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
           aria-label="Section"
           value={selectedSectionId}
           onChange={(e) => setSelectedSectionId(e.target.value)}
-          className="max-w-32 font-display font-bold ring-1 ring-brand-500/40"
+          className="max-w-32 font-display font-bold ring-1 ring-accent-solid/40"
         >
           {sections.map((s) => (
             <option key={s.id} value={s.id}>
@@ -200,7 +205,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
                 onClick={() => setSubjectFilter(s.id)}
                 className={
                   on
-                    ? 'rounded-lg border border-brand-500 bg-brand-500/10 px-2.5 py-1.5 text-xs font-semibold text-brand-500'
+                    ? 'rounded-lg border border-accent-solid bg-accent-solid/10 px-2.5 py-1.5 text-xs font-semibold text-accent'
                     : 'rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:text-ink'
                 }
               >
@@ -224,7 +229,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
               <p className="text-xs text-muted">Sessions</p>
             </Card>
             <Card className="p-3 text-center">
-              <p className="font-display text-xl font-bold tabular-nums text-brand-500">
+              <p className="font-display text-xl font-bold tabular-nums text-danger">
                 {analytics?.penaltyPoints ?? 0}
               </p>
               <p className="text-xs text-muted">Points deducted</p>
@@ -252,7 +257,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
           {atRisk.length > 0 && (
             <Card className="p-5">
               <div className="mb-3 flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/10 text-brand-500">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-solid/10 text-accent">
                   <WarningIcon className="h-4.5 w-4.5" />
                 </span>
                 <div>
@@ -269,7 +274,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.fullName}</span>
                     <span className="shrink-0 text-xs text-muted">{s.absent} absent</span>
                     <span
-                      className={cn('shrink-0 text-sm font-bold tabular-nums', rateTone(s.rate))}
+                      className={cn('shrink-0 text-sm font-bold tabular-nums', rateClass(s.rate))}
                     >
                       {pct(s.rate)}
                     </span>
@@ -297,7 +302,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
                     onClick={() => setSort(key)}
                     className={cn(
                       'rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors',
-                      sort === key ? 'bg-brand-500/10 text-brand-500' : 'text-muted hover:text-ink',
+                      sort === key ? 'bg-accent-solid/10 text-accent' : 'text-muted hover:text-ink',
                     )}
                   >
                     {label}
@@ -382,7 +387,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
                                 type="button"
                                 disabled={tagging === s.id}
                                 onClick={() => onTag(s.id, subject.id)}
-                                className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-muted transition-colors hover:border-brand-500 hover:text-brand-500 disabled:opacity-50"
+                                className="rounded-lg border border-line px-2 py-1 text-xs font-semibold text-muted transition-colors hover:border-accent-solid hover:text-accent disabled:opacity-50"
                               >
                                 {subject.code}
                               </button>
@@ -414,7 +419,7 @@ function StudentRow({ stat }: { stat: StudentAttendanceStat }) {
           {neutral > 0 && ` · ${neutral} not counted`}
         </p>
       </div>
-      <p className={cn('shrink-0 font-display text-base font-bold tabular-nums', rateTone(stat.rate))}>
+      <p className={cn('shrink-0 font-display text-base font-bold tabular-nums', rateClass(stat.rate))}>
         {pct(stat.rate)}
       </p>
     </div>
@@ -463,13 +468,7 @@ function TrendBars({ data }: { data: Array<{ week: number; rate: number | null }
             <div
               className={cn(
                 'w-full rounded-md transition-[height]',
-                rate === null
-                  ? 'bg-line'
-                  : rate >= 0.85
-                    ? 'bg-success-solid'
-                    : rate >= AT_RISK_RATE
-                      ? 'bg-gold-400'
-                      : 'bg-brand-500',
+                rate === null ? 'bg-line' : TONE[rateTone(rate * 100)].dot,
               )}
               style={{ height: Math.max(MIN_BAR_H, (rate ?? 0) * TRACK_H) }}
             />

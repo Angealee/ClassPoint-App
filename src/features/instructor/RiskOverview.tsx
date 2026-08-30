@@ -70,7 +70,7 @@ export function RiskOverview() {
         <ListSkeleton rows={4} />
       ) : error ? (
         <div className="flex items-center gap-3">
-          <p className="min-w-0 flex-1 text-sm text-brand-500">{error}</p>
+          <p className="min-w-0 flex-1 text-sm text-accent">{error}</p>
           <Button variant="outline" size="sm" onClick={() => void load()}>
             Try again
           </Button>

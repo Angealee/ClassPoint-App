@@ -177,7 +177,7 @@ export function Redemptions() {
                           {timeAgo(r.requestedAt)}
                         </p>
                       </div>
-                      <span className="shrink-0 font-display text-2xl font-bold tabular-nums text-brand-500">
+                      <span className="shrink-0 font-display text-2xl font-bold tabular-nums text-accent">
                         {r.points}
                       </span>
                     </div>
@@ -188,7 +188,7 @@ export function Redemptions() {
                     </p>
 
                     {r.points > r.semesterPoints && (
-                      <p className="mt-2 text-xs font-semibold text-brand-500">
+                      <p className="mt-2 text-xs font-semibold text-accent">
                         They only have {r.semesterPoints} points now — approving will fail.
                       </p>
                     )}

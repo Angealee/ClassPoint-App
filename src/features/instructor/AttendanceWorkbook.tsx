@@ -58,7 +58,7 @@ export function AttendanceWorkbook() {
             onClick={() => setTerm(t.key)}
             className={cn(
               'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              term === t.key ? 'bg-brand-500 text-white' : 'bg-card-2 text-muted hover:text-ink',
+              term === t.key ? 'bg-accent-solid text-white' : 'bg-card-2 text-muted hover:text-ink',
             )}
           >
             {t.label}

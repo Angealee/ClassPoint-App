@@ -116,7 +116,7 @@ export function ArchivedStudentsSheet({
                     setDeleteTarget(s)
                     setDeleteStep(1)
                   }}
-                  className="shrink-0 text-xs font-semibold text-muted transition-colors hover:text-brand-500"
+                  className="shrink-0 text-xs font-semibold text-muted transition-colors hover:text-accent"
                 >
                   Delete forever
                 </button>

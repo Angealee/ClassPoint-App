@@ -144,7 +144,7 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
         <ListSkeleton rows={6} />
       ) : error ? (
         <Card className="p-6 text-center">
-          <p className="text-sm text-brand-500">Could not load activity.</p>
+          <p className="text-sm text-accent">Could not load activity.</p>
           <Button variant="outline" className="mt-4" onClick={() => void refresh()}>
             Try again
           </Button>
@@ -165,7 +165,7 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
                     negative
                       ? 'bg-danger-solid/10 text-danger'
                       : r.category === 'activity'
-                        ? 'bg-brand-500/10 text-brand-500'
+                        ? 'bg-danger-solid/10 text-danger'
                         : 'bg-gold-400/15 text-reward',
                   )}
                 >

@@ -422,7 +422,7 @@ export function Students() {
             <button
               type="button"
               onClick={copyAll}
-              className="text-sm font-medium text-brand-500 hover:underline"
+              className="text-sm font-medium text-accent hover:underline"
             >
               Copy unclaimed tokens
             </button>
@@ -492,7 +492,7 @@ export function Students() {
             onClick={() =>
               setSelected(allFilteredSelected ? new Set() : new Set(filtered.map((s) => s.id)))
             }
-            className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-brand-500 hover:text-brand-500"
+            className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-accent-solid hover:text-accent"
           >
             {allFilteredSelected ? 'Clear all' : `Select all (${filtered.length})`}
           </button>
@@ -500,7 +500,7 @@ export function Students() {
             <button
               type="button"
               onClick={() => setSelected(new Set(unclaimedIds))}
-              className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-brand-500 hover:text-brand-500"
+              className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-accent-solid hover:text-accent"
             >
               Select unclaimed ({unclaimedIds.length})
             </button>
@@ -510,7 +510,7 @@ export function Students() {
               type="button"
               onClick={() => setSelected(new Set(lastSessionIds))}
               title="Everyone marked Present or Late in this section's most recent class"
-              className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-brand-500 hover:text-brand-500"
+              className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-accent-solid hover:text-accent"
             >
               Select from last class ({lastSessionIds.length})
             </button>
@@ -524,7 +524,7 @@ export function Students() {
                 key={s.id}
                 className={cn(
                   'flex items-center gap-3 p-3.5 transition-colors',
-                  selected.has(s.id) && 'bg-brand-500/8',
+                  selected.has(s.id) && 'bg-accent-solid/8',
                 )}
               >
                 {/* The row body ticks for an award — a safe, reversible action,
@@ -544,7 +544,7 @@ export function Students() {
                       className={cn(selected.has(s.id) && 'opacity-40')}
                     />
                     {selected.has(s.id) && (
-                      <span className="absolute inset-0 flex items-center justify-center rounded-full bg-brand-500 text-white">
+                      <span className="absolute inset-0 flex items-center justify-center rounded-full bg-accent-solid text-white">
                         <CheckIcon className="h-5 w-5" />
                       </span>
                     )}
@@ -599,7 +599,7 @@ export function Students() {
                   type="button"
                   onClick={() => navigate(`/teach/student/${s.id}`)}
                   aria-label={`View ${s.full_name}'s record`}
-                  className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand-500 transition-colors hover:bg-brand-500/10"
+                  className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent-solid/10"
                 >
                   View ›
                 </button>
@@ -615,7 +615,7 @@ export function Students() {
         <button
           type="button"
           onClick={() => setSelected(new Set(reselectable))}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line py-2.5 text-sm font-medium text-muted transition-colors hover:border-brand-500 hover:text-brand-500"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line py-2.5 text-sm font-medium text-muted transition-colors hover:border-accent-solid hover:text-accent"
         >
           Select the same {reselectable.length} again
         </button>

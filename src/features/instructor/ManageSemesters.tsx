@@ -350,7 +350,7 @@ export function ManageSemesters() {
                         onClick={() => toggleAssignment(section.id, subject.id)}
                         className={
                           on
-                            ? 'flex items-center gap-1.5 rounded-lg border border-brand-500 bg-brand-500/10 px-2.5 py-1.5 text-xs font-semibold text-brand-500'
+                            ? 'flex items-center gap-1.5 rounded-lg border border-accent-solid bg-accent-solid/10 px-2.5 py-1.5 text-xs font-semibold text-accent'
                             : 'flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:text-ink'
                         }
                       >

@@ -136,13 +136,13 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
                 'theme-transition rounded-2xl border bg-card p-3 shadow-lg shadow-black/20',
                 // The whole bar turns red while deducting — the sign toggle alone
                 // was too quiet for an action that takes points away.
-                penalty ? 'border-brand-500 ring-1 ring-brand-500/40' : 'border-line',
+                penalty ? 'border-danger-solid ring-1 ring-danger-solid/40' : 'border-line',
               )}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-semibold">
                   {count} selected
-                  {penalty && <span className="ml-1.5 text-brand-500">· deducting</span>}
+                  {penalty && <span className="ml-1.5 text-danger">· deducting</span>}
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -176,7 +176,7 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
                         'px-2.5 py-1.5 text-sm font-bold transition-colors',
                         mode === m
                           ? m === 'penalty'
-                            ? 'bg-brand-500 text-white'
+                            ? 'bg-accent-solid text-white'
                             : 'bg-gold-400 text-brand-950'
                           : 'text-muted hover:text-ink',
                       )}
@@ -200,7 +200,7 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
                       className={cn(
                         'h-9 w-9 shrink-0 rounded-lg border text-sm font-bold tabular-nums transition-colors',
                         points === p && !custom
-                          ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                          ? 'border-accent-solid bg-accent-solid/10 text-accent'
                           : 'border-line text-muted hover:text-ink',
                       )}
                     >
@@ -223,7 +223,7 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
                       className={cn(
                         'rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors',
                         category === c.value
-                          ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                          ? 'border-accent-solid bg-accent-solid/10 text-accent'
                           : 'border-line text-muted hover:text-ink',
                       )}
                     >
@@ -259,7 +259,7 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
 
               <Button
                 size="md"
-                className={cn('mt-2 w-full', penalty && 'bg-brand-500 hover:bg-brand-600')}
+                className={cn('mt-2 w-full', penalty && 'bg-danger-solid hover:brightness-110')}
                 disabled={submitting || !ready}
                 onClick={() => (needsConfirm ? setConfirming(true) : void submit())}
               >

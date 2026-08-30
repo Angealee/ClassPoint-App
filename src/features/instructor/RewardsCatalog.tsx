@@ -207,7 +207,7 @@ export function RewardsCatalog() {
                       type="button"
                       disabled={busy}
                       onClick={() => onToggleArchived(item)}
-                      className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-brand-500 hover:bg-brand-500/10"
+                      className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-accent hover:bg-accent-solid/10"
                     >
                       Restore
                     </button>
@@ -256,7 +256,7 @@ export function RewardsCatalog() {
                     className={cn(
                       'rounded-lg border px-2 py-1 text-xs font-semibold transition-colors',
                       kind === k.value
-                        ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                        ? 'border-accent-solid bg-accent-solid/10 text-accent'
                         : 'border-line text-muted hover:text-ink',
                     )}
                   >

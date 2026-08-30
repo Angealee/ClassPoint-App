@@ -73,7 +73,7 @@ export function SemesterRollover({
             onClick={() => setStep(s.key)}
             className={cn(
               'flex-1 rounded-lg px-2 py-2 text-xs font-semibold transition-colors',
-              step === s.key ? 'bg-brand-500 text-white' : 'bg-card-2 text-muted hover:text-ink',
+              step === s.key ? 'bg-accent-solid text-white' : 'bg-card-2 text-muted hover:text-ink',
             )}
           >
             {i + 1}. {s.label}
@@ -310,7 +310,7 @@ function SubjectsStep({ semester, onNext }: { semester: Semester; onNext: () => 
                       onClick={() => void toggle(sec.id, sub.id)}
                       className={cn(
                         'rounded-lg px-2.5 py-1 text-xs font-medium transition-colors',
-                        on ? 'bg-brand-500 text-white' : 'bg-card-2 text-muted hover:text-ink',
+                        on ? 'bg-accent-solid text-white' : 'bg-card-2 text-muted hover:text-ink',
                       )}
                     >
                       {sub.code}
@@ -470,7 +470,7 @@ function PromoteStep({ semester, onNext }: { semester: Semester; onNext: () => v
             </span>
             <button
               type="button"
-              className="font-semibold text-brand-500"
+              className="font-semibold text-accent"
               onClick={() =>
                 setPicked((p) =>
                   p.size === roster.length ? new Set() : new Set(roster.map((s) => s.id)),
@@ -500,7 +500,7 @@ function PromoteStep({ semester, onNext }: { semester: Semester; onNext: () => v
                     className={cn(
                       'flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded border text-2xs',
                       picked.has(s.id)
-                        ? 'border-brand-500 bg-brand-500 text-white'
+                        ? 'border-accent-solid bg-accent-solid text-white'
                         : 'border-line',
                     )}
                   >
@@ -612,8 +612,8 @@ function ActivateStep({ semester, onDone }: { semester: Semester; onDone: () => 
       ) : (
         <>
           {blockers.map((c) => (
-            <div key={c.code} className="mb-2 rounded-xl bg-brand-500/10 px-3 py-2">
-              <p className="text-xs font-semibold text-brand-500">
+            <div key={c.code} className="mb-2 rounded-xl bg-accent-solid/10 px-3 py-2">
+              <p className="text-xs font-semibold text-accent">
                 {c.count > 0 ? `${c.count} · ` : ''}
                 {c.detail}
               </p>
