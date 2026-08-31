@@ -979,6 +979,53 @@ Header: the scope chip ("Top 10" / the section name) said the same thing as the 
 beside it, so it is gone and Share moved up — reclaiming a row, which matters more now
 comments fly in front of the board.
 
+Share image + board extras (2026-08-31, no migration). Decisions (user): **a
+Samsung-S22-shaped story card** · **biggest climber, settle countdown, section identity
+colour, bigger podium photos**.
+
+**The share card is now 1080×1920 and exports as JPEG, not PNG.** It was a squat
+landscape-ish card sized for nothing in particular; a story is the only place a
+leaderboard screenshot actually gets posted. JPEG at quality 0.92 because a 1080×1920 PNG
+of a photo-bearing card is several megabytes and some share sheets silently refuse the
+handoff. `modern-screenshot` is called with `scale: 1` — the card is already at device
+resolution, so the old scale factor was multiplying an already-large image.
+The podium faces went 232px (champion) / 176px, which is the point of a story format:
+at 1080 wide the old sizes were postage stamps. 👑 became a **drawn `Crown()` SVG** —
+an emoji renders in the capture context as whatever font the cloned document resolves,
+which is not the font on screen.
+**`RankRow` has two densities.** The list variant (ten rows, no podium) left a 448px void
+at the bottom at story height, so `roomy` spends that height on the rows themselves
+(face 76, 18px padding) rather than on a gap. The podium variant keeps `compact`, where
+the three stands have already taken the height.
+ShareCard remains a **token-free island** — see the Phase 4 note. Every value in it is a
+literal.
+
+**`biggestClimber(entries)` lives in `RankSignals.tsx`**, beside the other things that
+read `previous_rank`, and feeds BOTH the share card and the board banner. On the board it
+sits between the podium and the ranks 4–10 list, and is **gated on `rankSignals`** for
+the same reason the per-row arrows are: `previous_rank` describes the whole board, so on
+a section view it would report movement against a ranking that is not on screen.
+
+**The settle countdown already existed** and was not rebuilt — `SnapshotChip` renders
+"next 5h 12m" from `nextSnapshotAt`/`countdownTo` in `src/lib/time.ts`. It reads the
+DEVICE clock, which is correct here because every student is in Manila; a UTC-derived
+countdown would be the thing that broke if anyone travelled.
+
+**`src/lib/sectionColor.ts` is a separate palette from the role tokens, on purpose.** A
+role colour MEANS something — success, warn, danger, reward — and a section is not a
+status; reusing `--success` for "BSIT 2A" would have the same green say "present" in one
+place and "your class" in another. Six hues chosen to dodge every role (violet, cyan,
+indigo, fuchsia, teal, slate-blue). It returns hex for an inline style rather than a
+Tailwind class because a class would have to be a complete literal for the scanner, and a
+raw-palette class would trip `tone.test.ts`'s guard — correctly, since it is not a role.
+**FNV-1a alone was not enough and the test caught it:** its low bits are poorly
+distributed and `% 6` reads exactly those, so every anagram pair tested landed in the SAME
+slot despite different hashes. A xorshift-multiply finalizer mixes the high bits down.
+Six slots still collide by pigeonhole — the dot is a scanning aid, not an identifier.
+The dot only renders where `showSection` is on (the global board); on a section view every
+row would wear the same colour. Both theme values ride as CSS variables with a `dark:`
+utility rather than reading the theme once in JS, so it follows a theme switch.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
