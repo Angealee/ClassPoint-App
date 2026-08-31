@@ -1,14 +1,21 @@
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { Sheet } from '@/components/ui/Sheet'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { DownloadIcon } from '@/components/ui/icons'
 import { CARD_H, CARD_W, ShareCard, type ShareVariant } from './ShareCard'
+import { biggestClimber } from './RankSignals'
 import type { LeaderboardEntry } from '@/lib/types'
 
-/** Preview width inside the sheet; the card itself stays 1080×1350. */
-const PREVIEW_W = 260
+/**
+ * Preview width inside the sheet; the card itself stays 1080×1920.
+ *
+ * Narrower than it was, because a 9:16 card previews more than twice as tall as
+ * the old 4:5 one — at the previous 260 the preview alone was 462px, which does
+ * not leave room for the format picker and the buttons on a phone.
+ */
+const PREVIEW_W = 190
 const SCALE = PREVIEW_W / CARD_W
 
 interface ShareSheetProps {
@@ -26,7 +33,7 @@ interface ShareSheetProps {
  * Preview the leaderboard as an image, pick a style, then share or save it.
  *
  * Capture pitfalls handled here:
- *  • Fonts — wait for document.fonts.ready, or the PNG renders in a fallback
+ *  • Fonts — wait for document.fonts.ready, or the export renders in a fallback
  *    face and the whole thing looks off-brand.
  *  • Avatars — decode every <img> before capturing; an undecoded remote image
  *    exports as a blank square.
@@ -51,6 +58,11 @@ export function ShareSheet({
   const [variant, setVariant] = useState<ShareVariant>('podium')
   const [busy, setBusy] = useState(false)
 
+  // `entries` is the FULL ranked list for this view, which is what the climber
+  // must be computed from — the biggest climber is usually someone still
+  // working their way up, not one of the ten on the card.
+  const climber = useMemo(() => biggestClimber(entries), [entries])
+
   // Warm the capture library while the user is still looking at the preview, so
   // the tap itself stays inside iOS's activation window.
   useEffect(() => {
@@ -74,12 +86,17 @@ export function ShareSheet({
       ),
     )
 
+    // JPEG, not PNG. A 1080×1920 dark gradient as PNG is several megabytes —
+    // which matters when a student sends it over mobile data, and some share
+    // targets recompress a large file anyway (so you get JPEG quality at PNG
+    // size). 0.92 is visually lossless on faces and avatars.
     return domToBlob(node, {
       width: CARD_W,
       height: CARD_H,
       scale: 1,
       backgroundColor: '#0d0d10',
-      type: 'image/png',
+      type: 'image/jpeg',
+      quality: 0.92,
     })
   }
 
@@ -97,8 +114,8 @@ export function ShareSheet({
     try {
       const blob = await render()
       if (!blob) throw new Error('no blob')
-      const filename = `classpoint-leaderboard-${new Date().toISOString().slice(0, 10)}.png`
-      const file = new File([blob], filename, { type: 'image/png' })
+      const filename = `classpoint-leaderboard-${new Date().toISOString().slice(0, 10)}.jpg`
+      const file = new File([blob], filename, { type: 'image/jpeg' })
 
       if (navigator.canShare?.({ files: [file] })) {
         try {
@@ -165,6 +182,7 @@ export function ShareSheet({
                   myPoints={myPoints}
                   scopeLabel={scopeLabel}
                   capturedAt={capturedAt}
+                  climber={climber}
                 />
               </div>
             </div>

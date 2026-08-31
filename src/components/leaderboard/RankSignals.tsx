@@ -27,6 +27,30 @@ export function rankDelta(entry: LeaderboardEntry): number | null {
 }
 
 /**
+ * Who climbed the most places since the last settle.
+ *
+ * The database has stored `previous_rank` since 0037 and nothing ever surfaced
+ * it beyond a per-row arrow. This is the most story-worthy thing a leaderboard
+ * produces, and it is the reason a student outside the top three has to care
+ * about the board at all.
+ *
+ * Pass the FULL ranked list, not the top ten: the biggest climber is usually
+ * someone still working their way up. Returns null when nobody moved, which is
+ * the normal state between settles.
+ */
+export function biggestClimber(
+  entries: readonly LeaderboardEntry[],
+): { name: string; places: number } | null {
+  let best: { name: string; places: number } | null = null
+  for (const e of entries) {
+    const moved = rankDelta(e)
+    if (moved === null || moved <= 0) continue
+    if (!best || moved > best.places) best = { name: e.display_name, places: moved }
+  }
+  return best
+}
+
+/**
  * "▲ 3" / "▼ 2" — movement since the previous board.
  *
  * Renders nothing when a student is new to the board or hasn't moved: an
