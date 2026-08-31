@@ -59,7 +59,7 @@ and the leaderboard **reset each semester**; achievements and the all-time total
   stay one-tap for speed.
 - **Components:** function components, named exports, PascalCase files. Lazy imports
   destructure the named export: `.then(m => ({ default: m.Foo }))`.
-- **Verify: `npm run verify`** — typecheck (`tsc -b --noEmit`) → ESLint → 114 unit tests →
+- **Verify: `npm run verify`** — typecheck (`tsc -b --noEmit`) → ESLint → 129 unit tests →
   `vite build`, in that order. That one command is the gate before every commit.
   Individually: `npm run lint` · `npm run lint:eslint` · `npm test` (`test:watch` for
   TDD) · `npm run build`. Heavy libs (`xlsx`, capture libs) only via dynamic `import()`.
@@ -951,6 +951,34 @@ screen** — all twelve phases are verified by typecheck, build, tests and targe
 browser measurement of unauthenticated surfaces only. The agreed next step is a guided
 verification pass on a real device before any feature work.
 
+Leaderboard rework (2026-08-31, no migration). Decisions (user): **measured lanes,
+no overlap** · **wrap to 3 lines** · **full-screen overlay** · **calm the podium, one
+ranked list, gap on your row, standing on the plate, tighter header**.
+
+**The podium ran SIX simultaneous effects** — arena spotlight, breathing champion glow,
+bobbing crown, drifting sparkles, light sweep, tap flash — before a single comment flew
+over it. What survives is what carries MEANING: the crown (who won) and the XP ring (how
+far through the level). The champion now wears a steady gold edge instead of a pulsing
+glow. **Confetti stays** because it fires once on arrival, and the tap scale stays because
+it is feedback rather than ambience. `Sparkles` is deleted.
+
+**Ranks 4–10 are one divided list, not seven Cards.** That is where most students actually
+find themselves, and seven floating objects with gaps read as unresolved next to the
+podium. Inside the row the RANK anchors it — it used to be muted and the same size as the
+points on the far right, which is backwards for a leaderboard.
+
+**The gap to the row above shows on YOUR row only.** On every row it is ten small numbers
+competing with the points column, and for someone forty points back it reads as
+discouraging rather than motivating.
+
+**`YourRankCard` moved onto `--color-plate`**, the same fixed dark surface as the home
+scoreboard, for the same reason: it is the one thing on the board that is about you, so it
+should read as an object rather than another row.
+
+Header: the scope chip ("Top 10" / the section name) said the same thing as the picker
+beside it, so it is gone and Share moved up — reclaiming a row, which matters more now
+comments fly in front of the board.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
@@ -1206,12 +1234,31 @@ Gotchas:
   so staleness is a non-issue. `student_id is null` ⇒ posted by the instructor.
 - The danmaku keyframe (`.cp-fly`) needs `container-type: inline-size` on the
   deck — `cqw` resolves against it. Without it pills start mid-board instead of
-  off the right edge. Never swap `cqw` for `vw`: the deck is a centred column.
-  The deck is a `sticky top-[52px]` band ABOVE the podium (not an absolute
-  overlay on it) so it never covers the crown and stays visible while scrolling
-  the rankings. Tapping a student pill fires `onOpenProfile` up to the leaderboard
-  (which owns the profile sheet); instructor moderation lives only in the Recent
-  comments list.
+  off the right edge. Keep it as `cqw`, never `vw`: `cqw` measures the DECK, and
+  that is what kept the animation correct when the deck changed shape.
+  **The deck is now a FULL-SCREEN overlay** (it used to be a sticky band above
+  the podium — reversed on the user's instruction, 2026-08-31). `pointer-events-none`
+  on it is LOAD-BEARING: without it the layer swallows every tap on the board,
+  the section picker and the tab bar. Verified with `elementFromPoint` — over a
+  plain pill the tap reaches the control beneath; over a tappable pill it hits
+  the pill. Lanes stop short of the header and the tab bar (`TOP_INSET` /
+  `BOTTOM_INSET`) so comments never cover the app's own chrome. Tapping a student
+  pill fires `onOpenProfile` up to the leaderboard (which owns the profile
+  sheet); instructor moderation lives only in the Recent comments list.
+- **`src/lib/danmaku.ts` owns the flying-comment timing, and it is TESTED.** The
+  old code was capped at `LANES = 1` — one comment on screen at a time, roughly
+  seven a minute, with only the newest six of twenty ever flying — and it
+  reserved a lane from an ESTIMATED width (`96 + chars * 6.6`). That estimate WAS
+  the anti-overlap guarantee, and it could not account for wrapping, the width
+  cap, emoji or a long name, so it was wrong in both directions at once. A pill
+  now mounts parked off the right edge, is MEASURED at its real size, and only
+  then gets a lane. `danmaku.test.ts` simulates two pills sharing a lane at the
+  earliest instant the rules allow and asserts their boxes stay disjoint.
+  **Pills wrap to three lines rather than truncating** — the clamp sits on the
+  WRAPPER, not the body: `line-clamp` makes its element a `-webkit-box`, so on
+  the body alone the sender's name breaks onto its own line. Measured at 375px:
+  a 3-line pill is 78px in a 90px lane, and both a 400-word comment and a
+  204-character unbroken string stay inside it (`[overflow-wrap:anywhere]`).
 - `get_profile_visitors` (0022) returns the viewer's `student_id` + section/points/
   rank so a tapped visitor row opens their profile. VisitorsSheet bubbles the row
   up via `onOpenViewer` (Profile owns the preview) to avoid a component→feature
