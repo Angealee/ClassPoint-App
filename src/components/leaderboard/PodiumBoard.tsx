@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Card, Rows } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
-import { CrownIcon } from '@/components/ui/icons'
+import { CrownIcon, TicketIcon } from '@/components/ui/icons'
 import { ConfettiBurst } from '@/components/leaderboard/ConfettiBurst'
 import { RankDelta, RankTenure, biggestClimber } from '@/components/leaderboard/RankSignals'
 import { sectionColor } from '@/lib/sectionColor'
@@ -85,6 +85,61 @@ const TIER: Record<
   },
 }
 
+/**
+ * The spend board's own ramp — a TICKET STUB rather than a medal.
+ *
+ * You did not win third place at spending; you cashed something in. So the
+ * champion wears a ticket instead of a crown, the stands carry punched notches,
+ * and the metal ramps give way to a violet family that is unmistakably not
+ * gold. That last part is the point: a student who lands on a board should know
+ * which one it is from a glance at a screenshot, without reading a word.
+ *
+ * Raw palette values, exactly like the medal ramps above — PodiumBoard is one
+ * of the three declared token-free art islands (see tone.test.ts). A two-stop
+ * gradient plus the ink that sits on it is not something a flat role token can
+ * express, which is why --silver and --bronze were removed in Phase 4.
+ *
+ * Violet to indigo to slate is a DESCENDING ramp, so it still reads as 1-2-3.
+ */
+const TIER_SPEND: typeof TIER = {
+  1: {
+    border: 'border-violet-400/70!',
+    tint: 'from-violet-400/25 via-violet-500/5',
+    pedestal: 'from-violet-300 to-violet-600',
+    pedestalBorder: 'border-violet-600/50',
+    pedestalInk: 'text-violet-950',
+  },
+  2: {
+    border: 'border-indigo-400/60!',
+    tint: 'from-indigo-300/20 via-indigo-400/5',
+    pedestal: 'from-indigo-200 to-indigo-500',
+    pedestalBorder: 'border-indigo-500/50',
+    pedestalInk: 'text-indigo-900',
+  },
+  3: {
+    border: 'border-slate-400/60!',
+    tint: 'from-slate-400/20 via-slate-500/5',
+    pedestal: 'from-slate-300 to-slate-500',
+    pedestalBorder: 'border-slate-500/50',
+    pedestalInk: 'text-slate-800',
+  },
+}
+
+/**
+ * What share of everything they earned this semester they have actually spent.
+ *
+ * `points` is the balance still on the board and `spent_points` is what left, so the
+ * two together are what they earned — the same arithmetic UsePoints already
+ * shows you about yourself ("you've cashed in 12 of the 40 you've earned").
+ *
+ * It fills the ring that level progress leaves empty on this board, and it is
+ * the most interesting figure on it: who is all-in versus who is hoarding.
+ */
+function spentSharePct(entry: LeaderboardEntry): number {
+  const earned = entry.spent_points + entry.points
+  return earned > 0 ? (entry.spent_points / earned) * 100 : 0
+}
+
 /** Stand heights — #1 tallest, creating the classic winners' staircase. */
 const PEDESTAL_H: Record<Place, string> = {
   1: 'h-14 sm:h-20',
@@ -128,15 +183,20 @@ export function PodiumBoard({
   return (
     <div className="space-y-3">
       <div className="relative">
-        {/* A single STATIC gold wash grounds the podium. It used to breathe
+        {/* A single STATIC wash grounds the podium. It used to breathe
             (cp-arena-glow); with comments now flying in front of the board, one
-            more thing pulsing was one too many. */}
+            more thing pulsing was one too many.
+            The hue follows the board — a GOLD halo behind the violet spend
+            podium was the one thing still saying "points" on a screen that had
+            otherwise changed colour completely. */}
         {glow && (
           <div
             className="pointer-events-none absolute left-1/2 top-6 h-44 w-[130%] -translate-x-1/2 rounded-[50%]"
             style={{
               background:
-                'radial-gradient(ellipse at center, rgba(255,186,31,0.16), rgba(255,186,31,0) 70%)',
+                metric === 'spent'
+                  ? 'radial-gradient(ellipse at center, rgba(167,139,250,0.16), rgba(167,139,250,0) 70%)'
+                  : 'radial-gradient(ellipse at center, rgba(255,186,31,0.16), rgba(255,186,31,0) 70%)',
             }}
           />
         )}
@@ -261,10 +321,15 @@ function PodiumCard({
   metric: 'points' | 'spent'
   onClick?: () => void
 }) {
-  const tier = TIER[place]
+  const spend = metric === 'spent'
+  const tier = spend ? TIER_SPEND[place] : TIER[place]
   // On the spend board there is no level to show — see the `metric` doc above.
-  const progress = metric === 'spent' ? null : getLevelProgress(entry.points)
-  const value = metric === 'spent' ? entry.spent_points : entry.points
+  const progress = spend ? null : getLevelProgress(entry.points)
+  const value = spend ? entry.spent_points : entry.points
+  // Gold level progress on the points board, share-of-earnings on the spend
+  // board. Same ring, same geometry, so the two podiums read as siblings.
+  const ringPct = spend ? spentSharePct(entry) : (progress?.progressPct ?? 0)
+  const ringColor = spend ? '#a78bfa' : '#ffba1f'
   const champ = place === 1
 
   // Tap a podium card → a brief celebratory spotlight, then open the profile.
@@ -305,10 +370,19 @@ function PodiumCard({
           'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
       )}
     >
-      {/* Crown floats above the champion. */}
+      {/* A crown for the top of the points board, a ticket for the top of the
+          spend board. Same slot, same bob — the glyph is the tell. */}
       {champ && (
         <div className="pointer-events-none absolute -top-9 left-1/2 z-20 -translate-x-1/2">
-          <CrownIcon className={cn('h-9 w-9 text-gold-400 drop-shadow-md', !reduced && 'cp-bob')} />
+          {spend ? (
+            <TicketIcon
+              className={cn('h-9 w-9 text-violet-400 drop-shadow-md', !reduced && 'cp-bob')}
+            />
+          ) : (
+            <CrownIcon
+              className={cn('h-9 w-9 text-gold-400 drop-shadow-md', !reduced && 'cp-bob')}
+            />
+          )}
         </div>
       )}
 
@@ -329,15 +403,14 @@ function PodiumCard({
         {/* "You" tint. */}
         {isMe && <div className="pointer-events-none absolute inset-0 bg-accent-solid/10" />}
 
-        {/* Gold XP ring around the avatar shows level progress. The spend board
-            keeps the ring's geometry (so the podium is the same shape) but
-            leaves it unfilled — there is no progress to report there. */}
+        {/* One ring, two meanings: level progress on the points board, and how
+            much of everything they've earned they've cashed in on the spend
+            board. It used to sit empty on the spend board, which read as
+            something that had failed to load. */}
         <div
           className="relative z-[1] rounded-full p-[3px]"
           style={{
-            background: progress
-              ? `conic-gradient(#ffba1f ${progress.progressPct}%, rgba(160,160,160,0.25) ${progress.progressPct}%)`
-              : 'rgba(160,160,160,0.25)',
+            background: `conic-gradient(${ringColor} ${ringPct}%, rgba(160,160,160,0.25) ${ringPct}%)`,
           }}
         >
           <div className="rounded-full bg-card p-[2px]">
@@ -358,10 +431,13 @@ function PodiumCard({
             {entry.display_name}
             {isMe && <span className="text-accent"> (you)</span>}
           </p>
+          {/* The ring's number, written out — "Lv 3" on one board, "60%
+              cashed in" on the other. Reading the same slot differently is
+              itself a signal of which board you're on. */}
           <p className="truncate text-2xs text-muted sm:text-xs">
             {sectionLabel}
-            {sectionLabel && progress ? ' · ' : ''}
-            {progress ? `Lv ${progress.level}` : ''}
+            {sectionLabel ? ' · ' : ''}
+            {spend ? `${Math.round(ringPct)}% cashed in` : `Lv ${progress?.level ?? 1}`}
           </p>
         </div>
 
@@ -405,6 +481,23 @@ function PodiumCard({
         )}
       >
         <div className="absolute inset-x-0 top-0 h-1 bg-white/30" />
+        {/* Punched notches — the stand becomes a torn ticket stub. Half of each
+            circle sits outside the pedestal and is clipped away by its own
+            overflow-hidden, so what shows is a bite out of the edge rather
+            than a dot on top of it. Sized for the SHORTEST stand (#3 is h-7),
+            or the notches would meet in the middle there. */}
+        {spend && (
+          <>
+            <span
+              aria-hidden
+              className="absolute -left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-canvas"
+            />
+            <span
+              aria-hidden
+              className="absolute -right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-canvas"
+            />
+          </>
+        )}
         <span
           className={cn(
             'absolute inset-0 flex items-center justify-center font-display text-2xl font-bold sm:text-3xl',
@@ -448,9 +541,10 @@ function RestRow({
    */
   gapToAbove?: number | null
 }) {
+  const spend = metric === 'spent'
   // Null on the spend board — see the `metric` doc on PodiumBoardProps.
-  const level = metric === 'spent' ? null : getLevelProgress(entry.points).level
-  const value = metric === 'spent' ? entry.spent_points : entry.points
+  const level = spend ? null : getLevelProgress(entry.points).level
+  const value = spend ? entry.spent_points : entry.points
   return (
     <motion.div
       layout
@@ -516,8 +610,10 @@ function RestRow({
             )}
             <span className="truncate">
               {sectionLabel}
-              {sectionLabel && level !== null ? ' · ' : ''}
-              {level !== null ? `Lv ${level}` : ''}
+              {sectionLabel ? ' · ' : ''}
+              {spend
+                ? `${Math.round(spentSharePct(entry))}% cashed in`
+                : `Lv ${level ?? 1}`}
             </span>
             {rankSignals && (
               <>

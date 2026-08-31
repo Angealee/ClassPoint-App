@@ -1,6 +1,6 @@
 import { RankDeltaValue, rankDelta } from '@/components/leaderboard/RankSignals'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { Link } from 'react-router-dom'
+import { BoardSwitcher } from '@/components/leaderboard/BoardSwitcher'
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Select } from '@/components/ui/Select'
 import { Avatar } from '@/components/ui/Avatar'
@@ -20,6 +20,8 @@ import { StudentProfilePreview } from './StudentProfilePreview'
 
 const TOP_N = 10
 const GLOBAL = 'global'
+/** Sentinel value for the picker's archive entry — never a real section id. */
+const PAST = '__past__'
 
 // The share card + its capture path are only needed once someone actually taps
 // Share, so they stay out of the leaderboard's own chunk.
@@ -138,14 +140,28 @@ export function Leaderboard() {
           ("Top 10" / the section name) said the same thing as the picker beside
           it, so it is gone and Share moved up to join them. That reclaims a row
           — which matters more now comments fly in front of the board. */}
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="min-w-0 flex-1 truncate font-display text-xl font-bold leading-tight">
-            Leaderboard
-          </h1>
+      <div className="space-y-2.5">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate font-display text-xl font-bold leading-tight">Leaderboard</h1>
+            {/* The settle countdown reads as a caption under the title now
+                rather than as one more pill competing on its own row. */}
+            <div className="mt-0.5">
+              <SnapshotChip capturedAt={capturedAt} />
+            </div>
+          </div>
           <Select
             value={view}
-            onChange={(e) => setView(e.target.value)}
+            onChange={(e) => {
+              // "Past semesters" is an ACTION, not a view — open the sheet and
+              // leave `view` alone, so the controlled select snaps back to the
+              // board you were actually looking at.
+              if (e.target.value === PAST) {
+                setPastOpen(true)
+                return
+              }
+              setView(e.target.value)
+            }}
             aria-label="Choose leaderboard"
             className="h-9! max-w-34 shrink-0 text-sm!"
           >
@@ -156,6 +172,14 @@ export function Leaderboard() {
                 {s.id === me?.section_id ? ' (mine)' : ''}
               </option>
             ))}
+            {/* Past boards (0035) lives here now. I argued the opposite when it
+                was built — that folding a second axis into this picker makes
+                both harder to read — and that was right while it was the only
+                other control. With a switcher needing the row, an archive is
+                the thing that should cost the least. */}
+            <optgroup label="Archive">
+              <option value={PAST}>Past semesters…</option>
+            </optgroup>
           </Select>
           {top.length > 0 && (
             <IconButton
@@ -169,27 +193,8 @@ export function Leaderboard() {
             />
           )}
         </div>
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <SnapshotChip capturedAt={capturedAt} />
-          {/* Past boards (0035). Always available, but it's the students whose
-              own semester ended who most need it — their final rank is the one
-              thing the live board can no longer show them. */}
-          <button
-            type="button"
-            onClick={() => setPastOpen(true)}
-            className="inline-flex shrink-0 items-center rounded-full bg-card-2 px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:text-ink"
-          >
-            Past boards
-          </button>
-          {/* The other board (0038). One tap apart is what makes the fork
-              visible: you can be high on one and low on the other. */}
-          <Link
-            to="/app/spenders"
-            className="inline-flex shrink-0 items-center rounded-full bg-card-2 px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:text-ink"
-          >
-            Spend board
-          </Link>
-        </div>
+        {/* Which of the two boards this is (0038). */}
+        <BoardSwitcher value="points" />
       </div>
 
       {loading ? (

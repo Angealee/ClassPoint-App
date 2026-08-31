@@ -1081,6 +1081,59 @@ and watching it fail. `changelog.test.ts` no longer hard-codes the leading versi
 `LATEST_VERSION === CHANGELOG[0].version` instead, which is the actual invariant the
 "What's new" gate depends on.
 
+Spend board — making the fork VISIBLE (2026-08-31, no migration). Decisions (user):
+**filled segmented control** · **a different podium motif** · **share-of-earnings in the
+ring** · **Past boards folds into the section picker**.
+
+**`BoardSwitcher` NAVIGATES, it does not filter.** The two boards are two screens by
+decision, so this is a router move wrapped in `SegmentedControl` — each board keeps its
+own URL, back behaviour and deep link, while a screen CHANGE looks like a tab switch.
+It reuses the primitive rather than hand-rolling tabs specifically because that is a real
+`radiogroup` with `aria-checked`: a hand-rolled strip announces two unrelated buttons,
+which is the "I don't know which board I'm on" problem restated in audio. Tapping the
+active tab is a no-op — navigating would push a duplicate history entry and make Back
+feel broken.
+
+**The header did not grow.** It was two rows (title + picker + share, then a pill row of
+snapshot chip / Past boards / Spend board). Both pills left: "Spend board" BECAME the
+switcher, and **Past boards folded into the section picker** as an `optgroup` — reversing
+the note recorded when `PastSemesterBoard` was built ("that picker chooses sections, and
+folding a second axis into it makes both harder to read"). That was right while it was
+the only other control; with a switcher needing the row, an archive is what should cost
+least. The picker's archive entry is an ACTION, not a view: it opens the sheet and leaves
+`view` alone, so the controlled `<select>` snaps back to the board actually on screen.
+The snapshot chip became a caption under the title.
+
+**Both screens are titled "Leaderboard"** — the switcher names which one. `SpendBoard`
+keeps `PageHeader`'s back arrow because, unlike the points board, it is not a bottom tab
+(you can arrive from UsePoints).
+
+**`TIER_SPEND` is a second ramp, not a recolour of the first** — violet → indigo → slate,
+descending so it still reads 1-2-3, and a crown becomes a `TicketIcon`. Raw palette
+values like the medal ramps beside it; PodiumBoard is a declared token-free art island.
+The pedestal's **ticket notches are two circles half-outside the stand**, clipped by its
+own `overflow-hidden` so what shows is a bite from the edge rather than a dot on top.
+Sized `h-3 w-3` for the SHORTEST stand (#3 is `h-7`) or they would meet in the middle
+there. **Verified they add ZERO scrollable overflow** — a clipped box still reports a
+bounding rect, so the honest test is `scrollWidth` on a 375px stage, and it is byte-equal
+to the points board's.
+
+**The podium glow follows the metric.** It was hardcoded gold, so the violet spend podium
+sat under a gold halo — the one element still saying "points" on a screen that had
+otherwise changed colour completely. Found by rendering, not by reading.
+
+**The empty ring is filled with `spentSharePct`** — `spent / (spent + points)`, i.e. how
+much of everything earned this semester has been cashed in (the same arithmetic UsePoints
+already shows you about yourself). An unfilled ring read as something that had failed to
+load. The meta line under the name reads the same figure out: **"Lv 3" on one board,
+"60% cashed in" on the other**, which makes that one slot another tell for which board
+you are on.
+
+Verified by probe route at 375px (removed, residue-checked): switcher `aria-checked` and
+fill flip correctly, rings render gold vs violet at correct percentages, notches clip on
+all three stands, champion glyph and meta line differ per board. **Not verified on a real
+authenticated screen.**
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained

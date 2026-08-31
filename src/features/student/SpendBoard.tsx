@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotChip } from '@/components/ui/SnapshotStamp'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { BoardSwitcher } from '@/components/leaderboard/BoardSwitcher'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
 import type { LeaderboardEntry } from '@/lib/types'
@@ -62,10 +63,14 @@ export function SpendBoard() {
   return (
     <PullToRefresh onRefresh={refresh}>
       <div className="space-y-4">
+      {/* Titled "Leaderboard", not "Spend board" — the switcher below names
+          which one, and having the heading say it too would be the same word
+          twice. It keeps a back arrow because, unlike the points board, this
+          screen is not a bottom tab: you can arrive from Use points. */}
         <PageHeader
-          title="Spend board"
+          title="Leaderboard"
           fallback="/app/leaderboard"
-          subtitle="Who's actually cashing in their points"
+          subtitle={<SnapshotChip capturedAt={capturedAt} />}
           actions={
             sections.length > 0 ? (
               <Select
@@ -86,7 +91,14 @@ export function SpendBoard() {
           }
         />
 
-        <SnapshotChip capturedAt={capturedAt} />
+        <BoardSwitcher value="spent" />
+
+        {/* One line of what this board actually measures. The points board
+            needs no such caption — everyone already knows what points are. */}
+        <p className="text-xs text-muted">
+          Points cashed in this semester. Spending costs you places on the other
+          board — that&rsquo;s the trade.
+        </p>
 
         {loading ? (
           <ListSkeleton rows={6} />

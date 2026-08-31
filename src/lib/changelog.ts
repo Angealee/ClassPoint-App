@@ -48,9 +48,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         heading: 'There are two boards now',
         major: true,
         items: [
-          'The Spend board ranks whoever has cashed in the most points this semester. Spending used to only ever cost you — now it wins something. Find it next to Past boards, or from the Use points screen.',
+          'A Points / Spent switch sits at the top of the leaderboard, so you always know which ranking you are looking at — and the other one is a tap away.',
+          'The Spend board ranks whoever has cashed in the most points this semester. Spending used to only ever cost you — now it wins something.',
           'Your own card on the leaderboard will tell you where you would have been if you had never spent: “You’d be #9 if you hadn’t spent.” No guessing what a redemption actually cost you.',
-          'Both boards settle at the same two moments each day, so they can never disagree about you.',
+          'The spend podium wears ticket stubs instead of medals, and the ring around each face shows how much of everything you have earned you have actually cashed in.',
         ],
       },
     ],
