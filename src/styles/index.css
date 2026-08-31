@@ -315,8 +315,10 @@
 
    The pill is parked at `left: 100%` (just past the deck's right edge) and
    travels the deck's width PLUS its own, so it enters and exits fully
-   off-screen. `cqw` measures the deck, not the viewport — the deck is a
-   centred content column, so viewport units would overshoot badly on desktop.
+   off-screen. `cqw` measures the DECK, which is what keeps this correct
+   whatever the deck happens to be: it was a centred content column above the
+   podium, and is now a full-screen overlay in front of the whole board. Either
+   way the pill travels exactly the deck's width plus its own.
    Requires `container-type: inline-size` on the deck. */
 @keyframes cp-fly {
   from { transform: translate3d(0, 0, 0); }

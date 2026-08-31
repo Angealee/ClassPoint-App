@@ -13,6 +13,7 @@ import {
 import { supabase, uniqueChannel } from '@/lib/supabase'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
+import { flightDurationMs, laneCount, laneHoldMs, pickLane } from '@/lib/danmaku'
 import {
   MAX_COMMENT_LENGTH,
   MAX_COMMENTS_PER_DAY,
@@ -20,29 +21,19 @@ import {
 } from '@/lib/types'
 
 /**
- * A single-file ticker: one lane, so comments read cleanly one after another
- * and never stack. Height stays slim so the podium sits right at the top.
+ * Tall enough for a pill wrapped to its 3-line maximum, plus breathing room.
+ * Every lane is sized for the tallest possible pill so lane N always starts
+ * where lane N-1 ended, whatever is in it.
  */
-const LANES = 1
-// Tall enough for the whole pill plus breathing room. At 30 the pill was
-// physically taller than its lane, so overflow-hidden sliced the top and
-// bottom off every comment — the bug that made them look cut in half.
-const LANE_HEIGHT = 40
-/**
- * CONSTANT speed for every pill (px per second). This is the anti-overlap
- * guarantee: because all pills move at the same speed and enter from the same
- * point, a later pill can never catch an earlier one — the gap between them is
- * fixed at launch. Slow enough (~20–28s per crossing) to read comfortably.
- */
-const SPEED_PX_PER_SEC = 30
-/** Visible gap kept between one pill's tail and the next pill's nose. */
-const MIN_GAP_PX = 52
-
-/** Estimate a pill's rendered width from its text, so timing/gaps are right. */
-function estPillWidth(c: LeaderboardComment): number {
-  const chars = (c.displayName?.length ?? 0) + (c.body?.length ?? 0)
-  return 96 + chars * 6.6 // avatar + padding + ~6.6px per char at text-xs
-}
+const LANE_HEIGHT = 90
+/** Ceiling on lanes regardless of screen height — past this it reads as noise. */
+const MAX_LANES = 5
+/** Keep the page header and the bottom tab bar clear of flying comments. */
+const TOP_INSET = 76
+const BOTTOM_INSET = 104
+/** Mounted-but-unlaunched pills waiting for a lane. Beyond this we drop the
+ *  oldest rather than mounting an unbounded number of invisible nodes. */
+const MAX_PENDING = 24
 
 /** Tap-to-fill prompts. A blank box gets far fewer posts than a chip does. */
 const QUICK_CHIPS = [
@@ -60,8 +51,20 @@ const QUICK_CHIPS = [
 interface FlyingPill extends LeaderboardComment {
   /** Unique per flight — a comment can be re-launched, keys must not collide. */
   key: string
-  lane: number
-  durationMs: number
+  /**
+   * Null until the pill has been MEASURED.
+   *
+   * The previous version estimated width as `96 + chars * 6.6` and reserved a
+   * lane from that guess. The guess was the whole anti-overlap guarantee, and
+   * it could not account for wrapping, the width cap, emoji, or a long display
+   * name — so the reservation was either too long (throttling the stream to a
+   * few comments a minute) or too short (pills overlapping).
+   *
+   * Now a pill mounts parked off the right edge, is measured at its real
+   * rendered size, and only then gets a lane and a duration.
+   */
+  lane: number | null
+  durationMs: number | null
 }
 
 function errorText(e: unknown, fallback: string): string {
@@ -116,61 +119,96 @@ export function CommentsOverlay({
     [],
   )
 
-  const queueRef = useRef<LeaderboardComment[]>([])
-  const laneFreeAtRef = useRef<number[]>(Array(LANES).fill(0))
+  const laneFreeAtRef = useRef<number[]>([])
   const seenRef = useRef<Set<string>>(new Set())
-  // The flight deck — measured so pill duration matches the real width and the
-  // constant-speed math holds on both phone and desktop.
+  /** The full-screen flight deck. Its width is the distance a pill travels. */
   const deckRef = useRef<HTMLDivElement>(null)
+  /** Live nodes, so a pill can be measured at its real rendered size. */
+  const pillRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
-  /** Launch anything queued whose lane has freed up. */
-  const drain = useCallback(() => {
-    if (reduced) return
-    const now = Date.now()
-    const deckW = deckRef.current?.clientWidth || 360
-    while (queueRef.current.length > 0) {
-      // Single lane, but keep the loop general: pick the lane free longest.
-      let lane = 0
-      for (let i = 1; i < LANES; i++) {
-        if (laneFreeAtRef.current[i] < laneFreeAtRef.current[lane]) lane = i
-      }
-      if (laneFreeAtRef.current[lane] > now) break // lane still busy — wait
-
-      const c = queueRef.current.shift()!
-      const pillW = estPillWidth(c)
-      // Distance = deck width + the pill's own width (enters and exits fully
-      // off-screen). Constant speed → duration scales with that distance.
-      const durationMs = Math.round(((deckW + pillW) / SPEED_PX_PER_SEC) * 1000)
-      // Reserve the lane until this pill's tail + gap has cleared the entry
-      // point, so the next pill never overlaps it.
-      const reserveMs = Math.round(((pillW + MIN_GAP_PX) / SPEED_PX_PER_SEC) * 1000)
-      laneFreeAtRef.current[lane] = now + reserveMs
-      setFlying((f) => [...f, { ...c, key: `${c.id}-${now}-${lane}`, lane, durationMs }])
-    }
-  }, [reduced])
-
-  // Drain on a light interval — cheap, and it keeps the queue moving without
-  // wiring a timer per pill.
+  /**
+   * How many lanes fit between the header and the tab bar.
+   *
+   * Derived from the viewport rather than hard-coded: a tall phone gets more
+   * lanes than a short one, and rotating re-derives it.
+   */
+  const [lanes, setLanes] = useState(3)
   useEffect(() => {
     if (reduced) return
-    const t = setInterval(drain, 400)
+    const calc = () =>
+      setLanes(laneCount(window.innerHeight, TOP_INSET, BOTTOM_INSET, LANE_HEIGHT, MAX_LANES))
+    calc()
+    window.addEventListener('resize', calc)
+    return () => window.removeEventListener('resize', calc)
+  }, [reduced])
+
+  /**
+   * Measure every parked pill and launch the ones whose lane is free.
+   *
+   * A pill mounts with `lane: null`, parked off the right edge and not
+   * animating, so the browser lays it out at its true width and height. Only
+   * then is it given a lane and a duration. That is the whole difference from
+   * the old version, which guessed the width before the pill existed.
+   */
+  const assign = useCallback(() => {
+    if (reduced) return
+    const deckW = deckRef.current?.clientWidth || window.innerWidth || 360
+    const now = Date.now()
+
+    // Grow/shrink the lane bookkeeping to match the current lane count.
+    const free = laneFreeAtRef.current
+    while (free.length < lanes) free.push(0)
+    if (free.length > lanes) free.length = lanes
+
+    setFlying((prev) => {
+      let changed = false
+      const next = prev.map((p) => {
+        if (p.lane !== null) return p
+        const el = pillRefs.current[p.key]
+        if (!el) return p // not mounted yet — next tick
+
+        // The timing rules live in lib/danmaku, where the no-overlap property
+        // is actually asserted rather than eyeballed on a moving screen.
+        const lane = pickLane(free, now)
+        if (lane === null) return p // every lane still busy — keep waiting
+
+        const pillW = el.offsetWidth
+        free[lane] = now + laneHoldMs(pillW)
+        changed = true
+        return { ...p, lane, durationMs: flightDurationMs(deckW, pillW) }
+      })
+      return changed ? next : prev
+    })
+  }, [reduced, lanes])
+
+  // One light interval drives both measuring and launching.
+  useEffect(() => {
+    if (reduced) return
+    const t = setInterval(assign, 200)
     return () => clearInterval(t)
-  }, [drain, reduced])
+  }, [assign, reduced])
 
   const enqueue = useCallback(
     (c: LeaderboardComment) => {
       if (seenRef.current.has(c.id)) return
       seenRef.current.add(c.id)
       setRecent((r) => [c, ...r].slice(0, 40))
-      queueRef.current.push(c)
-      drain()
+      if (reduced) return
+      setFlying((f) => {
+        const pending = f.filter((p) => p.lane === null).length
+        // Drop the oldest waiting pill rather than mounting without bound.
+        const trimmed = pending >= MAX_PENDING ? f.slice(1) : f
+        return [
+          ...trimmed,
+          { ...c, key: `${c.id}-${Date.now()}`, lane: null, durationMs: null },
+        ]
+      })
     },
-    [drain],
+    [reduced],
   )
 
-  // Seed from the last day. The "Recent comments" list shows up to 20, but a
-  // single-file ticker would take minutes to drain 20 — so only the newest few
-  // actually fly on load; the rest just populate the list.
+  // Seed from the last day. With several lanes the stream actually drains, so
+  // more of the fetched comments get to fly than the old six.
   useEffect(() => {
     let cancelled = false
     listLeaderboardComments(20)
@@ -179,9 +217,17 @@ export function CommentsOverlay({
         setRecent(list)
         for (const c of list) seenRef.current.add(c.id)
         if (!reduced) {
-          // Newest 6, oldest-first so they fly in chronological order.
-          queueRef.current.push(...list.slice(0, 6).reverse())
-          drain()
+          // Oldest-first so they fly in chronological order.
+          const seed = list.slice(0, 14).reverse()
+          const now = Date.now()
+          setFlying(
+            seed.map((c, i) => ({
+              ...c,
+              key: `${c.id}-${now}-${i}`,
+              lane: null,
+              durationMs: null,
+            })),
+          )
         }
       })
       .catch(() => {
@@ -190,7 +236,7 @@ export function CommentsOverlay({
     return () => {
       cancelled = true
     }
-  }, [drain, reduced])
+  }, [reduced])
 
   useEffect(() => {
     if (!studentId) return
@@ -215,7 +261,6 @@ export function CommentsOverlay({
           if (!id) return
           setFlying((f) => f.filter((p) => p.id !== id))
           setRecent((r) => r.filter((c) => c.id !== id))
-          queueRef.current = queueRef.current.filter((c) => c.id !== id)
         },
       )
       .subscribe()
@@ -261,61 +306,78 @@ export function CommentsOverlay({
 
   return (
     <>
-      {/* Slim single-lane ticker directly ABOVE the podium — a thin strip so the
-          podium stays right at the top and the crown is never covered. Pills fly
-          one at a time (constant speed, never stacking). pointer-events-none so
-          scrolls pass through; student pills re-enable taps to open a profile. */}
+      {/* The flight deck: a FULL-SCREEN overlay, so comments float in front of
+          the whole board rather than in a strip above it.
+
+          `pointer-events-none` on the deck is load-bearing — without it this
+          layer would swallow every tap on the board, the section picker and the
+          tab bar underneath. Only a tappable pill re-enables pointer events,
+          and only on itself.
+
+          Lanes stop short of the header and the tab bar (TOP_INSET /
+          BOTTOM_INSET) so comments never cover the app's own chrome. */}
       {!reduced && (
         <div
           ref={deckRef}
-          className="pointer-events-none relative mb-1 overflow-hidden"
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
           // container-type makes `cqw` in the cp-fly keyframe resolve against
           // this deck's width — that's what tells a pill how far to travel.
-          style={{ height: LANES * LANE_HEIGHT, containerType: 'inline-size' }}
+          style={{ containerType: 'inline-size' }}
         >
           {flying.map((p) => {
             const tappable = p.studentId !== null && !!onOpenProfile
+            const launched = p.lane !== null
             return (
               <div
                 key={p.key}
-                // `left` comes from .cp-fly (100% — parked off the right edge).
-                className="cp-fly absolute whitespace-nowrap"
+                ref={(el) => {
+                  pillRefs.current[p.key] = el
+                }}
+                // Parked off the right edge until measured; .cp-fly then takes
+                // over the same `left: 100%` and animates the transform.
+                className={cn('absolute', launched && 'cp-fly')}
                 style={
                   {
-                    // Centred in the lane rather than pinned 2px from its
-                    // top, so the pill cannot ride out of the clip region.
-                    top: p.lane * LANE_HEIGHT,
-                    height: LANE_HEIGHT,
-                    display: "flex",
-                    alignItems: "center",
-                    '--cp-fly-dur': `${p.durationMs}ms`,
+                    left: '100%',
+                    top: TOP_INSET + (p.lane ?? 0) * LANE_HEIGHT,
+                    width: 'max-content',
+                    maxWidth: '76cqw',
+                    ...(launched ? { '--cp-fly-dur': `${p.durationMs}ms` } : null),
                   } as React.CSSProperties
                 }
-                onAnimationEnd={() => setFlying((f) => f.filter((x) => x.key !== p.key))}
+                onAnimationEnd={() => {
+                  delete pillRefs.current[p.key]
+                  setFlying((f) => f.filter((x) => x.key !== p.key))
+                }}
               >
                 <span
                   className={cn(
-                    'inline-flex max-w-[85cqw] items-center gap-2 rounded-full border px-3 py-1.5 text-sm shadow-lg backdrop-blur-md',
+                    'flex items-start gap-2 rounded-2xl border px-3 py-2 text-sm shadow-lg backdrop-blur-md',
                     p.studentId === null
                       ? 'border-accent-solid/50 bg-accent-solid/25 text-accent'
-                      : 'border-line bg-card/95 text-ink',
+                      : 'border-line bg-card/92 text-ink',
                     tappable && 'pointer-events-auto cursor-pointer',
                   )}
                   onClick={tappable ? () => onOpenProfile!(p) : undefined}
                 >
                   {p.studentId === null ? (
-                    <span className="text-2xs font-bold uppercase tracking-wide">
+                    <span className="mt-0.5 shrink-0 text-2xs font-bold uppercase tracking-wide">
                       Instructor
                     </span>
                   ) : (
                     <Avatar
                       name={p.displayName}
                       url={p.avatarUrl}
-                      className="h-5 w-5 text-2xs"
+                      className="mt-0.5 h-5 w-5 shrink-0 text-2xs"
                     />
                   )}
-                  <span className="shrink-0 font-semibold">{p.displayName}</span>
-                  <span className="truncate text-muted">{p.body}</span>
+                  {/* Wraps to three lines rather than truncating. A comment you
+                      cannot finish reading is worse than a taller pill. */}
+                  <span className="line-clamp-3 min-w-0 [overflow-wrap:anywhere]">
+                    <span className="font-semibold">{p.displayName}</span>{' '}
+                    <span className="text-muted">{p.body}</span>
+                  </span>
                 </span>
               </div>
             )
