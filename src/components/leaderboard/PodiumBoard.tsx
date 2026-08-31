@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Card, Rows } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
 import { CrownIcon } from '@/components/ui/icons'
 import { ConfettiBurst } from '@/components/leaderboard/ConfettiBurst'
-import { RankDelta, RankTenure } from '@/components/leaderboard/RankSignals'
+import { RankDelta, RankTenure, biggestClimber } from '@/components/leaderboard/RankSignals'
+import { sectionColor } from '@/lib/sectionColor'
 import { getLevelProgress } from '@/lib/leveling'
 import { cn } from '@/lib/cn'
 import type { LeaderboardEntry } from '@/lib/types'
@@ -103,6 +104,7 @@ export function PodiumBoard({
   const pick = onSelect ? (entry: LeaderboardEntry) => () => onSelect(entry) : undefined
   const top3 = entries.slice(0, 3).map((entry, i) => ({ entry, place: (i + 1) as Place }))
   const rest = entries.slice(3)
+  const climber = biggestClimber(entries)
 
   // Visually raise #1 in the centre: [#2, #1, #3]. Fewer than three → natural order.
   const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3
@@ -145,6 +147,29 @@ export function PodiumBoard({
             podium instead of floating bars. */}
         <div className="relative z-[1] -mt-px h-2.5 rounded-b-lg border border-t-0 border-line bg-gradient-to-b from-card-2 to-card shadow-sm" />
       </div>
+
+      {/* Who moved most, sitting between the podium and the rest — which is
+          exactly what it means: the bridge from "the winners" to "everyone
+          else". Gated on rankSignals for the same reason the per-row arrows
+          are: previous_rank describes the WHOLE board, so on a section view it
+          would be mixing two different rankings. */}
+      {rankSignals && climber && (
+        <div className="flex items-center gap-2.5 rounded-xl bg-success-solid/10 px-3 py-2">
+          <span className="text-sm font-bold text-success" aria-hidden>
+            ▲
+          </span>
+          <p className="min-w-0 flex-1 truncate text-xs">
+            <span className="font-semibold">{climber.name}</span>
+            <span className="text-muted">
+              {' '}
+              climbed {climber.places} place{climber.places === 1 ? '' : 's'}
+            </span>
+          </p>
+          <span className="shrink-0 text-2xs uppercase tracking-wider text-muted">
+            biggest climb
+          </span>
+        </div>
+      )}
 
       {/* One divided list, not seven floating cards. This is where most
           students actually find themselves, so it should read as a ranking —
@@ -436,6 +461,22 @@ function RestRow({
               rank, no flame under a day — so this line stays quiet for most
               rows instead of becoming a column of dashes and zeroes. */}
           <p className="flex items-center gap-1.5 text-xs text-muted">
+            {/* A stable colour per section, so you can find your own class among
+                208 students on the global board. Both theme values ride as CSS
+                variables rather than reading the theme once in JS, so the dot
+                follows a theme switch like everything else. */}
+            {sectionLabel && (
+              <span
+                aria-hidden
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--dot)] dark:bg-[var(--dot-dark)]"
+                style={
+                  {
+                    '--dot': sectionColor(entry.section_id, false),
+                    '--dot-dark': sectionColor(entry.section_id, true),
+                  } as CSSProperties
+                }
+              />
+            )}
             <span className="truncate">
               {sectionLabel ? `${sectionLabel} · ` : ''}Lv {level}
             </span>
