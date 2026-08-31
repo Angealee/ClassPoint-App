@@ -5,11 +5,13 @@ import { Select } from '@/components/ui/Select'
 import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotChip } from '@/components/ui/SnapshotStamp'
-import { ShareIcon, TrophyIcon } from '@/components/ui/icons'
+import { ShareIcon } from '@/components/ui/icons'
+import { IconButton } from '@/components/ui/IconButton'
 import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
 import { CommentsOverlay } from '@/components/leaderboard/CommentsOverlay'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { getLevelProgress } from '@/lib/leveling'
+import { cn } from '@/lib/cn'
 import type { LeaderboardComment, LeaderboardEntry } from '@/lib/types'
 import { PastSemesterBoard } from './PastSemesterBoard'
 import { useStudentData } from './StudentData'
@@ -98,21 +100,23 @@ export function Leaderboard() {
       ? { pts: Math.max(0, above.points - meEntry.points), pos: meIdx }
       : null
 
-  const subtitle = isGlobal ? `Top ${TOP_N}` : sectionName(view)
-
   return (
     <PullToRefresh onRefresh={refresh}>
       <div className="space-y-4">
-      {/* Header: title + picker on one row; the scope/countdown chips sit on
-          their own row below so they always stay horizontal. */}
+      {/* Header, tightened. The scope chip that used to sit on the second row
+          ("Top 10" / the section name) said the same thing as the picker beside
+          it, so it is gone and Share moved up to join them. That reclaims a row
+          — which matters more now comments fly in front of the board. */}
       <div>
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="font-display text-2xl font-bold leading-tight">Leaderboard</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="min-w-0 flex-1 truncate font-display text-xl font-bold leading-tight">
+            Leaderboard
+          </h1>
           <Select
             value={view}
             onChange={(e) => setView(e.target.value)}
             aria-label="Choose leaderboard"
-            className="max-w-34 shrink-0"
+            className="h-9! max-w-34 shrink-0 text-sm!"
           >
             <option value={GLOBAL}>Global</option>
             {sections.map((s) => (
@@ -122,12 +126,19 @@ export function Leaderboard() {
               </option>
             ))}
           </Select>
+          {top.length > 0 && (
+            <IconButton
+              label="Share the board"
+              variant="accent"
+              onClick={() => {
+                setShareMounted(true)
+                setShareOpen(true)
+              }}
+              icon={<ShareIcon className="h-4.5 w-4.5" />}
+            />
+          )}
         </div>
-        <div className="mt-2 flex items-center gap-1.5">
-          <span className="inline-flex items-center gap-1 rounded-full bg-card-2 px-2.5 py-1 text-xs font-semibold text-muted">
-            <TrophyIcon className="h-3.5 w-3.5" />
-            {subtitle}
-          </span>
+        <div className="mt-1.5 flex items-center gap-1.5">
           <SnapshotChip capturedAt={capturedAt} />
           {/* Past boards (0035). Always available, but it's the students whose
               own semester ended who most need it — their final rank is the one
@@ -137,20 +148,8 @@ export function Leaderboard() {
             onClick={() => setPastOpen(true)}
             className="inline-flex shrink-0 items-center rounded-full bg-card-2 px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:text-ink"
           >
-            Past
+            Past boards
           </button>
-          {top.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                setShareMounted(true)
-                setShareOpen(true)
-              }}
-              className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-solid/10 px-2.5 py-1 text-xs font-semibold text-accent transition-opacity hover:opacity-80"
-            >
-              <ShareIcon className="h-3.5 w-3.5" /> Share
-            </button>
-          )}
         </div>
       </div>
 
@@ -240,42 +239,64 @@ function YourRankCard({
       type="button"
       onClick={onClick}
       aria-label="View your profile"
-      className="block w-full overflow-hidden rounded-2xl border border-gold-400/40 bg-linear-to-r from-accent-solid/10 via-card to-gold-400/10 p-3.5 text-left transition-transform active:scale-[0.99]"
+      className={cn(
+        'block w-full overflow-hidden rounded-2xl text-left transition-transform active:scale-[0.99]',
+        // The same plate as the home scoreboard, and for the same reason: this
+        // is the one thing on the board that is about YOU, so it should read as
+        // an object rather than as another row. It also makes the two screens
+        // feel like one app.
+        'bg-gradient-to-br from-plate-2 to-plate shadow-lg shadow-black/25 ring-1 ring-white/10',
+      )}
     >
-      <div className="flex items-center gap-3">
-        <div className="w-12 shrink-0 text-center">
-          <p className="text-2xs font-semibold uppercase tracking-wider text-muted">
-            Your rank
-          </p>
-          <p className="font-display text-3xl font-bold leading-none text-reward">
-            #{position}
-          </p>
-          <RankDeltaValue delta={delta} verbose />
-        </div>
-        <div className="h-11 w-px shrink-0 bg-line" />
-        <Avatar
-          name={entry.display_name}
-          url={entry.avatar_url}
-          className="h-12! w-12! ring-2 ring-gold-400/50"
+      <div className="relative p-4">
+        {/* Gold bloom behind the rank, echoing the home hero. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -left-8 -top-12 h-36 w-36 rounded-full bg-gold-400/12 blur-3xl"
         />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{entry.display_name}</p>
-          <p className="truncate text-xs text-muted">
-            {sectionLabel} · Lv {level}
-          </p>
-          <p className="truncate text-xs font-semibold text-reward">
+
+        <div className="relative flex items-end justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-2xs font-semibold uppercase tracking-widest text-white/60">
+              Your rank
+            </p>
+            <p className="flex items-baseline gap-2 font-display text-5xl font-bold leading-none text-white">
+              <span className="tabular-nums">#{position}</span>
+              <RankDeltaValue delta={delta} verbose />
+            </p>
+          </div>
+
+          <div className="min-w-0 text-right">
+            <p className="text-2xs font-semibold uppercase tracking-widest text-white/60">
+              Points
+            </p>
+            <p className="font-display text-3xl font-bold leading-none tabular-nums text-gold-300">
+              {entry.points}
+            </p>
+          </div>
+        </div>
+
+        {/* The gap is the bridge between the two figures above — what it would
+            take to move. Same idea as the home screen's next milestone. */}
+        <div className="relative mt-4 flex items-center gap-3 border-t border-white/10 pt-3">
+          <Avatar
+            name={entry.display_name}
+            url={entry.avatar_url}
+            className="h-9! w-9! shrink-0 ring-2 ring-white/15"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">{entry.display_name}</p>
+            <p className="truncate text-2xs text-white/55">
+              {sectionLabel} · Lv {level}
+            </p>
+          </div>
+          <p className="shrink-0 text-right text-2xs font-semibold text-white/85">
             {toNext
               ? toNext.pts > 0
-                ? `${toNext.pts} pts to #${toNext.pos}`
+                ? `${toNext.pts} to #${toNext.pos}`
                 : `Tied with #${toNext.pos}`
               : 'Top of the board'}
           </p>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="font-display text-xl font-bold text-reward">
-            {entry.points}
-          </p>
-          <p className="text-2xs uppercase tracking-wider text-muted">pts</p>
         </div>
       </div>
     </button>

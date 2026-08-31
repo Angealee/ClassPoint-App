@@ -1,6 +1,6 @@
-import { type CSSProperties, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Card } from '@/components/ui/Card'
+import { Card, Rows } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
 import { CrownIcon } from '@/components/ui/icons'
 import { ConfettiBurst } from '@/components/leaderboard/ConfettiBurst'
@@ -110,19 +110,20 @@ export function PodiumBoard({
   return (
     <div className="space-y-3">
       <div className="relative">
-        {/* Arena spotlight behind the stand. */}
+        {/* A single STATIC gold wash grounds the podium. It used to breathe
+            (cp-arena-glow); with comments now flying in front of the board, one
+            more thing pulsing was one too many. */}
         {glow && (
           <div
-            className={cn(
-              'pointer-events-none absolute left-1/2 top-6 h-44 w-[130%] -translate-x-1/2 rounded-[50%]',
-              !reduced && 'cp-arena-glow',
-            )}
+            className="pointer-events-none absolute left-1/2 top-6 h-44 w-[130%] -translate-x-1/2 rounded-[50%]"
             style={{
               background:
-                'radial-gradient(ellipse at center, rgba(255,186,31,0.22), rgba(255,186,31,0) 70%)',
+                'radial-gradient(ellipse at center, rgba(255,186,31,0.16), rgba(255,186,31,0) 70%)',
             }}
           />
         )}
+        {/* Confetti stays: it fires ONCE on arrival, so it is a moment rather
+            than ambient motion. */}
         {showConfetti && <ConfettiBurst />}
 
         <div className="relative flex items-end justify-center gap-1.5 px-0.5 pt-12 sm:gap-3 sm:px-1">
@@ -145,8 +146,11 @@ export function PodiumBoard({
         <div className="relative z-[1] -mt-px h-2.5 rounded-b-lg border border-t-0 border-line bg-gradient-to-b from-card-2 to-card shadow-sm" />
       </div>
 
+      {/* One divided list, not seven floating cards. This is where most
+          students actually find themselves, so it should read as a ranking —
+          and it reclaims the vertical space seven card gaps were spending. */}
       {rest.length > 0 && (
-        <div className="space-y-2">
+        <Rows>
           {rest.map((entry, i) => (
             <RestRow
               key={entry.student_id}
@@ -158,9 +162,15 @@ export function PodiumBoard({
               reduced={reduced}
               rankSignals={rankSignals}
               onClick={pick?.(entry)}
+              // entries[i + 2] is the row directly above this one (place i+3).
+              gapToAbove={
+                meId === entry.student_id
+                  ? Math.max(0, entries[i + 2].points - entry.points)
+                  : null
+              }
             />
           ))}
-        </div>
+        </Rows>
       )}
 
       {pinnedSelf && (
@@ -168,6 +178,7 @@ export function PodiumBoard({
           <p className="text-center text-2xs uppercase tracking-wider text-muted">
             your standing
           </p>
+          <Rows>
           <RestRow
             entry={pinnedSelf}
             place={pinnedSelf.rank}
@@ -180,6 +191,7 @@ export function PodiumBoard({
             rankSignals
             onClick={pick?.(pinnedSelf)}
           />
+          </Rows>
         </div>
       )}
     </div>
@@ -246,20 +258,6 @@ function PodiumCard({
           'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
       )}
     >
-      {/* Spotlight flash on tap. */}
-      {spot && !reduced && (
-        <motion.div
-          className="pointer-events-none absolute inset-0 z-30 rounded-2xl"
-          initial={{ opacity: 0.75 }}
-          animate={{ opacity: 0 }}
-          transition={{ duration: 0.45 }}
-          style={{
-            background:
-              'radial-gradient(circle at 50% 40%, rgba(255,255,255,0.7), rgba(255,186,31,0.25) 50%, transparent 75%)',
-          }}
-        />
-      )}
-
       {/* Crown floats above the champion. */}
       {champ && (
         <div className="pointer-events-none absolute -top-9 left-1/2 z-20 -translate-x-1/2">
@@ -267,27 +265,20 @@ function PodiumCard({
         </div>
       )}
 
-      {/* Sparkles drift up around the champion. */}
-      {champ && !reduced && <Sparkles />}
-
       <Card pad="none"
         className={cn(
           'relative flex flex-col items-center gap-1.5 overflow-hidden border px-2 text-center sm:gap-2 sm:px-3',
           tier.border,
           champ ? 'pb-3 pt-7 sm:pb-4 sm:pt-8' : 'pb-3 pt-5 sm:pb-3.5 sm:pt-6',
-          champ && !reduced && 'cp-podium-glow',
+          // The champion's card carries a steady gold edge instead of a
+          // breathing glow — still clearly the winner, no longer pulsing.
+          champ && 'ring-1 ring-gold-400/40',
         )}
       >
         {/* Metal tint wash. */}
         <div
           className={cn('pointer-events-none absolute inset-0 bg-gradient-to-b to-transparent', tier.tint)}
         />
-        {/* Champion light sweep. */}
-        {champ && !reduced && (
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="cp-shimmer absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-white/10" />
-          </div>
-        )}
         {/* "You" tint. */}
         {isMe && <div className="pointer-events-none absolute inset-0 bg-accent-solid/10" />}
 
@@ -378,6 +369,7 @@ function RestRow({
   reduced,
   rankSignals,
   onClick,
+  gapToAbove,
 }: {
   entry: LeaderboardEntry
   place: number
@@ -387,6 +379,14 @@ function RestRow({
   reduced: boolean
   rankSignals?: boolean
   onClick?: () => void
+  /**
+   * Points needed to pass the row above — shown on YOUR row only.
+   *
+   * On every row it becomes ten small numbers competing with the points
+   * column, and for someone forty points back it reads as discouraging rather
+   * than motivating. On your own row it is the one figure you can act on.
+   */
+  gapToAbove?: number | null
 }) {
   const level = getLevelProgress(entry.points).level
   return (
@@ -407,19 +407,22 @@ function RestRow({
         }
       }}
       className={cn(
+        'relative',
         onClick &&
-          'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+          'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50',
       )}
     >
-      <Card
+      <div
         className={cn(
           'relative flex items-center gap-3 overflow-hidden p-3 transition-colors',
           onClick && 'hover:bg-card-2',
-          isMe && 'ring-1 ring-accent-solid/40',
         )}
       >
         {isMe && <div className="pointer-events-none absolute inset-0 bg-accent-solid/10" />}
-        <span className="relative z-[1] w-6 text-center font-display text-base font-bold text-muted">
+        {/* The rank is the primary datum on a leaderboard, so it anchors the
+            row. It used to be the quietest element in it — muted, and the same
+            size as the points on the far right. */}
+        <span className="relative z-[1] w-7 shrink-0 text-center font-display text-lg font-bold tabular-nums">
           {place}
         </span>
         <Avatar name={entry.display_name} url={entry.avatar_url} className="relative z-[1] h-9! w-9!" />
@@ -432,7 +435,7 @@ function RestRow({
               themselves when there's nothing to say — no arrow on an unchanged
               rank, no flame under a day — so this line stays quiet for most
               rows instead of becoming a column of dashes and zeroes. */}
-          <p className="flex items-center gap-1.5 text-sm text-muted">
+          <p className="flex items-center gap-1.5 text-xs text-muted">
             <span className="truncate">
               {sectionLabel ? `${sectionLabel} · ` : ''}Lv {level}
             </span>
@@ -444,42 +447,21 @@ function RestRow({
             )}
           </p>
         </div>
-        <span className="relative z-[1] font-display text-base font-bold text-reward">
-          {entry.points}
+        <span className="relative z-[1] shrink-0 text-right">
+          <span className="block font-display text-base font-bold tabular-nums text-reward">
+            {entry.points}
+          </span>
+          {gapToAbove !== null && gapToAbove !== undefined && (
+            <span className="block text-2xs tabular-nums text-muted">
+              {gapToAbove === 0 ? `tied with #${place - 1}` : `${gapToAbove} to #${place - 1}`}
+            </span>
+          )}
         </span>
-      </Card>
+      </div>
     </motion.div>
   )
 }
 
-/** Gold motes that rise and fade around the champion card. */
-function Sparkles() {
-  const motes = [
-    { left: '10%', dur: '2.4s', delay: '0s' },
-    { left: '26%', dur: '3s', delay: '0.7s' },
-    { left: '46%', dur: '2.1s', delay: '1.2s' },
-    { left: '64%', dur: '2.7s', delay: '0.35s' },
-    { left: '82%', dur: '2.5s', delay: '1s' },
-    { left: '92%', dur: '3.1s', delay: '1.6s' },
-  ]
-  return (
-    <div className="pointer-events-none absolute inset-x-0 -top-3 bottom-2 z-0 overflow-visible">
-      {motes.map((m, i) => (
-        <span
-          key={i}
-          className="cp-sparkle absolute top-3 h-1.5 w-1.5 rounded-full bg-gold-300"
-          style={
-            {
-              left: m.left,
-              '--cp-dur': m.dur,
-              '--cp-delay': m.delay,
-            } as CSSProperties
-          }
-        />
-      ))}
-    </div>
-  )
-}
 
 /** Eases a number from 0 up to `value` once on mount. */
 function CountUp({
