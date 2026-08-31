@@ -126,6 +126,10 @@ export interface Database {
         previous_rank: number | null
         /** PENDING 0037 — when the current "this rank or better" run began. */
         rank_since: Timestamp
+        /** PENDING 0038 — points cashed out this semester (the spend board). */
+        spent_points: number
+        /** PENDING 0038 — place on the spend board; NULL means "hasn't spent". */
+        spend_rank: number | null
       }>
 
       leaderboard_meta: Row<{ id: boolean; captured_at: Timestamp }>

@@ -40,6 +40,22 @@ export interface ChangelogEntry {
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '4.1.0',
+    date: '2026-08-31',
+    title: 'Climb, or cash out',
+    sections: [
+      {
+        heading: 'There are two boards now',
+        major: true,
+        items: [
+          'The Spend board ranks whoever has cashed in the most points this semester. Spending used to only ever cost you — now it wins something. Find it next to Past boards, or from the Use points screen.',
+          'Your own card on the leaderboard will tell you where you would have been if you had never spent: “You’d be #9 if you hadn’t spent.” No guessing what a redemption actually cost you.',
+          'Both boards settle at the same two moments each day, so they can never disagree about you.',
+        ],
+      },
+    ],
+  },
+  {
     version: '4.0.0',
     date: '2026-08-25',
     title: 'A whole new semester',

@@ -1,5 +1,6 @@
 import { RankDeltaValue, rankDelta } from '@/components/leaderboard/RankSignals'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Link } from 'react-router-dom'
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Select } from '@/components/ui/Select'
 import { Avatar } from '@/components/ui/Avatar'
@@ -64,6 +65,8 @@ export function Leaderboard() {
         section_id: '',
         points: 0,
         avatar_url: c.avatarUrl,
+        spent_points: 0,
+        spend_rank: null,
         // Unranked: no movement to report and no run to time, which is exactly
         // what makes both rank signals render nothing for this target.
         previous_rank: null,
@@ -90,6 +93,34 @@ export function Leaderboard() {
    * of migration 0037, where `previous_rank` is null for everyone.
    */
   const localDelta = useRankDelta(me?.id, view, capturedAt, meEntry ? myPos : null)
+
+  /**
+   * Where you would sit if you had never spent — "climb or cash out", as a
+   * number rather than a warning (0038).
+   *
+   * Holds everyone else CONSTANT: it re-places you on the board as it actually
+   * stands, using the points you'd still have. A "nobody had spent"
+   * counterfactual would be a different and far less useful claim.
+   *
+   * Computed inside `ranked`, not the global snapshot, so it is in the same
+   * frame as `myPos` — on a section view both numbers count section rows.
+   * Ties break on display_name, exactly as `refresh_leaderboard_snapshot`
+   * does, so this can't be off by one against the board it describes.
+   *
+   * Null when there is nothing to say — nothing spent, or spending cost no
+   * places — following the same discipline as RankDelta and RankTenure.
+   */
+  const shadowRank = useMemo(() => {
+    if (!meEntry || meEntry.spent_points <= 0) return null
+    const would = meEntry.points + meEntry.spent_points
+    const ahead = ranked.filter(
+      (e) =>
+        e.student_id !== meEntry.student_id &&
+        (e.points > would || (e.points === would && e.display_name < meEntry.display_name)),
+    ).length
+    const pos = ahead + 1
+    return pos < myPos ? pos : null
+  }, [ranked, meEntry, myPos])
   const dbDelta = isGlobal && meEntry ? rankDelta(meEntry) : null
   const delta = dbDelta ?? localDelta
 
@@ -150,6 +181,14 @@ export function Leaderboard() {
           >
             Past boards
           </button>
+          {/* The other board (0038). One tap apart is what makes the fork
+              visible: you can be high on one and low on the other. */}
+          <Link
+            to="/app/spenders"
+            className="inline-flex shrink-0 items-center rounded-full bg-card-2 px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:text-ink"
+          >
+            Spend board
+          </Link>
         </div>
       </div>
 
@@ -183,6 +222,7 @@ export function Leaderboard() {
           position={myPos}
           delta={delta}
           toNext={toNext}
+          shadowRank={shadowRank}
           sectionLabel={sectionName(meEntry.section_id)}
           onClick={() => setSelected(meEntry)}
         />
@@ -223,6 +263,7 @@ function YourRankCard({
   position,
   delta,
   toNext,
+  shadowRank,
   sectionLabel,
   onClick,
 }: {
@@ -230,6 +271,8 @@ function YourRankCard({
   position: number
   delta: number | null
   toNext: { pts: number; pos: number } | null
+  /** Where you'd sit if you hadn't spent (0038); null when there's nothing to say. */
+  shadowRank: number | null
   sectionLabel: string
   onClick: () => void
 }) {
@@ -264,6 +307,14 @@ function YourRankCard({
               <span className="tabular-nums">#{position}</span>
               <RankDeltaValue delta={delta} verbose />
             </p>
+            {/* The cost of cashing out, stated where the rank is — the other
+                half of a sentence the shop only ever told as a warning. */}
+            {shadowRank !== null && (
+              <p className="mt-1.5 text-2xs text-white/55">
+                You&rsquo;d be <span className="font-semibold text-white/80">#{shadowRank}</span> if
+                you hadn&rsquo;t spent
+              </p>
+            )}
           </div>
 
           <div className="min-w-0 text-right">

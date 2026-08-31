@@ -138,7 +138,7 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   badges simply never unlock and their progress bars read empty (it degrades quietly —
   the client defaults the missing columns). **0037 (`rank_history`) is unapplied too**;
   without it `getLeaderboardSnapshot` selects two columns that don't exist and the whole
-  board 400s — this one is LOUD. Next number: 0038.
+  board 400s — this one is LOUD. **0038 (`spend_board`) is unapplied and is also LOUD** — `getLeaderboardSnapshot` selects `spent_points`/`spend_rank`, so without it every student's leaderboard 400s, same as 0037. Next number: 0039.
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -1025,6 +1025,61 @@ Six slots still collide by pigeonhole — the dot is a scanning aid, not an iden
 The dot only renders where `showSection` is on (the global board); on a section view every
 row would wear the same colour. Both theme values ride as CSS variables with a `dark:`
 utility rather than reading the theme once in JS, so it follows a theme switch.
+
+Since 0038 (The spend board — "climb or cash out"): `leaderboard_snapshot` gains
+`spent_points` and a NULLABLE `spend_rank`. **Ownership move
+`refresh_leaderboard_snapshot` 0037 → 0038** (same signature, plain
+`create or replace`; 0037's upsert body carried forward verbatim plus a spend CTE
+and the two columns in the `on conflict` SET list).
+
+**Why the snapshot and not an RPC.** Students cannot compute anyone else's
+spending — `point_events` (0003) and `point_redemptions` (0019) are both "own rows
+or instructor". The points board already solves that by reading
+`leaderboard_snapshot`, so spend goes through the same door. Both boards then
+settle at the same moment, obey the same RLS, and **arrive in ONE fetch** —
+`SpendBoard` issues no query of its own, it re-reads StudentData's `leaderboard`.
+A separate RPC would settle on its own schedule and the two boards would visibly
+disagree about the same student.
+
+**Spend is summed from the LEDGER** (`point_events where category = 'redeem' and
+semester_id = cp_active_semester_id()`), not from `point_redemptions` — the ledger
+is authoritative, its rows are semester-stamped by 0029's trigger, and the filter
+is byte-identical to `cp_recompute_points`'s. **`listTopSpenders` was repointed at
+the snapshot for the same reason**: it summed `point_redemptions` client-side at
+`limit: 500` (a 0031-style truncation waiting to happen) and would have become a
+SECOND definition of one quantity — the exact bug already fixed twice here. Its
+`requests` count is GONE, because the authoritative source cannot provide it and
+every request is listed in full directly above that card.
+
+**`spend_rank` is NULL for anyone who hasn't spent — not a place at the bottom.**
+Median earnings are 22 points a semester against items costing 1–50, so most
+students will be null; ordering a ~170-way tie at zero by name would look like a
+ranking while meaning nothing. The `display_name asc` tiebreaker MATCHES the points
+rank's (the 0035 lesson). **No `previous_spend_rank`** — 0037 refused to invent
+movement it never recorded, and the spend board has no history at all yet.
+
+**`PodiumBoard` gained `metric: 'points' | 'spent'` rather than being duplicated.**
+It derives a level from `entry.points` at two places for the XP ring and the "Lv N"
+label; pointed at spend totals that renders a CONFIDENTLY WRONG level for every
+student, so `'spent'` skips the level computation entirely (unfilled ring, no level
+line, "used" not "pts"). Varying beats copying here on precedent: five copies of the
+show-up-rate rule and four of the points row all drifted before being merged.
+`confetti={false}` on the spend board — confetti belongs to the board you climb.
+
+**The shadow rank is the whole feature in one line.** `YourRankCard` shows "You'd be
+#9 if you hadn't spent", computed from `points + spent_points` re-placed against
+**`ranked`, not the global snapshot**, so it shares a frame with `myPos` (on a
+section view both count section rows). Ties break on `display_name` exactly as the
+SQL does, so it cannot be off by one against the board it annotates. Renders nothing
+when there's nothing to say — same discipline as `RankDelta`/`RankTenure`.
+
+**`routes.test.ts`'s `hasInboundLink` only matched SINGLE quotes** and so could not
+see a `<Link to="/app/spenders">`, reporting a properly-linked screen as orphaned.
+It matches both quote styles now. Verified to bite by pointing both links elsewhere
+and watching it fail. `changelog.test.ts` no longer hard-codes the leading version
+(that forced an edit every release, which teaches people to edit it unread); it pins
+`LATEST_VERSION === CHANGELOG[0].version` instead, which is the actual invariant the
+"What's new" gate depends on.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

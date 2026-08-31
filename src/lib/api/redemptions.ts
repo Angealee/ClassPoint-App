@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import { rpc } from './_internal'
+import { oneEmbed, rpc } from './_internal'
 import type {
   Redemption,
   RedemptionKind,
@@ -129,21 +129,35 @@ export async function getPendingRedemptionCount(): Promise<number> {
 }
 
 /** Instructor: who has actually spent the most (approved requests only). */
+/**
+ * The instructor's Top spenders card — read from the SAME snapshot the students'
+ * spend board renders (0038).
+ *
+ * It used to sum `point_redemptions` client-side at `limit: 500`, which had two
+ * problems. It would truncate the way the attendance queries did before 0031.
+ * And once students had a spend board of their own, it was a SECOND definition
+ * of one quantity — the exact shape of bug this project has already fixed twice
+ * (the "your 142" / "available 137" split). One source, one number.
+ *
+ * Two deliberate consequences of the move: this is now per-SEMESTER and excludes
+ * archived students, both of which match what students see; and the old
+ * `requests` count is gone, because the authoritative source cannot provide it.
+ * Nothing is lost — every request is listed in full directly above this card.
+ */
 export async function listTopSpenders(limit = 5): Promise<SpenderStat[]> {
-  const all = await listRedemptions({ status: 'approved', limit: 500 })
-  const by = new Map<string, SpenderStat>()
-  for (const r of all) {
-    const cur = by.get(r.studentId) ?? {
-      studentId: r.studentId,
-      studentName: r.studentName,
-      avatarUrl: r.avatarUrl,
-      spent: 0,
-      requests: 0,
-    }
-    cur.spent += r.points
-    cur.requests += 1
-    by.set(r.studentId, cur)
-  }
-  return [...by.values()].sort((a, b) => b.spent - a.spent).slice(0, limit)
+  const { data, error } = await supabase
+    .from('leaderboard_snapshot')
+    .select('student_id, display_name, spent_points, spend_rank, students(avatar_url)')
+    .not('spend_rank', 'is', null)
+    .order('spend_rank')
+    .limit(limit)
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    studentId: r.student_id as string,
+    studentName: r.display_name as string,
+    avatarUrl: oneEmbed<{ avatar_url: string | null }>(r.students)?.avatar_url ?? null,
+    spent: (r.spent_points as number) ?? 0,
+    rank: (r.spend_rank as number) ?? 0,
+  }))
 }
 

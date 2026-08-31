@@ -52,7 +52,10 @@ export function InstructorLeaderboard() {
         points: 0,
         avatar_url: c.avatarUrl,
         rank: 0,
-        // Unranked: no movement to report and no run to time.
+        // Unranked: no movement to report and no run to time, and not on the
+        // spend board either.
+        spent_points: 0,
+        spend_rank: null,
         previous_rank: null,
         rank_since: new Date().toISOString(),
       },

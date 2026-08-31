@@ -597,7 +597,7 @@ export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot> {
     supabase
       .from('leaderboard_snapshot')
       .select(
-        'student_id, display_name, section_id, semester_points, rank, previous_rank, rank_since',
+        'student_id, display_name, section_id, semester_points, rank, previous_rank, rank_since, spent_points, spend_rank',
       )
       .order('rank'),
     supabase.from('leaderboard_meta').select('captured_at').maybeSingle(),
@@ -620,6 +620,11 @@ export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot> {
     // arrow and no tenure, rather than rendering `undefined`.
     previous_rank: (e.previous_rank as number | null) ?? null,
     rank_since: (e.rank_since as string | null) ?? new Date().toISOString(),
+    // The spend board (0038) rides on this same fetch — one request feeds both
+    // boards, which is the whole reason spend lives in the snapshot rather than
+    // behind its own RPC.
+    spent_points: (e.spent_points as number | null) ?? 0,
+    spend_rank: (e.spend_rank as number | null) ?? null,
   }))
   return { entries, capturedAt: meta.data?.captured_at ?? null }
 }

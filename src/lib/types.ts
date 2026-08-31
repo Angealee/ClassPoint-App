@@ -86,6 +86,22 @@ export interface LeaderboardEntry {
    * Climbing keeps it; only dropping resets it. Drives the tenure flame.
    */
   rank_since: string
+  /**
+   * Points cashed out on approved redemptions THIS SEMESTER (0038).
+   *
+   * The spend board ranks on this, and `points + spent_points` is what the
+   * student would have had if they'd never spent — which is where the shadow
+   * rank on the leaderboard comes from.
+   */
+  spent_points: number
+  /**
+   * Place on the spend board, or null for a student who hasn't spent anything.
+   *
+   * Null is not "last": most students will have spent nothing, and ordering a
+   * ~170-way tie at zero by name would look like a ranking while meaning
+   * nothing. Those students are simply not on that board yet.
+   */
+  spend_rank: number | null
 }
 
 /** A recent point award/penalty as the instructor reviews it (for undo). */
@@ -317,9 +333,10 @@ export interface SpenderStat {
   studentId: string
   studentName: string
   avatarUrl: string | null
-  /** Points actually spent (approved requests only). */
+  /** Points actually spent this semester, from the same snapshot students see. */
   spent: number
-  requests: number
+  /** Place on the spend board (0038). */
+  rank: number
 }
 
 /** One student's attendance record across a whole section's sessions. */

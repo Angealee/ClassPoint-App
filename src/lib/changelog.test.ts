@@ -63,12 +63,20 @@ describe('CHANGELOG integrity', () => {
   })
 })
 
-describe('the 4.0.0 era, once announced', () => {
-  it('leads the changelog', () => {
-    // DRAFT_4_0_0 is gone: the era shipped, so it lives in CHANGELOG now. This
-    // replaces the old guard that asserted the draft stayed OUT of the array.
-    expect(CHANGELOG[0]?.version).toBe('4.0.0')
-    expect(LATEST_VERSION).toBe('4.0.0')
+describe('the announced changelog', () => {
+  it('is led by a real entry that LATEST_VERSION agrees with', () => {
+    // Was pinned to '4.0.0' when that era shipped and DRAFT_4_0_0 was retired.
+    // Hard-coding the leading version means every release has to edit this
+    // test, which teaches people to edit it without reading it. What actually
+    // matters is that the "What's new" sheet is gated on the entry students
+    // will be shown — LATEST_VERSION reads CHANGELOG[0], so that is the
+    // invariant worth pinning.
+    expect(CHANGELOG[0]?.version).toBeTruthy()
+    expect(LATEST_VERSION).toBe(CHANGELOG[0]?.version)
+  })
+
+  it('still contains the 4.0.0 era it announced', () => {
+    expect(CHANGELOG.some((e) => e.version === '4.0.0')).toBe(true)
   })
 
   it('stays short enough that a student actually reads it', () => {

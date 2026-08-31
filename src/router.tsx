@@ -44,6 +44,9 @@ const AttendanceStats = lazy(() =>
 const PointsHistory = lazy(() =>
   import('@/features/student/PointsHistory').then((m) => ({ default: m.PointsHistory })),
 )
+const SpendBoard = lazy(() =>
+  import('@/features/student/SpendBoard').then((m) => ({ default: m.SpendBoard })),
+)
 const ScanLanding = lazy(() =>
   import('@/features/student/ScanLanding').then((m) => ({ default: m.ScanLanding })),
 )
@@ -127,6 +130,7 @@ export const router = createBrowserRouter([
           { path: 'points', element: <UsePoints /> },
           { path: 'settings', element: <Settings /> },
           { path: 'history', element: <PointsHistory /> },
+          { path: 'spenders', element: <SpendBoard /> },
           { path: 'profile', element: <Profile /> },
           { path: 'achievements', element: <Achievements /> },
         ],

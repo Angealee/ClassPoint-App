@@ -38,6 +38,21 @@ interface PodiumBoardProps {
    * stated truthfully.
    */
   rankSignals?: boolean
+  /**
+   * Which number this board ranks on (0038).
+   *
+   * `'spent'` is NOT a cosmetic swap. This component derives a level from
+   * `entry.points` for the XP ring and the "Lv N" label, and spend totals run
+   * through the level curve produce a CONFIDENTLY WRONG level for every
+   * student. So the spend board skips the level computation entirely — plain
+   * ring, no level line — rather than showing a number that means nothing.
+   *
+   * Varying the board instead of copying it is deliberate: this codebase has
+   * paid five times over for duplicating the show-up-rate rule and four times
+   * for duplicating the points row, discovering each time that the copies had
+   * drifted apart.
+   */
+  metric?: 'points' | 'spent'
 }
 
 type Place = 1 | 2 | 3
@@ -88,6 +103,7 @@ export function PodiumBoard({
   glow = true,
   confetti = true,
   rankSignals = false,
+  metric = 'points',
 }: PodiumBoardProps) {
   const reduced = useReducedMotion() ?? false
   // One-shot celebration when the board first mounts; auto-clears after ~2s.
@@ -138,6 +154,7 @@ export function PodiumBoard({
               sectionLabel={label(entry.section_id)}
               reduced={reduced}
               rankSignals={rankSignals}
+              metric={metric}
               onClick={pick?.(entry)}
             />
           ))}
@@ -186,6 +203,7 @@ export function PodiumBoard({
               index={i}
               reduced={reduced}
               rankSignals={rankSignals}
+              metric={metric}
               onClick={pick?.(entry)}
               // entries[i + 2] is the row directly above this one (place i+3).
               gapToAbove={
@@ -211,6 +229,7 @@ export function PodiumBoard({
             sectionLabel={label(pinnedSelf.section_id)}
             index={0}
             reduced={reduced}
+            metric={metric}
             // Safe even in a section view: this row is numbered by the real
             // global rank, not a position within the filtered list.
             rankSignals
@@ -230,6 +249,7 @@ function PodiumCard({
   sectionLabel,
   reduced,
   rankSignals,
+  metric,
   onClick,
 }: {
   entry: LeaderboardEntry
@@ -238,11 +258,13 @@ function PodiumCard({
   sectionLabel: string
   reduced: boolean
   rankSignals?: boolean
+  metric: 'points' | 'spent'
   onClick?: () => void
 }) {
   const tier = TIER[place]
-  const progress = getLevelProgress(entry.points)
-  const level = progress.level
+  // On the spend board there is no level to show — see the `metric` doc above.
+  const progress = metric === 'spent' ? null : getLevelProgress(entry.points)
+  const value = metric === 'spent' ? entry.spent_points : entry.points
   const champ = place === 1
 
   // Tap a podium card → a brief celebratory spotlight, then open the profile.
@@ -307,11 +329,15 @@ function PodiumCard({
         {/* "You" tint. */}
         {isMe && <div className="pointer-events-none absolute inset-0 bg-accent-solid/10" />}
 
-        {/* Gold XP ring around the avatar shows level progress. */}
+        {/* Gold XP ring around the avatar shows level progress. The spend board
+            keeps the ring's geometry (so the podium is the same shape) but
+            leaves it unfilled — there is no progress to report there. */}
         <div
           className="relative z-[1] rounded-full p-[3px]"
           style={{
-            background: `conic-gradient(#ffba1f ${progress.progressPct}%, rgba(160,160,160,0.25) ${progress.progressPct}%)`,
+            background: progress
+              ? `conic-gradient(#ffba1f ${progress.progressPct}%, rgba(160,160,160,0.25) ${progress.progressPct}%)`
+              : 'rgba(160,160,160,0.25)',
           }}
         >
           <div className="rounded-full bg-card p-[2px]">
@@ -333,17 +359,24 @@ function PodiumCard({
             {isMe && <span className="text-accent"> (you)</span>}
           </p>
           <p className="truncate text-2xs text-muted sm:text-xs">
-            {sectionLabel ? `${sectionLabel} · ` : ''}Lv {level}
+            {sectionLabel}
+            {sectionLabel && progress ? ' · ' : ''}
+            {progress ? `Lv ${progress.level}` : ''}
           </p>
         </div>
 
         <div className="relative z-[1] flex items-baseline gap-1">
           <CountUp
-            value={entry.points}
+            value={value}
             reduced={reduced}
             className="font-display text-xl font-bold text-gold-400 sm:text-2xl"
           />
-          <span className="text-xs font-medium text-muted">pts</span>
+          {/* "used" rather than "spent": the shop screen is called Use points
+              and the ledger writes "Used · …", so this is the word students
+              already have for it. */}
+          <span className="text-xs font-medium text-muted">
+            {metric === 'spent' ? 'used' : 'pts'}
+          </span>
         </div>
 
         {/* Movement + tenure (0037). Their own centred row rather than the name
@@ -393,6 +426,7 @@ function RestRow({
   index,
   reduced,
   rankSignals,
+  metric,
   onClick,
   gapToAbove,
 }: {
@@ -403,6 +437,7 @@ function RestRow({
   index: number
   reduced: boolean
   rankSignals?: boolean
+  metric: 'points' | 'spent'
   onClick?: () => void
   /**
    * Points needed to pass the row above — shown on YOUR row only.
@@ -413,7 +448,9 @@ function RestRow({
    */
   gapToAbove?: number | null
 }) {
-  const level = getLevelProgress(entry.points).level
+  // Null on the spend board — see the `metric` doc on PodiumBoardProps.
+  const level = metric === 'spent' ? null : getLevelProgress(entry.points).level
+  const value = metric === 'spent' ? entry.spent_points : entry.points
   return (
     <motion.div
       layout
@@ -478,7 +515,9 @@ function RestRow({
               />
             )}
             <span className="truncate">
-              {sectionLabel ? `${sectionLabel} · ` : ''}Lv {level}
+              {sectionLabel}
+              {sectionLabel && level !== null ? ' · ' : ''}
+              {level !== null ? `Lv ${level}` : ''}
             </span>
             {rankSignals && (
               <>
@@ -490,7 +529,7 @@ function RestRow({
         </div>
         <span className="relative z-[1] shrink-0 text-right">
           <span className="block font-display text-base font-bold tabular-nums text-reward">
-            {entry.points}
+            {value}
           </span>
           {gapToAbove !== null && gapToAbove !== undefined && (
             <span className="block text-2xs tabular-nums text-muted">

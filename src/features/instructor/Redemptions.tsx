@@ -222,19 +222,21 @@ export function Redemptions() {
           {spenders.length > 0 && (
             <Card className="p-5">
               <p className="font-display font-bold">Top spenders</p>
-              <p className="mb-3 text-xs text-muted">Points actually cashed in for grades.</p>
+              {/* Same figures, same order, same settle as the board students
+                  see — this card and /app/spenders read one row each from
+                  `leaderboard_snapshot`. */}
+              <p className="mb-3 text-xs text-muted">
+                This semester, from the board students see.
+              </p>
               <div className="space-y-2">
-                {spenders.map((s, i) => (
+                {spenders.map((s) => (
                   <div key={s.studentId} className="flex items-center gap-3">
                     <span className="w-4 shrink-0 text-center font-display text-sm font-bold text-muted">
-                      {i + 1}
+                      {s.rank}
                     </span>
                     <Avatar name={s.studentName} url={s.avatarUrl} className="h-8 w-8" />
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">
                       {s.studentName}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted">
-                      {s.requests} request{s.requests === 1 ? '' : 's'}
                     </span>
                     <span className="shrink-0 font-display text-sm font-bold tabular-nums text-reward">
                       {s.spent}

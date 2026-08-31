@@ -7,6 +7,7 @@ import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Link } from 'react-router-dom'
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
@@ -251,6 +252,14 @@ export function UsePoints() {
               ? 'Nothing spent yet — your points are all still on the board.'
               : `You've cashed in ${spent} of the ${spent + balance} points you've earned.`}
           </p>
+          {/* The board this figure ranks you on (0038), placed beside the
+              number itself rather than in a menu somewhere. */}
+          <Link
+            to="/app/spenders"
+            className="mt-2 inline-flex items-center rounded-full bg-accent-solid/12 px-2.5 py-1 text-xs font-semibold text-accent"
+          >
+            {spent === 0 ? 'See the spend board' : 'See where that puts you'}
+          </Link>
         </div>
 
         {pendingPoints > 0 && (
@@ -496,7 +505,12 @@ export function UsePoints() {
             approves it.
           </>
         }
-        detail={`If approved, your total drops to ${Math.max(0, balance - points)} — your level and leaderboard rank drop with it.`}
+        // Both sides of the trade. The warning half is unchanged; what was
+        // missing is that spending is also the ONLY way onto the other board,
+        // which is what makes this a choice rather than just a cost. No figure
+        // for the spend side: nothing is spent until the instructor approves,
+        // and that board only settles twice a day.
+        detail={`If approved, your total drops to ${Math.max(0, balance - points)} — your level and leaderboard rank drop with it, and you climb the spend board.`}
         confirmLabel="Send request"
         busy={submitting}
         onConfirm={onSubmit}

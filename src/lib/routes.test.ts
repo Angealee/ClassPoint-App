@@ -35,9 +35,20 @@ function walk(dir: string, out: string[] = []): string[] {
 
 const FILES = walk(SRC).filter((f) => !f.endsWith('router.tsx'))
 
-/** Does any source file outside the router mention this path literally? */
+/**
+ * Does any source file outside the router mention this path literally?
+ *
+ * BOTH quote styles, and that is not pedantry — the first version only matched
+ * single quotes, which is how `navigate('/app/x')` is written. It therefore
+ * could not see a perfectly good `<Link to="/app/x">`, and reported a linked
+ * screen as orphaned. A reachability test that cries wolf gets ignored, which
+ * is the one failure mode it cannot afford.
+ */
 function hasInboundLink(path: string): boolean {
-  return FILES.some((f) => readFileSync(f, 'utf8').includes(`'${path}'`))
+  return FILES.some((f) => {
+    const src = readFileSync(f, 'utf8')
+    return src.includes(`'${path}'`) || src.includes(`"${path}"`)
+  })
 }
 
 /**
@@ -54,6 +65,7 @@ const MUST_BE_LINKED = [
   '/app/achievements',
   '/app/attendance/stats',
   '/app/settings',
+  '/app/spenders',
   // Instructor
   '/teach/ops',
   '/teach/redemptions',
