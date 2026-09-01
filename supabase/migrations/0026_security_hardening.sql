@@ -27,11 +27,25 @@
 --      random website can't POST to them from a student's browser. Supabase
 --      dashboard → Edge Functions → Secrets:
 --
---        ALLOWED_ORIGINS = https://<your-app>.vercel.app,http://localhost:5173
+--        ALLOWED_ORIGINS = https://ccs-classpoint.vercel.app,http://localhost:5173
 --
---      (Comma-separated, no trailing slash. FAIL-SAFE: if the secret is unset
---      the functions keep today's permissive behaviour, so nothing breaks
---      before you set it.)
+--      Comma-separated, no trailing slash. Put YOUR REAL DOMAIN here — the
+--      angle-bracket form below is documentation, never a value to paste:
+--
+--        ✗ https://<your-vercel-domain>     ← this exact string was saved once,
+--                                              and it took claim + PIN reset
+--                                              DOWN for every student. The
+--                                              function echoed it back as
+--                                              Access-Control-Allow-Origin,
+--                                              which is not a legal header
+--                                              value, so every browser failed
+--                                              the preflight.
+--
+--      FAIL-SAFE (hardened after that incident): if the secret is unset — OR
+--      if nothing in it parses as a real origin — the functions fall back to
+--      today's permissive behaviour. A bad value can now only fail to TIGHTEN
+--      CORS; it can no longer take the app down. See parseOrigin() in
+--      supabase/functions/_shared/security.ts.
 --
 --   b) Redeploy all three functions after running this migration:
 --        supabase functions deploy claim-token

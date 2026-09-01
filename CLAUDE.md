@@ -119,11 +119,7 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   `point_events_category_check` — see 0007/0011 precedent).
 - Manual dashboard steps go in a `── ONE-TIME SETUP ──` header comment (0010 pattern).
   Current manual state: Vault secret `edge_service_key` exists; VAPID keys are set as
-  edge function secrets; pg_cron + pg_net enabled. **Pending since 0026:** set the
-  `ALLOWED_ORIGINS` edge-function secret (comma-separated origins, no trailing slash)
-  and redeploy `claim-token`, `reset-pin`, `send-push`. Until it is set the two public
-  functions stay on the old permissive CORS — by design, so a missing secret can never
-  take the app down.
+  edge function secrets; pg_cron + pg_net enabled. **RESOLVED 2026-09-01, the hard way:** the `ALLOWED_ORIGINS` edge-function secret was set to the LITERAL PLACEHOLDER `https://<your-vercel-domain>`. A non-empty allowlist made `corsHeaders` take the configured branch and echo that string back as `Access-Control-Allow-Origin` — not a legal header value — so every browser failed the preflight and **claim-token and reset-pin were unreachable for every student**. The 0026 fail-safe only covered an UNSET secret; an unusable one was worse than none. `_shared/security.ts` now runs every entry through `parseOrigin()` (rejects `<>`/whitespace, requires http/https, normalises to `u.origin`) and falls back to `*` when nothing parses, so a bad value can only fail to TIGHTEN CORS. The real value is `https://ccs-classpoint.vercel.app`; redeploy `claim-token`, `reset-pin`, `send-push` after changing it.
 - The user pastes migrations whole into the SQL editor — test idempotency by running twice.
 - **Migration before client, always.** A migration adding a column the client selects
   must land in the database BEFORE the build that selects it, or every read 400s.

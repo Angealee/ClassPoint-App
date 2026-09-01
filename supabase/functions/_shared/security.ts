@@ -53,17 +53,54 @@ export interface AuthEvent {
 }
 
 /**
+ * Is this a usable browser origin?
+ *
+ * ── WHY THIS EXISTS ────────────────────────────────────────────────────────
+ * The original fail-safe only covered an UNSET secret. It did not cover a
+ * secret set to something unusable — and the first thing that actually
+ * happened in production was `ALLOWED_ORIGINS` being saved as the literal
+ * placeholder from the setup notes, `https://<your-vercel-domain>`.
+ *
+ * That is worse than leaving it empty. A non-empty allowlist made the code
+ * take the "configured" branch and echo that string back as
+ * `Access-Control-Allow-Origin`, which is not a valid header value, so EVERY
+ * browser rejected the preflight and both public functions became unreachable.
+ * Students could not claim an account or reset a PIN at all.
+ *
+ * So an entry has to survive parsing to count. Anything that doesn't is
+ * dropped, and if nothing survives we are back to the documented fail-safe of
+ * '*' — the pre-0026 behaviour. A misconfigured secret can now only fail to
+ * TIGHTEN CORS; it can never take the app down.
+ */
+function parseOrigin(raw: string): string | null {
+  const s = raw.trim().replace(/\/+$/, '')
+  if (!s) return null
+  // Placeholder text ("https://<your-domain>") and anything with whitespace is
+  // never a real origin — reject before URL() gets a chance to be lenient.
+  if (/[<>\s]/.test(s)) return null
+  try {
+    const u = new URL(s)
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null
+    // Normalise to scheme + host + port: an origin is nothing more than that,
+    // so a value pasted with a trailing path still matches what browsers send.
+    return u.origin
+  } catch {
+    return null
+  }
+}
+
+/**
  * Allowlisted browser origins, from the ALLOWED_ORIGINS function secret
- * (comma-separated). FAIL-SAFE: when unset we fall back to '*', i.e. exactly
- * the behaviour before 0026 — a missing secret can never take the app down.
+ * (comma-separated). FAIL-SAFE: when unset — or when nothing in it parses as a
+ * real origin — we fall back to '*', i.e. exactly the behaviour before 0026.
  */
 const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
   .split(',')
-  .map((o) => o.trim().replace(/\/+$/, ''))
-  .filter(Boolean)
+  .map(parseOrigin)
+  .filter((o): o is string => o !== null)
 
 export function corsHeaders(req: Request): Record<string, string> {
-  const origin = (req.headers.get('origin') ?? '').replace(/\/+$/, '')
+  const origin = parseOrigin(req.headers.get('origin') ?? '') ?? ''
   // With no allowlist configured, stay permissive. With one configured, echo
   // the origin when it matches; otherwise answer with the first allowed origin
   // so the browser itself blocks the response for everyone else.
