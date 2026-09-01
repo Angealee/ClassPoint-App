@@ -1273,6 +1273,25 @@ squared it off. Measured the fix rather than eyeballing it: radius is **16px**, 
 (12px) still painted over the curve and `pl-5` (20px) clears it — `clearsCorner: true`,
 lift reduced to 32px.
 
+**The profile name was painted UNDER the cover, and the cause was paint order, not
+spacing (2026-09-01).** The header was a flex row lifted as a unit (), which put
+the name inside the cover's box — where  is  and the row
+was static, and **positioned elements paint above static ones regardless of DOM order**.
+Confirmed with : the top element at the name was the cover's
+, and  was false. The avatar survived only because it sat in
+its own  wrapper.
+
+**Bottom-aligning the text to a lifted avatar cannot fix this** — with  the
+largest lift that keeps the text clear is , about 31px, which
+is barely an overlap. Measured: at  the name cleared but the avatar overlapped by
+only 14px. **So the avatar is ABSOLUTELY positioned** (its overlap no longer depends on
+how tall the text happens to be) and the text is indented past it. Both surfaces measured
+after: Profile 40px overlap, sheet 36px, name clearing the cover vertically AND the avatar
+horizontally with a 12px gap on both.
+The sheet additionally needs  because its cover is  — 20px clears the
+16px radius, where 12px still painted over the curve. **Profile's cover is square-cornered
+and needs no such inset, which is why the number is deliberately not shared between them.**
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained

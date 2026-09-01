@@ -206,11 +206,28 @@ export function Profile() {
             onChange={onPickFile}
           />
 
-          <div className="px-5 pb-5">
-            {/* The avatar overlaps the cover, so the two read as one header
-                rather than a photo with an icon parked beneath it. */}
-            <div className="-mt-11 flex items-end gap-3">
-              <div className="relative shrink-0">
+          {/*
+            THE AVATAR IS POSITIONED, THE TEXT IS NOT — and that separation is
+            the whole fix.
+
+            It used to be a flex row lifted as a unit with `-mt-11`, which put
+            the name INSIDE the cover's box. There it was painted underneath the
+            image: `CoverPhoto` is `position: relative` and this row was static,
+            and positioned elements paint above static ones regardless of DOM
+            order. Confirmed with `elementFromPoint` — the top element at the
+            name was the cover's `<img>`.
+
+            Bottom-aligning the text to a lifted avatar can't fix it either: the
+            largest lift that keeps the text clear is `avatarHeight −
+            textHeight`, about 31px, which is barely an overlap at all.
+
+            So the avatar is absolutely positioned — its overlap is now
+            independent of how tall the text happens to be — and the text is
+            simply indented past it. `z-[1]` keeps the whole block above the
+            cover as a belt to that pair of braces.
+          */}
+          <div className="relative z-[1] px-5 pb-5 pt-3">
+            <div className="absolute -top-10 left-5 z-[1]">
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
@@ -249,18 +266,22 @@ export function Profile() {
                     <XIcon className="h-3 w-3" />
                   </button>
                 )}
-              </div>
-              <div className="min-w-0 flex-1 pb-1">
-                <p className="truncate font-display text-2xl font-bold leading-tight">
-                  {me.display_name}
-                </p>
-                {me.display_title && (
-                  <p className="truncate text-xs font-semibold text-reward">{me.display_title}</p>
-                )}
-                <p className="truncate text-sm text-muted">
-                  {sectionName(me.section_id)} · Level {getLevelProgress(me.semester_points).level}
-                </p>
-              </div>
+            </div>
+
+            {/* Indented past the 80px avatar plus a 12px gap. `min-h` keeps the
+                block at least as tall as the half of the avatar that hangs
+                below the cover, so a one-line name can't let the buttons ride
+                up underneath it. */}
+            <div className="min-h-11 min-w-0 pl-23">
+              <p className="truncate font-display text-2xl font-bold leading-tight">
+                {me.display_name}
+              </p>
+              {me.display_title && (
+                <p className="truncate text-xs font-semibold text-reward">{me.display_title}</p>
+              )}
+              <p className="truncate text-sm text-muted">
+                {sectionName(me.section_id)} · Level {getLevelProgress(me.semester_points).level}
+              </p>
             </div>
 
             <div className="mt-4 flex gap-3">

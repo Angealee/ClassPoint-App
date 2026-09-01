@@ -134,22 +134,27 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
             stays, because it sits with the other two figures it belongs with.
           */}
           {/*
-            The overlap is tuned for THIS container, not copied from Profile.
-            Profile's cover is full-bleed and square-cornered inside an
-            `overflow-hidden` card, so a 44px lift on an 80px avatar sits
-            cleanly. Here the cover is inset and `rounded-2xl` — that same 44px
-            put the avatar straight onto the bottom-left corner radius and
-            squared it off. Less lift, and inset from the left so the corner
-            stays visible.
+            Same structure as Profile's identity block, and for the same
+            reasons: the avatar is ABSOLUTELY positioned so its overlap doesn't
+            depend on the text's height, and the text is indented past it so it
+            can never sit inside the cover's box — where a `relative` cover
+            paints over a static sibling.
+
+            `left-5` (20px) is measured against this cover's own `rounded-2xl`
+            radius (16px), so the avatar clears the corner curve rather than
+            squaring it off. Profile's cover is square-cornered and needs no
+            such inset — which is exactly why the number is not shared.
           */}
-          <div className="-mt-8 flex items-end gap-3 pl-5">
-            <Avatar
-              name={target.display_name}
-              url={profile?.avatar_url ?? target.avatar_url}
-              className="h-20 w-20 shrink-0 rounded-2xl ring-4 ring-canvas"
-              textClassName="text-2xl"
-            />
-            <div className="min-w-0 flex-1 pb-0.5">
+          <div className="relative z-[1] pt-3">
+            <div className="absolute -top-9 left-5 z-[1]">
+              <Avatar
+                name={target.display_name}
+                url={profile?.avatar_url ?? target.avatar_url}
+                className="h-20 w-20 rounded-2xl ring-4 ring-canvas"
+                textClassName="text-2xl"
+              />
+            </div>
+            <div className="min-h-10 min-w-0 pl-28">
               <p className="truncate font-display text-xl font-bold leading-tight">
                 {target.display_name}
                 {isMe && <span className="ml-1 text-sm text-accent">(you)</span>}
