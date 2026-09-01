@@ -144,6 +144,14 @@ export interface StudentSelf {
   interests: string | null
   /** Up to 3 public "showcase" photo URLs on the profile. */
   banner_urls: string[] | null
+  /**
+   * Wide cover image at the top of the profile (0039).
+   *
+   * Deliberately NOT banner_urls[0]: that array is the photo STRIP, and taking
+   * its first slot would silently change what the strip shows for every student
+   * who already has photos.
+   */
+  header_url: string | null
   /** The currently-equipped achievement title, or null. */
   display_title: string | null
   /** Up to 3 favorite unlocked achievement codes, featured first. */
@@ -463,6 +471,8 @@ export interface PublicProfile {
   interests: string | null
   /** Up to 3 public "showcase" photo URLs on the profile. */
   banner_urls: string[] | null
+  /** Wide cover image at the top of the profile (0039). */
+  header_url: string | null
   /** Their currently-equipped achievement title, or null. */
   display_title: string | null
   /** Up to 3 favorite unlocked achievement codes, featured first. */

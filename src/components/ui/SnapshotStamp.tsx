@@ -32,7 +32,12 @@ export function SnapshotChip({ capturedAt }: { capturedAt: string | null }) {
   return (
     <span
       title={capturedAt ? `Updated ${snapshotLabel(capturedAt)}` : 'Not settled yet'}
-      className="inline-flex items-center gap-1 rounded-full bg-card-2 px-2.5 py-1 text-xs font-medium text-muted"
+      // `whitespace-nowrap` is load-bearing, not tidiness. This chip used to sit
+      // alone on a full-width row; once it moved under the leaderboard title —
+      // into a narrow flex column beside the section picker — "next 3h 1m"
+      // wrapped onto three lines, and a `rounded-full` pill around three short
+      // lines renders as a circular blob.
+      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-card-2 px-2.5 py-1 text-xs font-medium text-muted"
     >
       <ClockIcon className="h-3.5 w-3.5" />
       next {countdownTo(nextSnapshotAt(now), now)}

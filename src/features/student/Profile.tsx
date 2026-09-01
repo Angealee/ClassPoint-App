@@ -29,6 +29,8 @@ export function Profile() {
     clearAvatar,
     saveBanner,
     removeBanner,
+    saveHeader,
+    clearHeader,
     achievements,
     setPinnedAchievements,
     hasUnseenAchievements,
@@ -36,6 +38,9 @@ export function Profile() {
   const { toast } = useToast()
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
+  const headerRef = useRef<HTMLInputElement>(null)
+  const [headerBusy, setHeaderBusy] = useState(false)
+  const [confirmHeader, setConfirmHeader] = useState(false)
   const bannerRef = useRef<HTMLInputElement>(null)
   const [bannerBusy, setBannerBusy] = useState(false)
   const [pinBusy, setPinBusy] = useState(false)
@@ -93,6 +98,24 @@ export function Profile() {
     toast(error ?? 'Profile picture removed.', error ? 'error' : 'success')
   }
 
+  async function onPickHeader(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-picking the same file
+    if (!file) return
+    setHeaderBusy(true)
+    const { error } = await saveHeader(file)
+    setHeaderBusy(false)
+    if (error) toast(error, 'error')
+  }
+
+  async function onRemoveHeader() {
+    setHeaderBusy(true)
+    const { error } = await clearHeader()
+    setHeaderBusy(false)
+    setConfirmHeader(false)
+    if (error) toast(error, 'error')
+  }
+
   async function onPickBanner(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = '' // allow re-picking the same file
@@ -127,8 +150,54 @@ export function Profile() {
       ) : !me ? (
         <EmptyState>We couldn't find your student record.</EmptyState>
       ) : (
-        <Card className="p-5">
-          <div className="flex items-center gap-4">
+        <Card pad="none" className="overflow-hidden">
+          {/*
+            Cover image (0039). Bleeds to the card's edges, with the avatar
+            row overlapping it below — the shape people already expect from a
+            profile. Tapping it picks a new one; there is no separate button,
+            because the image IS the affordance at this size.
+          */}
+          <button
+            type="button"
+            onClick={() => headerRef.current?.click()}
+            disabled={headerBusy}
+            aria-label={me.header_url ? 'Change cover photo' : 'Add a cover photo'}
+            className="group relative block h-32 w-full overflow-hidden bg-gradient-to-br from-card-2 via-card to-card-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 disabled:opacity-60"
+          >
+            {me.header_url && (
+              <img src={me.header_url} alt="" className="h-full w-full object-cover" />
+            )}
+            <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
+              {headerBusy ? 'Uploading…' : me.header_url ? 'Change cover' : 'Add a cover photo'}
+            </span>
+            {/* Nothing is here for a student with no cover, so say so once. */}
+            {!me.header_url && !headerBusy && (
+              <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-muted group-hover:opacity-0">
+                Add a cover photo
+              </span>
+            )}
+          </button>
+          {me.header_url && (
+            <div className="flex justify-end px-5 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmHeader(true)}
+                disabled={headerBusy}
+                className="text-xs font-semibold text-muted transition-colors hover:text-danger"
+              >
+                Remove cover
+              </button>
+            </div>
+          )}
+          <input
+            ref={headerRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="hidden"
+            onChange={onPickHeader}
+          />
+
+          <div className="flex items-center gap-4 px-5 pt-4">
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -167,7 +236,7 @@ export function Profile() {
             onChange={onPickFile}
           />
 
-          <div className="mt-3 flex gap-3">
+          <div className="mt-3 flex gap-3 px-5">
             <Button
               variant="outline"
               size="sm"
@@ -189,9 +258,9 @@ export function Profile() {
               </Button>
             )}
           </div>
-          <p className="mt-1.5 text-xs text-muted">JPG, PNG, WebP or GIF · up to 5 MB.</p>
+          <p className="mt-1.5 px-5 text-xs text-muted">JPG, PNG, WebP or GIF · up to 5 MB.</p>
 
-          <div className="mt-5 space-y-3">
+          <div className="mt-5 space-y-3 px-5 pb-5">
             <Field label="Display name" value={me.display_name} />
             <Field label="Full name" value={me.full_name} />
             <Field label="Section" value={sectionName(me.section_id)} />
@@ -373,6 +442,16 @@ export function Profile() {
         open={!!viewerTarget}
         onClose={() => setViewerTarget(null)}
         sectionLabel={viewerTarget ? sectionName(viewerTarget.section_id) : ''}
+      />
+
+      <ConfirmDialog
+        open={confirmHeader}
+        title="Remove cover photo?"
+        message="Your profile goes back to the plain header — classmates won't see this picture anymore."
+        confirmLabel="Remove cover"
+        busy={headerBusy}
+        onConfirm={onRemoveHeader}
+        onClose={() => setConfirmHeader(false)}
       />
 
       <ConfirmDialog

@@ -99,17 +99,44 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
   return (
     <Sheet open={open} onClose={onClose}>
       {target && (
-        <div>
-          {/* Header */}
-          <div className="flex items-center gap-4">
+        <div className="space-y-4">
+          {/*
+            Cover image (0039), bled to the sheet's edges by cancelling its
+            px-5 with -mx-5. Falls back to a plain gradient when the student
+            has not set one, so the header never collapses to nothing.
+          */}
+          <div className="-mx-5 -mt-1">
+            <div className="relative h-28 w-full overflow-hidden bg-gradient-to-br from-card-2 via-card to-card-2">
+              {profile?.header_url && (
+                <img
+                  src={profile.header_url}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+                />
+              )}
+              {/* Scrim so the avatar and name below stay readable over any
+                  photo, however bright. */}
+              <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/35 to-transparent" />
+            </div>
+          </div>
+
+          {/*
+            Header. The rank USED to sit detached at the top-right — where it
+            was the first thing to be cut off on a narrow phone, and where it
+            duplicated the Rank stat tile a few lines below. Removing it fixes
+            the crop and the duplication at once; the tile is the one that
+            stays, because it sits with the other two figures it belongs with.
+          */}
+          <div className="-mt-10 flex items-end gap-3">
             <Avatar
               name={target.display_name}
               url={profile?.avatar_url ?? target.avatar_url}
-              className="h-16 w-16 rounded-2xl"
+              className="h-16 w-16 shrink-0 rounded-2xl ring-4 ring-canvas"
               textClassName="text-2xl"
             />
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-display text-xl font-bold">
+            <div className="min-w-0 flex-1 pb-0.5">
+              <p className="truncate font-display text-xl font-bold leading-tight">
                 {target.display_name}
                 {isMe && <span className="ml-1 text-sm text-accent">(you)</span>}
               </p>
@@ -118,33 +145,28 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
                   {profile.display_title}
                 </p>
               )}
-              <p className="text-sm text-muted">
+              <p className="truncate text-sm text-muted">
                 {sectionLabel} · Level {progress.level}
               </p>
             </div>
-            {target.rank != null && (
-              <div className="shrink-0 text-right">
-                <p className="font-display text-2xl font-bold text-reward">
-                  #{target.rank}
-                </p>
-                <p className="text-2xs uppercase tracking-wider text-muted">rank</p>
-              </div>
-            )}
           </div>
 
           {/* Level / XP */}
-          <div className="mt-4">
-            <div className="mb-1.5 flex items-center justify-between text-xs text-muted">
-              <span>
+          <div>
+            {/* `min-w-0` + `truncate` on the LEFT and `shrink-0` on the right:
+                without them the right-hand figure was the one that got cut, and
+                "62 to n…" is the half a student actually wants. */}
+            <div className="mb-1.5 flex items-center justify-between gap-3 text-xs text-muted">
+              <span className="min-w-0 truncate">
                 {progress.expIntoLevel} / {progress.expForLevel} XP
               </span>
-              <span>{progress.expToNext} to next</span>
+              <span className="shrink-0">{progress.expToNext} to next</span>
             </div>
             <XpBar value={progress.progressPct} />
           </div>
 
           {/* Stat tiles */}
-          <div className="mt-4 grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-3 gap-2.5">
             <StatTile
               icon={<BoltIcon className="h-4 w-4" />}
               label="Points"
@@ -167,14 +189,14 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
 
           {/* Who viewed you (own profile only) */}
           {isMe && (
-            <div className="mt-4">
+            <div>
               <ProfileVisitors studentId={target.student_id} />
             </div>
           )}
 
           {/* Pinned badges */}
           {profile?.pinned_achievements && profile.pinned_achievements.length > 0 && (
-            <div className="mt-4">
+            <div>
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">
                 Badges
               </p>
@@ -184,7 +206,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
 
           {/* Showcase photos */}
           {profile?.banner_urls && profile.banner_urls.length > 0 && (
-            <div className="mt-4">
+            <div>
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">
                 Photos
               </p>
@@ -194,7 +216,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
 
           {/* About */}
           {(loading || profile?.bio) && (
-            <div className="mt-4">
+            <div>
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">About</p>
               {loading && !profile ? (
                 <div className="h-12 animate-pulse rounded-xl bg-card-2" />
@@ -208,7 +230,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
 
           {/* Interests */}
           {tags.length > 0 && (
-            <div className="mt-4">
+            <div>
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">
                 Interests
               </p>
@@ -217,7 +239,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
           )}
 
           {/* Recent points */}
-          <div className="mt-4">
+          <div>
             <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">
               Recent points
             </p>
@@ -246,7 +268,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
 
           {/* Member since */}
           {profile?.created_at && (
-            <p className="mt-4 text-center text-xs text-muted">
+            <p className="text-center text-xs text-muted">
               Member since {memberSince(profile.created_at)}
             </p>
           )}
@@ -275,7 +297,11 @@ function StatTile({
   tone: 'reward' | 'accent'
 }) {
   return (
-    <div className="rounded-xl bg-card-2 p-3">
+    // `min-w-0` is the fix for the crop in the bug report: a grid item defaults
+    // to `min-width: auto`, so it refuses to shrink below its content and a wide
+    // figure pushes the whole three-up row out of the sheet instead of the row
+    // adapting. With it, the tiles narrow and the numbers stay inside.
+    <div className="min-w-0 rounded-xl bg-card-2 p-3">
       <div
         className={cn(
           'mx-auto mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg',

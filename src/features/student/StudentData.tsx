@@ -30,6 +30,8 @@ import {
   updateAvatar,
   updateProfileFields,
   uploadBannerPhoto,
+  uploadHeaderPhoto,
+  setHeaderUrl,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { configureTermCalendar } from '@/lib/term'
@@ -84,6 +86,10 @@ interface StudentDataValue {
   clearAvatar: () => Promise<{ error?: string }>
   /** Add one showcase banner photo (≤5 MB image, up to 3 total). */
   saveBanner: (file: File) => Promise<{ error?: string }>
+  /** Set the wide cover image at the top of the profile (0039). */
+  saveHeader: (file: File) => Promise<{ error?: string }>
+  /** Remove the cover image, falling back to the plain gradient. */
+  clearHeader: () => Promise<{ error?: string }>
   /** Remove one showcase banner photo by URL. */
   removeBanner: (url: string) => Promise<{ error?: string }>
   /** The level to celebrate with the burst, or null. */
@@ -822,6 +828,41 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     }
   }, [me])
 
+  /**
+   * Set the profile cover image (0039).
+   *
+   * Same 5 MB ceiling as the avatar and the showcase photos — deliberately the
+   * SAME constant, not a second number: the storage bucket also caps at 5 MB
+   * server-side, so a different client limit would only ever disagree with it.
+   */
+  const saveHeader = useCallback(
+    async (file: File) => {
+      if (!me || !user) return { error: 'Still loading — try again in a moment.' }
+      if (!file.type.startsWith('image/')) return { error: 'Please choose an image file.' }
+      if (file.size > MAX_AVATAR_BYTES) return { error: 'Image is too large (max 5 MB).' }
+      try {
+        const url = await uploadHeaderPhoto(user.id, file)
+        await setHeaderUrl(me.id, url)
+        setMe((m) => (m ? { ...m, header_url: url } : m))
+        return {}
+      } catch {
+        return { error: 'Could not upload the cover photo. Please try again.' }
+      }
+    },
+    [me, user, MAX_AVATAR_BYTES],
+  )
+
+  const clearHeader = useCallback(async () => {
+    if (!me) return { error: 'Still loading — try again in a moment.' }
+    try {
+      await setHeaderUrl(me.id, null)
+      setMe((m) => (m ? { ...m, header_url: null } : m))
+      return {}
+    } catch {
+      return { error: 'Could not remove the cover photo. Please try again.' }
+    }
+  }, [me])
+
   const saveBanner = useCallback(
     async (file: File) => {
       if (!me || !user) return { error: 'Still loading — try again in a moment.' }
@@ -962,6 +1003,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       saveAvatar,
       clearAvatar,
       saveBanner,
+      saveHeader,
+      clearHeader,
       removeBanner,
       levelUp,
       clearLevelUp,
@@ -987,7 +1030,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       markAllRead,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loading, error, me, sections, leaderboard, capturedAt, events, awayEvents, clearAwayRecap, live, rank, sectionName, load, saveProfile, saveAvatar, clearAvatar, saveBanner, removeBanner, levelUp, clearLevelUp, achievements, achievementsLoading, achievementsError, retryAchievements, attendanceTick, liveSession, liveStatus, semesterEnded, attendance, attendanceLoading, achievementProgress, unlockedAchievement, clearUnlockedAchievement, syncMyAchievements, hasUnseenAchievements, markAchievementsSeen, setDisplayTitleField, setPinnedAchievementsField, unreadCount, markAllRead],
+    [loading, error, me, sections, leaderboard, capturedAt, events, awayEvents, clearAwayRecap, live, rank, sectionName, load, saveProfile, saveAvatar, clearAvatar, saveBanner, saveHeader, clearHeader, removeBanner, levelUp, clearLevelUp, achievements, achievementsLoading, achievementsError, retryAchievements, attendanceTick, liveSession, liveStatus, semesterEnded, attendance, attendanceLoading, achievementProgress, unlockedAchievement, clearUnlockedAchievement, syncMyAchievements, hasUnseenAchievements, markAchievementsSeen, setDisplayTitleField, setPinnedAchievementsField, unreadCount, markAllRead],
   )
 
   return (

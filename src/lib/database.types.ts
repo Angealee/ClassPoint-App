@@ -90,6 +90,8 @@ export interface Database {
         banner_urls: string[] | null
         display_title: string | null
         pinned_achievements: string[] | null
+        /** PENDING 0039 — wide cover image at the top of the profile. */
+        header_url: string | null
       }>
 
       student_secrets: Row<{

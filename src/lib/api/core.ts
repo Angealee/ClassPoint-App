@@ -634,7 +634,7 @@ export async function getMyStudent(userId: string): Promise<StudentSelf | null> 
   const { data, error } = await supabase
     .from('students')
     .select(
-      'id, section_id, full_name, display_name, avatar_url, bio, interests, banner_urls, display_title, pinned_achievements, semester_points, lifetime_points',
+      'id, section_id, full_name, display_name, avatar_url, bio, interests, banner_urls, header_url, display_title, pinned_achievements, semester_points, lifetime_points',
     )
     .eq('user_id', userId)
     .maybeSingle()
@@ -679,7 +679,7 @@ export async function getPublicProfile(
     supabase
       .from('students')
       .select(
-        'id, display_name, section_id, avatar_url, bio, interests, banner_urls, display_title, pinned_achievements, semester_points, created_at',
+        'id, display_name, section_id, avatar_url, bio, interests, banner_urls, header_url, display_title, pinned_achievements, semester_points, created_at',
       )
       .eq('id', studentId)
       .maybeSingle(),
@@ -697,6 +697,7 @@ export async function getPublicProfile(
     bio: (s.bio as string | null) ?? null,
     interests: (s.interests as string | null) ?? null,
     banner_urls: (s.banner_urls as string[] | null) ?? null,
+    header_url: (s.header_url as string | null) ?? null,
     display_title: (s.display_title as string | null) ?? null,
     pinned_achievements: (s.pinned_achievements as string[] | null) ?? null,
     semester_points: (s.semester_points as number) ?? 0,
@@ -762,6 +763,30 @@ export async function uploadBannerPhoto(userId: string, original: File): Promise
     .upload(path, file, { cacheControl: '3600', upsert: true, contentType: file.type })
   if (upErr) throw upErr
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl
+}
+
+/**
+ * Upload the wide cover image for the top of the profile (0039).
+ *
+ * Same bucket, same downscale ceiling and same 5 MB client cap as the showcase
+ * photos — a header is just a wider crop of the same kind of picture, and a
+ * second size limit would be one more number to keep in sync.
+ */
+export async function uploadHeaderPhoto(userId: string, original: File): Promise<string> {
+  const file = await downscaleImage(original, BANNER_MAX_PX)
+  const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+  const path = `${userId}/header-${Date.now()}.${ext}`
+  const { error: upErr } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { cacheControl: '3600', upsert: true, contentType: file.type })
+  if (upErr) throw upErr
+  return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl
+}
+
+/** Set (or clear, with null) the student's profile header image. */
+export async function setHeaderUrl(studentId: string, url: string | null): Promise<void> {
+  const { error } = await supabase.from('students').update({ header_url: url }).eq('id', studentId)
+  if (error) throw error
 }
 
 /** Save the student's showcase banner photo URLs (0–3). */

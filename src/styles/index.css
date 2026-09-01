@@ -202,6 +202,23 @@
     text-rendering: optimizeLegibility;
     /* Let the in-app pull-to-refresh own the top-overscroll instead of the browser. */
     overscroll-behavior-y: contain;
+    /*
+     * Nothing may push the page sideways. One unclipped decoration used to be
+     * enough to make every screen read as "cropped": the leaderboard's podium
+     * glow is w-[130%], which measured 414px of scroll width inside a 360px
+     * box, and there was no overflow-x rule anywhere in the app to stop it.
+     *
+     * `clip`, NOT `hidden`. `overflow-x: hidden` silently turns this into a
+     * scroll container, which breaks `position: sticky` — and the Shell header,
+     * the instructor's award bar and the section roster all depend on sticky.
+     * `clip` cuts the overflow without creating one, and unlike `hidden` it is
+     * legal to clip one axis while the other stays visible.
+     *
+     * This is the backstop, not the fix: an element that overflows is still a
+     * bug and is fixed at its source (see PodiumBoard's glow). What this
+     * guarantees is that the NEXT one cannot crop a student's screen.
+     */
+    overflow-x: clip;
   }
 
   h1, h2, h3, h4, .font-display {

@@ -182,7 +182,13 @@ export function PodiumBoard({
 
   return (
     <div className="space-y-3">
-      <div className="relative">
+      {/* `overflow-x-clip` contains the glow below, which is deliberately
+          w-[130%] and was the app's one real source of horizontal overflow —
+          measured at 414px of scroll width inside a 360px box, which is what
+          made every screen on the leaderboard read as cropped. Clipped on the X
+          axis only, so the crown still floats above the champion's card
+          (`-top-9`); `clip` allows a per-axis value where `hidden` does not. */}
+      <div className="relative overflow-x-clip">
         {/* A single STATIC wash grounds the podium. It used to breathe
             (cp-arena-glow); with comments now flying in front of the board, one
             more thing pulsing was one too many.

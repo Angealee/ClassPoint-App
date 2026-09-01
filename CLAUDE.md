@@ -138,7 +138,7 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   badges simply never unlock and their progress bars read empty (it degrades quietly —
   the client defaults the missing columns). **0037 (`rank_history`) is unapplied too**;
   without it `getLeaderboardSnapshot` selects two columns that don't exist and the whole
-  board 400s — this one is LOUD. **0038 (`spend_board`) is unapplied and is also LOUD** — `getLeaderboardSnapshot` selects `spent_points`/`spend_rank`, so without it every student's leaderboard 400s, same as 0037. Next number: 0039.
+  board 400s — this one is LOUD. **0038 (`spend_board`) is unapplied and is also LOUD** — `getLeaderboardSnapshot` selects `spent_points`/`spend_rank`, so without it every student's leaderboard 400s, same as 0037. **0039 (`profile_header`) is unapplied and is LOUD too** — `getMyStudent` and `getPublicProfile` both select `header_url`, so without it the student app cannot load a profile at all. Next number: 0040.
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -1133,6 +1133,53 @@ Verified by probe route at 375px (removed, residue-checked): switcher `aria-chec
 fill flip correctly, rings render gold vs violet at correct percentages, notches clip on
 all three stands, champion glyph and meta line differ per board. **Not verified on a real
 authenticated screen.**
+
+Mobile fit + the profile cover (2026-09-01). Decisions (user): **global clip AND fix the
+glow** · **chip stays under the title, just stop it wrapping** · **rebuild the profile
+sheet header, make the stat tiles safe, tighten the rhythm, add a header photo**.
+
+**Nothing clipped horizontal overflow anywhere in this app, and one decoration was
+enough to crop every screen.** `body` now carries **`overflow-x: clip`**. `clip`, NOT
+`hidden`: `overflow-x: hidden` silently turns the element into a scroll container, which
+breaks `position: sticky` — and the Shell header, AwardBar and the roster all depend on
+it. `clip` also legally takes a per-axis value where `hidden` does not, so
+`overflow-y` stays `visible` (verified in the browser: body computes
+`overflow-x: clip / overflow-y: visible`, page still scrolls vertically).
+**That is the backstop, not the fix.** The actual offender was PodiumBoard's glow, which
+is `w-[130%]` by design and measured **414px of scroll width inside a 360px box**; its
+wrapper now has `overflow-x-clip` (X only, so the champion's crown still floats above the
+card at `-top-9`). Measured after: both boards report `scrollWidth === clientWidth === 375`.
+
+**`SnapshotChip` needed `whitespace-nowrap`, and this was a self-inflicted regression.**
+It had always sat alone on a full-width row; moving it under the leaderboard title put it
+in a narrow flex column, "next 3h 1m" wrapped onto three lines, and a `rounded-full` pill
+around three short lines renders as a **circle**. Measured: 110×24 single line after,
+~54px tall before. Any pill-shaped chip that can land in a narrow flex parent needs
+`whitespace-nowrap` + `shrink-0`.
+
+**The profile sheet rendered the rank TWICE** — detached at the top-right of the header
+AND as one of the three stat tiles. The top-right copy was also the first thing to be cut
+off on a narrow phone. Deleting it fixes the crop and the duplication together; the tile
+is the one that survives, because it sits with the two figures it belongs with.
+**`StatTile` gained `min-w-0`**: a grid item defaults to `min-width: auto` and so refuses
+to shrink below its content, which is what let a wide figure push the three-up row out of
+the sheet instead of the row adapting. The XP line got `min-w-0 truncate` on the left and
+`shrink-0` on the right — the right-hand figure ("62 to next") was the half being cut,
+and it is the half a student actually wants. Rhythm is now one `space-y-4` on the
+container instead of nine repeated `mt-4`s.
+
+Since 0039 (Profile header photo): `students.header_url`, one nullable column and nothing
+else. **Deliberately NOT `banner_urls[0]`** — that array is the up-to-three photo STRIP
+(0015), and taking its first slot would silently change what the strip shows for every
+student who already has photos. No RPC to touch: `getPublicProfile` selects from
+`students` directly, so there is no return type to grow; RLS is row-level so a new column
+needs no policy change; and `cp_nightly_backup` mirrors the table wholesale and self-heals
+on schema drift. Uploads reuse `uploadHeaderPhoto` → the same `avatars` bucket,
+`BANNER_MAX_PX` downscale and the **same `MAX_AVATAR_BYTES` 5 MB constant** as the avatar
+and showcase photos — a second limit would only ever drift from the bucket's own
+server-side 5 MB cap. The cover is tappable-to-change on your own profile with the remove
+behind a ConfirmDialog; on someone else's it renders read-only with a scrim so the avatar
+and name stay legible over any photo, and falls back to a plain gradient when unset.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
