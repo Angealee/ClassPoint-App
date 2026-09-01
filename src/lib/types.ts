@@ -152,6 +152,13 @@ export interface StudentSelf {
    * who already has photos.
    */
   header_url: string | null
+  /**
+   * Which part of `header_url` to show, 0-100 (0040).
+   *
+   * Renders as CSS `object-position: 50% <n>%`. 50 is centred, which is what
+   * every cover did before this existed — and what cut the heads off portraits.
+   */
+  header_pos: number
   /** The currently-equipped achievement title, or null. */
   display_title: string | null
   /** Up to 3 favorite unlocked achievement codes, featured first. */
@@ -473,6 +480,8 @@ export interface PublicProfile {
   banner_urls: string[] | null
   /** Wide cover image at the top of the profile (0039). */
   header_url: string | null
+  /** Vertical focal point of the cover, 0-100 (0040). */
+  header_pos: number
   /** Their currently-equipped achievement title, or null. */
   display_title: string | null
   /** Up to 3 favorite unlocked achievement codes, featured first. */

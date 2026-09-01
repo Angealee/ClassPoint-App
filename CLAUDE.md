@@ -134,7 +134,7 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   badges simply never unlock and their progress bars read empty (it degrades quietly —
   the client defaults the missing columns). **0037 (`rank_history`) is unapplied too**;
   without it `getLeaderboardSnapshot` selects two columns that don't exist and the whole
-  board 400s — this one is LOUD. **0038 (`spend_board`) is unapplied and is also LOUD** — `getLeaderboardSnapshot` selects `spent_points`/`spend_rank`, so without it every student's leaderboard 400s, same as 0037. **0039 (`profile_header`) is unapplied and is LOUD too** — `getMyStudent` and `getPublicProfile` both select `header_url`, so without it the student app cannot load a profile at all. Next number: 0040.
+  board 400s — this one is LOUD. **0038 (`spend_board`) is unapplied and is also LOUD** — `getLeaderboardSnapshot` selects `spent_points`/`spend_rank`, so without it every student's leaderboard 400s, same as 0037. **0039 (`profile_header`) is unapplied and is LOUD too** — `getMyStudent` and `getPublicProfile` both select `header_url`, so without it the student app cannot load a profile at all. **0040 (`header_position`) is unapplied and is LOUD too** — both profile selects read `header_pos`. Next number: 0041.
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -1176,6 +1176,55 @@ and showcase photos — a second limit would only ever drift from the bucket's o
 server-side 5 MB cap. The cover is tappable-to-change on your own profile with the remove
 behind a ConfirmDialog; on someone else's it renders read-only with a scrim so the avatar
 and name stay legible over any photo, and falls back to a plain gradient when unset.
+
+Profile polish (2026-09-01). Decisions (user): **drag to reposition anytime** · **80px
+avatar overlapping the cover** · **split into three cards** · **section labels, rhythm,
+overlay Remove-cover, merge the photo buttons, and fix the cut-off preview**.
+
+**The padding bug was structural, so the fix is structural.** Converting Profile's one
+Card to `pad="none"` for the cover meant hand-padding each child, and everything after
+the fields — Bio, Interests, Photos, Achievements — was missed and rendered flush to the
+card edge (the `pb-5` also ended up on a block that was no longer last). It is now
+**three cards — Identity / Details / Showcase** — each owning its own padding, so there
+is no longer a way to add a block and forget to pad it. Measured after: 17px inset on
+both sides where it was 0.
+
+Since 0040 (Cover position): `students.header_pos smallint not null default 50`, CHECK
+0–100, rendered as `object-position: 50% <n>%`. **A focal point, not a cropped upload** —
+cropping in the browser needs no column but throws the original away, so changing your
+mind later means finding the file again; storing a position keeps the full image and
+makes the cover adjustable forever, which is what "adjustable" has to mean to be worth
+building. **Horizontal position is deliberately not stored**: the cover is a wide short
+strip, so there is vertical slack and no horizontal slack on nearly every photo.
+`setHeaderUrl` resets the position on BOTH set and clear — a new cover is a different
+picture, and inheriting the last one's angle drops it in framed for a photo that is gone.
+
+**`components/profile/CoverPhoto.tsx` is the one definition**, used editable on Profile
+and read-only in the preview sheet, so a cover cannot be framed differently depending on
+who is looking. **The drag commits from a REF, not from state** — the first version read
+`livePos` in the pointerup handler, which closes over its own render, so a move and a
+release inside one React batch left it null and the reposition was silently dropped.
+Normal use interleaves frames and works, which is the worst version of that bug: it would
+have surfaced as "sometimes my cover doesn't save". Caught by simulating pointer events,
+not by reading. `touch-none` is load-bearing — without it the browser claims the vertical
+gesture as a page scroll and the drag never fires on a phone, the only place it matters.
+A move under 4px is a TAP (opens the picker) rather than a 2% nudge that saves itself.
+
+**The preview sheet's cover is INSET, not bled.** It used `-mx-5` to cancel the scroll
+area's `px-5`, and that is what was cutting off the avatar ring and the right edge:
+the Sheet body is `overflow-y-auto`, and **per spec when one overflow axis is not
+`visible` the other computes to `auto`** — verified in the browser, a container declaring
+only `overflow-y-auto` reports `overflow-x: auto` — so the bleed pushed content outside a
+scroller that then clipped it. A rounded inset cover needs no bleed and cannot clip.
+
+**The avatar's "Change photo" row is gone.** The avatar was already the affordance; the
+row duplicated it. It is now 80px with an always-visible pencil badge — always-visible
+because a hover overlay is invisible on the touch screens this is used on — and a small
+`×` for removal, matching the deliberate small-and-destructive call already made for
+PinnedBadges' Unpin and the photo strip's remove (a 44px target there invites the
+accidental taps its size prevents). Removal still routes through ConfirmDialog.
+Section headings use the `SectionLabel` primitive rather than four hand-written copies of
+`text-sm text-muted`, and its `action` slot now carries the achievements "View all" link.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

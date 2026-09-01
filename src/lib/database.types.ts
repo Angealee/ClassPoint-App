@@ -92,6 +92,8 @@ export interface Database {
         pinned_achievements: string[] | null
         /** PENDING 0039 — wide cover image at the top of the profile. */
         header_url: string | null
+        /** PENDING 0040 — vertical focal point of header_url, 0-100. */
+        header_pos: number
       }>
 
       student_secrets: Row<{

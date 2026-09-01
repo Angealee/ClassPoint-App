@@ -12,6 +12,9 @@ import { Avatar } from '@/components/ui/Avatar'
 import { useToast } from '@/components/ui/Toast'
 import { getLevelProgress } from '@/lib/leveling'
 import { ProfileBanner } from '@/components/profile/ProfileBanner'
+import { CoverPhoto } from '@/components/profile/CoverPhoto'
+import { SectionLabel } from '@/components/ui/SectionLabel'
+import { PencilIcon, XIcon } from '@/components/ui/icons'
 import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
 import { PinnedBadges } from '@/components/achievements/PinnedBadges'
 import { InterestTags, parseInterests } from '@/components/profile/InterestTags'
@@ -31,6 +34,7 @@ export function Profile() {
     removeBanner,
     saveHeader,
     clearHeader,
+    saveHeaderPos,
     achievements,
     setPinnedAchievements,
     hasUnseenAchievements,
@@ -108,6 +112,11 @@ export function Profile() {
     if (error) toast(error, 'error')
   }
 
+  async function onRepositionHeader(pos: number) {
+    const { error } = await saveHeaderPos(pos)
+    if (error) toast(error, 'error')
+  }
+
   async function onRemoveHeader() {
     setHeaderBusy(true)
     const { error } = await clearHeader()
@@ -150,45 +159,37 @@ export function Profile() {
       ) : !me ? (
         <EmptyState>We couldn't find your student record.</EmptyState>
       ) : (
+        <>
+        {/* ── Identity ────────────────────────────────────────────────────
+            Cover, avatar, name. Splitting the old single card into three is
+            what makes the padding correct BY CONSTRUCTION: each card owns its
+            own padding, so there is no longer a way to add a block and forget
+            to pad it — which is exactly what happened when this became
+            `pad="none"` and Bio, Interests, Photos and Achievements all ended
+            up flush against the card edge. */}
         <Card pad="none" className="overflow-hidden">
-          {/*
-            Cover image (0039). Bleeds to the card's edges, with the avatar
-            row overlapping it below — the shape people already expect from a
-            profile. Tapping it picks a new one; there is no separate button,
-            because the image IS the affordance at this size.
-          */}
-          <button
-            type="button"
-            onClick={() => headerRef.current?.click()}
-            disabled={headerBusy}
-            aria-label={me.header_url ? 'Change cover photo' : 'Add a cover photo'}
-            className="group relative block h-32 w-full overflow-hidden bg-gradient-to-br from-card-2 via-card to-card-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 disabled:opacity-60"
-          >
-            {me.header_url && (
-              <img src={me.header_url} alt="" className="h-full w-full object-cover" />
-            )}
-            <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
-              {headerBusy ? 'Uploading…' : me.header_url ? 'Change cover' : 'Add a cover photo'}
-            </span>
-            {/* Nothing is here for a student with no cover, so say so once. */}
-            {!me.header_url && !headerBusy && (
-              <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-muted group-hover:opacity-0">
-                Add a cover photo
-              </span>
-            )}
-          </button>
-          {me.header_url && (
-            <div className="flex justify-end px-5 pt-2">
-              <button
-                type="button"
-                onClick={() => setConfirmHeader(true)}
-                disabled={headerBusy}
-                className="text-xs font-semibold text-muted transition-colors hover:text-danger"
-              >
-                Remove cover
-              </button>
-            </div>
-          )}
+          <CoverPhoto
+            url={me.header_url}
+            pos={me.header_pos}
+            className="h-36"
+            editable
+            busy={headerBusy}
+            onPick={() => headerRef.current?.click()}
+            onReposition={onRepositionHeader}
+            action={
+              me.header_url ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmHeader(true)}
+                  disabled={headerBusy}
+                  aria-label="Remove cover photo"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white transition-colors hover:bg-black/75"
+                >
+                  <XIcon className="h-4 w-4" />
+                </button>
+              ) : undefined
+            }
+          />
           <input
             ref={headerRef}
             type="file"
@@ -196,37 +197,6 @@ export function Profile() {
             className="hidden"
             onChange={onPickHeader}
           />
-
-          <div className="flex items-center gap-4 px-5 pt-4">
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              aria-label="Change profile picture"
-              className="group relative rounded-2xl focus:outline-none focus:ring-2 focus:ring-ring/40 disabled:opacity-60"
-            >
-              <Avatar
-                name={me.display_name}
-                url={me.avatar_url}
-                className="h-16 w-16 rounded-2xl"
-                textClassName="text-2xl"
-              />
-              <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/45 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
-                {uploading ? '…' : 'Change'}
-              </span>
-            </button>
-            <div className="min-w-0">
-              <p className="truncate font-display text-xl font-bold">{me.display_name}</p>
-              {me.display_title && (
-                <p className="truncate text-xs font-semibold text-reward">
-                  {me.display_title}
-                </p>
-              )}
-              <p className="text-sm text-muted">
-                {sectionName(me.section_id)} · Level {getLevelProgress(me.semester_points).level}
-              </p>
-            </div>
-          </div>
 
           <input
             ref={fileRef}
@@ -236,31 +206,80 @@ export function Profile() {
             onChange={onPickFile}
           />
 
-          <div className="mt-3 flex gap-3 px-5">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? 'Uploading…' : me.avatar_url ? 'Change photo' : 'Add photo'}
-            </Button>
-            {me.avatar_url && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted"
-                onClick={() => setConfirmPhoto(true)}
-                disabled={uploading}
-              >
-                Remove
-              </Button>
-            )}
-          </div>
-          <p className="mt-1.5 px-5 text-xs text-muted">JPG, PNG, WebP or GIF · up to 5 MB.</p>
+          <div className="px-5 pb-5">
+            {/* The avatar overlaps the cover, so the two read as one header
+                rather than a photo with an icon parked beneath it. */}
+            <div className="-mt-11 flex items-end gap-3">
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                  aria-label={me.avatar_url ? 'Change profile picture' : 'Add a profile picture'}
+                  className="group relative block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
+                >
+                  <Avatar
+                    name={me.display_name}
+                    url={me.avatar_url}
+                    className="h-20 w-20 rounded-2xl ring-4 ring-card"
+                    textClassName="text-3xl"
+                  />
+                  {/* An ALWAYS-VISIBLE badge, not a hover overlay: the separate
+                      "Change photo" button is gone, and on a touch screen
+                      there is no hover to discover the tap target with. */}
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-accent-solid text-white ring-2 ring-card">
+                    {uploading ? (
+                      <span className="text-2xs">…</span>
+                    ) : (
+                      <PencilIcon className="h-3.5 w-3.5" />
+                    )}
+                  </span>
+                </button>
+                {/* Small and destructive on purpose — the same call made for
+                    PinnedBadges' Unpin and the photo strip's remove: a 44px
+                    target here invites the accidental taps its size prevents. */}
+                {me.avatar_url && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmPhoto(true)}
+                    disabled={uploading}
+                    aria-label="Remove profile picture"
+                    className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-danger-solid"
+                  >
+                    <XIcon className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+              <div className="min-w-0 flex-1 pb-1">
+                <p className="truncate font-display text-2xl font-bold leading-tight">
+                  {me.display_name}
+                </p>
+                {me.display_title && (
+                  <p className="truncate text-xs font-semibold text-reward">{me.display_title}</p>
+                )}
+                <p className="truncate text-sm text-muted">
+                  {sectionName(me.section_id)} · Level {getLevelProgress(me.semester_points).level}
+                </p>
+              </div>
+            </div>
 
-          <div className="mt-5 space-y-3 px-5 pb-5">
+            <div className="mt-4 flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={openEdit}>
+                Edit profile
+              </Button>
+              <Button variant="ghost" className="flex-1" onClick={() => setPreviewOpen(true)}>
+                Preview
+              </Button>
+            </div>
+            <p className="mt-2 text-center text-xs text-muted">
+              Preview is exactly what classmates see when they tap you on the leaderboard.
+            </p>
+          </div>
+        </Card>
+
+        {/* ── Details ───────────────────────────────────────────────────── */}
+        <Card>
+          <div className="space-y-3">
             <Field label="Display name" value={me.display_name} />
             <Field label="Full name" value={me.full_name} />
             <Field label="Section" value={sectionName(me.section_id)} />
@@ -269,22 +288,26 @@ export function Profile() {
           </div>
 
           {me.bio && (
-            <div className="mt-3 rounded-xl bg-card-2 px-4 py-3">
-              <p className="mb-1 text-sm text-muted">Bio</p>
-              <p className="text-sm leading-relaxed text-ink">{me.bio}</p>
+            <div className="mt-4">
+              <SectionLabel>Bio</SectionLabel>
+              <p className="rounded-xl bg-card-2 px-4 py-3 text-sm leading-relaxed text-ink">
+                {me.bio}
+              </p>
             </div>
           )}
 
           {parseInterests(me.interests).length > 0 && (
-            <div className="mt-3 rounded-xl bg-card-2 px-4 py-3">
-              <p className="mb-2 text-sm text-muted">Interests</p>
+            <div className="mt-4">
+              <SectionLabel>Interests</SectionLabel>
               <InterestTags raw={me.interests} />
             </div>
           )}
+        </Card>
 
-          {/* Showcase photos (up to 3) */}
-          <div className="mt-5">
-            <p className="mb-2 text-sm text-muted">Photos</p>
+        {/* ── Showcase ──────────────────────────────────────────────────── */}
+        <Card>
+          <div>
+            <SectionLabel>Photos</SectionLabel>
             <ProfileBanner
               urls={me.banner_urls ?? []}
               editable
@@ -292,7 +315,7 @@ export function Profile() {
               onRemove={(url) => setConfirmBannerUrl(url)}
               busy={bannerBusy}
             />
-            <p className="mt-1.5 text-xs text-muted">
+            <p className="mt-2 text-xs text-muted">
               Up to 3 · classmates see these on your profile. JPG, PNG, WebP or GIF · ≤ 5 MB.
             </p>
             <input
@@ -304,23 +327,26 @@ export function Profile() {
             />
           </div>
 
-          {/* Achievements */}
           <div className="mt-5">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="flex items-center gap-2 text-sm text-muted">
+            <SectionLabel
+              action={
+                <button
+                  type="button"
+                  onClick={() => navigate('/app/achievements')}
+                  className="text-xs font-semibold text-accent transition-opacity hover:opacity-80"
+                >
+                  {achievements.filter((a) => a.unlockedAt).length}/{achievements.length} · View all
+                  →
+                </button>
+              }
+            >
+              <span className="flex items-center gap-2">
                 Achievements
                 {hasUnseenAchievements && (
                   <span className="h-2 w-2 rounded-full bg-accent-solid" aria-label="New badges" />
                 )}
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate('/app/achievements')}
-                className="text-xs font-semibold text-accent transition-opacity hover:opacity-80"
-              >
-                {achievements.filter((a) => a.unlockedAt).length}/{achievements.length} · View all →
-              </button>
-            </div>
+              </span>
+            </SectionLabel>
             <PinnedBadges
               achievements={achievements}
               pinnedCodes={me.pinned_achievements ?? []}
@@ -330,7 +356,6 @@ export function Profile() {
             />
           </div>
 
-          {/* Who viewed your profile */}
           <div className="mt-5">
             <ProfileVisitors
               studentId={me.id}
@@ -346,19 +371,8 @@ export function Profile() {
               }
             />
           </div>
-
-          <div className="mt-5 flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={openEdit}>
-              Edit profile
-            </Button>
-            <Button variant="ghost" className="flex-1" onClick={() => setPreviewOpen(true)}>
-              Preview
-            </Button>
-          </div>
-          <p className="mt-1.5 text-center text-xs text-muted">
-            Preview is exactly what classmates see when they tap you on the leaderboard.
-          </p>
         </Card>
+        </>
       )}
 
       {/* Settings moved to their own screen: this one is about who you are,

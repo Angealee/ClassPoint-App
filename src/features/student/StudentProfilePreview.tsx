@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Sheet } from '@/components/ui/Sheet'
+import { CoverPhoto } from '@/components/profile/CoverPhoto'
 import { Avatar } from '@/components/ui/Avatar'
 import { XpBar } from '@/components/ui/XpBar'
 import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
@@ -101,24 +102,28 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
       {target && (
         <div className="space-y-4">
           {/*
-            Cover image (0039), bled to the sheet's edges by cancelling its
-            px-5 with -mx-5. Falls back to a plain gradient when the student
-            has not set one, so the header never collapses to nothing.
+            Cover image (0039), INSET rather than bled to the sheet's edges.
+
+            The first version cancelled the scroll area's `px-5` with `-mx-5`,
+            and that is what was cutting things off in the preview: the Sheet's
+            body is `overflow-y-auto`, and per spec when one overflow axis is
+            not `visible` the other computes to `auto` — so the bleed pushed
+            content outside a scroller that then clipped it, taking the avatar's
+            ring and the right-hand edge with it. A rounded inset cover needs no
+            bleed and so cannot clip.
+
+            Read-only here, and it honours the focal point its owner chose on
+            their own Profile (0040). Same component on both screens, so the
+            cover cannot end up framed differently depending on who is looking.
           */}
-          <div className="-mx-5 -mt-1">
-            <div className="relative h-28 w-full overflow-hidden bg-gradient-to-br from-card-2 via-card to-card-2">
-              {profile?.header_url && (
-                <img
-                  src={profile.header_url}
-                  alt=""
-                  loading="lazy"
-                  className="h-full w-full object-cover"
-                />
-              )}
-              {/* Scrim so the avatar and name below stay readable over any
-                  photo, however bright. */}
-              <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/35 to-transparent" />
-            </div>
+          <div className="relative">
+            <CoverPhoto
+              url={profile?.header_url ?? null}
+              pos={profile?.header_pos ?? 50}
+              className="h-28 rounded-2xl"
+            />
+            {/* Scrim so the avatar and name stay readable over any photo. */}
+            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-t from-canvas/85 via-canvas/25 to-transparent" />
           </div>
 
           {/*
@@ -128,11 +133,11 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
             the crop and the duplication at once; the tile is the one that
             stays, because it sits with the other two figures it belongs with.
           */}
-          <div className="-mt-10 flex items-end gap-3">
+          <div className="-mt-11 flex items-end gap-3">
             <Avatar
               name={target.display_name}
               url={profile?.avatar_url ?? target.avatar_url}
-              className="h-16 w-16 shrink-0 rounded-2xl ring-4 ring-canvas"
+              className="h-20 w-20 shrink-0 rounded-2xl ring-4 ring-canvas"
               textClassName="text-2xl"
             />
             <div className="min-w-0 flex-1 pb-0.5">

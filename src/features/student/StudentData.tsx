@@ -32,6 +32,7 @@ import {
   uploadBannerPhoto,
   uploadHeaderPhoto,
   setHeaderUrl,
+  setHeaderPos,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { configureTermCalendar } from '@/lib/term'
@@ -90,6 +91,8 @@ interface StudentDataValue {
   saveHeader: (file: File) => Promise<{ error?: string }>
   /** Remove the cover image, falling back to the plain gradient. */
   clearHeader: () => Promise<{ error?: string }>
+  /** Save the cover position, 0-100 (0040). */
+  saveHeaderPos: (pos: number) => Promise<{ error?: string }>
   /** Remove one showcase banner photo by URL. */
   removeBanner: (url: string) => Promise<{ error?: string }>
   /** The level to celebrate with the burst, or null. */
@@ -843,7 +846,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       try {
         const url = await uploadHeaderPhoto(user.id, file)
         await setHeaderUrl(me.id, url)
-        setMe((m) => (m ? { ...m, header_url: url } : m))
+        setMe((m) => (m ? { ...m, header_url: url, header_pos: 50 } : m))
         return {}
       } catch {
         return { error: 'Could not upload the cover photo. Please try again.' }
@@ -852,11 +855,33 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     [me, user, MAX_AVATAR_BYTES],
   )
 
+  /**
+   * Save where the cover sits (0040). OPTIMISTIC: the drag already moved the
+   * image under the finger, so waiting on the server would only make it jump
+   * back and then forward again. Reverts on failure.
+   */
+  const saveHeaderPos = useCallback(
+    async (pos: number) => {
+      if (!me) return { error: 'Still loading — try again in a moment.' }
+      const clamped = Math.max(0, Math.min(100, Math.round(pos)))
+      const previous = me.header_pos
+      setMe((m) => (m ? { ...m, header_pos: clamped } : m))
+      try {
+        await setHeaderPos(me.id, clamped)
+        return {}
+      } catch {
+        setMe((m) => (m ? { ...m, header_pos: previous } : m))
+        return { error: 'Could not save the cover position.' }
+      }
+    },
+    [me],
+  )
+
   const clearHeader = useCallback(async () => {
     if (!me) return { error: 'Still loading — try again in a moment.' }
     try {
       await setHeaderUrl(me.id, null)
-      setMe((m) => (m ? { ...m, header_url: null } : m))
+      setMe((m) => (m ? { ...m, header_url: null, header_pos: 50 } : m))
       return {}
     } catch {
       return { error: 'Could not remove the cover photo. Please try again.' }
@@ -1005,6 +1030,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       saveBanner,
       saveHeader,
       clearHeader,
+      saveHeaderPos,
       removeBanner,
       levelUp,
       clearLevelUp,
@@ -1030,7 +1056,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       markAllRead,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loading, error, me, sections, leaderboard, capturedAt, events, awayEvents, clearAwayRecap, live, rank, sectionName, load, saveProfile, saveAvatar, clearAvatar, saveBanner, saveHeader, clearHeader, removeBanner, levelUp, clearLevelUp, achievements, achievementsLoading, achievementsError, retryAchievements, attendanceTick, liveSession, liveStatus, semesterEnded, attendance, attendanceLoading, achievementProgress, unlockedAchievement, clearUnlockedAchievement, syncMyAchievements, hasUnseenAchievements, markAchievementsSeen, setDisplayTitleField, setPinnedAchievementsField, unreadCount, markAllRead],
+    [loading, error, me, sections, leaderboard, capturedAt, events, awayEvents, clearAwayRecap, live, rank, sectionName, load, saveProfile, saveAvatar, clearAvatar, saveBanner, saveHeader, clearHeader, saveHeaderPos, removeBanner, levelUp, clearLevelUp, achievements, achievementsLoading, achievementsError, retryAchievements, attendanceTick, liveSession, liveStatus, semesterEnded, attendance, attendanceLoading, achievementProgress, unlockedAchievement, clearUnlockedAchievement, syncMyAchievements, hasUnseenAchievements, markAchievementsSeen, setDisplayTitleField, setPinnedAchievementsField, unreadCount, markAllRead],
   )
 
   return (

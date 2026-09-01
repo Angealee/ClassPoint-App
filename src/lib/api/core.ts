@@ -634,7 +634,7 @@ export async function getMyStudent(userId: string): Promise<StudentSelf | null> 
   const { data, error } = await supabase
     .from('students')
     .select(
-      'id, section_id, full_name, display_name, avatar_url, bio, interests, banner_urls, header_url, display_title, pinned_achievements, semester_points, lifetime_points',
+      'id, section_id, full_name, display_name, avatar_url, bio, interests, banner_urls, header_url, header_pos, display_title, pinned_achievements, semester_points, lifetime_points',
     )
     .eq('user_id', userId)
     .maybeSingle()
@@ -679,7 +679,7 @@ export async function getPublicProfile(
     supabase
       .from('students')
       .select(
-        'id, display_name, section_id, avatar_url, bio, interests, banner_urls, header_url, display_title, pinned_achievements, semester_points, created_at',
+        'id, display_name, section_id, avatar_url, bio, interests, banner_urls, header_url, header_pos, display_title, pinned_achievements, semester_points, created_at',
       )
       .eq('id', studentId)
       .maybeSingle(),
@@ -698,6 +698,7 @@ export async function getPublicProfile(
     interests: (s.interests as string | null) ?? null,
     banner_urls: (s.banner_urls as string[] | null) ?? null,
     header_url: (s.header_url as string | null) ?? null,
+    header_pos: (s.header_pos as number | null) ?? 50,
     display_title: (s.display_title as string | null) ?? null,
     pinned_achievements: (s.pinned_achievements as string[] | null) ?? null,
     semester_points: (s.semester_points as number) ?? 0,
@@ -783,9 +784,30 @@ export async function uploadHeaderPhoto(userId: string, original: File): Promise
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl
 }
 
-/** Set (or clear, with null) the student's profile header image. */
+/**
+ * Set (or clear, with null) the student's profile header image.
+ *
+ * Both paths reset the focal point. A new cover is a different picture, and
+ * inheriting the last one's position would drop it in at an angle chosen for a
+ * photo that is no longer there.
+ */
 export async function setHeaderUrl(studentId: string, url: string | null): Promise<void> {
-  const { error } = await supabase.from('students').update({ header_url: url }).eq('id', studentId)
+  const { error } = await supabase
+    .from('students')
+    .update({ header_url: url, header_pos: 50 })
+    .eq('id', studentId)
+  if (error) throw error
+}
+
+/** Save where the cover sits vertically, 0–100 (0040). */
+export async function setHeaderPos(studentId: string, pos: number): Promise<void> {
+  // Clamped here as well as by the CHECK: a drag that runs one frame past the
+  // edge should reposition the cover, not fail the write.
+  const clamped = Math.max(0, Math.min(100, Math.round(pos)))
+  const { error } = await supabase
+    .from('students')
+    .update({ header_pos: clamped })
+    .eq('id', studentId)
   if (error) throw error
 }
 
