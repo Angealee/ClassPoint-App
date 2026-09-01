@@ -1274,23 +1274,26 @@ squared it off. Measured the fix rather than eyeballing it: radius is **16px**, 
 lift reduced to 32px.
 
 **The profile name was painted UNDER the cover, and the cause was paint order, not
-spacing (2026-09-01).** The header was a flex row lifted as a unit (), which put
-the name inside the cover's box — where  is  and the row
+spacing (2026-09-01).** The header was a flex row lifted as a unit (`-mt-11`), which put
+the name inside the cover's box — where `CoverPhoto` is `position: relative` and the row
 was static, and **positioned elements paint above static ones regardless of DOM order**.
-Confirmed with : the top element at the name was the cover's
-, and  was false. The avatar survived only because it sat in
-its own  wrapper.
+Confirmed with `elementFromPoint`: the top element at the name was the cover's `<img>`,
+and `nameIsHitTestable` was false. The avatar survived only because it already sat in its
+own `relative` wrapper.
 
-**Bottom-aligning the text to a lifted avatar cannot fix this** — with  the
-largest lift that keeps the text clear is , about 31px, which
-is barely an overlap. Measured: at  the name cleared but the avatar overlapped by
-only 14px. **So the avatar is ABSOLUTELY positioned** (its overlap no longer depends on
-how tall the text happens to be) and the text is indented past it. Both surfaces measured
-after: Profile 40px overlap, sheet 36px, name clearing the cover vertically AND the avatar
-horizontally with a 12px gap on both.
-The sheet additionally needs  because its cover is  — 20px clears the
-16px radius, where 12px still painted over the curve. **Profile's cover is square-cornered
-and needs no such inset, which is why the number is deliberately not shared between them.**
+**Bottom-aligning the text to a lifted avatar cannot fix this** — with `items-end` the
+largest lift that keeps the text clear is `avatarHeight − textHeight`, about 31px, which
+is barely an overlap at all. Measured: at `-mt-17` the name cleared but the avatar
+overlapped by only 14px. **So the avatar is ABSOLUTELY positioned** — its overlap no
+longer depends on how tall the text happens to be — and the text is indented past it, so
+neither can collide with the other at any name length. Measured after: Profile 40px
+overlap, sheet 36px, and on both the name clears the cover vertically AND the avatar
+horizontally with a 12px gap.
+
+The sheet additionally needs `left-5`, because its cover is `rounded-2xl`: 20px clears the
+16px radius where 12px still painted over the curve. **Profile's cover is square-cornered
+and needs no such inset, which is why that number is deliberately NOT shared between the
+two — copying it between containers is what caused this bug in the first place.**
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
