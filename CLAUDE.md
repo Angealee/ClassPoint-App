@@ -1226,6 +1226,53 @@ accidental taps its size prevents). Removal still routes through ConfirmDialog.
 Section headings use the `SectionLabel` primitive rather than four hand-written copies of
 `text-sm text-muted`, and its `action` slot now carries the achievements "View all" link.
 
+Celebrations + the Sheet focus bug (2026-09-01). Decisions (user): **keep the level-up
+content minimal, rebuild the motion** · **all four motion layers** · **tap anywhere, no
+auto-dismiss** · **match the achievement burst, stop them stacking, fix the overlap**.
+
+**THE SHEET STOLE FOCUS ON EVERY KEYSTROKE — 21 sheets, reported as "typing in Bio goes
+to Display name".** `Sheet`'s focus-trap effect depended on `[open, onClose]`. Most
+callers pass an inline arrow (`onClose={() => setEditOpen(false)}`), a new identity every
+render — so any state change inside a sheet re-ran the effect, and its `focusFirst()`
+moved focus to the panel's FIRST focusable element. Type one character into Bio, the
+parent re-renders, the next character lands in Display name. `onClose` now lives in a ref
+and the effect depends on **`[open]` alone**. The same class of bug is worth watching for
+anywhere an effect lists a callback prop: `PullToRefresh`, `SuccessTick` and
+`AbsenceExcuses` all do, though their call sites currently pass stable callbacks
+(`QrScanner`'s `onDetect` is `useCallback`'d at its only call site — not a bug today, but
+one inline arrow away from restarting the camera on every render).
+
+**Neither celebration auto-dismisses any more.** Both said "Tap to continue" and then
+vanished anyway (3.6s / 4.2s) — copy promising control the screen did not give, and a
+student with the phone in a pocket simply missed it. Both now wait for a tap, behind a
+**700ms TAP_GUARD** that is NOT an auto-dismiss in reverse: these fire while a finger is
+already on the glass, and without it the tap already in flight skips the moment before it
+draws a frame. Verified: a tap inside the guard is ignored, the screen is still up 4.2s
+after the old timer would have fired, and a real tap closes it.
+
+**The two bursts could render on top of each other** — a single award can trip a level
+AND a badge, both full-screen `z-50`, with the level-up's backdrop over the badge art.
+`AchievementUnlockOverlay` is now gated on `levelUp === null`, so the badge waits its
+turn. Safe only because neither auto-dismisses now; with timers this would have hidden
+the badge entirely.
+
+Level-up motion is layered and each layer is opt-out: confetti (the existing
+`ConfettiBurst`), rotating light rays, an 18-star particle ring, a medallion that slams
+with a squash and then takes a shine sweep, a number that counts from the previous level
+(derivable — a level-up is always one step, so this needed no new data), an XP rail that
+fills to full and empties into the new level, and an impact flash plus a short shake.
+`<MotionConfig reducedMotion="user">` neutralises the framer-motion layers, and `reduced`
+additionally drops the shake and flash **outright** — a shaking screen is the effect most
+associated with motion sickness, so shortening it is not enough.
+
+**The avatar/cover overlap was a number copied between two different containers.**
+Profile's cover is full-bleed and square-cornered inside an `overflow-hidden` card, where
+a 44px lift on an 80px avatar sits cleanly. The preview sheet's cover is inset and
+`rounded-2xl`, so the same 44px put the avatar on the bottom-left corner radius and
+squared it off. Measured the fix rather than eyeballing it: radius is **16px**, so `pl-3`
+(12px) still painted over the curve and `pl-5` (20px) clears it — `clearsCorner: true`,
+lift reduced to 32px.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained

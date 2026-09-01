@@ -75,10 +75,23 @@ function LevelUpOverlay() {
   return <LevelUpBurst level={levelUp} onDone={clearLevelUp} />
 }
 
-/** Renders the achievement-unlock celebration, one at a time from the queue. */
+/**
+ * Renders the achievement-unlock celebration, one at a time from the queue.
+ *
+ * GATED ON THE LEVEL-UP BURST. Both are full-screen `z-50` overlays, and a
+ * point award can trip a level AND a badge in the same instant — which drew the
+ * two on top of each other, with the level-up's backdrop over the badge art.
+ * Now the badge waits its turn: neither auto-dismisses any more, so the student
+ * dismisses the first and the second appears behind it.
+ */
 function AchievementUnlockOverlay() {
-  const { unlockedAchievement, clearUnlockedAchievement } = useStudentData()
-  return <AchievementUnlockBurst achievement={unlockedAchievement} onDone={clearUnlockedAchievement} />
+  const { unlockedAchievement, clearUnlockedAchievement, levelUp } = useStudentData()
+  return (
+    <AchievementUnlockBurst
+      achievement={levelUp === null ? unlockedAchievement : null}
+      onDone={clearUnlockedAchievement}
+    />
+  )
 }
 
 /** Recaps points/penalties received while the app was closed. */

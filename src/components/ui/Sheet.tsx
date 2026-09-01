@@ -32,6 +32,24 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
   const titleId = useId()
 
   /**
+   * `onClose` lives in a ref so the effect below can depend on `open` ALONE.
+   *
+   * ── THE BUG THIS FIXES ─────────────────────────────────────────────────
+   * The effect used to list `onClose` as a dependency. Most callers pass an
+   * inline arrow (`onClose={() => setEditOpen(false)}`), which is a new
+   * function identity on every render — so any state change inside the sheet
+   * re-ran the whole effect, and its `focusFirst()` moved focus to the panel's
+   * FIRST focusable element.
+   *
+   * In practice: typing a character into the Bio textarea re-rendered Profile,
+   * and the next keystroke landed in Display name. Every field in every sheet
+   * whose parent re-renders as you type was affected — 21 sheets, including the
+   * student excuse-reason form and the instructor's import and grant flows.
+   */
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  /**
    * Focus management + scroll lock.
    *
    * Every modal, confirm dialog and profile preview in the app is a Sheet, so
@@ -57,7 +75,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        onCloseRef.current()
         return
       }
       if (e.key !== 'Tab') return
@@ -90,7 +108,8 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
       // Return focus to whatever opened the sheet.
       previouslyFocused?.focus?.({ preventScroll: true })
     }
-  }, [open, onClose])
+    // `open` ONLY — see the onCloseRef note above.
+  }, [open])
 
   // Dismiss if flung or dragged far enough down; otherwise it springs back.
   function onDragEnd(_: PointerEvent, info: PanInfo) {

@@ -133,7 +133,16 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
             the crop and the duplication at once; the tile is the one that
             stays, because it sits with the other two figures it belongs with.
           */}
-          <div className="-mt-11 flex items-end gap-3">
+          {/*
+            The overlap is tuned for THIS container, not copied from Profile.
+            Profile's cover is full-bleed and square-cornered inside an
+            `overflow-hidden` card, so a 44px lift on an 80px avatar sits
+            cleanly. Here the cover is inset and `rounded-2xl` — that same 44px
+            put the avatar straight onto the bottom-left corner radius and
+            squared it off. Less lift, and inset from the left so the corner
+            stays visible.
+          */}
+          <div className="-mt-8 flex items-end gap-3 pl-5">
             <Avatar
               name={target.display_name}
               url={profile?.avatar_url ?? target.avatar_url}

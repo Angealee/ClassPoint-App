@@ -1,10 +1,19 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BadgeArt } from './BadgeArt'
 import { StarIcon } from '@/components/ui/icons'
 import type { Achievement } from '@/lib/types'
 
-const AUTO_DISMISS_MS = 4200
+/**
+ * Taps are ignored for this long — this is NOT an auto-dismiss.
+ *
+ * The screen used to say 'Tap to continue' and then vanish after 4.2s anyway,
+ * which promised control it did not give and let the moment pass a student who
+ * had their phone in a pocket. It now waits for a tap, with a short guard so
+ * the tap already in flight when it appears cannot skip it instantly. Matches
+ * LevelUpBurst exactly, so the two celebrations behave the same way.
+ */
+const TAP_GUARD_MS = 700
 
 // Same deterministic particle ring as LevelUpBurst, for a consistent feel
 // across every celebratory moment in the app.
@@ -23,11 +32,13 @@ export function AchievementUnlockBurst({
   achievement: Achievement | null
   onDone: () => void
 }) {
+  const [armed, setArmed] = useState(false)
   useEffect(() => {
     if (!achievement) return
-    const t = setTimeout(onDone, AUTO_DISMISS_MS)
+    setArmed(false)
+    const t = setTimeout(() => setArmed(true), TAP_GUARD_MS)
     return () => clearTimeout(t)
-  }, [achievement, onDone])
+  }, [achievement])
 
   return (
     <AnimatePresence>
@@ -37,10 +48,10 @@ export function AchievementUnlockBurst({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={onDone}
+          onClick={() => armed && onDone()}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6 backdrop-blur-sm"
           role="alertdialog"
-          aria-label={`Achievement unlocked: ${achievement.name}`}
+          aria-label={`Achievement unlocked: ${achievement.name}. Tap to continue.`}
         >
           <div className="relative flex flex-col items-center">
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
