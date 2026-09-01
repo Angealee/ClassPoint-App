@@ -1,0 +1,36 @@
+# ClassPoint · Supabase CLI config
+#
+# ── WHY THIS FILE EXISTS ─────────────────────────────────────────────────────
+# Two of the three edge functions are PUBLIC by design and must run with JWT
+# verification OFF: a student claiming an account or resetting a forgotten PIN
+# is not signed in yet, so there is no token to verify.
+#
+# That setting is per-function and lives server-side. Without it declared here,
+# `supabase functions deploy claim-token` uses the CLI default (verify_jwt =
+# true) and the gateway starts rejecting every unauthenticated call — which
+# breaks claim and PIN reset in a NEW way, immediately after a deploy meant to
+# fix them. Pinning it in the repo makes the deploy reproducible instead of
+# depending on remembering a `--no-verify-jwt` flag.
+#
+# ── WHAT PROTECTS THE PUBLIC FUNCTIONS INSTEAD ───────────────────────────────
+# Not the gateway. They are guarded by, in order: a CORS allowlist from the
+# ALLOWED_ORIGINS secret, a per-IP rate limit counted in `auth_events`
+# (30 failures / 15 min), 64-bit single-use tokens, and uniform error messages
+# so a guesser cannot tell a bad token from a used one. See migration 0026 and
+# supabase/functions/_shared/security.ts.
+
+project_id = "cxfxstazlwjijozkglgx"
+
+# PUBLIC — reached by a student who is not signed in yet.
+[functions.claim-token]
+verify_jwt = false
+
+# PUBLIC — same reason: a forgotten PIN means no session to authenticate with.
+[functions.reset-pin]
+verify_jwt = false
+
+# PRIVATE. Keeps the gateway's JWT check, and additionally asserts the caller
+# is the service role inside the handler — the gateway check alone was
+# satisfied by ANY signed-in student's token, which is what 0026 fixed.
+[functions.send-push]
+verify_jwt = true
