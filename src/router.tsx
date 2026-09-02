@@ -2,11 +2,9 @@ import { Suspense, lazy, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { RedirectIfAuthed, RequireRole } from '@/features/auth/guards'
 import { Splash } from '@/components/layout/Splash'
-// Eager import on purpose: the error screen must not be a lazy chunk, because
-// its most common trigger IS a lazy chunk failing to load after a deploy.
+
 import { RouteError } from '@/components/layout/RouteError'
 
-// Code-split: each screen/layout is fetched on demand to shrink the first load.
 const Landing = lazy(() => import('@/features/Landing').then((m) => ({ default: m.Landing })))
 const SignIn = lazy(() => import('@/features/auth/SignIn').then((m) => ({ default: m.SignIn })))
 const Claim = lazy(() => import('@/features/auth/Claim').then((m) => ({ default: m.Claim })))
@@ -88,8 +86,6 @@ const StudentReport = lazy(() =>
 const withSplash = (node: ReactNode) => <Suspense fallback={<Splash />}>{node}</Suspense>
 
 export const router = createBrowserRouter([
-  // Public + auth screens — already-signed-in users are bounced to their home,
-  // so pressing Back after logging in never lands on the landing/login pages.
   {
     element: <RedirectIfAuthed />,
     errorElement: <RouteError />,
@@ -98,22 +94,14 @@ export const router = createBrowserRouter([
       { path: '/signin', element: withSplash(<SignIn />) },
       { path: '/claim', element: withSplash(<Claim />) },
       { path: '/reset', element: withSplash(<ResetPin />) },
-      // Instructor sign-in lives at a secret, unlinked path (not surfaced in any
-      // UI). Bookmark it to access. The old public path is retired below.
       { path: '/macalesideauth', element: withSplash(<InstructorSignIn />) },
     ],
   },
 
-  // Retired public instructor path — dead-ends to the landing page so the login
-  // can't be reached (or fingerprinted) the obvious way.
   { path: '/instructor/signin', element: <Navigate to="/" replace /> },
 
-  // Native-camera QR check-in target. PUBLIC (outside the role guards): a
-  // logged-out or not-yet-installed student's camera must land here. It
-  // captures the proof, then routes based on auth.
   { path: '/scan', element: withSplash(<ScanLanding />), errorElement: <RouteError /> },
 
-  // Student area. (Child screens lazy-load inside the Shell's own Suspense.)
   {
     path: '/app',
     element: <RequireRole role="student" />,
@@ -138,7 +126,7 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Instructor area.
+  // Instructor
   {
     path: '/teach',
     element: <RequireRole role="instructor" />,
@@ -157,9 +145,6 @@ export const router = createBrowserRouter([
           { path: 'student/:studentId', element: <StudentRecord /> },
           { path: 'history', element: <History /> },
           { path: 'leaderboard', element: <InstructorLeaderboard /> },
-          // Awarding moved into the section roster and class stats into the
-          // History tab. Old links (the record page's Award button, bookmarks,
-          // anything a student was sent) keep working.
           { path: 'award', element: <Navigate to="/teach" replace /> },
           {
             path: 'attendance/history',
@@ -167,8 +152,7 @@ export const router = createBrowserRouter([
           },
         ],
       },
-      // The printable report renders OUTSIDE the shell (no nav/tabs/theme) but
-      // still under the instructor role guard.
+      
       {
         path: 'student/:studentId/report',
         element: withSplash(<StudentReport />),

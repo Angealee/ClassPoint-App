@@ -330,3 +330,12 @@ export function TargetIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+/** Chevron pointing down — scroll cues, disclosure affordances. */
+export function ChevronDownIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}

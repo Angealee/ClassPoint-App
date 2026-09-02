@@ -381,3 +381,66 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Landing page ambience.
+
+   Every keyframe below animates ONLY transform and opacity, so each one runs on
+   the compositor and costs no main-thread work per frame. That is the whole
+   reason these are CSS and not framer-motion: the landing page runs continuous
+   effects for as long as somebody is looking at it, and a JS spring per element
+   would be paying a render loop forever to decorate a page nobody has even
+   signed into yet. framer-motion on this screen does one-shot entrances only.
+
+   None of them need their own reduced-motion guard. The global block above uses
+   `!important`, which wins over these regardless of source order.
+--------------------------------------------------------------------------- */
+
+/* Aurora — two soft colour fields drifting behind the hero.
+
+   Two keyframes rather than one reused with a delay, and the durations are
+   deliberately not multiples of each other (26s / 34s): matched periods drift
+   in and out of phase together and read as one pulsing blob rather than as
+   weather. */
+@keyframes cp-aurora-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(6%, -8%, 0) scale(1.16); }
+}
+
+@keyframes cp-aurora-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.12); }
+  50%      { transform: translate3d(-8%, 6%, 0) scale(0.94); }
+}
+
+.cp-aurora-a { animation: cp-aurora-a 26s ease-in-out infinite; }
+.cp-aurora-b { animation: cp-aurora-b 34s ease-in-out infinite; }
+
+/* The scoreboard's "+3" award chip — rises, holds, fades, waits.
+
+   Base opacity is 0 and the keyframe returns to 0, which is what makes this
+   safe under reduced motion: that block collapses the animation to a single
+   0.01ms pass, so the chip simply never appears rather than freezing on screen
+   mid-flight. Most of the 7s cycle is deliberately empty — a chip that pops
+   constantly stops reading as an event. */
+@keyframes cp-award-pop {
+  0%      { opacity: 0; transform: translateY(6px) scale(0.9); }
+  6%, 20% { opacity: 1; transform: translateY(-2px) scale(1); }
+  34%     { opacity: 0; transform: translateY(-18px) scale(1); }
+  100%    { opacity: 0; transform: translateY(-18px) scale(1); }
+}
+
+.cp-award-pop {
+  opacity: 0;
+  animation: cp-award-pop 7s ease-in-out infinite;
+  animation-delay: var(--cp-delay, 0s);
+}
+
+/* A light sweep across the scoreboard plate. It rests for the back half of the
+   cycle (the 60%->100% hold parks it off-screen), so it reads as an occasional
+   glint rather than a rotating beacon. */
+@keyframes cp-sheen {
+  0%        { transform: translateX(-150%) skewX(-18deg); }
+  60%, 100% { transform: translateX(340%) skewX(-18deg); }
+}
+
+.cp-sheen { animation: cp-sheen 9s ease-in-out infinite; }

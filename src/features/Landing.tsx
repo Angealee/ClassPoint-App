@@ -7,15 +7,12 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { InstallButton } from '@/components/pwa/InstallButton'
 import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
 
-// Instructor sign-in is unlinked (router.tsx). Inside an installed PWA there's
-// no address bar to type it, so reveal it with a secret gesture: tap the footer
-// 5 times within 2 seconds.
 const INSTRUCTOR_PATH = '/macalesideauth'
 const SECRET_TAPS = 5
 const TAP_WINDOW_MS = 2000
 
 const features = [
-  { Icon: BoltIcon, title: 'Earn points', body: 'Recitation and activities — 1 to 5 points, awarded live in class.' },
+  { Icon: BoltIcon, title: 'Earn points', body: 'Recitation and activities gives 1 to 5 points, awarded live in class.' },
   { Icon: StarIcon, title: 'Level up', body: 'Points become XP. Fill the bar, level up, and keep grinding.' },
   { Icon: TrophyIcon, title: 'Climb ranks', body: 'See where you stand across every section on the leaderboard.' },
 ]
@@ -23,7 +20,7 @@ const features = [
 export function Landing() {
   const navigate = useNavigate()
 
-  // Secret tap counter for revealing the instructor sign-in inside the PWA.
+  // Secret tap
   const taps = useRef(0)
   const firstTapAt = useRef(0)
 
@@ -64,8 +61,8 @@ export function Landing() {
             Turn class points into <span className="text-accent">XP</span>.
           </h1>
           <p className="mx-auto mt-3 max-w-md text-muted">
-            A pointing/leveling system for the classroom. Earn points in class, level up, and climb the
-            leaderboard, built for DCT-CCS students who likes the grind.
+            A pointing/leveling system and classroom management tool. Earn points in class, level up, and climb the
+            leaderboard like a madman.
           </p>
         </motion.div>
 
@@ -83,7 +80,7 @@ export function Landing() {
             onClick={() => navigate('/claim')}
             className="text-sm text-muted hover:text-ink"
           >
-            First time? <span className="font-semibold text-accent">Claim your account</span>
+            First time? <span className="font-semibold text-accent">Claim your account, Use your token your instructor gave you.</span>
           </button>
           <InstallButton className="mt-1 w-full" />
         </motion.div>
@@ -98,7 +95,7 @@ export function Landing() {
               className="rounded-2xl border border-line bg-card p-4"
             >
               <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-accent-solid/10 text-accent">
-                <Icon className="h-5 w-5" />
+                <Icon className="h-5 w-" />
               </div>
               <p className="font-display font-semibold">{title}</p>
               <p className="mt-1 text-sm text-muted">{body}</p>
@@ -114,7 +111,7 @@ export function Landing() {
           aria-label="ClassPoint"
           className="cursor-default select-none bg-transparent text-xs text-muted focus:outline-none"
         >
-          ClassPoint · early build
+          ClassPoint · Version 6.0
         </button>
       </footer>
     </div>
