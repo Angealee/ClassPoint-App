@@ -10,6 +10,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { XIcon } from '@/components/ui/icons'
 import { MessageRow } from '@/components/space/MessageRow'
+import { AstronautArt } from '@/components/space/AstronautArt'
 import { ReportSheet } from '@/components/space/ReportSheet'
 import { useStudentDataOptional } from '@/features/student/StudentData'
 import {
@@ -348,6 +349,13 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
     () => people.map((p) => ({ id: p.id, displayName: p.displayName })),
     [people],
   )
+  // The same roster, as names, for STYLING `@Name` in a rendered message. The
+  // instructor has no row in `people`, so their name is added here or a mention
+  // of them would be the one that never lights up.
+  const mentionNames = useMemo(
+    () => [...people.map((p) => p.displayName), 'Instructor'],
+    [people],
+  )
 
   const divider = useMemo(
     () => unreadDividerIndex(messages, entryLastRead),
@@ -411,7 +419,12 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
           )}
 
           {messages.length === 0 ? (
-            <EmptyState description="Say something first.">Nothing here yet.</EmptyState>
+            <EmptyState
+              icon={<AstronautArt variant="space" size="md" />}
+              description="Say something first — somebody has to."
+            >
+              Nobody has said anything yet.
+            </EmptyState>
           ) : (
             <div>
               {messages.map((m, i) => {
@@ -453,8 +466,16 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
                     ? m.authorStudentId === myStudentId
                     : m.authorStudentId === null
 
+                // A hairline wherever the speaker changes and nothing louder is
+                // already being drawn. With no bubbles the column is one
+                // continuous block of text, and in a busy room the eye needs
+                // somewhere to break. Indented past the avatar gutter (28px +
+                // the 8px gap) so it separates the TALK, not the whole row.
+                const showRule = !!prev && !showTime && i !== divider && !joinsPrev
+
                 return (
                   <div key={m.id}>
+                    {showRule && <div aria-hidden="true" className="ml-9 mt-2 h-px bg-line" />}
                     {showTime && (
                       // Centred, quiet, and the ONLY timestamp in the thread —
                       // per-message clock times were most of the remaining
@@ -484,6 +505,7 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
                       mine={mine}
                       isInstructor={m.authorStudentId === null}
                       showSectionDot={room?.kind === 'global'}
+                      mentionNames={mentionNames}
                       canReact={block === null}
                       onReact={react}
                       onReply={setReplyTo}

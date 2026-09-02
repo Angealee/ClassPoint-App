@@ -17,6 +17,12 @@ export interface BodyPart {
   content: string
 }
 
+/** A run inside a plain-text part: ordinary words, a link, or an @mention. */
+export type InlineToken =
+  | { kind: 'plain'; content: string }
+  | { kind: 'link'; content: string; href: string }
+  | { kind: 'mention'; content: string }
+
 /** Box drawing, block elements, and the punctuation ASCII art is built from. */
 // Note the ordering rules inside a character class: `-` sits LAST so it needs
 // no escape, `]` and `\` are escaped, and `^` is not first. Getting any of
@@ -85,4 +91,69 @@ export function parseMessageBody(body: string | null | undefined): BodyPart[] {
         : p,
     )
     .filter((p) => p.content.trim() !== '' || p.kind === 'mono')
+}
+
+/**
+ * Links and @mentions inside one plain-text part.
+ *
+ * ⚠ ONLY http, https and bare `www.` are matched, and that is a SECURITY rule
+ * rather than a convenience: the matched text becomes an `href`, so a pattern
+ * loose enough to catch `javascript:` or `data:` would turn any message into a
+ * script the reader taps. Do not widen this regex to "any scheme".
+ *
+ * Mentions are matched against the NAMES THE CALLER SUPPLIES, never against a
+ * bare `@word`. `src/lib/mentions.ts` learned this the hard way for the
+ * server-side resolution and the reasoning is identical here: an app where
+ * "@everyone" or "@8pm" lights up like a real person is lying about who was
+ * notified. With no names, nothing is styled — the text renders plain.
+ */
+const URL_RE = /(?:https?:\/\/|www\.)[^\s<>()[\]{}"'`]+/gi
+/** A URL at the end of a sentence should not swallow the full stop. */
+const URL_TRAIL_RE = /[.,!?;:]+$/
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+interface Hit {
+  start: number
+  end: number
+  token: InlineToken
+}
+
+export function parseInline(text: string, names: readonly string[] = []): InlineToken[] {
+  if (text === '') return []
+  const hits: Hit[] = []
+
+  for (const m of text.matchAll(URL_RE)) {
+    const raw = m[0].replace(URL_TRAIL_RE, '')
+    if (raw === '') continue
+    const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+    hits.push({ start: m.index, end: m.index + raw.length, token: { kind: 'link', content: raw, href } })
+  }
+
+  // Longest name first, so "Maria Santos" wins over "Maria" at the same index.
+  for (const name of [...names].sort((a, b) => b.length - a.length)) {
+    if (name.trim() === '') continue
+    const re = new RegExp(`(^|[^\\w@])(@${escapeRe(name)})(?![\\w])`, 'gi')
+    for (const m of text.matchAll(re)) {
+      const start = m.index + m[1].length
+      hits.push({ start, end: start + m[2].length, token: { kind: 'mention', content: m[2] } })
+    }
+  }
+
+  // Earliest wins; a longer match wins a tie. Anything overlapping a kept hit
+  // is dropped, so a name inside a URL cannot split the link in half.
+  hits.sort((a, b) => a.start - b.start || b.end - a.end)
+
+  const out: InlineToken[] = []
+  let at = 0
+  for (const h of hits) {
+    if (h.start < at) continue
+    if (h.start > at) out.push({ kind: 'plain', content: text.slice(at, h.start) })
+    out.push(h.token)
+    at = h.end
+  }
+  if (at < text.length) out.push({ kind: 'plain', content: text.slice(at) })
+  return out
 }

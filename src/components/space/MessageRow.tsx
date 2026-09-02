@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Avatar } from '@/components/ui/Avatar'
 import { cn } from '@/lib/cn'
 import { getLevelProgress } from '@/lib/leveling'
 import { sectionColor } from '@/lib/sectionColor'
-import { parseMessageBody } from '@/lib/message-body'
+import { parseInline, parseMessageBody } from '@/lib/message-body'
 import {
   CHAT_REACTIONS,
   REACTION_ORDER,
@@ -16,24 +17,44 @@ import {
  * One message — Instagram's structure at Discord's density.
  *
  * ── WHAT CHANGED, AND WHY ──────────────────────────────────────────────────
- * Left-aligned bubbles for EVERYONE (the user's call), so wide content — ASCII
- * art, emoji walls — keeps the full column instead of the ~78% a right-aligned
- * layout leaves. Ownership is a 2px accent bar down the side of the run, not a
- * background wash: the wash tinted every line in a run separately, so three
- * consecutive messages read as three disconnected grey blocks. That was the
- * "cluttered" complaint, and merging the run into ONE shape is the fix.
+ * Left-aligned for EVERYONE (the user's call), so wide content — ASCII art,
+ * emoji walls — keeps the full column instead of the ~78% a right-aligned
+ * layout leaves.
  *
- * Corners merge across a run (first rounds its top, last its bottom), the
- * avatar sits beside the LAST message of an incoming run rather than the first,
- * and individual timestamps are gone — the room prints a centred time divider
- * on a gap instead. All three are Instagram's arrangement.
+ * THERE ARE NO BUBBLES. Messages sit on the plain canvas. A bubble had to be
+ * painted on every single line, which turned a run of three into three grey
+ * slabs and a busy room into a wall of boxes — that was the "cluttered"
+ * complaint, and removing the fill is the fix that a lighter fill was not.
+ * What survives is MARKS on a flat surface, and each one means something:
  *
+ *   2px accent bar   this one is yours
+ *   2px gold bar     the instructor
+ *   blue tint        you were @mentioned
+ *   red tint         hidden by moderation
+ *   card fill        the row you are hovering or holding
+ *
+ * The avatar sits beside the LAST message of a run — YOURS INCLUDED. Hiding
+ * your own made the room read as something happening to other people. The name
+ * header shows on the first of every run for the same reason: your rank medal
+ * and section dot are part of the fun, and there is no reason you should be the
+ * one person who never sees their own.
+ *
+ * Individual timestamps are gone; the room prints a centred divider on a gap.
  * Actions live in a floating toolbar on hover / long-press, so they cost the
  * message no vertical space.
  */
 
 const LONG_PRESS_MS = 420
 const MOVE_CANCEL_PX = 8
+/**
+ * Two taps inside this window are one double-tap.
+ *
+ * Comfortably under LONG_PRESS_MS, so the two gestures cannot both fire: a
+ * finger held still for 420ms opens the toolbar, two quick taps send a 🔥.
+ */
+const DOUBLE_TAP_MS = 320
+/** The reaction a double-tap sends. Instagram's heart, spent on this app's W. */
+const DOUBLE_TAP_CODE: ReactionCode = 'fire'
 
 /**
  * Top-three rank, as a TINTED NUMBER rather than a 🥇.
@@ -85,7 +106,44 @@ function RingAvatar({ person, name, url }: { person?: SpacePerson; name: string;
   )
 }
 
-function Body({ body }: { body: string }) {
+/** Words, links and @mentions inside one plain-text run. */
+function Inline({ text, names }: { text: string; names: readonly string[] }) {
+  return (
+    <>
+      {parseInline(text, names).map((t, i) =>
+        t.kind === 'link' ? (
+          <a
+            key={i}
+            href={t.href}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            // stopPropagation, or opening a link also counts as a tap toward
+            // the double-tap reaction.
+            onClick={(e) => e.stopPropagation()}
+            // `overflow-wrap:anywhere`, not `break-all`: a long URL still has to
+            // break rather than push the page sideways, but a short one is not
+            // chopped mid-word for no reason. Accent because Era 6.0 Phase 10
+            // already put inline links on the accent role.
+            className="font-medium text-accent underline decoration-accent/40 underline-offset-2 [overflow-wrap:anywhere]"
+          >
+            {t.content}
+          </a>
+        ) : t.kind === 'mention' ? (
+          <span
+            key={i}
+            className="rounded bg-info-solid/15 px-0.5 font-semibold text-info"
+          >
+            {t.content}
+          </span>
+        ) : (
+          <span key={i}>{t.content}</span>
+        ),
+      )}
+    </>
+  )
+}
+
+function Body({ body, names }: { body: string; names: readonly string[] }) {
   const parts = parseMessageBody(body)
   return (
     <>
@@ -95,13 +153,13 @@ function Body({ body }: { body: string }) {
           // rewrapping into noise, and it still cannot push the page sideways.
           <pre
             key={i}
-            className="my-1 overflow-x-auto rounded-lg bg-canvas/70 px-2.5 py-2 font-mono text-xs leading-tight text-ink"
+            className="my-1 overflow-x-auto rounded-lg border border-line bg-card px-2.5 py-2 font-mono text-xs leading-tight text-ink"
           >
             {p.content}
           </pre>
         ) : (
           <span key={i} className="whitespace-pre-wrap break-words">
-            {p.content}
+            <Inline text={p.content} names={names} />
           </span>
         ),
       )}
@@ -116,6 +174,7 @@ export function MessageRow({
   mine,
   isInstructor,
   showSectionDot,
+  mentionNames = [],
   onReact,
   onReply,
   onDelete,
@@ -127,12 +186,17 @@ export function MessageRow({
   message: SpaceMessage
   /** Game facts for the author, from the room's one roster fetch. */
   person?: SpacePerson
-  /** Where this sits in a run of consecutive messages — drives the corners. */
+  /** Where this sits in a run — drives the name header and the avatar. */
   runPosition: 'only' | 'first' | 'middle' | 'last'
   mine?: boolean
   isInstructor?: boolean
   /** Only the Global room, where several sections mix. */
   showSectionDot?: boolean
+  /**
+   * Everyone in this room, for styling `@Name` in the body. Names ONLY — a bare
+   * `@word` is never styled, so "@everyone" cannot pretend to be a person.
+   */
+  mentionNames?: readonly string[]
   onReact: (m: SpaceMessage, code: ReactionCode) => void
   onReply: (m: SpaceMessage) => void
   onDelete: (m: SpaceMessage) => void
@@ -143,8 +207,10 @@ export function MessageRow({
 }) {
   const [pinned, setPinned] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [burst, setBurst] = useState(0)
   const timerRef = useRef<number | null>(null)
   const startRef = useRef<{ x: number; y: number } | null>(null)
+  const lastTapRef = useRef(0)
 
   const removed = message.deletedAt !== null
   const hidden = !removed && message.hiddenAt !== null && message.body === null
@@ -187,6 +253,33 @@ export function MessageRow({
     }
   }
 
+  /**
+   * Double-tap to react — the one gesture in the room with no chrome at all.
+   *
+   * Counted from `click` rather than `dblclick` so a phone and a mouse take the
+   * same path, and guarded against clicks that were meant for something else:
+   * a link, the reply quote, or a reaction pill inside the message.
+   */
+  function onBodyClick(e: React.MouseEvent) {
+    if (!canReact || removed || hidden) return
+    if ((e.target as HTMLElement).closest('a,button')) return
+    const now = Date.now()
+    if (now - lastTapRef.current < DOUBLE_TAP_MS) {
+      lastTapRef.current = 0
+      setBurst((n) => n + 1)
+      onReact(message, DOUBLE_TAP_CODE)
+    } else {
+      lastTapRef.current = now
+    }
+  }
+
+  // The burst is decoration; it must never outlive the message.
+  useEffect(() => {
+    if (burst === 0) return
+    const t = window.setTimeout(() => setBurst(0), 700)
+    return () => window.clearTimeout(t)
+  }, [burst])
+
   const actionsVisible = pinned || pickerOpen
 
   return (
@@ -194,10 +287,11 @@ export function MessageRow({
       id={`msg-${message.id}`}
       className={cn('group relative flex items-end gap-2', startsRun ? 'mt-2' : 'mt-0.5')}
     >
-      {/* Avatar gutter. Reserved on every row so the bubbles stay in one
-          column, but only DRAWN on the last of an incoming run. */}
+      {/* Avatar gutter. Reserved on every row so text stays in one column, and
+          DRAWN on the last message of every run — yours included. Hiding your
+          own avatar made the room feel like it was happening to someone else. */}
       <div className="w-7 shrink-0">
-        {!mine && endsRun && (
+        {endsRun && (
           <button
             type="button"
             onClick={() => onOpenPerson?.(message)}
@@ -210,8 +304,8 @@ export function MessageRow({
       </div>
 
       <div className="min-w-0 flex-1">
-        {startsRun && !mine && (
-          <div className="mb-0.5 flex items-center gap-1.5 pl-1">
+        {startsRun && (
+          <div className="mb-0.5 flex items-center gap-1.5 pl-3">
             {/* Both theme values ride as CSS variables rather than reading the
                 theme once in JS, so the dot follows a theme switch — the same
                 arrangement PodiumBoard uses for the identical dot. */}
@@ -230,6 +324,16 @@ export function MessageRow({
             <span className="min-w-0 truncate text-2xs font-semibold text-muted">
               {message.displayName}
             </span>
+            {/* The XP ring around the avatar shows PROGRESS through the level;
+                this reads out WHICH. Deliberately MUTED rather than the reward
+                gold levels wear elsewhere: at rank 1 the medal is also gold, and
+                two gold chips side by side blurred into one. The medal is the
+                rarer fact, so it keeps the colour. */}
+            {person && (
+              <span className="shrink-0 text-2xs font-semibold tabular-nums text-muted">
+                Lv {getLevelProgress(person.semesterPoints).level}
+              </span>
+            )}
             {medal && (
               <span
                 className={cn('shrink-0 text-2xs font-bold tabular-nums', medal)}
@@ -251,27 +355,65 @@ export function MessageRow({
           onPointerMove={onPointerMove}
           onPointerUp={clearTimer}
           onPointerCancel={clearTimer}
+          onClick={onBodyClick}
+          // Or a double-click selects a word under the burst.
+          onDoubleClick={(e) => e.preventDefault()}
           className={cn(
-            'relative px-3 py-1.5 text-sm',
-            // Merged corners: one shape per run.
-            'rounded-2xl',
-            !startsRun && 'rounded-tl-md',
-            !endsRun && 'rounded-bl-md',
-            mine
-              ? // A BAR, not a wash. The wash tinted each line separately, so a
-                // run read as disconnected blocks.
-                'border-l-2 border-accent-solid bg-card pl-2.5'
-              : 'bg-card',
-            isInstructor && !mine && 'ring-1 ring-gold-400/25',
+            // NO BUBBLE. Messages sit on the plain canvas — the user's call, and
+            // it is what lets a run read as one block of talk instead of a stack
+            // of grey slabs. Everything below is a MARK on that flat surface,
+            // never a fill: the only things that paint are the ones that mean
+            // something (yours, a mention, hidden, and the row you are touching).
+            'relative rounded-xl px-3 py-1 text-sm transition-colors',
             // A mention is INFO ("this is addressed to you"), deliberately NOT
             // accent: accent is already the bar down your OWN run, so an accent
             // tint here made someone else's message read as one of yours — and
-            // on a dark card a red wash reads as an error besides.
-            message.mentionsMe && !mine && 'bg-info-solid/10 ring-1 ring-info-solid/40',
+            // a red wash reads as an error besides.
+            message.mentionsMe && !mine && 'bg-info-solid/10',
             hidden && 'bg-danger-solid/8',
-            actionsVisible && 'bg-card-2',
+            // The row you are pointing at is the one surface that lights up, so
+            // the floating toolbar has something to belong to.
+            actionsVisible ? 'bg-card' : 'group-hover:bg-card/60',
           )}
         >
+          {/* The identity rule.
+              It is a positioned SPAN, not a `border-l` on this box: a border
+              follows the box's own `rounded-xl`, so each message in a run bowed
+              inward at both ends and three consecutive messages rendered as
+              three parentheses. This draws one straight 2px rule that BLEEDS
+              into the 2px gap below (`-bottom-0.5`) unless it is the last of the
+              run, so a run of five reads as a single unbroken line. */}
+          {(mine || isInstructor) && (
+            <span
+              aria-hidden="true"
+              className={cn(
+                'absolute left-0 top-0 w-0.5',
+                endsRun ? 'bottom-0 rounded-b-full' : '-bottom-0.5',
+                startsRun && 'rounded-t-full',
+                mine ? 'bg-accent-solid' : 'bg-gold-400',
+              )}
+            />
+          )}
+
+          {/* The double-tap's only feedback. `MotionConfig reducedMotion="user"`
+              in App.tsx neutralises it for anyone who asked for less motion, so
+              it needs no guard of its own. */}
+          <AnimatePresence>
+            {burst > 0 && (
+              <motion.span
+                key={burst}
+                aria-hidden="true"
+                initial={{ opacity: 0, scale: 0.4, y: 0 }}
+                animate={{ opacity: [0, 1, 1, 0], scale: [0.4, 1.3, 1.1, 1], y: -18 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.7, ease: 'easeOut' }}
+                className="pointer-events-none absolute right-4 top-0 z-10 select-none text-base"
+              >
+                {CHAT_REACTIONS[DOUBLE_TAP_CODE]}
+              </motion.span>
+            )}
+          </AnimatePresence>
+
           {message.replyToId && (
             <button
               type="button"
@@ -290,13 +432,14 @@ export function MessageRow({
           ) : hidden ? (
             <span className="text-sm font-medium text-danger">Hidden — reported</span>
           ) : (
-            <Body body={message.body ?? ''} />
+            <Body body={message.body ?? ''} names={mentionNames} />
           )}
 
           {tallies.length > 0 && !removed && (
-            // Overlaps the bubble's bottom edge, so a reaction costs almost no
-            // extra height — the Instagram/Messenger arrangement.
-            <div className="-mb-2.5 mt-1 flex flex-wrap items-center gap-1">
+            // The old -mb pulled these up over the bubble's bottom edge. With no
+            // bubble there is no edge to hide behind, and the overlap would put
+            // a pill on top of the next message.
+            <div className="mt-1 flex flex-wrap items-center gap-1">
               {tallies.map((code) => {
                 const isMine = message.myReactions.includes(code)
                 return (
@@ -309,7 +452,7 @@ export function MessageRow({
                     aria-pressed={isMine}
                     className={cn(
                       'flex items-center gap-0.5 rounded-full border border-line px-1.5 py-0.5 text-2xs font-semibold shadow-sm',
-                      isMine ? 'bg-accent-solid/15 text-accent' : 'bg-canvas text-muted',
+                      isMine ? 'bg-accent-solid/15 text-accent' : 'bg-card text-muted',
                       !canReact && 'cursor-not-allowed opacity-60',
                     )}
                   >

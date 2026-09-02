@@ -1560,17 +1560,28 @@ Decisions (user): **Instagram inspo mixed with the Discord density already there
 **left-aligned for everyone** · **ASCII art supported** · **Level and the XP ring only —
 no streak on a message row**.
 
-**The "cluttered highlighted my message" complaint was a BACKGROUND WASH, and the fix is
-that a run is one shape.** Own messages had a tinted background applied per message, so
-three consecutive lines read as three disconnected blocks. Ownership is now a **2px accent
-bar down the side**, and corners merge across a run (first rounds its top, last its bottom,
-middles square the left edge). Measured after: a continuation row is **32px**, a run-start
-row 46–48px.
+**THERE ARE NO BUBBLES — messages sit on the plain canvas (the user's call, 2026-09-03).**
+The "cluttered highlighted my message" complaint was a background FILL, and two rounds
+proved a lighter fill was not the fix: a bubble has to be painted on every line, so a run
+of three rendered as three grey slabs and a busy room as a wall of boxes. What survives is
+**marks on a flat surface, each one meaning something** — 2px accent rule = yours, 2px gold
+rule = the instructor, blue tint = you were @mentioned, red tint = hidden by moderation,
+card fill = the row you are hovering or holding. Measured after: a continuation row is
+**28px**, a run-start row 44px, and a plain row's background computes `rgba(0,0,0,0)`.
+
+**The identity rule is a positioned SPAN, not `border-l`.** A border follows the box's own
+`rounded-xl`, so each message in a run bowed inward at both ends and three consecutive
+messages rendered as three parentheses. The span bleeds into the 2px inter-message gap
+(`-bottom-0.5`) unless it is the last of the run, so a run reads as ONE unbroken line —
+verified by measuring the segments: consecutive bars touch at exactly 0px.
 
 **Everyone is left-aligned, including you.** Right-aligning your own messages leaves each
 side ~78% of the column, and this room carries ASCII art and emoji walls that want the
-whole width. The avatar sits beside the **LAST** message of an incoming run, not the first
-— Instagram's arrangement, and it is the message the reply lands next to.
+whole width. The avatar sits beside the **LAST** message of a run — **yours included**.
+Hiding your own avatar made the room read as something happening to other people (the
+user's report), and it is the message a reply lands next to. The name header shows on the
+first of every run for the same reason: your rank medal and section dot are part of the
+fun, and there is no reason you should be the one person who never sees their own.
 
 **Per-message timestamps are gone; the room prints a centred divider on a ≥30-minute gap.**
 At this density a time on every row was more chrome than content.
@@ -1581,10 +1592,47 @@ cancelling the press** — without that, scrolling opens the toolbar of every me
 passes. Measured: 12 toolbars in the DOM, 0 visible, 134×26 when opened and inside the
 viewport.
 
-**A mention is `info`, deliberately NOT `accent`.** Accent is already the bar down your own
-run, so an accent tint made someone else's message read as one of yours — and on a dark
-card a red wash reads as an error. Blue ring + blue tint is unambiguous against own
-(accent bar), instructor (gold ring) and hidden (danger).
+**A mention is `info`, deliberately NOT `accent`.** Accent is already the rule down your own
+run, so an accent tint made someone else's message read as one of yours — and a red wash
+reads as an error besides. A blue band is unambiguous against own (accent rule), instructor
+(gold rule) and hidden (danger tint).
+
+**With no bubble, anything that needs a surface must bring its own.** The mono block went
+`bg-canvas/70` → `border border-line bg-card` (it was invisible against a flat canvas) and
+reaction pills went `bg-canvas` → `bg-card`. The reaction row also lost its `-mb-2.5`: that
+negative margin existed to tuck the pills under the bubble's bottom edge, and with no edge
+to hide behind it put a pill on top of the next message.
+
+**A hairline separates SPEAKERS, and it is the flat layout's cost of doing business.** With
+nothing drawn, a busy room is one continuous column of text. The rule is rendered by
+ChatRoom (not the row) wherever the author changes and nothing louder — a time divider, the
+unread divider — is already being drawn, and it is indented `ml-9` past the avatar gutter so
+it separates the TALK rather than cutting the whole row in half.
+
+**Double-tap sends a 🔥, and the two touch gestures cannot collide:** `DOUBLE_TAP_MS` (320)
+is comfortably under `LONG_PRESS_MS` (420), so a held finger opens the toolbar and two quick
+taps react. It is counted from `click` so a phone and a mouse take one path, and it bails
+when the tap landed on an `a` or `button` — otherwise following a link also reacted.
+⚠ **A synthetic `new MouseEvent('click')` does NOT reach a React 19 handler unless it
+carries `view: window`** (and realistic coordinates). Half an hour went into "the handler is
+not firing" when the handler was fine and the test event was malformed — call the handler
+off `__reactProps$…` to tell the two apart.
+
+**Links and @mentions are styled by `parseInline` in `message-body.ts`, and its regex is a
+SECURITY boundary.** The matched text becomes an `href`, so only `http`, `https` and bare
+`www.` are matched — a pattern loose enough to catch `javascript:` or `data:` would turn any
+message into a script the reader taps. Pinned by a test that walks three such schemes.
+Mentions are matched against **the names the caller supplies**, never a bare `@word`, for
+the reason `mentions.ts` already documents: an app where "@everyone" lights up like a real
+person is lying about who was notified. Longest name wins at a tie (so "@Maria Santos" is
+not a mention of "Maria" plus a stray "Santos"), and a hit overlapping an earlier one is
+dropped, so a name inside a URL cannot split the link. Links use `[overflow-wrap:anywhere]`
+rather than `break-all` — a long URL must still break, but a short one should not be chopped
+mid-word. Links are `accent` because Era 6.0 Phase 10 already put inline links on that role.
+
+**The level chip beside a name is MUTED, not reward gold.** Gold is the level's colour
+everywhere else in the app, but at rank 1 the medal is also gold and the two chips blurred
+into one. The medal is the rarer fact, so it keeps the colour.
 
 **The top-three rank is a tinted `#N`, not a 🥇.** UI chrome in this app uses icons rather
 than emoji, and at `text-2xs` a colour-emoji medal beside its own rank number rendered as a
@@ -1611,8 +1659,12 @@ crept back in while these screens were being built; they are `text-2xs` and `tex
 per Era 6.0 Phase 4 (104 arbitrary sizes → 5 named steps, zero remaining).
 
 Verified by probe route at 375×812 in both themes (removed, residue-checked): no horizontal
-overflow (`scrollWidth === clientWidth === 375`), merged runs, long-press toolbar, mention
-ring, mono block. **Not verified on a real authenticated screen.**
+overflow (`scrollWidth === clientWidth === 375`); a plain row's background computes
+`rgba(0,0,0,0)`; consecutive own-run bar segments touch at exactly 0px; long-press opens the
+toolbar; a fast double-tap reacts and bursts while a 500ms one and a tap on a link do not;
+`href` resolves to `https://…` with `rel="noopener noreferrer nofollow"`; the empty room
+renders the 64px pixel-art astronaut at `image-rendering: pixelated`.
+**Not verified on a real authenticated screen.**
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
