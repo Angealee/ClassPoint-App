@@ -316,6 +316,50 @@ export interface Database {
         row_data: unknown
       }>
 
+      /** 0042 — the Lounge feed. Select-only; every write goes through an RPC. */
+      lounge_posts: Row<{
+        id: UUID
+        semester_id: UUID
+        kind: 'text' | 'shoutout' | 'pulse'
+        /** Null = the instructor. On a pulse card, the student it is about. */
+        author_student_id: UUID | null
+        display_name: string
+        avatar_url: string | null
+        body: string
+        target_student_id: UUID | null
+        target_display_name: string | null
+        target_avatar_url: string | null
+        pulse_kind: 'level' | 'podium' | null
+        pulse_value: number | null
+        /** Trigger-maintained. Never written from the client. */
+        w_count: number
+        reply_count: number
+        pinned_at: Timestamp | null
+        hidden_at: Timestamp | null
+        deleted_at: Timestamp | null
+        created_at: Timestamp
+      }>
+
+      /** 0042 — one row per (post, student). The PK is the "one W each" rule. */
+      lounge_ws: Row<{
+        post_id: UUID
+        student_id: UUID
+        created_at: Timestamp
+      }>
+
+      /** 0042 — replies. Soft-deleted so a thread never loses its parent. */
+      lounge_replies: Row<{
+        id: UUID
+        post_id: UUID
+        author_student_id: UUID | null
+        display_name: string
+        avatar_url: string | null
+        body: string
+        hidden_at: Timestamp | null
+        deleted_at: Timestamp | null
+        created_at: Timestamp
+      }>
+
       /**
        * 0041 — feature flags. NO RLS policy at all: reachable only through the
        * SECURITY DEFINER functions, like leaderboard_banned_words. Declared

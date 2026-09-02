@@ -625,6 +625,12 @@ export type NotificationType =
   | 'excuse'
   /** An instructor announcement sent via send_broadcast (0034). */
   | 'broadcast'
+  /** Someone shouted you out in the Lounge (0042). Deep-links to the post. */
+  | 'space_shoutout'
+  /** Someone mentioned you or replied to you in a chat room (0043). */
+  | 'space_mention'
+  /** A direct message (0043). */
+  | 'space_dm'
   | 'test'
 
 /** One row of the student's notification history (the bell). */
@@ -793,3 +799,150 @@ export interface SpaceTimeout {
   until: string
   reason: string | null
 }
+
+// ─── The Student Lounge (0042) ──────────────────────────────────────────────
+
+/** What a Lounge card is. `pulse` cards are written by ClassPoint, not a student. */
+export type LoungePostKind = 'text' | 'shoutout' | 'pulse'
+
+/** Which milestone a Class Pulse card announces. */
+export type PulseKind = 'level' | 'podium'
+
+/**
+ * One card in the feed.
+ *
+ * Author and target are DENORMALIZED on the row (0020's rule) so a realtime
+ * payload renders with no join and no second round-trip.
+ */
+export interface LoungePost {
+  id: string
+  kind: LoungePostKind
+  /** Null when the instructor wrote it. On a `pulse` card, the student it is about. */
+  authorStudentId: string | null
+  displayName: string
+  avatarUrl: string | null
+  /**
+   * Null when the post is hidden and you are not the instructor — the server
+   * withholds it rather than trusting the client not to draw it.
+   */
+  body: string | null
+  targetStudentId: string | null
+  targetDisplayName: string | null
+  targetAvatarUrl: string | null
+  pulseKind: PulseKind | null
+  pulseValue: number | null
+  wCount: number
+  replyCount: number
+  iGaveW: boolean
+  canDelete: boolean
+  pinnedAt: string | null
+  /** Non-null once auto-hidden by reports (0044). */
+  hiddenAt: string | null
+  createdAt: string
+}
+
+export interface LoungeReply {
+  id: string
+  authorStudentId: string | null
+  displayName: string
+  avatarUrl: string | null
+  body: string | null
+  canDelete: boolean
+  hiddenAt: string | null
+  createdAt: string
+}
+
+/** What the composer needs to show its counters without guessing. */
+export interface LoungeQuota {
+  postsLeft: number
+  shoutoutsLeft: number
+  wsLeft: number
+}
+
+/** One shoutout on someone's profile strip (7-day window). */
+export interface ShoutoutReceived {
+  id: string
+  displayName: string
+  avatarUrl: string | null
+  body: string
+  createdAt: string
+}
+
+/** Longest a post or reply may be (mirrors the DB CHECK and cp_lounge_clean). */
+export const MAX_POST_LENGTH = 600
+/** Text posts per rolling 24h (mirrors post_to_lounge). */
+export const MAX_POSTS_PER_DAY = 5
+/** Shoutouts per rolling 7 days, max one per classmate (mirrors post_shoutout). */
+export const MAX_SHOUTOUTS_PER_WEEK = 3
+/** Ws you can be holding at once, per rolling 24h (mirrors give_w). */
+export const MAX_WS_PER_DAY = 3
+
+// ─── Student Space messaging (0043) ─────────────────────────────────────────
+
+export type RoomKind = 'section' | 'global' | 'dm'
+
+/**
+ * The six reactions, as CODE → GLYPH.
+ *
+ * ⚠ The DATABASE stores the code, never the emoji. Several glyphs carry a
+ * variation selector (❤️ is U+2764 U+FE0F), so a CHECK against the character
+ * itself fails the moment any layer normalises the string — and the reaction
+ * silently does not save. This map is the only place the glyph appears, which
+ * also means changing one is a client edit rather than a migration.
+ */
+export const CHAT_REACTIONS = {
+  like: '👍',
+  lol: '😂',
+  fire: '🔥',
+  wow: '😮',
+  sad: '😢',
+  love: '❤️',
+} as const
+
+export type ReactionCode = keyof typeof CHAT_REACTIONS
+
+/** Order shown in the reaction bar. */
+export const REACTION_ORDER: ReactionCode[] = ['like', 'lol', 'fire', 'wow', 'sad', 'love']
+
+export interface SpaceRoom {
+  id: string
+  kind: RoomKind
+  /** 'Global', the section name, or the other person in a DM. */
+  name: string
+  slowModeSeconds: number
+  announceOnly: boolean
+  pinnedMessageId: string | null
+  muted: boolean
+  lastMessageAt: string | null
+  lastMessageBy: string | null
+  lastMessageBody: string | null
+  memberCount: number
+}
+
+export interface SpaceMessage {
+  id: string
+  /** Null when the instructor sent it. */
+  authorStudentId: string | null
+  displayName: string
+  avatarUrl: string | null
+  /**
+   * Null for a tombstone (deleted) or a hidden message you may not read. The
+   * server withholds it; the client never receives text it should not draw.
+   */
+  body: string | null
+  replyToId: string | null
+  replyToName: string | null
+  replyToExcerpt: string | null
+  mentionsMe: boolean
+  canDelete: boolean
+  /** code → count, e.g. { fire: 3, lol: 1 }. */
+  reactions: Partial<Record<ReactionCode, number>>
+  /** The codes YOU reacted with. */
+  myReactions: ReactionCode[]
+  hiddenAt: string | null
+  deletedAt: string | null
+  createdAt: string
+}
+
+/** Longest a chat message may be — same limit and normaliser as a Lounge post. */
+export const MAX_MESSAGE_LENGTH = 600

@@ -24,6 +24,18 @@ const Leaderboard = lazy(() =>
   import('@/features/student/Leaderboard').then((m) => ({ default: m.Leaderboard })),
 )
 const Profile = lazy(() => import('@/features/student/Profile').then((m) => ({ default: m.Profile })))
+const Chats = lazy(() =>
+  import('@/features/space/Chats').then((m) => ({ default: m.Chats })),
+)
+const ChatRoom = lazy(() =>
+  import('@/features/space/ChatRoom').then((m) => ({ default: m.ChatRoom })),
+)
+const Lounge = lazy(() =>
+  import('@/features/space/Lounge').then((m) => ({ default: m.Lounge })),
+)
+const LoungePostDetail = lazy(() =>
+  import('@/features/space/LoungePostDetail').then((m) => ({ default: m.LoungePostDetail })),
+)
 const StudentSpace = lazy(() =>
   import('@/features/space/StudentSpace').then((m) => ({ default: m.StudentSpace })),
 )
@@ -127,6 +139,10 @@ export const router = createBrowserRouter([
           { path: 'spenders', element: <SpendBoard /> },
           { path: 'profile', element: <Profile /> },
           { path: 'space', element: <StudentSpace /> },
+          { path: 'space/lounge', element: <Lounge /> },
+          { path: 'space/chats', element: <Chats /> },
+          { path: 'space/chat/:roomId', element: <ChatRoom /> },
+          { path: 'space/post/:postId', element: <LoungePostDetail /> },
         { path: 'achievements', element: <Achievements /> },
         ],
       },

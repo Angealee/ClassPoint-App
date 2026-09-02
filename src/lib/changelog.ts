@@ -401,6 +401,27 @@ export const DRAFT_5_0_0: ChangelogEntry = {
         'Student Space is in beta. If your section is in it you will see a BETA tag; if not, it says Soon.',
       ],
     },
+    {
+      heading: 'The Student Lounge',
+      major: true,
+      items: [
+        'Post what you like, reply to anyone, and give a W to the posts worth backing — you get 3 Ws at a time, so spend them on something good.',
+        'Shout out a classmate: 3 a week, one per person. They get a notification and it sits on their profile for a week.',
+        'Level-ups and a new #1 post themselves to the feed automatically.',
+        'Latest shows everything newest-first. Trending shows the most-W’d posts of the last 7 days.',
+      ],
+    },
+    {
+      heading: 'Chats',
+      major: true,
+      items: [
+        'A room for your section, a Global room with your instructor in it, and private DMs.',
+        'Reply to a message, react with an emoji, and @mention someone to get their attention.',
+        'No read receipts — nobody can see whether you have read a message, including your instructor.',
+        'DMs are private. Your instructor can only review a thread if it gets reported, and that leaves a record.',
+        'Mute any room you do not want notifications from.',
+      ],
+    },
   ],
 }
 

@@ -131,11 +131,11 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   should show only `as $$`, in equal number to `$$;`.
 - **Migration before client, always.** A migration adding a column the client selects
   must land in the database BEFORE the build that selects it, or every read 400s.
-  **ALL migrations 0001–0041 are APPLIED as of 2026-09-02** (confirmed by the user; 0041 was pasted twice to prove idempotency).
+  **ALL migrations 0001–0041 are APPLIED as of 2026-09-02** (confirmed by the user; 0041 was pasted twice to prove idempotency). **0042 and 0043 are WRITTEN AND NOT YET APPLIED** — until they are, /app/space/lounge and /app/space/chats show their error states and every Lounge/messaging RPC 404s. Paste them in order.
   The long "0033–0040 are unapplied / this one is LOUD" warning that used to live here
   is gone because it was describing a state that no longer exists — and a stale warning
   is worse than none, since the next reader cannot tell which half is still true.
-  **Next number: 0042.**
+  **Next number: 0044.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -1315,6 +1315,110 @@ control and `max-w-34` belongs on the box that lays out.
 silently failing to reach the element that acts on it. Worth checking any primitive that
 wraps its control in a layout div — the caller's `className` may not be landing where they
 think it is.
+
+
+Since 0042 (The Student Lounge — Student Space Phase 3): `lounge_posts` (one shared
+feed, semester-scoped by the 0029 default), `lounge_ws`, `lounge_replies`. All three are
+SELECT-only to authenticated; every write goes through a `security definer` RPC, so the
+banned-word filter (reused from 0020, one word list), the rate limits and the 0041 timeout
+cannot be skipped. Deletion is SOFT throughout.
+
+**Only `lounge_posts` is published to realtime, and that is a design choice not an
+omission.** `w_count` and `reply_count` are trigger-maintained columns ON the post, so a W
+or a reply fires an UPDATE on the post — publishing the other two tables would triple the
+traffic to learn the same fact. The client therefore subscribes to one table for three
+kinds of change.
+
+**New posts never splice into the list.** A realtime INSERT only increments a counter,
+which surfaces as a "N new posts" pill; the list changes when the reader asks. Content
+shifting mid-read is how you tap the wrong post’s W button on a phone. The UPDATE handler
+patches ONLY `w_count`/`reply_count`/`hidden_at`/`pinned_at` from the payload — `i_gave_w`
+and `can_delete` are computed PER VIEWER by the RPC and do not exist on the raw row, so
+spreading the payload blind would wipe them (the same trap StudentData documents for
+`lifetime_points`).
+
+**Limits, mirrored in types.ts:** 600 chars · 5 text posts/24h · 3 shoutouts/7 days with
+at most one per classmate · 3 Ws. The W allowance counts LIVE rows, so un-W-ing REFUNDS
+it — three a day with no undo would make a mis-tap cost a third of the allowance. Read it
+as "you can be backing three posts at a time". `post_to_lounge` also carries a DUPLICATE
+GUARD (same body, same student, 5 minutes): a retry after a timeout that actually
+succeeded would otherwise burn one of five with no edit available.
+
+**A hidden post loses its BODY server-side** (`case when hidden_at is not null and not
+is_instructor()`), in all four feed functions. Returning the text and trusting the client
+not to draw it would make moderation a rendering preference. 0044 sets `hidden_at`.
+
+**Class Pulse triggers hang off the TABLE, never the function.**
+`refresh_leaderboard_snapshot` has changed owner three times (0023→0029→0037→0038), each
+move re-copying a growing body; `trg_pulse_podium` on `leaderboard_snapshot` gets the same
+signal with nothing to drift from. Its guard `OLD.rank is not distinct from 1` is
+load-bearing: the 0038 upsert sets `rank = excluded.rank` on every refresh, so `update of
+rank` fires twice a day for everyone and without that line the feed would fill with "X is
+now #1" forever. Both triggers no-op entirely while no section has `space_enabled`, so
+opening the beta later does not reveal months of backlog. Voice is NEUTRAL AND FACTUAL
+(the user’s call).
+
+**`list_lounge_classmates()` exists because `listStudents` must never be called from the
+student app** — that one joins `student_secrets` to merge claim tokens for the
+instructor’s roster, so using it to build a shoutout picker would ship every classmate’s
+claim token over the wire. The RPC returns id/display_name/avatar_url and nothing else.
+
+Client: `src/lib/api/lounge.ts`; `components/space/` (PostCard, PostComposer, WButton,
+BetaBanner, AstronautArt); `/app/space/lounge` and `/app/space/post/:postId`. The post
+detail is a ROUTE, not a sheet, because the shoutout notification needs somewhere to
+point. Pinned posts come from their OWN function and are EXCLUDED from the chronological
+query — folding them in means either a duplicate or a cursor that special-cases page one.
+
+
+Since 0043 (Student Space messaging — Phase 4): `space_rooms` (one per beta section, one
+`global` per semester, plus `dm`), `space_room_members` (DM rooms ONLY — section and global
+membership is derived, so there are no rows to fall out of sync when a student is promoted),
+`space_messages`, `space_message_reactions`, `space_mentions`, `space_room_prefs`.
+
+**THE DM PROMISE IS THE SHAPE OF `cp_can_read_room()`.** Its `dm` branch resolves to
+membership and the instructor branch deliberately does NOT cover it — so RLS gives the
+instructor nothing in a DM they are not in. Their only path is `read_dm_thread()`, which
+writes an `audit_log` row BEFORE returning a message. Widening that one `or` would silently
+void the promise the DM screen makes to students, app-wide, with nothing failing. 0043’s
+verify step 2 tests exactly this.
+
+**There is no read-receipt column anywhere, and that is why "no seen" is true rather than
+merely unimplemented** — a column that exists gets rendered eventually. Unread lives in
+`src/lib/unread.ts` as a localStorage pointer compared against `space_rooms.last_message_at`.
+Its two load-bearing rules, both pinned: the pointer NEVER moves backwards (two tabs would
+otherwise resurrect a cleared badge), and `unreadDividerIndex` returns -1 when EVERY message
+is unseen — a "New messages" line at index 0 has nothing above it and reads as a bug.
+
+**Reactions are stored as CODES (‘like’, ‘fire’…), never as the emoji.** ❤️ is U+2764 plus a
+variation selector, so a CHECK against the glyph fails the moment any layer normalises the
+string and the reaction silently does not save. `CHAT_REACTIONS` in types.ts is the only
+place a glyph appears, which also makes changing one a client edit rather than a migration.
+
+**`space_message_reactions.room_id` is denormalized for realtime, not for reads.** A
+`postgres_changes` filter is single-column equality, so without it every reaction anywhere
+would be pushed to every open room. Two tables are published here where the Lounge
+publishes one — the trade differs because a chat subscription is scoped to ONE room and
+filtered, so its traffic is bounded.
+
+**@mentions are resolved by the CLIENT and validated by the server.** `send_message` takes
+`uuid[]`; parsing the body in SQL would mean the database guessing which "Maria" was meant.
+`src/lib/mentions.ts` CONSUMES each match as it is found — sorting longest-first is not
+enough on its own, and without consumption "@Maria Santos" resolves to both Maria Santos
+AND Maria, pushing to the wrong person. Its own test caught that.
+
+**The chat composer uses `StickyBar`, not a bounded flex column.** The plan called for
+`h-[calc(100dvh-…)]`, which needs a number that must agree with Shell’s paddings on two
+breakpoints. `StickyBar` (`sticky bottom-19 md:bottom-4`) already exists for exactly this
+and keeps the tab-bar height in one place. Measured at 375×812: composer clears the last
+message with no overlap and sits inside the viewport.
+
+`cp_room_post_block()` returns the REASON a student cannot post (space state, timeout,
+announce-only, slow mode) or null — one answer, so the composer’s disabled state and the
+send itself can never disagree. **The timeout exception lives there**: a muted student may
+still post in a DM whose members include the instructor, because otherwise their only way
+to appeal a mute is in person.
+
+Retention: `cp_purge_space_messages()` daily at 03:25 UTC, 90 days.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

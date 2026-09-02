@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { AstronautArt } from '@/components/space/AstronautArt'
@@ -119,9 +120,9 @@ function PausedView() {
 }
 
 /**
- * The hub. In Phase 2 the Lounge and chats do not exist yet, so it announces
- * them rather than pretending — the placeholder cards become the real entry
- * points in Phases 3 and 4.
+ * The hub: the two rooms of Student Space. Chats is still a placeholder until
+ * Phase 4 — announced rather than hidden, so the shape of the place is legible
+ * before it is finished.
  */
 function OpenView() {
   const { spaceAccess } = useStudentData()
@@ -144,20 +145,35 @@ function OpenView() {
         </Card>
       )}
 
-      <Card pad="roomy">
-        <div className="flex flex-col items-center gap-4 py-6 text-center">
-          <AstronautArt variant="space" size="lg" />
-          <div className="space-y-1.5">
-            <p className="font-display text-lg font-bold">You&apos;re in</p>
-            <p className="mx-auto max-w-sm text-sm text-muted">
-              Welcome to the beta. The Lounge and chats are landing next — this is where
-              they&apos;ll show up.
-            </p>
+      <Link to="/app/space/lounge" className="block">
+        <Card pad="roomy" interactive>
+          <div className="flex items-center gap-4">
+            <AstronautArt variant="lounge" size="md" />
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-lg font-bold">Student Lounge</p>
+              <p className="text-sm text-muted">
+                Post, give a W, shout out a classmate.
+              </p>
+            </div>
+            <span className="shrink-0 text-lg text-muted">›</span>
           </div>
-        </div>
-      </Card>
+        </Card>
+      </Link>
 
-      <WhatsComing />
+      <Link to="/app/space/chats" className="block">
+        <Card pad="roomy" interactive>
+          <div className="flex items-center gap-4">
+            <AstronautArt variant="space" size="md" />
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-lg font-bold">Chats</p>
+              <p className="text-sm text-muted">
+                Your section, the whole class, and direct messages.
+              </p>
+            </div>
+            <span className="shrink-0 text-lg text-muted">›</span>
+          </div>
+        </Card>
+      </Link>
     </div>
   )
 }
