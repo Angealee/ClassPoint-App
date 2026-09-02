@@ -11,6 +11,7 @@ import {
 import { useAuth } from '@/lib/auth'
 import {
   getAchievementProgress,
+  getSpaceAccess,
   getActiveSemester,
   getActiveSessionForStudent,
   getLeaderboardSnapshot,
@@ -36,6 +37,7 @@ import {
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { configureTermCalendar } from '@/lib/term'
+import { SPACE_ACCESS_UNKNOWN, type SpaceAccess } from '@/lib/space-gate'
 import { getLevelProgress } from '@/lib/leveling'
 import { useToast } from '@/components/ui/Toast'
 import { initSound, playSound } from '@/lib/sound'
@@ -55,7 +57,7 @@ import type {
   StudentSelf,
 } from '@/lib/types'
 
-interface StudentDataValue {
+export interface StudentDataValue { // PROBE-TEMP
   loading: boolean
   error: boolean
   me: StudentSelf | null
@@ -164,9 +166,18 @@ interface StudentDataValue {
   unreadCount: number
   /** Mark every notification read (bell sheet open); clears the badge. */
   markAllRead: () => Promise<void>
+  /**
+   * Whether Student Space is open to this student (0041), decided server-side.
+   *
+   * Lives here rather than in a Space-only provider because the ACCOUNT MENU
+   * reads it, and the menu renders outside the /app/space subtree. Everything
+   * else about Student Space — posts, rooms, unread counts — belongs to its own
+   * provider, so a chat message never re-renders the Dashboard.
+   */
+  spaceAccess: SpaceAccess
 }
 
-const StudentDataContext = createContext<StudentDataValue | undefined>(undefined)
+export const StudentDataContext = createContext<StudentDataValue | undefined>(undefined) // PROBE-TEMP
 
 /**
  * How long the tab must be hidden before coming back counts as "might have
@@ -217,6 +228,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   // Achievements queued to celebrate, shown one at a time (oldest first).
   const [unlockQueue, setUnlockQueue] = useState<Achievement[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const [spaceAccess, setSpaceAccess] = useState<SpaceAccess>(SPACE_ACCESS_UNKNOWN)
 
   // Tracks the level/rank we last reflected, to detect changes.
   const levelRef = useRef<number | null>(null)
@@ -457,6 +469,10 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         // Bell badge — independent of the main load; failures just keep the
         // last-known count.
         void getUnreadNotificationCount(mine.id).then(setUnreadCount).catch(() => {})
+        // Off the critical path like achievements: the gate failing must not
+        // stop the dashboard rendering, and getSpaceAccess already degrades to
+        // locked rather than throwing.
+        void getSpaceAccess().then(setSpaceAccess).catch(() => {})
         // Is class running right now? Independent of the main load — a failure
         // just leaves the banner hidden, never blocks the dashboard.
         void getActiveSessionForStudent(mine.section_id)
@@ -1054,9 +1070,10 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       setPinnedAchievements: setPinnedAchievementsField,
       unreadCount,
       markAllRead,
+      spaceAccess,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loading, error, me, sections, leaderboard, capturedAt, events, awayEvents, clearAwayRecap, live, rank, sectionName, load, saveProfile, saveAvatar, clearAvatar, saveBanner, saveHeader, clearHeader, saveHeaderPos, removeBanner, levelUp, clearLevelUp, achievements, achievementsLoading, achievementsError, retryAchievements, attendanceTick, liveSession, liveStatus, semesterEnded, attendance, attendanceLoading, achievementProgress, unlockedAchievement, clearUnlockedAchievement, syncMyAchievements, hasUnseenAchievements, markAchievementsSeen, setDisplayTitleField, setPinnedAchievementsField, unreadCount, markAllRead],
+    [loading, error, me, sections, leaderboard, capturedAt, events, awayEvents, clearAwayRecap, live, rank, sectionName, load, saveProfile, saveAvatar, clearAvatar, saveBanner, saveHeader, clearHeader, saveHeaderPos, removeBanner, levelUp, clearLevelUp, achievements, achievementsLoading, achievementsError, retryAchievements, attendanceTick, liveSession, liveStatus, semesterEnded, attendance, attendanceLoading, achievementProgress, unlockedAchievement, clearUnlockedAchievement, syncMyAchievements, hasUnseenAchievements, markAchievementsSeen, setDisplayTitleField, setPinnedAchievementsField, unreadCount, markAllRead, spaceAccess],
   )
 
   return (

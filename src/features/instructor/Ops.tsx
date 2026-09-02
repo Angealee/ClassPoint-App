@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
-import { CalendarIcon } from '@/components/ui/icons'
+import { CalendarIcon, SaturnIcon } from '@/components/ui/icons'
 import {
   forceLeaderboardRefresh,
   getBackupHealth,
@@ -58,6 +58,7 @@ export function Ops() {
       />
 
       <SemestersCard />
+      <SpaceCard />
 
       {/* Acting-on-students first, inspection below — the order you'd want on
           a Monday morning. */}
@@ -416,6 +417,36 @@ function AuditLogCard() {
         </>
       )}
     </Card>
+  )
+}
+
+/**
+ * Entry point to /teach/space — the Student Space beta controls.
+ *
+ * Same reasoning as SemestersCard: admin work belongs beside backup health and
+ * the audit log, not in the daily tab bar. And routes.test.ts enforces it —
+ * this link is the ONLY way in, which is exactly the shape that orphaned two
+ * screens in production before.
+ */
+function SpaceCard() {
+  const navigate = useNavigate()
+  return (
+    <button
+      type="button"
+      onClick={() => navigate('/teach/space')}
+      className="flex w-full items-center gap-3 rounded-2xl border border-line bg-card p-4 text-left transition-colors hover:bg-card-2"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-solid/10 text-accent">
+        <SaturnIcon className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">Student Space</span>
+        <span className="block text-sm text-muted">
+          Who is in the beta, muted students, and the switch that turns it all off.
+        </span>
+      </span>
+      <span className="shrink-0 text-lg text-muted">›</span>
+    </button>
   )
 }
 

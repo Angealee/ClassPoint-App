@@ -69,6 +69,8 @@ export interface Database {
         created_at: Timestamp
         /** 0027 */
         semester_id: UUID
+        /** 0041 — the Student Space beta roster. */
+        space_enabled: boolean
       }>
 
       students: Row<{
@@ -312,6 +314,29 @@ export interface Database {
         student_id: UUID | null
         summary: string | null
         row_data: unknown
+      }>
+
+      /**
+       * 0041 — feature flags. NO RLS policy at all: reachable only through the
+       * SECURITY DEFINER functions, like leaderboard_banned_words. Declared
+       * here for completeness; the client never selects from it.
+       */
+      app_flags: Row<{
+        key: string
+        enabled: boolean
+        note: string | null
+        updated_at: Timestamp
+        updated_by: UUID | null
+      }>
+
+      /** 0041 — Student Space mutes. Own rows selectable; writes via RPC only. */
+      space_timeouts: Row<{
+        id: UUID
+        student_id: UUID
+        until: Timestamp
+        reason: string | null
+        created_by: UUID | null
+        created_at: Timestamp
       }>
 
       /** 0026 — the auth trail AND the rate-limit counter. */

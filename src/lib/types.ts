@@ -766,3 +766,30 @@ export interface PastLeaderboardEntry {
   rank: number
   avatarUrl: string | null
 }
+
+// ─── Student Space (0041) ───────────────────────────────────────────────────
+
+/**
+ * One section's beta membership, for /teach/space.
+ *
+ * `SpaceAccess` — the student-facing shape — deliberately lives in
+ * lib/space-gate.ts instead of here, beside the functions that interpret it.
+ * It is the one type in the app whose meaning is inseparable from its rules.
+ */
+export interface SpaceAdminSection {
+  sectionId: string
+  sectionName: string
+  spaceEnabled: boolean
+  /** Active students, so the roster shows what enabling a section costs. */
+  studentCount: number
+}
+
+/** A live mute. Lapsed timeouts stay in the table but are never listed. */
+export interface SpaceTimeout {
+  studentId: string
+  displayName: string
+  sectionName: string | null
+  /** ISO — when the mute lifts. */
+  until: string
+  reason: string | null
+}

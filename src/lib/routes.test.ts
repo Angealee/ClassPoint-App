@@ -73,6 +73,7 @@ const MUST_BE_LINKED = [
   '/app/spenders',
   // Instructor
   '/teach/ops',
+  '/teach/space',
   '/teach/redemptions',
   '/teach/semesters',
 ]

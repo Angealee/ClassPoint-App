@@ -1,4 +1,6 @@
 import { Suspense, lazy, type ReactNode } from 'react'
+import { ProbeSpace } from '@/features/ProbeSpace' // PROBE-TEMP
+import { InstructorSpace as ProbeInstructorSpace } from '@/features/instructor/InstructorSpace' // PROBE-TEMP
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { RedirectIfAuthed, RequireRole } from '@/features/auth/guards'
 import { Splash } from '@/components/layout/Splash'
@@ -24,8 +26,11 @@ const Leaderboard = lazy(() =>
   import('@/features/student/Leaderboard').then((m) => ({ default: m.Leaderboard })),
 )
 const Profile = lazy(() => import('@/features/student/Profile').then((m) => ({ default: m.Profile })))
-const SpaceComingSoon = lazy(() =>
-  import('@/features/space/SpaceComingSoon').then((m) => ({ default: m.SpaceComingSoon })),
+const StudentSpace = lazy(() =>
+  import('@/features/space/StudentSpace').then((m) => ({ default: m.StudentSpace })),
+)
+const InstructorSpace = lazy(() =>
+  import('@/features/instructor/InstructorSpace').then((m) => ({ default: m.InstructorSpace })),
 )
 const Achievements = lazy(() =>
   import('@/features/student/Achievements').then((m) => ({ default: m.Achievements })),
@@ -123,7 +128,7 @@ export const router = createBrowserRouter([
           { path: 'history', element: <PointsHistory /> },
           { path: 'spenders', element: <SpendBoard /> },
           { path: 'profile', element: <Profile /> },
-          { path: 'space', element: <SpaceComingSoon /> },
+          { path: 'space', element: <StudentSpace /> },
         { path: 'achievements', element: <Achievements /> },
         ],
       },
@@ -146,6 +151,7 @@ export const router = createBrowserRouter([
           { path: 'redemptions', element: <Redemptions /> },
           { path: 'semesters', element: <ManageSemesters /> },
           { path: 'ops', element: <Ops /> },
+          { path: 'space', element: <InstructorSpace /> },
           { path: 'student/:studentId', element: <StudentRecord /> },
           { path: 'history', element: <History /> },
           { path: 'leaderboard', element: <InstructorLeaderboard /> },
@@ -164,4 +170,6 @@ export const router = createBrowserRouter([
       },
     ],
   },
+  { path: '/__probe/:state', element: <ProbeSpace /> }, // PROBE-TEMP
+  { path: '/__probe-instr', element: <div className="mx-auto w-full max-w-2xl px-4 py-5"><ProbeInstructorSpace /></div> }, // PROBE-TEMP
 ])

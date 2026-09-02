@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { NavLink } from 'react-router-dom'
 import type { NavItem } from '@/components/layout/Shell'
 import { IdentityBlock, SettingsRow, SignOutRow, type AccountActions } from './AccountMenu'
-import { Chip } from '@/components/ui/Chip'
 import { XIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 
@@ -197,11 +196,3 @@ export function MobileMenu({
   )
 }
 
-/** The BETA chip the Student Space nav row carries. */
-export function BetaChip() {
-  return (
-    <Chip tone="accent" size="sm">
-      BETA
-    </Chip>
-  )
-}

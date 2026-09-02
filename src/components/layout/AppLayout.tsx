@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
 import { SidebarAccount } from '@/components/layout/AccountMenu'
-import { BetaChip, MobileMenu } from '@/components/layout/MobileMenu'
+import { MobileMenu } from '@/components/layout/MobileMenu'
 import { StudentDataProvider, useStudentData } from '@/features/student/StudentData'
 import { LevelUpBurst } from '@/components/ui/LevelUpBurst'
 import { AchievementUnlockBurst } from '@/components/achievements/AchievementUnlockBurst'
@@ -14,6 +14,8 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useAuth } from '@/lib/auth'
 import { useIsDesktop } from '@/lib/useIsDesktop'
 import { LATEST_VERSION, setSeenVersion } from '@/lib/changelog'
+import { spaceChip } from '@/lib/space-gate'
+import { Chip } from '@/components/ui/Chip'
 import {
   BellIcon,
   HomeIcon,
@@ -99,7 +101,7 @@ function NotificationBell() {
  * nothing and both could open at once. See lib/useIsDesktop.ts.
  */
 function StudentShell() {
-  const { hasUnseenAchievements } = useStudentData()
+  const { hasUnseenAchievements, spaceAccess } = useStudentData()
   const { signOut } = useAuth()
   const isDesktop = useIsDesktop()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -115,17 +117,23 @@ function StudentShell() {
     setSignOutOpen(true)
   }
 
-  const nav = useMemo<NavItem[]>(
-    () =>
-      SIDEBAR_NAV.map((item) => ({
-        ...item,
-        badge: item.to === '/app/space' ? <BetaChip /> : undefined,
-        // The unseen-achievements dot follows the trophy case, which lives on
-        // Profile.
-        dot: item.to === '/app/profile' ? hasUnseenAchievements : undefined,
-      })),
-    [hasUnseenAchievements],
-  )
+  const nav = useMemo<NavItem[]>(() => {
+    const chip = spaceChip(spaceAccess.state)
+    return SIDEBAR_NAV.map((item) => ({
+      ...item,
+      // BETA / Paused / Soon — whichever the server says. Hardcoding BETA here
+      // would tell a locked student they are in a beta they cannot open.
+      badge:
+        item.to === '/app/space' ? (
+          <Chip tone={chip.tone} size="sm">
+            {chip.label}
+          </Chip>
+        ) : undefined,
+      // The unseen-achievements dot follows the trophy case, which lives on
+      // Profile.
+      dot: item.to === '/app/profile' ? hasUnseenAchievements : undefined,
+    }))
+  }, [hasUnseenAchievements, spaceAccess.state])
 
   const tabNav = useMemo<NavItem[]>(
     () => [
