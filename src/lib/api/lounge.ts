@@ -5,6 +5,7 @@ import type {
   LoungeReply,
   PulseKind,
   ShoutoutReceived,
+  SpacePerson,
 } from '@/lib/types'
 
 // ============================================================================
@@ -206,22 +207,34 @@ export async function listShoutoutsFor(studentId: string): Promise<ShoutoutRecei
 }
 
 /**
- * The shoutout picker's roster: everyone in a beta section but you.
+ * Everyone in Student Space, with the game facts the social surfaces draw
+ * beside a name: level (from points), rank, and section.
  *
  * ⚠ Deliberately NOT `listStudents` — that one joins `student_secrets` to merge
  * claim tokens for the instructor's roster, so calling it from the student app
  * would ship every classmate's claim token over the wire to build a name list.
- * This RPC returns three columns and nothing else.
+ *
+ * INCLUDES the caller. One fetch per screen feeds the XP ring, the rank medal,
+ * the section dot AND mention resolution; the shoutout picker filters itself
+ * out, which is a one-line concern there rather than a second round-trip here.
  */
-export async function listLoungeClassmates(): Promise<
-  { id: string; displayName: string; avatarUrl: string | null }[]
-> {
-  const rows = await rpc<{ id: string; display_name: string; avatar_url: string | null }[]>(
-    'list_lounge_classmates',
-  )
+export async function listSpacePeople(): Promise<SpacePerson[]> {
+  const rows = await rpc<
+    {
+      id: string
+      display_name: string
+      avatar_url: string | null
+      semester_points: number
+      section_id: string | null
+      rank: number | null
+    }[]
+  >('get_space_people')
   return (rows ?? []).map((r) => ({
     id: r.id,
     displayName: r.display_name,
     avatarUrl: r.avatar_url,
+    semesterPoints: r.semester_points ?? 0,
+    sectionId: r.section_id,
+    rank: r.rank,
   }))
 }

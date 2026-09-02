@@ -8,7 +8,7 @@ describe('looksLikeArt', () => {
       "   .-''`      `''-.",
       "  /   .-'''-.      \\",
       " |  .'       '.    |",
-      "  \  '._____.'    /",
+      "  \\  '._____.'    /",
       "   '-.._______..-'",
     ].join('\n')
     expect(looksLikeArt(art)).toBe(true)
@@ -32,7 +32,7 @@ describe('looksLikeArt', () => {
   })
 
   it('ignores anything too short to be a drawing', () => {
-    expect(looksLikeArt('/\\n\/')).toBe(false)
+    expect(looksLikeArt('/\\\n\\/')).toBe(false)
   })
 })
 

@@ -28,6 +28,7 @@ import { supabase, uniqueChannel } from '@/lib/supabase'
 import { errorText } from '@/lib/errors'
 import { resolveMentions, type MentionCandidate } from '@/lib/mentions'
 import { getLastRead, markRead, unreadDividerIndex } from '@/lib/unread'
+import { getLevelProgress } from '@/lib/leveling'
 import { noteTyping, shouldBroadcast, typingLabel, type TypingEntry } from '@/lib/typing'
 import { Sheet } from '@/components/ui/Sheet'
 import { Avatar } from '@/components/ui/Avatar'
@@ -583,6 +584,90 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
           </StickyBar>
         </>
       )}
+
+      {/* Tapping an avatar. Three things, all of which already exist elsewhere —
+          this is a shortcut, not a new feature. */}
+      <Sheet
+        open={!!personTarget}
+        onClose={() => setPersonTarget(null)}
+        title={personTarget?.displayName ?? 'Person'}
+      >
+        <div className="space-y-3 pb-2">
+          {(() => {
+            const t = personTarget
+            const person = t?.authorStudentId ? peopleById.get(t.authorStudentId) : undefined
+            if (!t) return null
+            return (
+              <>
+                <div className="flex items-center gap-3 rounded-2xl border border-line bg-card p-3">
+                  <Avatar
+                    name={t.displayName}
+                    url={t.avatarUrl}
+                    className="h-12 w-12"
+                    textClassName="text-base"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-display text-base font-bold">{t.displayName}</p>
+                    <p className="text-xs text-muted">
+                      {person
+                        ? `Lv ${getLevelProgress(person.semesterPoints).level}${
+                            person.rank ? ` · #${person.rank}` : ''
+                          }`
+                        : 'Instructor'}
+                    </p>
+                  </div>
+                </div>
+
+                {t.authorStudentId && (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        setPersonTarget(null)
+                        navigate(`/app/profile`)
+                      }}
+                      disabled={!myStudentId}
+                    >
+                      View profile
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        const id = t.authorStudentId
+                        setPersonTarget(null)
+                        if (!id) return
+                        void startDm(id)
+                          .then((room) => navigate(`${basePath}/chat/${room}`))
+                          .catch((e) =>
+                            toast(errorText(e, 'Could not open that conversation.'), 'error'),
+                          )
+                      }}
+                    >
+                      Message
+                    </Button>
+                  </>
+                )}
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    // Drops "@Name " into the composer rather than opening an
+                    // autocomplete — the mention resolver matches on the name,
+                    // so typing it by hand and tapping here are the same thing.
+                    setBody((b) => `${b}${b && !b.endsWith(' ') ? ' ' : ''}@${t.displayName} `)
+                    setPersonTarget(null)
+                    areaRef.current?.focus()
+                  }}
+                >
+                  Mention
+                </Button>
+              </>
+            )
+          })()}
+        </div>
+      </Sheet>
 
       <ReportSheet
         open={!!reportTarget}

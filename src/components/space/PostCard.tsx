@@ -103,7 +103,7 @@ export function PostCard({
                   name={post.targetDisplayName}
                   url={post.targetAvatarUrl}
                   className="h-4 w-4"
-                  textClassName="text-[8px]"
+                  textClassName="text-2xs"
                 />
                 <span className="min-w-0 truncate font-medium text-ink">
                   {post.targetDisplayName}

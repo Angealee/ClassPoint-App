@@ -1555,6 +1555,65 @@ at opacity 0 and the over-limit border looked like `--line`. Inject
 `*{transition:none!important}` before reading colour or opacity, per the note in the Era 6.0
 Phase 6 section. Do not "fix" what is already right.
 
+Message rows — Instagram structure at Discord density (2026-09-02, no migration).
+Decisions (user): **Instagram inspo mixed with the Discord density already there** ·
+**left-aligned for everyone** · **ASCII art supported** · **Level and the XP ring only —
+no streak on a message row**.
+
+**The "cluttered highlighted my message" complaint was a BACKGROUND WASH, and the fix is
+that a run is one shape.** Own messages had a tinted background applied per message, so
+three consecutive lines read as three disconnected blocks. Ownership is now a **2px accent
+bar down the side**, and corners merge across a run (first rounds its top, last its bottom,
+middles square the left edge). Measured after: a continuation row is **32px**, a run-start
+row 46–48px.
+
+**Everyone is left-aligned, including you.** Right-aligning your own messages leaves each
+side ~78% of the column, and this room carries ASCII art and emoji walls that want the
+whole width. The avatar sits beside the **LAST** message of an incoming run, not the first
+— Instagram's arrangement, and it is the message the reply lands next to.
+
+**Per-message timestamps are gone; the room prints a centred divider on a ≥30-minute gap.**
+At this density a time on every row was more chrome than content.
+
+**Actions are a floating toolbar, absolutely positioned, so they cost the message no
+height.** Hover on mouse, **420ms long-press** on touch, with a **>8px pointermove
+cancelling the press** — without that, scrolling opens the toolbar of every message it
+passes. Measured: 12 toolbars in the DOM, 0 visible, 134×26 when opened and inside the
+viewport.
+
+**A mention is `info`, deliberately NOT `accent`.** Accent is already the bar down your own
+run, so an accent tint made someone else's message read as one of yours — and on a dark
+card a red wash reads as an error. Blue ring + blue tint is unambiguous against own
+(accent bar), instructor (gold ring) and hidden (danger).
+
+**The top-three rank is a tinted `#N`, not a 🥇.** UI chrome in this app uses icons rather
+than emoji, and at `text-2xs` a colour-emoji medal beside its own rank number rendered as a
+smudge followed by a redundant "1". Reaction glyphs stay emoji — those are content.
+
+**`src/lib/message-body.ts` + its test decide what becomes monospace.** Explicit ``` fences
+always win; otherwise a block is promoted when it is ≥50% line-art characters over ≥40
+non-space characters AND contains a newline. **The detector must never fire on an emoji
+wall** — emoji are not in the art class, so the ratio stays near zero, which is the property
+the test pins (a wall of 😂 in a scrollable mono block would look broken in a way nobody
+would report). Measured ratios: a drawn figure 0.97, a bar pattern 1.00, prose 0.04, emoji
+0.00. **The length floor was picked by measuring, not by feel** — at 60 it rejected both
+real drawings in the fixtures (48 and 59 dense characters). An UNCLOSED fence stays literal
+text rather than swallowing the rest of the message. The mono block owns its own
+`overflow-x-auto`, so art keeps its shape and still cannot push the page sideways.
+
+**`get_space_people()` replaced `list_lounge_classmates`** — one roster fetch per room feeds
+the XP ring, the rank medal, the section dot AND mention resolution. `listStudents` must
+never be called from the student app: it joins `student_secrets` to merge claim tokens for
+the instructor's roster.
+
+**Type sizes in Space use the named steps only.** `text-[8px]`/`[9px]`/`[10px]`/`[11px]`
+crept back in while these screens were being built; they are `text-2xs` and `text-xs` now,
+per Era 6.0 Phase 4 (104 arbitrary sizes → 5 named steps, zero remaining).
+
+Verified by probe route at 375×812 in both themes (removed, residue-checked): no horizontal
+overflow (`scrollWidth === clientWidth === 375`), merged runs, long-press toolbar, mention
+ring, mono block. **Not verified on a real authenticated screen.**
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained

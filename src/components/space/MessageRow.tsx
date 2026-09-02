@@ -35,11 +35,18 @@ import {
 const LONG_PRESS_MS = 420
 const MOVE_CANCEL_PX = 8
 
-/** Gold, silver, bronze — matching the podium's ramp, flattened to one colour. */
-const MEDAL: Record<number, { glyph: string; className: string }> = {
-  1: { glyph: '🥇', className: 'text-gold-400' },
-  2: { glyph: '🥈', className: 'text-muted' },
-  3: { glyph: '🥉', className: 'text-warn' },
+/**
+ * Top-three rank, as a TINTED NUMBER rather than a 🥇.
+ *
+ * Two reasons the medal emoji lost: UI chrome in this app uses icons, not emoji
+ * (the user's standing call), and at `text-2xs` a colour-emoji medal beside its
+ * own rank number rendered as an unreadable smudge followed by a redundant "1".
+ * The number IS the rank, and the colour is the medal.
+ */
+const MEDAL: Record<number, string> = {
+  1: 'text-reward',
+  2: 'text-muted',
+  3: 'text-warn',
 }
 
 /**
@@ -53,7 +60,7 @@ function RingAvatar({ person, name, url }: { person?: SpacePerson; name: string;
   const pct = person ? getLevelProgress(person.semesterPoints).progressPct : 0
   return (
     <span className="relative block h-7 w-7">
-      <Avatar name={name} url={url} className="h-7 w-7" textClassName="text-[9px]" />
+      <Avatar name={name} url={url} className="h-7 w-7" textClassName="text-2xs" />
       {person && (
         <svg
           viewBox="0 0 32 32"
@@ -88,7 +95,7 @@ function Body({ body }: { body: string }) {
           // rewrapping into noise, and it still cannot push the page sideways.
           <pre
             key={i}
-            className="my-1 overflow-x-auto rounded-lg bg-canvas/70 px-2.5 py-2 font-mono text-[11px] leading-tight text-ink"
+            className="my-1 overflow-x-auto rounded-lg bg-canvas/70 px-2.5 py-2 font-mono text-xs leading-tight text-ink"
           >
             {p.content}
           </pre>
@@ -145,7 +152,7 @@ export function MessageRow({
 
   const startsRun = runPosition === 'first' || runPosition === 'only'
   const endsRun = runPosition === 'last' || runPosition === 'only'
-  const medal = person?.rank && person.rank <= 3 ? MEDAL[person.rank] : null
+  const medal = person?.rank != null && person.rank <= 3 ? MEDAL[person.rank] : null
 
   useEffect(() => {
     if (!pinned && !pickerOpen) return
@@ -224,13 +231,15 @@ export function MessageRow({
               {message.displayName}
             </span>
             {medal && (
-              <span className={cn('shrink-0 text-2xs', medal.className)} title={`#${person?.rank}`}>
-                {medal.glyph}
-                {person?.rank}
+              <span
+                className={cn('shrink-0 text-2xs font-bold tabular-nums', medal)}
+                title={`Rank ${person?.rank} on the leaderboard`}
+              >
+                #{person?.rank}
               </span>
             )}
             {isInstructor && (
-              <span className="shrink-0 rounded-full bg-gold-400/15 px-1.5 text-[9px] font-bold uppercase tracking-wide text-reward">
+              <span className="shrink-0 rounded-full bg-gold-400/15 px-1.5 text-2xs font-bold uppercase tracking-wide text-reward">
                 Instructor
               </span>
             )}
@@ -254,7 +263,11 @@ export function MessageRow({
                 'border-l-2 border-accent-solid bg-card pl-2.5'
               : 'bg-card',
             isInstructor && !mine && 'ring-1 ring-gold-400/25',
-            message.mentionsMe && 'bg-accent-solid/10',
+            // A mention is INFO ("this is addressed to you"), deliberately NOT
+            // accent: accent is already the bar down your OWN run, so an accent
+            // tint here made someone else's message read as one of yours — and
+            // on a dark card a red wash reads as an error besides.
+            message.mentionsMe && !mine && 'bg-info-solid/10 ring-1 ring-info-solid/40',
             hidden && 'bg-danger-solid/8',
             actionsVisible && 'bg-card-2',
           )}
@@ -295,7 +308,7 @@ export function MessageRow({
                     aria-label={`${CHAT_REACTIONS[code]} ${message.reactions[code]}`}
                     aria-pressed={isMine}
                     className={cn(
-                      'flex items-center gap-0.5 rounded-full border border-line px-1.5 py-0.5 text-[10px] font-semibold shadow-sm',
+                      'flex items-center gap-0.5 rounded-full border border-line px-1.5 py-0.5 text-2xs font-semibold shadow-sm',
                       isMine ? 'bg-accent-solid/15 text-accent' : 'bg-canvas text-muted',
                       !canReact && 'cursor-not-allowed opacity-60',
                     )}

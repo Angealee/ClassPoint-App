@@ -11,7 +11,8 @@ import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { BetaBanner } from '@/components/space/BetaBanner'
-import { listLoungeClassmates, listMyRooms, startDm } from '@/lib/api'
+import { listMyRooms, listSpacePeople, startDm } from '@/lib/api'
+import { useStudentDataOptional } from '@/features/student/StudentData'
 import { errorText } from '@/lib/errors'
 import { isRoomUnread } from '@/lib/unread'
 import { timeAgo } from '@/lib/time'
@@ -28,6 +29,7 @@ import type { SpaceRoom } from '@/lib/types'
  */
 export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
   const navigate = useNavigate()
+  const myStudentId = useStudentDataOptional()?.me?.id ?? null
   const { toast } = useToast()
 
   const [rooms, setRooms] = useState<SpaceRoom[]>([])
@@ -55,12 +57,14 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
 
   useEffect(() => {
     if (!pickerOpen || people.length > 0) return
-    void listLoungeClassmates()
-      .then(setPeople)
+    void listSpacePeople()
+      // The picker is for messaging SOMEONE ELSE. The RPC includes the caller
+      // because chat needs their own badges; here they are filtered out.
+      .then((rows) => setPeople(rows.filter((r) => r.id !== myStudentId)))
       .catch(() => {
         /* the picker stays empty */
       })
-  }, [pickerOpen, people.length])
+  }, [pickerOpen, people.length, myStudentId])
 
   async function openDm(targetId: string | null) {
     setStarting(true)

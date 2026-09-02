@@ -108,7 +108,7 @@ export function PostComposer({
             name={target.displayName}
             url={target.avatarUrl}
             className="h-5 w-5"
-            textClassName="text-[9px]"
+            textClassName="text-2xs"
           />
           <span className="min-w-0 flex-1 truncate text-sm font-medium">
             {target.displayName}

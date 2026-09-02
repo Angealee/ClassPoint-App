@@ -21,7 +21,7 @@ import {
   getLoungeQuota,
   getOpenEvent,
   giveW,
-  listLoungeClassmates,
+  listSpacePeople,
   postShoutout,
   postToLounge,
   type FeedCursor,
@@ -104,10 +104,12 @@ export function Lounge() {
   useEffect(() => {
     if (!me?.section_id) return
     let cancelled = false
-    void listLoungeClassmates()
+    void listSpacePeople()
       .then((rows) => {
         if (cancelled) return
-        setClassmates(rows)
+        // You cannot shout yourself out; the RPC includes you because chat
+        // needs your own badges.
+        setClassmates(rows.filter((r) => r.id !== me?.id))
       })
       .catch(() => {
         /* the picker just stays empty */
