@@ -355,9 +355,9 @@ language sql
 stable
 security definer
 set search_path = public
-as $
+as $$$$
   select case when public.is_instructor() then public.cp_space_flag() else null end;
-$;
+$$$$;
 
 grant execute on function public.get_space_flag() to authenticated;
 

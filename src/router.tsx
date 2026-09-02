@@ -1,6 +1,4 @@
 import { Suspense, lazy, type ReactNode } from 'react'
-import { ProbeSpace } from '@/features/ProbeSpace' // PROBE-TEMP
-import { InstructorSpace as ProbeInstructorSpace } from '@/features/instructor/InstructorSpace' // PROBE-TEMP
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { RedirectIfAuthed, RequireRole } from '@/features/auth/guards'
 import { Splash } from '@/components/layout/Splash'
@@ -170,6 +168,4 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  { path: '/__probe/:state', element: <ProbeSpace /> }, // PROBE-TEMP
-  { path: '/__probe-instr', element: <div className="mx-auto w-full max-w-2xl px-4 py-5"><ProbeInstructorSpace /></div> }, // PROBE-TEMP
 ])

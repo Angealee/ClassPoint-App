@@ -373,6 +373,37 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
 ]
 
+/**
+ * ── THE STUDENT SPACE ERA, STILL BEING BUILT ───────────────────────────────
+ * Accumulate sections here as phases land; move the whole entry into CHANGELOG
+ * only when the era is ready to announce.
+ *
+ * ⚠ It is exported but deliberately NOT in the CHANGELOG array. LATEST_VERSION
+ * reads CHANGELOG[0], so putting a draft in the array would fire the "What's
+ * new" sheet at every student mid-build — announcing a beta they cannot open.
+ *
+ * Trim before shipping. 4.0.0 went out at 6 sections / 19 bullets after being
+ * cut down from 19 / 72, and changelog.test.ts now caps the LIVE entry at
+ * 8 / 24. Most of what follows is instructor-only plumbing that has no business
+ * in a student's release notes.
+ */
+export const DRAFT_5_0_0: ChangelogEntry = {
+  version: '5.0.0',
+  date: '2026-09-02',
+  title: 'Student Space',
+  sections: [
+    {
+      heading: 'A menu, and a new place to go',
+      major: true,
+      items: [
+        'Profile, Settings and Student Space now live behind the Menu tab — tap your way in from anywhere.',
+        'On a computer they are all in the sidebar instead, with your name and level pinned to the bottom.',
+        'Student Space is in beta. If your section is in it you will see a BETA tag; if not, it says Soon.',
+      ],
+    },
+  ],
+}
+
 export const LATEST_VERSION = CHANGELOG[0]?.version ?? '0.0.0'
 
 const SEEN_KEY = 'cp_seen_changelog_version'

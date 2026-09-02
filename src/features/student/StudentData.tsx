@@ -57,7 +57,7 @@ import type {
   StudentSelf,
 } from '@/lib/types'
 
-export interface StudentDataValue { // PROBE-TEMP
+interface StudentDataValue {
   loading: boolean
   error: boolean
   me: StudentSelf | null
@@ -177,7 +177,7 @@ export interface StudentDataValue { // PROBE-TEMP
   spaceAccess: SpaceAccess
 }
 
-export const StudentDataContext = createContext<StudentDataValue | undefined>(undefined) // PROBE-TEMP
+const StudentDataContext = createContext<StudentDataValue | undefined>(undefined)
 
 /**
  * How long the tab must be hidden before coming back counts as "might have
