@@ -121,13 +121,21 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   Current manual state: Vault secret `edge_service_key` exists; VAPID keys are set as
   edge function secrets; pg_cron + pg_net enabled. **RESOLVED 2026-09-01, the hard way:** the `ALLOWED_ORIGINS` edge-function secret was set to the LITERAL PLACEHOLDER `https://<your-vercel-domain>`. A non-empty allowlist made `corsHeaders` take the configured branch and echo that string back as `Access-Control-Allow-Origin` — not a legal header value — so every browser failed the preflight and **claim-token and reset-pin were unreachable for every student**. The 0026 fail-safe only covered an UNSET secret; an unusable one was worse than none. `_shared/security.ts` now runs every entry through `parseOrigin()` (rejects `<>`/whitespace, requires http/https, normalises to `u.origin`) and falls back to `*` when nothing parses, so a bad value can only fail to TIGHTEN CORS. The real value is `https://ccs-classpoint.vercel.app`; redeploy `claim-token`, `reset-pin`, `send-push` after changing it.
 - The user pastes migrations whole into the SQL editor — test idempotency by running twice.
+- **NEVER build a migration body with `String.replace()`.** In a replacement STRING, `$$`
+  means "one literal `$`" — so a `create function … as $$ … $$;` inserted that way lands in
+  the file as `as $ … $;` and Postgres fails with `42601: syntax error at or near "$"`.
+  This shipped once in 0041 and was only caught when the file was pasted. Write SQL with
+  the Write tool, or pass a replacer FUNCTION (`() => 'as $$'`), which is not scanned for
+  `$` escapes. **$$ IN A GENERATED MIGRATION IS THE THING TO CHECK FIRST** when a pasted
+  file errors on a dollar sign: `grep -n '^as $*$' file | awk -F: '{print $2}' | sort | uniq -c`
+  should show only `as $$`, in equal number to `$$;`.
 - **Migration before client, always.** A migration adding a column the client selects
   must land in the database BEFORE the build that selects it, or every read 400s.
-  **ALL migrations 0001–0040 are APPLIED as of 2026-09-02** (confirmed by the user).
+  **ALL migrations 0001–0041 are APPLIED as of 2026-09-02** (confirmed by the user; 0041 was pasted twice to prove idempotency).
   The long "0033–0040 are unapplied / this one is LOUD" warning that used to live here
   is gone because it was describing a state that no longer exists — and a stale warning
   is worse than none, since the next reader cannot tell which half is still true.
-  **Next number: 0041.**
+  **Next number: 0042.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
