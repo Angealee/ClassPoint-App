@@ -1,5 +1,4 @@
 import { Suspense, lazy, type ReactNode } from 'react'
-import { ProbeMenu } from '@/features/ProbeMenu' // PROBE-TEMP
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { RedirectIfAuthed, RequireRole } from '@/features/auth/guards'
 import { Splash } from '@/components/layout/Splash'
@@ -161,5 +160,4 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  { path: '/__probe', element: <ProbeMenu /> }, // PROBE-TEMP
 ])

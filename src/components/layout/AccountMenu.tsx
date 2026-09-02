@@ -88,8 +88,12 @@ function LockedSpaceRow() {
   return (
     <div className={cn(ROW_SHELL, 'cursor-default text-muted')}>
       <span className="min-w-0 truncate">Student Space</span>
+      {/* "Soon", not "Coming soon". Measured in the 240px desktop sidebar: the
+          row is 205px, and the longer chip took 80 of it — leaving the label 81
+          where it needs 98, so "Student Space" truncated to "Student S…". A
+          one-word chip also pairs correctly with the "BETA" chip it becomes. */}
       <Chip tone="neutral" size="sm">
-        Coming soon
+        Soon
       </Chip>
     </div>
   )
