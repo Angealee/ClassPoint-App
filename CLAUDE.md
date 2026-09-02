@@ -131,11 +131,11 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   should show only `as $$`, in equal number to `$$;`.
 - **Migration before client, always.** A migration adding a column the client selects
   must land in the database BEFORE the build that selects it, or every read 400s.
-  **ALL migrations 0001–0041 are APPLIED as of 2026-09-02** (confirmed by the user; 0041 was pasted twice to prove idempotency). **0042, 0043 and 0044 are WRITTEN AND NOT YET APPLIED** — until they are, every Student Space screen past the hub shows its error state. Paste them IN ORDER: 0043 widens `audit_log_action_check` for `space_break_glass`, and 0044 widens it again for `space_moderate`.
+  **ALL migrations 0001–0041 are APPLIED as of 2026-09-02** (confirmed by the user; 0041 was pasted twice to prove idempotency). **0042, 0043, 0044 and 0045 are WRITTEN AND NOT YET APPLIED** — until they are, every Student Space screen past the hub shows its error state. Paste them IN ORDER, and order matters: 0043 and 0044 each widen `audit_log_action_check`, and 0045 widens `point_events_category_check`.
   The long "0033–0040 are unapplied / this one is LOUD" warning that used to live here
   is gone because it was describing a state that no longer exists — and a stale warning
   is worse than none, since the next reader cannot tell which half is still true.
-  **Next number: 0045.**
+  **Next number: 0046.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -1458,6 +1458,102 @@ on /teach/redemptions, where the badge already lives. Timeouts are offered as 1 
 / 7 days plus a custom box, and go through 0041’s `timeout_student`, which caps at 90 days.
 Resolving notifies every reporter that it was reviewed, WITHOUT the outcome — what happened
 to another student is between them and the instructor.
+
+
+Since 0045 (Random Events — Student Space Phase 6, the last): `lounge_events` +
+`lounge_event_answers`. Two modes, one column apart: `answer_key` SET means correct answers
+are paid automatically on close; NULL means open-ended and the instructor awards by hand at
+the event’s own point value (one tap, no picker).
+
+**ANSWERS ARE SEALED UNTIL CLOSE, ENFORCED TWICE.** The RLS policy on
+`lounge_event_answers` grants a student their OWN row plus everything once
+`status = closed`; `get_event_answers()` says the same thing independently. The feed shows a
+count and the count is all the database will give it. Without this the first correct answer
+is copyable and auto-award pays the fastest COPIER rather than the fastest thinker — which
+is the trap the whole design is built around.
+
+**CLOSING IS THE ONLY THING THAT PAYS, AND IT IS IDEMPOTENT.** `cp_close_event_core()`
+takes `for update` on the event and returns 0 if it is already closed. THREE things can
+close one — the instructor, the per-minute cron at `closes_at`, and a retried request — and
+any two racing must not pay twice. Same guard on `award_event_answer`, keyed on
+`point_event_id` already being set.
+
+Winners are the first `winner_cap` correct answers ordered by `(created_at, id)`. The id is
+not decoration: a timestamp alone is not a total order, and two answers in the same
+millisecond would rank differently in the client preview than in the database.
+
+**`src/lib/lounge-answers.ts` MIRRORS `cp_event_normalize()` AND IS PINNED BY A TEST.** The
+instructor previews who would win before closing; the database decides who is paid. A drift
+makes that preview a lie about real points. The subtle half is that punctuation is REMOVED,
+not replaced with a space — "run-time" normalises to "runtime", and swapping that one
+character in the JS fails four tests. Change one side, change the other, same commit.
+
+**`point_events.category` gains `event`** (constraint name preserved, all earlier values
+re-listed). `point_events_points_check` needed no change — its `category <> ‘redeem’` branch
+already allows 1..100. Reusing `activity` would have been free and was rejected: the ledger
+is the one place in this app that has to stay answerable about where points came from.
+Widening the union surfaced two call sites at compile time — `PointsHistory`’s
+`Record<PointCategory, …>` legend and `database.types.ts` — which is exactly what a union
+that narrow is for.
+
+**No notification is queued on an event payout.** `cp_notify_point_event` (0017) already
+pushes for a `point_events` row; queueing another here would double-notify. Same rule
+`commit_attendance_penalties` follows.
+
+Client: `src/lib/api/events.ts` — **nothing in it can return `answer_key`**, which is a real
+column on a table the client may select, so every read path in 0045 reports only `has_key`.
+`components/space/EventCard.tsx` pins the open event above the Lounge feed with a live
+countdown; `features/instructor/EventComposer.tsx` sits at the top of /teach/space, above
+the gate controls — events are used weekly, the gates once.
+
+
+Chat UI rework (2026-09-02, no migration) — from real beta use, six things:
+
+**The instructor could not see chat at all.** Every chat screen lived under `/app`, which is
+`RequireRole role="student"`, so the instructor was redirected to /teach. The DATABASE always
+allowed it (`cp_can_read_room` returns true for them on global and section rooms) — only the
+screen was missing. `Chats` and `ChatRoom` now take a **`basePath`** prop and are mounted a
+second time under `/teach/space/chats` and `/teach/space/chat/:roomId`. ONE implementation,
+two mounts: the alternative was a parallel instructor copy, and every parallel copy in this
+codebase has drifted. `Chats` hides its "message your instructor" row when `basePath` is not
+a student path, and `ChatRoom` uses `useStudentDataOptional()` — undefined in the instructor
+area, which is also how "is this message mine" is decided there (author_student_id IS NULL).
+
+**"React · Reply · Report" under every message was the single biggest source of noise** —
+three words of chrome per line, which at group-chat density doubled the visual weight of the
+room. They now live in a floating toolbar that is ABSOLUTELY POSITIONED (so it costs the
+message no vertical space) and appears on hover, or on a 420ms long-press on touch. A
+pointermove beyond 8px cancels the press, or scrolling would open every message it passed.
+Measured after: 18 action buttons in the DOM, 0 visible, rows 48px.
+
+**The sticky header is a bug fix, not a polish item.** In a long room the header scrolled
+away and took the BACK BUTTON with it — there was no way out of a conversation without the
+browser. It is `sticky top-0 z-20` with negative margins so the blur spans the content width.
+
+**Enter sends, Shift+Enter is a newline.** Guarded with `!e.nativeEvent.isComposing`, or an
+IME candidate selection would fire a send mid-word — which is how this breaks for anyone
+typing a language with an input method.
+
+**Auto-scroll only when already at the bottom.** `atBottomRef` (a ref as well as state, so
+the realtime handler reads it without re-subscribing) gates whether a new message scrolls
+into view; otherwise it increments a "N new messages" count on the jump-to-latest button.
+Yanking the view while someone reads older messages is the most irritating thing a chat can
+do. Plus date separators, and a tappable reply-quote that scrolls to the parent and rings it.
+
+**The typing indicator is Realtime BROADCAST, not a table** (`src/lib/typing.ts`). Writing
+keystrokes to Postgres would be hundreds of rows a minute for information worthless two
+seconds later — and it would leave a permanent record of when each student was at their
+keyboard, which is exactly the surveillance the no-read-receipts decision exists to avoid.
+Broadcast touches no table and persists nothing. Throttled to 2.5s and expiring at 5s, and
+the test pins THROTTLE < TIMEOUT: invert that and an indicator flickers off while someone is
+still typing.
+
+⚠ **Two false alarms during verification, both the documented compositing artifact:** a
+`transition-opacity` toolbar and a `transition-colors` border both reported their
+PRE-transition computed value while the Browser pane was hidden, so the toolbar looked stuck
+at opacity 0 and the over-limit border looked like `--line`. Inject
+`*{transition:none!important}` before reading colour or opacity, per the note in the Era 6.0
+Phase 6 section. Do not "fix" what is already right.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

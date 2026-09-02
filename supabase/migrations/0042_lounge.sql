@@ -60,7 +60,14 @@ create table if not exists public.lounge_posts (
   target_display_name text,
   target_avatar_url   text,
 
-  pulse_kind          text check (pulse_kind is null or pulse_kind in ('level', 'podium')),
+  -- 'event' is listed here even though 0045 is what writes it. The alternative
+  -- is 0045 dropping an INLINE, auto-named check by guessing
+  -- `lounge_posts_pulse_kind_check` — a name Postgres generates, not one this
+  -- file chose. Naming the constraint and listing the value up front is the
+  -- cheaper of the two.
+  pulse_kind          text constraint lounge_posts_pulse_kind_check
+                        check (pulse_kind is null
+                               or pulse_kind in ('level', 'podium', 'event')),
   pulse_value         int,
 
   w_count             int not null default 0,
@@ -896,37 +903,51 @@ $$;
 
 grant execute on function public.get_lounge_quota() to authenticated;
 
--- Who you can shout out: everyone in a beta section but yourself.
+-- Everyone in Student Space, with the handful of game facts the social
+-- surfaces render beside a name.
 --
 -- ⚠ THE CLIENT MUST NOT USE `listStudents` FOR THIS. That function joins
 -- `student_secrets` to merge claim tokens for the instructor's roster — calling
 -- it from the student app would ship every classmate's claim token over the
--- wire to build a name picker. The columns below are the three a picker needs
+-- wire to build a name picker. The columns below are exactly what the UI draws
 -- and nothing else.
+--
+-- INCLUDES the caller, deliberately: chat renders a level and a rank beside
+-- your OWN name too, and `send_message` already ignores a self-mention. The
+-- shoutout picker filters itself out client-side, which is a one-line concern
+-- there rather than a second RPC here.
+--
+-- `rank` comes from the twice-daily snapshot, so it is the same number the
+-- leaderboard shows — not a live recount that would quietly disagree with it.
 drop function if exists public.list_lounge_classmates();
-create function public.list_lounge_classmates()
+drop function if exists public.get_space_people();
+create function public.get_space_people()
 returns table (
-  id           uuid,
-  display_name text,
-  avatar_url   text
+  id              uuid,
+  display_name    text,
+  avatar_url      text,
+  semester_points int,
+  section_id      uuid,
+  rank            int
 )
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select stu.id, stu.display_name, stu.avatar_url
+  select stu.id, stu.display_name, stu.avatar_url,
+         stu.semester_points, stu.section_id, snap.rank
     from public.students stu
     join public.sections sec on sec.id = stu.section_id
+    left join public.leaderboard_snapshot snap on snap.student_id = stu.id
    where sec.space_enabled
      and sec.semester_id = public.cp_active_semester_id()
      and stu.archived_at is null
-     and stu.id is distinct from public.cp_my_student_id()
      and (public.is_instructor() or public.cp_space_state() = 'open')
    order by stu.display_name;
 $$;
 
-grant execute on function public.list_lounge_classmates() to authenticated;
+grant execute on function public.get_space_people() to authenticated;
 
 -- The 7-day shoutout strip on a profile.
 drop function if exists public.list_shoutouts_for(uuid);

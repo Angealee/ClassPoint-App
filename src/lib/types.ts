@@ -1,5 +1,10 @@
 /** 'redeem' rows are debits from an approved spend request (always negative). */
-export type PointCategory = 'recitation' | 'activity' | 'penalty' | 'redeem'
+/**
+ * `event` is a Random Event payout (0045). It is its own category rather than
+ * reusing `activity` so "how many points came from events?" stays answerable —
+ * the ledger is the one place in this app that has to stay honest.
+ */
+export type PointCategory = 'recitation' | 'activity' | 'penalty' | 'redeem' | 'event'
 
 export interface Section {
   id: string
@@ -633,6 +638,8 @@ export type NotificationType =
   | 'space_dm'
   /** Your report was reviewed (0044). No outcome, by decision. */
   | 'space_report'
+  /** A Random Event was posted (0045). */
+  | 'space_event'
   | 'test'
 
 /** One row of the student's notification history (the bell). */
@@ -990,4 +997,73 @@ export interface ReportQueueItem {
   roomId: string | null
   isHidden: boolean
   isDeleted: boolean
+}
+
+// ─── Random Events (0045) ───────────────────────────────────────────────────
+
+/**
+ * An event as a STUDENT sees it. There is no `answerKey` field anywhere in the
+ * client types, deliberately: it is a column the client could select, so every
+ * read path in 0045 omits it and only reports `hasKey`. A student who can read
+ * the key wins every event.
+ */
+export interface LoungeEvent {
+  id: string
+  question: string
+  points: number
+  winnerCap: number
+  /** Whether it auto-awards on close — never what the answer is. */
+  hasKey: boolean
+  closesAt: string | null
+  answerCount: number
+  /** Your own answer, the only one visible while the event is open. */
+  myAnswer: string | null
+  createdAt: string
+}
+
+/** One answer. Visible to peers only once the event is closed. */
+export interface LoungeEventAnswer {
+  id: string
+  studentId: string
+  displayName: string
+  avatarUrl: string | null
+  body: string
+  /** Null until the event closes. */
+  isCorrect: boolean | null
+  awardedPoints: number | null
+  createdAt: string
+}
+
+/** One row of the instructor's event history. */
+export interface LoungeEventSummary {
+  id: string
+  question: string
+  points: number
+  winnerCap: number
+  hasKey: boolean
+  closesAt: string | null
+  status: 'open' | 'closed'
+  closedAt: string | null
+  answerCount: number
+  awardedCount: number
+  createdAt: string
+}
+
+/** Most an event can pay per winner (mirrors the DB CHECK). */
+export const MAX_EVENT_POINTS = 50
+
+/**
+ * A person in Student Space, with the game facts the social surfaces draw
+ * beside a name. Fetched ONCE per screen from `get_space_people()`, never
+ * denormalized onto a message — a stamped level would be wrong the moment the
+ * student earned a point.
+ */
+export interface SpacePerson {
+  id: string
+  displayName: string
+  avatarUrl: string | null
+  semesterPoints: number
+  sectionId: string | null
+  /** From the twice-daily snapshot, so it matches the leaderboard exactly. */
+  rank: number | null
 }

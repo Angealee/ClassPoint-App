@@ -26,7 +26,7 @@ import type { SpaceRoom } from '@/lib/types'
  * what you have read is ever sent, which is what makes "no seen feature" a
  * property of the system rather than a promise. See lib/unread.ts.
  */
-export function Chats() {
+export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
   const navigate = useNavigate()
   const { toast } = useToast()
 
@@ -68,13 +68,17 @@ export function Chats() {
       const id = await startDm(targetId)
       setPickerOpen(false)
       setSearch('')
-      navigate(`/app/space/chat/${id}`)
+      navigate(`${basePath}/chat/${id}`)
     } catch (e) {
       toast(errorText(e, 'Could not open that conversation.'), 'error')
     } finally {
       setStarting(false)
     }
   }
+
+  // The instructor mounts this too; "message your instructor" would then be
+  // an invitation to DM themselves.
+  const isStudentView = basePath.startsWith('/app')
 
   const groups = rooms.filter((r) => r.kind !== 'dm')
   const dms = rooms.filter((r) => r.kind === 'dm')
@@ -86,7 +90,7 @@ export function Chats() {
     const unread = isRoomUnread(room)
     return (
       <Link
-        to={`/app/space/chat/${room.id}`}
+        to={`${basePath}/chat/${room.id}`}
         className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-card-2"
       >
         <Avatar
@@ -124,7 +128,7 @@ export function Chats() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Chats" fallback="/app/space" />
+      <PageHeader title="Chats" fallback={basePath} />
       <BetaBanner />
 
       {loading ? (
@@ -176,6 +180,7 @@ export function Chats() {
           {/* Messaging the instructor is its own row, not buried in the people
               picker — it is the one conversation a muted student can still
               start, and it should never be hard to find. */}
+          {isStudentView && (
           <Card
             interactive
             pad="roomy"
@@ -193,6 +198,7 @@ export function Chats() {
               <span className="shrink-0 text-lg text-muted">›</span>
             </div>
           </Card>
+          )}
         </>
       )}
 

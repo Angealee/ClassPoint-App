@@ -9,6 +9,7 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useToast } from '@/components/ui/Toast'
 import { BetaBanner } from '@/components/space/BetaBanner'
 import { PostCard } from '@/components/space/PostCard'
+import { EventCard } from '@/components/space/EventCard'
 import { ReportSheet } from '@/components/space/ReportSheet'
 import { PostComposer, type ClassmateOption } from '@/components/space/PostComposer'
 import { AstronautArt } from '@/components/space/AstronautArt'
@@ -18,6 +19,7 @@ import {
   getLoungeFeed,
   getLoungePinned,
   getLoungeQuota,
+  getOpenEvent,
   giveW,
   listLoungeClassmates,
   postShoutout,
@@ -28,7 +30,7 @@ import {
 import { supabase, uniqueChannel } from '@/lib/supabase'
 import { errorText } from '@/lib/errors'
 import { canPostNow } from '@/lib/space-gate'
-import type { LoungePost, LoungeQuota } from '@/lib/types'
+import type { LoungeEvent, LoungePost, LoungeQuota } from '@/lib/types'
 
 const PAGE = 20
 
@@ -53,6 +55,7 @@ export function Lounge() {
   const [posts, setPosts] = useState<LoungePost[]>([])
   const [pinned, setPinned] = useState<LoungePost[]>([])
   const [quota, setQuota] = useState<LoungeQuota | null>(null)
+  const [event, setEvent] = useState<LoungeEvent | null>(null)
   const [classmates, setClassmates] = useState<ClassmateOption[]>([])
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
@@ -70,14 +73,16 @@ export function Lounge() {
     async (which: FeedMode) => {
       setFailed(false)
       try {
-        const [feed, pins, q] = await Promise.all([
+        const [feed, pins, q, ev] = await Promise.all([
           getLoungeFeed(which, { limit: PAGE }),
           which === 'latest' ? getLoungePinned() : Promise.resolve([]),
           getLoungeQuota(),
+          getOpenEvent(),
         ])
         setPosts(feed)
         setPinned(pins)
         setQuota(q)
+        setEvent(ev)
         setExhausted(feed.length < PAGE)
         setPendingNew(0)
       } catch {
@@ -272,6 +277,14 @@ export function Lounge() {
         <p className="rounded-xl border border-warn-solid/30 bg-warn-solid/8 px-3 py-2 text-sm text-warn">
           You&apos;re muted right now — you can still read everything.
         </p>
+      )}
+
+      {event && (
+        <EventCard
+          event={event}
+          canAnswer={canPost}
+          onAnswered={() => void getOpenEvent().then(setEvent).catch(() => {})}
+        />
       )}
 
       <SegmentedControl

@@ -8,6 +8,8 @@ import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { AstronautArt } from '@/components/space/AstronautArt'
+import { EventComposer } from './EventComposer'
+import { Link } from 'react-router-dom'
 import {
   getSpaceFlag,
   listSpaceSections,
@@ -168,6 +170,25 @@ export function InstructorSpace() {
         <ErrorState onRetry={() => void load()}>Could not load the Student Space settings.</ErrorState>
       ) : (
         <>
+          {/* The instructor IS a participant in Global and every section room —
+              the database always allowed it, there was simply no screen. */}
+          <Link to="/teach/space/chats" className="block">
+            <Card pad="roomy" interactive>
+              <div className="flex items-center gap-3">
+                <AstronautArt variant="lounge" size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">Chats</p>
+                  <p className="text-sm text-muted">
+                    Global, every section room, and any DM you are part of.
+                  </p>
+                </div>
+                <span className="shrink-0 text-lg text-muted">›</span>
+              </div>
+            </Card>
+          </Link>
+
+          <EventComposer />
+
           {/* ── The kill switch ─────────────────────────────────────────────
               Pausing goes through ConfirmDialog because it takes the feature
               away from everyone at once; turning it back ON does not, since

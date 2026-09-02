@@ -39,6 +39,18 @@ const LoungePostDetail = lazy(() =>
 const StudentSpace = lazy(() =>
   import('@/features/space/StudentSpace').then((m) => ({ default: m.StudentSpace })),
 )
+// The instructor reuses the student chat screens verbatim — only the base
+// path differs. One implementation means the two can never drift.
+const InstructorChats = lazy(() =>
+  import('@/features/space/Chats').then((m) => ({
+    default: () => <m.Chats basePath="/teach/space" />,
+  })),
+)
+const InstructorChatRoom = lazy(() =>
+  import('@/features/space/ChatRoom').then((m) => ({
+    default: () => <m.ChatRoom basePath="/teach/space" />,
+  })),
+)
 const InstructorSpace = lazy(() =>
   import('@/features/instructor/InstructorSpace').then((m) => ({ default: m.InstructorSpace })),
 )
@@ -166,6 +178,8 @@ export const router = createBrowserRouter([
           { path: 'semesters', element: <ManageSemesters /> },
           { path: 'ops', element: <Ops /> },
           { path: 'space', element: <InstructorSpace /> },
+          { path: 'space/chats', element: <InstructorChats /> },
+          { path: 'space/chat/:roomId', element: <InstructorChatRoom /> },
           { path: 'student/:studentId', element: <StudentRecord /> },
           { path: 'history', element: <History /> },
           { path: 'leaderboard', element: <InstructorLeaderboard /> },

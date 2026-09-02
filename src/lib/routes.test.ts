@@ -76,6 +76,7 @@ const MUST_BE_LINKED = [
   // Instructor
   '/teach/ops',
   '/teach/space',
+  '/teach/space/chats',
   '/teach/redemptions',
   '/teach/semesters',
 ]

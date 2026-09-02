@@ -23,6 +23,8 @@ const CATEGORY_META: Record<PointCategory, { label: string; dot: string; text: s
   activity: { label: 'Activities', dot: TONE.accent.dot, text: TONE.accent.text },
   penalty: { label: 'Penalties', dot: TONE.danger.dot, text: TONE.danger.text },
   redeem: { label: 'Spent', dot: TONE.neutral.dot, text: TONE.neutral.text },
+  // Gold, like recitations: an event payout is points you earned.
+  event: { label: 'Events', dot: TONE.reward.dot, text: TONE.reward.text },
 }
 
 /**

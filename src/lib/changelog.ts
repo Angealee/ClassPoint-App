@@ -430,6 +430,16 @@ export const DRAFT_5_0_0: ChangelogEntry = {
         'Nothing you report is shown to the person you reported.',
       ],
     },
+    {
+      heading: 'Random Events',
+      major: true,
+      items: [
+        'Your instructor drops a question into the Lounge. Answer it and you can earn real points.',
+        'Nobody sees anyone else’s answer until it closes — so there is nothing to copy, and being first actually counts.',
+        'You can change your answer any time before it closes.',
+        'When it closes, the answers reveal and the winners get paid automatically.',
+      ],
+    },
   ],
 }
 

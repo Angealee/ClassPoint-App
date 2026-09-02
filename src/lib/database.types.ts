@@ -111,7 +111,7 @@ export interface Database {
         id: UUID
         student_id: UUID
         points: number
-        category: 'recitation' | 'activity' | 'penalty' | 'redeem'
+        category: 'recitation' | 'activity' | 'penalty' | 'redeem' | 'event'
         note: string | null
         created_at: Timestamp
         /** 0029 — stamped by the trg_stamp_semester trigger. */
