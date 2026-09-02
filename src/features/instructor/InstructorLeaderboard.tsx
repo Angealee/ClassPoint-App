@@ -75,7 +75,7 @@ export function InstructorLeaderboard() {
           <Select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="max-w-36 shrink-0"
+            wrapperClassName="max-w-36 shrink-0"
           >
             <option value="all">All sections</option>
             {sections.map((s) => (

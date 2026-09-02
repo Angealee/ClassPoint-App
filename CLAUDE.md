@@ -1295,6 +1295,26 @@ The sheet additionally needs `left-5`, because its cover is `rounded-2xl`: 20px 
 and needs no such inset, which is why that number is deliberately NOT shared between the
 two — copying it between containers is what caused this bug in the first place.**
 
+**`Select` swallowed its caller's layout, and all three sizing call sites were wrong
+(2026-09-01).** The primitive's root is `<div className="w-full">` while `className`
+lands on the inner `<select>`. So `className="max-w-34 shrink-0"` in a flex row capped
+the visible control at 136px while the WRAPPER still spanned 291px — and because the
+chevron is `absolute right-3` **of the wrapper**, it detached from the control and floated
+143px past its right edge, on top of whatever sat there. Measured before/after: wrapper
+291 → 136, chevron 143px outside → 12px inside.
+
+Both leaderboards and the spend board passed sizing this way, so all three had it from the
+day they were written; it only became visible when the student header got tight enough for
+the stranded chevron to reach the settle-countdown chip. The fix is a **`wrapperClassName`
+prop**: sizing (width, max-width, flex) goes to the wrapper, appearance (height, text size)
+stays in `className`. A single `className` cannot serve both — `h-9!` belongs on the
+control and `max-w-34` belongs on the box that lays out.
+
+**This is the same shape as the `cn()` bug from Era 6.0 Phase 2**: a caller's intent
+silently failing to reach the element that acts on it. Worth checking any primitive that
+wraps its control in a layout div — the caller's `className` may not be landing where they
+think it is.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained

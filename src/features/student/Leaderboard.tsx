@@ -163,7 +163,8 @@ export function Leaderboard() {
               setView(e.target.value)
             }}
             aria-label="Choose leaderboard"
-            className="h-9! max-w-34 shrink-0 text-sm!"
+            wrapperClassName="max-w-34 shrink-0"
+            className="h-9! text-sm!"
           >
             <option value={GLOBAL}>Global</option>
             {sections.map((s) => (
