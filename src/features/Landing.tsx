@@ -279,7 +279,7 @@ function LandingPage() {
           <div className="mx-auto max-w-5xl px-5 py-16">
             <Reveal>
               <h2 className="text-center font-display text-2xl font-bold sm:text-3xl">
-                Three steps, then you are playing
+                Bago pumasok? Note mo to yah
               </h2>
             </Reveal>
 
@@ -296,8 +296,7 @@ function LandingPage() {
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-solid text-sm font-bold text-white">
                         {i + 1}
                       </span>
-                      {/* Inherits the parent Reveal's variant, so it pops just
-                          after the card lands — and replays with it. */}
+
                       <motion.span variants={revealIconVariants} className="inline-flex">
                         <Icon className="h-5 w-5 text-accent" />
                       </motion.span>
@@ -311,10 +310,7 @@ function LandingPage() {
           </div>
         </section>
 
-        {/* ── WHAT YOU GET ───────────────────────────────────────────────────
-            Two columns even on a phone: these are four short labels, and a
-            single stacked column of four would push the board preview a whole
-            screen further down for no gain in legibility. */}
+        {/* what you get */}
         <section className="border-t border-line">
           <div className="mx-auto max-w-5xl px-5 py-16">
             <Reveal>
@@ -347,7 +343,7 @@ function LandingPage() {
           </div>
         </section>
 
-        {/* ── THE BOARD ────────────────────────────────────────────────────── */}
+        {/* board*/}
         <section className="border-t border-line bg-card-2">
           <div className="mx-auto max-w-xl px-5 py-16">
             <Reveal className="text-center">
@@ -361,11 +357,8 @@ function LandingPage() {
             <BoardPreview className="mt-8" />
           </div>
         </section>
-
-        {/* ── INSTALL ────────────────────────────────────────────────────────
-            The install prompt gets its own moment at the end, where somebody
-            who has read this far is actually deciding to use the thing —
-            rather than as a third button competing with sign-in at the top. */}
+s
+        {/*install div*/}
         <section className="border-t border-line">
           <div className="mx-auto max-w-xl px-5 py-16">
             <Reveal>
@@ -393,10 +386,7 @@ function LandingPage() {
           ClassPoint · Version 6.0
         </button>
       </footer>
-
-      {/* Back to top. Four screens is far enough that scrolling back by hand is
-          a chore, and it shares the `scrolled` moment with the header so the
-          two never disagree about where the hero ended. */}
+      
       <AnimatePresence>
         {scrolled && (
           <motion.button
