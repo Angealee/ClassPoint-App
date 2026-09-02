@@ -61,6 +61,8 @@ function hasInboundLink(path: string): boolean {
 const MUST_BE_LINKED = [
   // Student
   '/app/points',
+  // Sidebar + menu link only — it is NOT one of the four bottom tabs.
+  '/app/space',
   // Stopped being a tab when the account menu replaced it — its only link is
   // now the Profile row in AccountMenu.tsx.
   '/app/profile',

@@ -19,6 +19,9 @@ export default defineConfig({
         'icon-maskable-512.png',
         'apple-touch-icon.png',
         'push-sw.js',
+        // Pixel art used on the Student Space screens (see AstronautArt).
+        'studentSpace.ico',
+        'studentLounge.ico',
       ],
       workbox: {
         // Pull the push/notificationclick handlers into the generated SW.

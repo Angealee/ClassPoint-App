@@ -65,6 +65,35 @@ export function MenuIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+/**
+ * Saturn — Student Space.
+ *
+ * ── WHY NOT AN ASTRONAUT HELMET ────────────────────────────────────────────
+ * A helmet was drawn first and rejected on measurement: a dome with a visor is,
+ * at the 20px the sidebar renders, a horizontal bar inside a circle — which is
+ * the universal "deny / no entry" glyph. Widening the visor to 76% of the dome
+ * and adding an antenna did not fix it, because ANY shape enclosed by a circle
+ * collapses into a symbol at that size. Rendered against the real nav at
+ * 20/24/48 alongside a rocket and chat bubbles, Saturn was the clear winner.
+ *
+ * The ring is what makes it work: it extends OUTSIDE the body, so the shape can
+ * never read as concentric. Drawn as one open path rather than a rotated
+ * ellipse so the ring passes behind the planet without a mask.
+ *
+ * Drawn rather than using public/studentSpace.ico: a nav icon must take
+ * `currentColor` to turn accent on the active route and survive a theme flip,
+ * and a 32x32 raster is soft at 24px. That art is used at 2x on the Space
+ * screens instead — see AstronautArt.
+ */
+export function SaturnIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="11" r="5.75" />
+      <path d="M4.2 15.6c-1.9.6-3.1.5-3.35-.35-.45-1.55 3.1-4.6 7.9-6.8s9.05-2.75 9.5-1.2c.25.85-.7 1.85-2.3 2.9" />
+    </svg>
+  )
+}
+
 export function ShieldIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>

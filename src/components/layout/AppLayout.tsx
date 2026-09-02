@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
-import { AccountMenuPanel, SidebarAccount } from '@/components/layout/AccountMenu'
+import { SidebarAccount } from '@/components/layout/AccountMenu'
+import { BetaChip, MobileMenu } from '@/components/layout/MobileMenu'
 import { StudentDataProvider, useStudentData } from '@/features/student/StudentData'
 import { LevelUpBurst } from '@/components/ui/LevelUpBurst'
 import { AchievementUnlockBurst } from '@/components/achievements/AchievementUnlockBurst'
@@ -9,27 +10,45 @@ import { WhatsNew } from '@/features/WhatsNew'
 import { AwayRecap } from '@/features/student/AwayRecap'
 import { NotificationsSheet } from '@/features/student/Notifications'
 import { Onboarding } from '@/features/student/Onboarding'
-import { Sheet } from '@/components/ui/Sheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useAuth } from '@/lib/auth'
 import { useIsDesktop } from '@/lib/useIsDesktop'
 import { LATEST_VERSION, setSeenVersion } from '@/lib/changelog'
-import { BellIcon, HomeIcon, MenuIcon, ScanIcon, TrophyIcon } from '@/components/ui/icons'
+import {
+  BellIcon,
+  HomeIcon,
+  MenuIcon,
+  SaturnIcon,
+  ScanIcon,
+  TrophyIcon,
+  UserIcon,
+} from '@/components/ui/icons'
 
 const ONBOARDED_KEY = 'cp_onboarded'
 
 /**
- * Three routed tabs plus the menu.
+ * The five destinations, in sidebar order.
  *
- * Profile lost its tab when the account menu arrived — it is a row in the menu
- * now, which is why `routes.test.ts` gained `/app/profile`: the nav array is no
- * longer the thing that keeps it reachable.
+ * Student Space sits second — directly under Home — because it is the feature
+ * being launched and burying it under a menu is how a beta goes unused. Profile
+ * is last: it is checked far less often than the three it follows.
  */
-const routedTabs = [
+const SIDEBAR_NAV = [
   { to: '/app', label: 'Home', Icon: HomeIcon, end: true },
+  { to: '/app/space', label: 'Student Space', Icon: SaturnIcon },
   { to: '/app/leaderboard', label: 'Ranks', Icon: TrophyIcon },
   { to: '/app/attendance', label: 'Attend', Icon: ScanIcon },
+  { to: '/app/profile', label: 'Profile', Icon: UserIcon },
 ] as const
+
+/**
+ * The mobile bottom bar carries three of those plus the menu.
+ *
+ * Five tabs is the comfortable limit on a phone and this would be the fifth, so
+ * Student Space and Profile live in the menu overlay — which mirrors the full
+ * sidebar, so nothing is more than two taps away.
+ */
+const TAB_ROUTES = ['/app', '/app/leaderboard', '/app/attendance'] as const
 
 /**
  * Bell + unread badge, rendered into the Shell's `actions` slot (mobile header
@@ -68,16 +87,16 @@ function NotificationBell() {
 }
 
 /**
- * The shell with a live nav, plus the account menu.
+ * The shell with a live nav, the sidebar account block, and the mobile menu.
  *
- * ⚠ `menuOpen` lives HERE, not in the nav item. Shell renders `nav` twice — the
- * desktop sidebar and the mobile tab bar — so a button owning its own state
- * would produce two menus that disagree. Same rule as the `actions` slot.
+ * ⚠ Both open states live HERE, not in the nav item or the menu component.
+ * Shell renders `nav` twice — desktop sidebar and mobile tab bar — so a button
+ * owning its own state would produce two menus that disagree. Same rule as the
+ * `actions` slot.
  *
- * The two presentations are chosen in JS rather than with `md:` classes because
- * the mobile one is a Sheet, and a Sheet portals to <body>: a `md:hidden`
- * wrapper around it would style nothing and both would open on a desktop
- * viewport. See the note in lib/useIsDesktop.ts.
+ * The two surfaces are chosen in JS rather than with `md:` classes because the
+ * mobile one portals to <body>, where a `md:hidden` wrapper would style
+ * nothing and both could open at once. See lib/useIsDesktop.ts.
  */
 function StudentShell() {
   const { hasUnseenAchievements } = useStudentData()
@@ -90,34 +109,51 @@ function StudentShell() {
   const closeMenu = () => setMenuOpen(false)
 
   // Sign out is confirmed in a ConfirmDialog, which is itself a Sheet. Close
-  // the menu FIRST so two portalled dialogs never stack their focus traps.
+  // this surface FIRST so two portalled overlays never stack their focus traps.
   const requestSignOut = () => {
     setMenuOpen(false)
     setSignOutOpen(true)
   }
 
   const nav = useMemo<NavItem[]>(
+    () =>
+      SIDEBAR_NAV.map((item) => ({
+        ...item,
+        badge: item.to === '/app/space' ? <BetaChip /> : undefined,
+        // The unseen-achievements dot follows the trophy case, which lives on
+        // Profile.
+        dot: item.to === '/app/profile' ? hasUnseenAchievements : undefined,
+      })),
+    [hasUnseenAchievements],
+  )
+
+  const tabNav = useMemo<NavItem[]>(
     () => [
-      ...routedTabs.map((t) => ({ ...t })),
+      ...nav
+        .filter((item): item is Extract<NavItem, { to: string }> =>
+          'to' in item ? (TAB_ROUTES as readonly string[]).includes(item.to) : false,
+        )
+        // A tab has no room for a chip; the label alone is the tab.
+        .map(({ badge: _badge, ...item }) => item),
       {
         kind: 'button' as const,
         id: 'menu',
         label: 'Menu',
         Icon: MenuIcon,
-        // The dot followed Profile into the menu, so it lands on the tab that
-        // now leads there — and is repeated on the Profile row inside.
+        // Surfaces the Profile dot, since Profile is only reachable in here.
         dot: hasUnseenAchievements,
         active: menuOpen,
         onClick: () => setMenuOpen((v) => !v),
       },
     ],
-    [hasUnseenAchievements, menuOpen],
+    [nav, hasUnseenAchievements, menuOpen],
   )
 
   return (
     <>
       <Shell
         nav={nav}
+        tabNav={tabNav}
         actions={<NotificationBell />}
         accountSlot={
           isDesktop ? (
@@ -132,9 +168,13 @@ function StudentShell() {
       />
 
       {!isDesktop && (
-        <Sheet open={menuOpen} onClose={closeMenu}>
-          <AccountMenuPanel onNavigate={closeMenu} onRequestSignOut={requestSignOut} />
-        </Sheet>
+        <MobileMenu
+          open={menuOpen}
+          onClose={closeMenu}
+          nav={nav}
+          onNavigate={closeMenu}
+          onRequestSignOut={requestSignOut}
+        />
       )}
 
       <ConfirmDialog

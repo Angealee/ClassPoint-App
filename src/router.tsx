@@ -24,6 +24,9 @@ const Leaderboard = lazy(() =>
   import('@/features/student/Leaderboard').then((m) => ({ default: m.Leaderboard })),
 )
 const Profile = lazy(() => import('@/features/student/Profile').then((m) => ({ default: m.Profile })))
+const SpaceComingSoon = lazy(() =>
+  import('@/features/space/SpaceComingSoon').then((m) => ({ default: m.SpaceComingSoon })),
+)
 const Achievements = lazy(() =>
   import('@/features/student/Achievements').then((m) => ({ default: m.Achievements })),
 )
@@ -120,7 +123,8 @@ export const router = createBrowserRouter([
           { path: 'history', element: <PointsHistory /> },
           { path: 'spenders', element: <SpendBoard /> },
           { path: 'profile', element: <Profile /> },
-          { path: 'achievements', element: <Achievements /> },
+          { path: 'space', element: <SpaceComingSoon /> },
+        { path: 'achievements', element: <Achievements /> },
         ],
       },
     ],

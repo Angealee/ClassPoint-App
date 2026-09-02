@@ -34,6 +34,12 @@ export interface NavLinkItem {
   end?: boolean
   /** Shows a small "attention" dot on the item (e.g. new achievements). */
   dot?: boolean
+  /**
+   * Trailing slot in the SIDEBAR only — e.g. the BETA chip on Student Space.
+   * The bottom tab bar deliberately ignores it: a tab is an icon over a 12px
+   * label with ~90px to work in, and a chip there would either wrap or clip.
+   */
+  badge?: ReactNode
 }
 
 /**
@@ -76,6 +82,7 @@ function NavBody({
   Icon,
   label,
   dot,
+  badge,
   isActive,
   surface,
   reduce,
@@ -83,6 +90,7 @@ function NavBody({
   Icon: NavIcon
   label: string
   dot?: boolean
+  badge?: ReactNode
   isActive: boolean
   surface: 'sidebar' | 'tab'
   reduce: boolean | null
@@ -121,7 +129,8 @@ function NavBody({
           {glyph}
         </motion.span>
       )}
-      {label}
+      {sidebar ? <span className="min-w-0 flex-1 truncate">{label}</span> : label}
+      {sidebar && badge}
     </>
   )
 }
@@ -145,11 +154,22 @@ const tabClasses = (isActive: boolean) =>
  */
 export function Shell({
   nav,
+  tabNav = nav,
   badge,
   actions,
   accountSlot,
 }: {
+  /** The desktop sidebar's nav. Also the mobile tab bar's, unless `tabNav` overrides. */
   nav: NavItem[]
+  /**
+   * The mobile bottom tab bar, when it must differ from the sidebar.
+   *
+   * The student sidebar lists five destinations; a phone comfortably fits four
+   * tabs, so the student passes a shorter array here and the full list lives in
+   * the menu overlay instead. Defaults to `nav`, so the instructor — who wants
+   * the same four in both places — passes nothing and is unaffected.
+   */
+  tabNav?: NavItem[]
   badge?: ReactNode
   actions?: ReactNode
   /**
@@ -162,8 +182,12 @@ export function Shell({
   const reduce = useReducedMotion()
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-6xl">
-      {/* Desktop sidebar */}
-      <aside className="theme-transition sticky top-0 hidden h-[100dvh] w-60 shrink-0 flex-col border-r border-line bg-canvas/60 px-4 py-5 backdrop-blur-md md:flex">
+      {/* Desktop sidebar.
+          w-64, not w-60: at 240px the "Student Space" label had exactly ONE
+          pixel of slack beside its BETA chip (label box 97px, text 98px) and
+          truncated to "Student Spa…". One pixel is not a margin — it fails on
+          any font fallback or browser zoom. 256px leaves 15px. */}
+      <aside className="theme-transition sticky top-0 hidden h-[100dvh] w-64 shrink-0 flex-col border-r border-line bg-canvas/60 px-4 py-5 backdrop-blur-md md:flex">
         <div className="flex items-center gap-2 px-2">
           <Logo className="h-8 w-8" />
           <span className="font-display text-lg font-bold tracking-tight">ClassPoint</span>
@@ -208,6 +232,7 @@ export function Shell({
                     Icon={item.Icon}
                     label={item.label}
                     dot={item.dot}
+                    badge={item.badge}
                     isActive={isActive}
                     surface="sidebar"
                     reduce={reduce}
@@ -254,7 +279,7 @@ export function Shell({
         {/* Mobile bottom navigation */}
         <nav className="theme-transition fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-2xl border-t border-line bg-canvas/90 px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md md:hidden">
           <ul className="flex items-center justify-around">
-            {nav.map((item) => (
+            {tabNav.map((item) => (
               <li key={navKey(item)} className="flex-1">
                 {item.kind === 'button' ? (
                   <button
