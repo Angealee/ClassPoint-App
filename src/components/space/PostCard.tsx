@@ -41,6 +41,7 @@ export function PostCard({
   post,
   onToggleW,
   onDelete,
+  onReport,
   wDisabled,
   /** Renders the body in full and drops the tap-through — the detail screen. */
   detail = false,
@@ -48,6 +49,8 @@ export function PostCard({
   post: LoungePost
   onToggleW: (post: LoungePost) => void
   onDelete?: (post: LoungePost) => void
+  /** Omitted for your own posts — reporting yourself is not a thing. */
+  onReport?: (post: LoungePost) => void
   wDisabled?: boolean
   detail?: boolean
 }) {
@@ -149,15 +152,26 @@ export function PostCard({
               </Link>
             )}
 
-            {post.canDelete && onDelete && (
-              <button
-                type="button"
-                onClick={() => onDelete(post)}
-                className="ml-auto text-xs font-semibold text-muted transition-colors hover:text-danger"
-              >
-                Delete
-              </button>
-            )}
+            <span className="ml-auto flex items-center gap-3">
+              {onReport && !isPulse && (
+                <button
+                  type="button"
+                  onClick={() => onReport(post)}
+                  className="text-xs font-semibold text-muted transition-colors hover:text-danger"
+                >
+                  Report
+                </button>
+              )}
+              {post.canDelete && onDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(post)}
+                  className="text-xs font-semibold text-muted transition-colors hover:text-danger"
+                >
+                  Delete
+                </button>
+              )}
+            </span>
           </div>
         </div>
       </div>

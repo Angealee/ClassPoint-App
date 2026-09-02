@@ -9,6 +9,7 @@ import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { PostCard } from '@/components/space/PostCard'
+import { ReportSheet } from '@/components/space/ReportSheet'
 import { useStudentData } from '@/features/student/StudentData'
 import {
   deleteLoungePost,
@@ -48,6 +49,7 @@ export function LoungePostDetail() {
   const [deletePost, setDeletePost] = useState<LoungePost | null>(null)
   const [deleteReply, setDeleteReply] = useState<LoungeReply | null>(null)
   const [busy, setBusy] = useState(false)
+  const [reportTarget, setReportTarget] = useState<LoungePost | null>(null)
   const areaRef = useRef<HTMLTextAreaElement>(null)
 
   const canPost = canPostNow(spaceAccess)
@@ -153,7 +155,14 @@ export function LoungePostDetail() {
         <ErrorState onRetry={() => void load()}>Could not load this post.</ErrorState>
       ) : (
         <>
-          <PostCard post={post} detail onToggleW={toggleW} onDelete={setDeletePost} wDisabled={!canPost} />
+          <PostCard
+            post={post}
+            detail
+            onToggleW={toggleW}
+            onDelete={setDeletePost}
+            onReport={post.canDelete ? undefined : setReportTarget}
+            wDisabled={!canPost}
+          />
 
           {canPost && (
             <Card pad="roomy">
@@ -247,6 +256,13 @@ export function LoungePostDetail() {
           )}
         </>
       )}
+
+      <ReportSheet
+        open={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        targetType="post"
+        targetId={reportTarget?.id ?? null}
+      />
 
       <ConfirmDialog
         open={!!deletePost}

@@ -9,6 +9,7 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { useToast } from '@/components/ui/Toast'
 import { BetaBanner } from '@/components/space/BetaBanner'
 import { PostCard } from '@/components/space/PostCard'
+import { ReportSheet } from '@/components/space/ReportSheet'
 import { PostComposer, type ClassmateOption } from '@/components/space/PostComposer'
 import { AstronautArt } from '@/components/space/AstronautArt'
 import { useStudentData } from '@/features/student/StudentData'
@@ -61,6 +62,7 @@ export function Lounge() {
   const [pendingNew, setPendingNew] = useState(0)
   const [deleteTarget, setDeleteTarget] = useState<LoungePost | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [reportTarget, setReportTarget] = useState<LoungePost | null>(null)
 
   const canPost = canPostNow(spaceAccess)
 
@@ -307,6 +309,7 @@ export function Lounge() {
                 wDisabled={wDisabled}
                 onToggleW={toggleW}
                 onDelete={setDeleteTarget}
+                onReport={p.canDelete ? undefined : setReportTarget}
               />
             ))}
 
@@ -329,6 +332,7 @@ export function Lounge() {
                   wDisabled={wDisabled}
                   onToggleW={toggleW}
                   onDelete={setDeleteTarget}
+                  onReport={p.canDelete ? undefined : setReportTarget}
                 />
               ))
             )}
@@ -346,6 +350,13 @@ export function Lounge() {
           </div>
         </PullToRefresh>
       )}
+
+      <ReportSheet
+        open={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        targetType="post"
+        targetId={reportTarget?.id ?? null}
+      />
 
       <ConfirmDialog
         open={!!deleteTarget}

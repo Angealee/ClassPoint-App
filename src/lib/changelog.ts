@@ -422,6 +422,14 @@ export const DRAFT_5_0_0: ChangelogEntry = {
         'Mute any room you do not want notifications from.',
       ],
     },
+    {
+      heading: 'Keeping it civil',
+      items: [
+        'Report any post, reply or message. Pick a reason, add a note if you want — only your instructor sees it.',
+        'You will get a notification when your report has been looked at.',
+        'Nothing you report is shown to the person you reported.',
+      ],
+    },
   ],
 }
 

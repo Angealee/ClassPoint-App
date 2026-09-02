@@ -1,4 +1,5 @@
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { ReportsInbox } from './ReportsInbox'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -22,7 +23,7 @@ import { ExcusesInbox } from './ExcusesInbox'
 import { RewardsCatalog } from './RewardsCatalog'
 import type { RedemptionKind, RedemptionRequest, RedemptionStatus, SpenderStat } from '@/lib/types'
 
-type RequestsTab = 'points' | 'excuses' | 'rewards'
+type RequestsTab = 'points' | 'excuses' | 'rewards' | 'reports'
 
 const KIND_LABEL: Record<RedemptionKind, string> = {
   quiz: 'Quiz',
@@ -143,12 +144,15 @@ export function Redemptions() {
           { value: 'points', label: 'Points' },
           { value: 'excuses', label: 'Excuses' },
           { value: 'rewards', label: 'Rewards' },
+          { value: 'reports', label: 'Reports' },
         ]}
       />
 
       {tab === 'excuses' && <ExcusesInbox />}
 
       {tab === 'rewards' && <RewardsCatalog />}
+
+      {tab === 'reports' && <ReportsInbox />}
 
       {tab === 'points' &&
         (loading ? (

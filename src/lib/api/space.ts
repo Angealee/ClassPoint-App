@@ -1,6 +1,13 @@
 import { rpc } from './_internal'
 import { SPACE_ACCESS_UNKNOWN, type SpaceAccess, type SpaceState } from '@/lib/space-gate'
-import type { SpaceAdminSection, SpaceTimeout } from '@/lib/types'
+import type {
+  ReportAction,
+  ReportQueueItem,
+  ReportReason,
+  ReportTargetType,
+  SpaceAdminSection,
+  SpaceTimeout,
+} from '@/lib/types'
 
 // ============================================================================
 // Student Space — the gate (migration 0041)
@@ -116,3 +123,107 @@ export async function clearSpaceTimeout(studentId: string): Promise<number> {
   return (await rpc<number>('clear_space_timeout', { p_student_id: studentId })) ?? 0
 }
 
+
+// ── Moderation (0044) ───────────────────────────────────────────────────────
+
+/**
+ * Report something. Returns how many DISTINCT people have now reported it.
+ *
+ * The RPC dedupes per reporter, refuses a target the caller cannot see, and
+ * auto-hides at 7 — so this is safe to call optimistically and safe to retry.
+ */
+export async function reportContent(
+  targetType: ReportTargetType,
+  targetId: string,
+  reason: ReportReason,
+  note?: string,
+): Promise<number> {
+  return (
+    (await rpc<number>('report_content', {
+      p_type: targetType,
+      p_id: targetId,
+      p_reason: reason,
+      p_note: note?.trim() || null,
+    })) ?? 0
+  )
+}
+
+/** Which of these have I already reported — so the UI can say so. */
+export async function myReportedIds(
+  targetType: ReportTargetType,
+  ids: string[],
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set()
+  const rows = await rpc<{ target_id: string }[]>('my_reported_ids', {
+    p_type: targetType,
+    p_ids: ids,
+  })
+  return new Set((rows ?? []).map((r) => r.target_id))
+}
+
+interface QueueRow {
+  target_type: string
+  target_id: string
+  report_count: number
+  reporters: string[] | null
+  reasons: string[] | null
+  notes: string[] | null
+  first_at: string
+  author_name: string | null
+  author_id: string | null
+  body: string | null
+  context: string
+  is_dm: boolean
+  room_id: string | null
+  is_hidden: boolean
+  is_deleted: boolean
+}
+
+/** The instructor's queue — one row per reported target, newest first. */
+export async function getReportQueue(): Promise<ReportQueueItem[]> {
+  const rows = await rpc<QueueRow[]>('get_space_report_queue')
+  return (rows ?? []).map((r) => ({
+    targetType: r.target_type as ReportTargetType,
+    targetId: r.target_id,
+    reportCount: r.report_count ?? 0,
+    reporters: r.reporters ?? [],
+    reasons: (r.reasons ?? []) as ReportReason[],
+    notes: r.notes ?? [],
+    firstAt: r.first_at,
+    authorName: r.author_name,
+    authorId: r.author_id,
+    body: r.body,
+    context: r.context,
+    isDm: !!r.is_dm,
+    roomId: r.room_id,
+    isHidden: !!r.is_hidden,
+    isDeleted: !!r.is_deleted,
+  }))
+}
+
+/** Drives the Requests badge, alongside pending redemptions and excuses. */
+export async function countOpenReports(): Promise<number> {
+  return (await rpc<number>('count_open_reports')) ?? 0
+}
+
+/**
+ * Close out every open report on a target.
+ *
+ * `restore` clears an auto-hide AND resets the report count, which is the
+ * counterweight to hiding at 7 — a group can bury something they merely
+ * disagree with, and this is the way back. Every reporter is told it was
+ * reviewed, without the outcome.
+ */
+export async function resolveReport(
+  targetType: ReportTargetType,
+  targetId: string,
+  action: ReportAction,
+): Promise<number> {
+  return (
+    (await rpc<number>('resolve_report', {
+      p_type: targetType,
+      p_id: targetId,
+      p_action: action,
+    })) ?? 0
+  )
+}

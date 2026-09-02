@@ -316,6 +316,90 @@ export interface Database {
         row_data: unknown
       }>
 
+      /** 0043 — chat rooms. Section and global membership is DERIVED, not stored. */
+      space_rooms: Row<{
+        id: UUID
+        kind: 'section' | 'global' | 'dm'
+        section_id: UUID | null
+        semester_id: UUID
+        /** Canonical sorted participant key, so a pair can only ever have one room. */
+        dm_key: string | null
+        slow_mode_seconds: number
+        announce_only: boolean
+        pinned_message_id: UUID | null
+        /** Trigger-maintained, so the room list is one query. */
+        last_message_at: Timestamp | null
+        last_message_by: string | null
+        last_message_body: string | null
+        created_at: Timestamp
+      }>
+
+      /** 0043 — DM membership only. `student_id` null = the instructor. */
+      space_room_members: Row<{
+        room_id: UUID
+        student_id: UUID | null
+        created_at: Timestamp
+      }>
+
+      /** 0043 — chat messages. Soft-deleted; the row is the tombstone. */
+      space_messages: Row<{
+        id: UUID
+        room_id: UUID
+        author_student_id: UUID | null
+        display_name: string
+        avatar_url: string | null
+        body: string
+        reply_to_id: UUID | null
+        reply_to_name: string | null
+        reply_to_excerpt: string | null
+        hidden_at: Timestamp | null
+        deleted_at: Timestamp | null
+        created_at: Timestamp
+      }>
+
+      /**
+       * 0043 — reactions, stored as CODES not emoji (a variation selector
+       * would fail a CHECK against the glyph). `room_id` is denormalized so a
+       * realtime filter can be scoped to one room.
+       */
+      space_message_reactions: Row<{
+        message_id: UUID
+        room_id: UUID
+        student_id: UUID
+        code: 'like' | 'lol' | 'fire' | 'wow' | 'sad' | 'love'
+        created_at: Timestamp
+      }>
+
+      /** 0043 — resolved by the CLIENT when sending; validated server-side. */
+      space_mentions: Row<{
+        message_id: UUID
+        student_id: UUID
+      }>
+
+      /** 0043 — per-room mute. A table, not localStorage: push is server-side. */
+      space_room_prefs: Row<{
+        student_id: UUID
+        room_id: UUID
+        muted: boolean
+      }>
+
+      /**
+       * 0044 — reports. No FK on `target_id`: it points into one of three
+       * tables, and a report must survive the thing it is about being deleted.
+       */
+      space_reports: Row<{
+        id: UUID
+        target_type: 'post' | 'reply' | 'message'
+        target_id: UUID
+        reporter_student_id: UUID
+        reason: 'harassment' | 'inappropriate' | 'spam' | 'other'
+        note: string | null
+        resolved_at: Timestamp | null
+        resolved_by: UUID | null
+        resolved_action: 'delete' | 'restore' | 'dismiss' | null
+        created_at: Timestamp
+      }>
+
       /** 0042 — the Lounge feed. Select-only; every write goes through an RPC. */
       lounge_posts: Row<{
         id: UUID

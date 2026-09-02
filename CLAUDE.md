@@ -131,11 +131,11 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   should show only `as $$`, in equal number to `$$;`.
 - **Migration before client, always.** A migration adding a column the client selects
   must land in the database BEFORE the build that selects it, or every read 400s.
-  **ALL migrations 0001–0041 are APPLIED as of 2026-09-02** (confirmed by the user; 0041 was pasted twice to prove idempotency). **0042 and 0043 are WRITTEN AND NOT YET APPLIED** — until they are, /app/space/lounge and /app/space/chats show their error states and every Lounge/messaging RPC 404s. Paste them in order.
+  **ALL migrations 0001–0041 are APPLIED as of 2026-09-02** (confirmed by the user; 0041 was pasted twice to prove idempotency). **0042, 0043 and 0044 are WRITTEN AND NOT YET APPLIED** — until they are, every Student Space screen past the hub shows its error state. Paste them IN ORDER: 0043 widens `audit_log_action_check` for `space_break_glass`, and 0044 widens it again for `space_moderate`.
   The long "0033–0040 are unapplied / this one is LOUD" warning that used to live here
   is gone because it was describing a state that no longer exists — and a stale warning
   is worse than none, since the next reader cannot tell which half is still true.
-  **Next number: 0044.**
+  **Next number: 0045.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -1419,6 +1419,45 @@ still post in a DM whose members include the instructor, because otherwise their
 to appeal a mute is in person.
 
 Retention: `cp_purge_space_messages()` daily at 03:25 UTC, 90 days.
+
+
+Since 0044 (Student Space moderation — Phase 5): `space_reports`, auto-hide, and the
+instructor queue. **This is the file that has to be applied before Student Space is opened
+to anyone but the instructor** — 0042 and 0043 give students places to write, and this is
+the only thing that lets a bad afternoon be undone without the SQL editor.
+
+**ONE QUEUE ITEM PER TARGET, NOT PER REPORT.** `unique (target_type, target_id, reporter)`
+gives one report each; the queue GROUPS by target, so seven people reporting one post is one
+item that says "7" and lists who. `count_open_reports()` counts distinct targets for the
+same reason — a badge reading 7 for one post would be a lie about how much work is waiting.
+
+**Auto-hide at 7 counts UNRESOLVED reports only.** After a restore the pile starts from
+zero, so a group cannot re-bury a post by adding one more report to an old stack. 0044’s
+verify step 4 tests exactly that, and it is the one that would fail silently.
+
+**A reported DM shows its reason and reporters but NOT its text.** Reading it means
+`read_dm_thread()`, which writes an audit row. If the queue printed the body, every DM
+report would be a silent break-glass and the promise on the student’s DM screen would be
+false in the one case it is most likely to be tested.
+
+**`report_content` refuses a target the caller cannot SEE** (`cp_target_visible`). Without
+that check a student could report by id alone and manufacture an auto-hide on content they
+were never shown — including inside a DM they are not in.
+
+**A bug 0043 shipped with, caught before it was applied:** `read_dm_thread` inserts
+action = 'space_break_glass', which was NOT in 0041’s `audit_log_action_check`. The first
+break-glass read — the most important safety path in the feature — would have died on a
+check violation. 0043 now widens the constraint itself, re-listing every earlier value.
+**Any migration that writes a NEW audit action must widen that constraint in the same
+file**, and re-list the rest.
+
+Client: report flow in `components/space/ReportSheet.tsx` (fixed reasons + optional note,
+300 chars, `text-base` so iOS does not zoom); Report buttons on `PostCard` and `MessageRow`,
+shown only when the row is NOT yours; `features/instructor/ReportsInbox.tsx` as a FOURTH tab
+on /teach/redemptions, where the badge already lives. Timeouts are offered as 1 hour / 1 day
+/ 7 days plus a custom box, and go through 0041’s `timeout_student`, which caps at 90 days.
+Resolving notifies every reporter that it was reviewed, WITHOUT the outcome — what happened
+to another student is between them and the instructor.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

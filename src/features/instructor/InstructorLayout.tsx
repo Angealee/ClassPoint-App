@@ -25,6 +25,7 @@ import {
 import {
   getActiveSemester,
   getPendingExcuseCount,
+  countOpenReports,
   getPendingRedemptionCount,
   listSections,
   listSectionSubjects,
@@ -146,6 +147,8 @@ export function InstructorLayout() {
   // One inbox, two request types: point spends + absence excuses.
   const [pendingRedemptions, setPendingRedemptions] = useState(0)
   const [pendingExcuses, setPendingExcuses] = useState(0)
+  // Reports group by TARGET, so seven complaints about one post count as one.
+  const [pendingReports, setPendingReports] = useState(0)
 
   // Owned here (single mount) rather than in RedemptionInbox, which Shell
   // renders twice. Page-scoped channels: subscribed on mount, removed on unmount.
@@ -157,6 +160,9 @@ export function InstructorLayout() {
         .catch(() => {})
       getPendingExcuseCount()
         .then((n) => !cancelled && setPendingExcuses(n))
+        .catch(() => {})
+      countOpenReports()
+        .then((n) => !cancelled && setPendingReports(n))
         .catch(() => {})
     }
     refresh()
@@ -170,10 +176,16 @@ export function InstructorLayout() {
         refresh(),
       )
       .subscribe()
+    const reportsCh = uniqueChannel('reports-badge')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'space_reports' }, () =>
+        refresh(),
+      )
+      .subscribe()
     return () => {
       cancelled = true
       void supabase.removeChannel(redemptionsCh)
       void supabase.removeChannel(excusesCh)
+      void supabase.removeChannel(reportsCh)
     }
   }, [])
 
@@ -282,7 +294,7 @@ export function InstructorLayout() {
           // Wrapped so the desktop sidebar's justify-between treats these as a
           // single unit instead of spreading them apart.
           <div className="flex items-center gap-2">
-            <RedemptionInbox count={pendingRedemptions + pendingExcuses} />
+            <RedemptionInbox count={pendingRedemptions + pendingExcuses + pendingReports} />
             <OpsButton />
                         <IconButton
               label="Sign out"

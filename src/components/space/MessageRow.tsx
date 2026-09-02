@@ -29,6 +29,7 @@ export function MessageRow({
   onReact,
   onReply,
   onDelete,
+  onReport,
   canReact,
 }: {
   message: SpaceMessage
@@ -36,6 +37,7 @@ export function MessageRow({
   onReact: (m: SpaceMessage, code: ReactionCode) => void
   onReply: (m: SpaceMessage) => void
   onDelete: (m: SpaceMessage) => void
+  onReport?: (m: SpaceMessage) => void
   canReact: boolean
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -155,7 +157,7 @@ export function MessageRow({
             >
               Reply
             </button>
-            {message.canDelete && (
+            {message.canDelete ? (
               <button
                 type="button"
                 onClick={() => onDelete(message)}
@@ -163,6 +165,16 @@ export function MessageRow({
               >
                 Delete
               </button>
+            ) : (
+              onReport && (
+                <button
+                  type="button"
+                  onClick={() => onReport(message)}
+                  className="font-semibold transition-colors hover:text-danger"
+                >
+                  Report
+                </button>
+              )
             )}
           </div>
         )}

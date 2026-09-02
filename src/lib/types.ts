@@ -631,6 +631,8 @@ export type NotificationType =
   | 'space_mention'
   /** A direct message (0043). */
   | 'space_dm'
+  /** Your report was reviewed (0044). No outcome, by decision. */
+  | 'space_report'
   | 'test'
 
 /** One row of the student's notification history (the bell). */
@@ -946,3 +948,46 @@ export interface SpaceMessage {
 
 /** Longest a chat message may be — same limit and normaliser as a Lounge post. */
 export const MAX_MESSAGE_LENGTH = 600
+
+// ─── Student Space moderation (0044) ────────────────────────────────────────
+
+export type ReportTargetType = 'post' | 'reply' | 'message'
+export type ReportReason = 'harassment' | 'inappropriate' | 'spam' | 'other'
+export type ReportAction = 'delete' | 'restore' | 'dismiss'
+
+/** The reasons offered, in the order shown. */
+export const REPORT_REASONS: { value: ReportReason; label: string }[] = [
+  { value: 'harassment', label: 'Bullying or harassment' },
+  { value: 'inappropriate', label: 'Inappropriate content' },
+  { value: 'spam', label: 'Spam' },
+  { value: 'other', label: 'Something else' },
+]
+
+/** Distinct reports that auto-hide a target. Mirrors report_content(). */
+export const AUTO_HIDE_AT = 7
+
+/**
+ * One item in the instructor's queue — one per TARGET, not per report.
+ *
+ * `body` is null for a message in a DM room, deliberately: printing it here
+ * would make every DM report a silent break-glass. Use `readDmThread`, which
+ * writes an audit row.
+ */
+export interface ReportQueueItem {
+  targetType: ReportTargetType
+  targetId: string
+  reportCount: number
+  reporters: string[]
+  reasons: ReportReason[]
+  notes: string[]
+  firstAt: string
+  authorName: string | null
+  authorId: string | null
+  body: string | null
+  /** 'Lounge post' · 'Global room' · 'Direct message' … */
+  context: string
+  isDm: boolean
+  roomId: string | null
+  isHidden: boolean
+  isDeleted: boolean
+}

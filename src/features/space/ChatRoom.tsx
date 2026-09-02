@@ -10,6 +10,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { XIcon } from '@/components/ui/icons'
 import { MessageRow } from '@/components/space/MessageRow'
+import { ReportSheet } from '@/components/space/ReportSheet'
 import {
   deleteMyMessage,
   getRoomMessages,
@@ -61,6 +62,7 @@ export function ChatRoom() {
   const [sending, setSending] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<SpaceMessage | null>(null)
   const [busy, setBusy] = useState(false)
+  const [reportTarget, setReportTarget] = useState<SpaceMessage | null>(null)
 
   const areaRef = useRef<HTMLTextAreaElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -340,6 +342,7 @@ export function ChatRoom() {
                       onReact={react}
                       onReply={setReplyTo}
                       onDelete={setDeleteTarget}
+                      onReport={setReportTarget}
                     />
                   </div>
                 )
@@ -412,6 +415,13 @@ export function ChatRoom() {
           </StickyBar>
         </>
       )}
+
+      <ReportSheet
+        open={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        targetType="message"
+        targetId={reportTarget?.id ?? null}
+      />
 
       <ConfirmDialog
         open={!!deleteTarget}

@@ -41,6 +41,27 @@
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
+-- 0. Widen the audit constraint
+--
+--    `read_dm_thread()` below writes action = 'space_break_glass', and 0041's
+--    constraint does not list it — so the FIRST break-glass read would die on a
+--    check violation. That is the most important safety path in Student Space,
+--    and it would have failed the one time it was ever needed.
+--
+--    Constraint name preserved (0007/0011). Every earlier value is RE-LISTED:
+--    dropping and recreating this silently narrows it otherwise, which has been
+--    the bug twice already.
+-- ----------------------------------------------------------------------------
+alter table public.audit_log drop constraint if exists audit_log_action_check;
+alter table public.audit_log add constraint audit_log_action_check
+  check (action in (
+    'delete','archive','restore','hard_delete','broadcast',
+    'promote','semester_activate',
+    'space_flag','space_section','space_timeout',
+    'space_break_glass'
+  ));
+
+-- ----------------------------------------------------------------------------
 -- 1. Tables
 -- ----------------------------------------------------------------------------
 
