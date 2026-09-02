@@ -1,44 +1,54 @@
-import { motion } from 'framer-motion'
+import { motion, useAnimationControls, type Variants } from 'framer-motion'
 import type { ReactNode } from 'react'
-import { spring } from '@/lib/motion'
+import { ease, spring } from '@/lib/motion'
+import { useLandingScroll } from './scroll'
 
-/**
- * A section that rises into place the first time it is scrolled to.
- *
- * ── WHY VIEWPORT-TRIGGERED AND NOT ON MOUNT ────────────────────────────────
- * The landing page is a scrolling story, so most of it is below the fold at
- * load. An `animate` entrance would play every section's arrival while nobody
- * is looking at it, and by the time you scrolled down the page would be a wall
- * of already-settled blocks — the animation budget spent on an empty room.
- *
- * `once: true` is load-bearing: re-animating on every pass turns scrolling back
- * up into a flicker, and it would also keep the observer paying attention for
- * the life of the page. One shot, then framer detaches.
- *
- * This is still one-shot entrance motion — the ambient half of the page is CSS
- * (see the `cp-aurora-*` / `cp-sheen` keyframes). Nothing here runs a spring
- * after the section has arrived.
- *
- * `margin: '-80px'` fires it slightly BEFORE the block reaches the viewport
- * edge, so the movement is finishing as it comes into view rather than starting
- * from nothing once it is already on screen.
- */
+const VARIANTS: Variants = {
+  hiddenBelow: { opacity: 0, y: 24 },
+  hiddenAbove: { opacity: 0, y: -24 },
+  show: { opacity: 1, y: 0 },
+}
+
+export const revealIconVariants: Variants = {
+  hiddenBelow: { opacity: 0, scale: 0.5 },
+  hiddenAbove: { opacity: 0, scale: 0.5 },
+  show: { opacity: 1, scale: 1, transition: { ...spring, delay: 0.14 } },
+}
+
 export function Reveal({
   children,
   delay = 0,
   className,
 }: {
   children: ReactNode
-  /** Seconds. Use to stagger siblings that reveal as one group. */
+  /** Seconds. Staggers siblings that reveal as one group. */
   delay?: number
   className?: string
 }) {
+  const controls = useAnimationControls()
+  const { direction } = useLandingScroll()
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-80px' }}
+      variants={VARIANTS}
+      initial="hiddenBelow"
+      animate={controls}
       transition={{ ...spring, delay }}
+      // A small negative margin so the entrance starts just before the block
+      // reaches the edge and is finishing as it becomes properly visible,
+      // rather than beginning from nothing once it is already on screen.
+      viewport={{ margin: '-40px' }}
+      onViewportEnter={() => {
+        // Jump to the correct side FIRST, then travel to rest. `set` is
+        // instantaneous and happens off-screen, so it is never seen.
+        controls.set(direction.current === 'up' ? 'hiddenAbove' : 'hiddenBelow')
+        void controls.start('show')
+      }}
+      onViewportLeave={() => {
+        // Leave through the edge it is actually heading for: travelling down,
+        // the block exits via the top.
+        void controls.start(direction.current === 'down' ? 'hiddenAbove' : 'hiddenBelow', ease)
+      }}
       className={className}
     >
       {children}
