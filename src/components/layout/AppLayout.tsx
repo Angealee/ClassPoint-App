@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
+import { AccountMenuPanel, SidebarAccount } from '@/components/layout/AccountMenu'
 import { StudentDataProvider, useStudentData } from '@/features/student/StudentData'
 import { LevelUpBurst } from '@/components/ui/LevelUpBurst'
 import { AchievementUnlockBurst } from '@/components/achievements/AchievementUnlockBurst'
@@ -8,17 +9,27 @@ import { WhatsNew } from '@/features/WhatsNew'
 import { AwayRecap } from '@/features/student/AwayRecap'
 import { NotificationsSheet } from '@/features/student/Notifications'
 import { Onboarding } from '@/features/student/Onboarding'
+import { Sheet } from '@/components/ui/Sheet'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useAuth } from '@/lib/auth'
+import { useIsDesktop } from '@/lib/useIsDesktop'
 import { LATEST_VERSION, setSeenVersion } from '@/lib/changelog'
-import { BellIcon, HomeIcon, ScanIcon, TrophyIcon, UserIcon } from '@/components/ui/icons'
+import { BellIcon, HomeIcon, MenuIcon, ScanIcon, TrophyIcon } from '@/components/ui/icons'
 
 const ONBOARDED_KEY = 'cp_onboarded'
 
-const studentNav: NavItem[] = [
+/**
+ * Three routed tabs plus the menu.
+ *
+ * Profile lost its tab when the account menu arrived — it is a row in the menu
+ * now, which is why `routes.test.ts` gained `/app/profile`: the nav array is no
+ * longer the thing that keeps it reachable.
+ */
+const routedTabs = [
   { to: '/app', label: 'Home', Icon: HomeIcon, end: true },
   { to: '/app/leaderboard', label: 'Ranks', Icon: TrophyIcon },
   { to: '/app/attendance', label: 'Attend', Icon: ScanIcon },
-  { to: '/app/profile', label: 'Profile', Icon: UserIcon },
-]
+] as const
 
 /**
  * Bell + unread badge, rendered into the Shell's `actions` slot (mobile header
@@ -56,17 +67,90 @@ function NotificationBell() {
   )
 }
 
-/** The shell with a live nav — the Profile tab gets a dot for new achievements. */
+/**
+ * The shell with a live nav, plus the account menu.
+ *
+ * ⚠ `menuOpen` lives HERE, not in the nav item. Shell renders `nav` twice — the
+ * desktop sidebar and the mobile tab bar — so a button owning its own state
+ * would produce two menus that disagree. Same rule as the `actions` slot.
+ *
+ * The two presentations are chosen in JS rather than with `md:` classes because
+ * the mobile one is a Sheet, and a Sheet portals to <body>: a `md:hidden`
+ * wrapper around it would style nothing and both would open on a desktop
+ * viewport. See the note in lib/useIsDesktop.ts.
+ */
 function StudentShell() {
   const { hasUnseenAchievements } = useStudentData()
-  const nav = useMemo(
-    () =>
-      studentNav.map((n) =>
-        n.to === '/app/profile' ? { ...n, dot: hasUnseenAchievements } : n,
-      ),
-    [hasUnseenAchievements],
+  const { signOut } = useAuth()
+  const isDesktop = useIsDesktop()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [signOutOpen, setSignOutOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+
+  const closeMenu = () => setMenuOpen(false)
+
+  // Sign out is confirmed in a ConfirmDialog, which is itself a Sheet. Close
+  // the menu FIRST so two portalled dialogs never stack their focus traps.
+  const requestSignOut = () => {
+    setMenuOpen(false)
+    setSignOutOpen(true)
+  }
+
+  const nav = useMemo<NavItem[]>(
+    () => [
+      ...routedTabs.map((t) => ({ ...t })),
+      {
+        kind: 'button' as const,
+        id: 'menu',
+        label: 'Menu',
+        Icon: MenuIcon,
+        // The dot followed Profile into the menu, so it lands on the tab that
+        // now leads there — and is repeated on the Profile row inside.
+        dot: hasUnseenAchievements,
+        active: menuOpen,
+        onClick: () => setMenuOpen((v) => !v),
+      },
+    ],
+    [hasUnseenAchievements, menuOpen],
   )
-  return <Shell nav={nav} actions={<NotificationBell />} />
+
+  return (
+    <>
+      <Shell
+        nav={nav}
+        actions={<NotificationBell />}
+        accountSlot={
+          isDesktop ? (
+            <SidebarAccount
+              open={menuOpen}
+              onToggle={() => setMenuOpen((v) => !v)}
+              onNavigate={closeMenu}
+              onRequestSignOut={requestSignOut}
+            />
+          ) : undefined
+        }
+      />
+
+      {!isDesktop && (
+        <Sheet open={menuOpen} onClose={closeMenu}>
+          <AccountMenuPanel onNavigate={closeMenu} onRequestSignOut={requestSignOut} />
+        </Sheet>
+      )}
+
+      <ConfirmDialog
+        open={signOutOpen}
+        title="Sign out?"
+        message="You'll need your username and PIN to get back in."
+        confirmLabel="Sign out"
+        busy={signingOut}
+        onConfirm={() => {
+          setSigningOut(true)
+          void signOut().finally(() => setSigningOut(false))
+        }}
+        onClose={() => setSignOutOpen(false)}
+      />
+    </>
+  )
 }
 
 /** Renders the celebratory burst from shared student data. */

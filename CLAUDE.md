@@ -123,18 +123,11 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
 - The user pastes migrations whole into the SQL editor — test idempotency by running twice.
 - **Migration before client, always.** A migration adding a column the client selects
   must land in the database BEFORE the build that selects it, or every read 400s.
-  **All migrations through 0032 are applied as of 2026-08-14.**
-  **0033, 0034 and 0035 are WRITTEN AND NOT YET APPLIED.** Paste all three, in order,
-  before deploying the current build. 0033 (`student_presence`) degrades quietly if
-  missing — the live-class banner just never fires. **0034 (`instructor_ops`) and 0035
-  (`rollover`) do NOT: every card on `/teach/ops` and every step of the rollover wizard
-  calls an RPC that won't exist.** 0035 has an ACID TEST in its footer — dress-rehearse
-  on a scratch semester and confirm `semester_points` round-trips exactly before doing
-  the real rollover. **0036 (`term_badges`) is also unapplied**; without it the four new
-  badges simply never unlock and their progress bars read empty (it degrades quietly —
-  the client defaults the missing columns). **0037 (`rank_history`) is unapplied too**;
-  without it `getLeaderboardSnapshot` selects two columns that don't exist and the whole
-  board 400s — this one is LOUD. **0038 (`spend_board`) is unapplied and is also LOUD** — `getLeaderboardSnapshot` selects `spent_points`/`spend_rank`, so without it every student's leaderboard 400s, same as 0037. **0039 (`profile_header`) is unapplied and is LOUD too** — `getMyStudent` and `getPublicProfile` both select `header_url`, so without it the student app cannot load a profile at all. **0040 (`header_position`) is unapplied and is LOUD too** — both profile selects read `header_pos`. Next number: 0041.
+  **ALL migrations 0001–0040 are APPLIED as of 2026-09-02** (confirmed by the user).
+  The long "0033–0040 are unapplied / this one is LOUD" warning that used to live here
+  is gone because it was describing a state that no longer exists — and a stale warning
+  is worse than none, since the next reader cannot tell which half is still true.
+  **Next number: 0041.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already

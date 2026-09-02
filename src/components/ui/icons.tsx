@@ -48,6 +48,23 @@ export function UserIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+/**
+ * Hamburger. Added for the student "Menu" tab, which replaced the Profile tab
+ * when Profile moved behind the account menu.
+ *
+ * Lines at 6 / 12 / 18 rather than a tighter 7/12/17 stack: at the 24px this
+ * renders in the tab bar, tighter spacing reads as one thick smudge.
+ */
+export function MenuIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h16" />
+    </svg>
+  )
+}
+
 export function ShieldIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>

@@ -54,13 +54,16 @@ function hasInboundLink(path: string): boolean {
 /**
  * Screens NOT in a bottom-tab bar, so a link is the only way in.
  *
- * Excluded on purpose: the four student tabs and four instructor tabs (the nav
- * arrays are the link); `/macalesideauth` (unlisted by design — linking it
+ * Excluded on purpose: the three routed student tabs and four instructor tabs
+ * (the nav arrays are the link); `/macalesideauth` (unlisted by design — linking it
  * defeats an unadvertised sign-in route); `/scan` (entered from a phone camera).
  */
 const MUST_BE_LINKED = [
   // Student
   '/app/points',
+  // Stopped being a tab when the account menu replaced it — its only link is
+  // now the Profile row in AccountMenu.tsx.
+  '/app/profile',
   '/app/history',
   '/app/achievements',
   '/app/attendance/stats',

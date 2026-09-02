@@ -55,7 +55,7 @@ import type {
   StudentSelf,
 } from '@/lib/types'
 
-interface StudentDataValue {
+export interface StudentDataValue { // PROBE-TEMP-EXPORT
   loading: boolean
   error: boolean
   me: StudentSelf | null
@@ -166,7 +166,7 @@ interface StudentDataValue {
   markAllRead: () => Promise<void>
 }
 
-const StudentDataContext = createContext<StudentDataValue | undefined>(undefined)
+export const StudentDataContext = createContext<StudentDataValue | undefined>(undefined) // PROBE-TEMP-EXPORT
 
 /**
  * How long the tab must be hidden before coming back counts as "might have
