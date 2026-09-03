@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -19,6 +20,7 @@ import { useStudentDataOptional } from '@/features/student/StudentData'
 import {
   deleteMyMessage,
   getRoomAudience,
+  getRoomLevel,
   getRoomMessages,
   getRoomPostBlock,
   listMyRooms,
@@ -28,16 +30,25 @@ import {
   startDm,
   reactToMessage,
   sendMessage,
+  setRoomLevel,
   setRoomMuted,
   unpinMessage,
   type MessageCursor,
 } from '@/lib/api'
 import { supabase, uniqueChannel } from '@/lib/supabase'
 import { errorText } from '@/lib/errors'
-import { resolveMentions, type MentionCandidate } from '@/lib/mentions'
+import {
+  applyMention,
+  matchMentions,
+  mentionQuery,
+  resolveMentions,
+  type MentionCandidate,
+  type MentionQuery,
+} from '@/lib/mentions'
 import { getLastRead, markRead, unreadDividerIndex } from '@/lib/unread'
 import { getLevelProgress } from '@/lib/leveling'
 import { noteTyping, shouldBroadcast, typingLabel, type TypingEntry } from '@/lib/typing'
+import { joinTypingChannel, type TypingChannel } from '@/lib/typing-channel'
 import { Sheet } from '@/components/ui/Sheet'
 import { Avatar } from '@/components/ui/Avatar'
 import { useNavigate } from 'react-router-dom'
@@ -46,6 +57,7 @@ import {
   MAX_MESSAGE_LENGTH,
   type ReactionCode,
   type RoomAudience,
+  type RoomNotifyLevel,
   type RoomPin,
   type SpaceMessage,
   type SpacePerson,
@@ -61,6 +73,32 @@ function readRailPref(): boolean {
   } catch {
     // A private window or blocked site data — default to showing it.
     return true
+  }
+}
+
+/**
+ * A half-typed message survives leaving the room.
+ *
+ * localStorage, not a table: a draft is per-device by definition, and the only
+ * thing worse than losing one is the server having a copy of what you decided
+ * not to send. Cleared on a successful send.
+ */
+const DRAFT_KEY = (roomId: string) => `cp_room_draft_v1:${roomId}`
+
+function readDraft(roomId: string): string {
+  try {
+    return window.localStorage.getItem(DRAFT_KEY(roomId)) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function writeDraft(roomId: string, text: string) {
+  try {
+    if (text.trim() === '') window.localStorage.removeItem(DRAFT_KEY(roomId))
+    else window.localStorage.setItem(DRAFT_KEY(roomId), text)
+  } catch {
+    /* the composer still works; the draft just will not survive */
   }
 }
 
@@ -96,6 +134,29 @@ const TIME_GAP_MS = 30 * 60 * 1000
  * past the viewport in a room with two messages. The row now takes its height
  * from the grid, and the rail fills it.
  */
+
+/**
+ * Three dots that rise in sequence, beside "X is typing…".
+ *
+ * framer-motion rather than a CSS keyframe, unlike the leaderboard's flame:
+ * exactly one of these exists at a time, so the forty-springs argument does not
+ * apply — and `MotionConfig reducedMotion="user"` in App.tsx switches it off
+ * without a second rule to remember.
+ */
+function TypingDots() {
+  return (
+    <span aria-hidden="true" className="flex shrink-0 items-end gap-0.5">
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          className="h-1 w-1 rounded-full bg-muted"
+          animate={{ y: [0, -3, 0], opacity: [0.4, 1, 0.4] }}
+          transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut', delay: i * 0.15 }}
+        />
+      ))}
+    </span>
+  )
+}
 
 function timeOf(iso: string): string {
   const d = new Date(iso)
@@ -154,11 +215,15 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
   const [audience, setAudience] = useState<RoomAudience | null>(null)
   const [railOpen, setRailOpen] = useState(readRailPref)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [peopleError, setPeopleError] = useState<string | null>(null)
+  const [level, setLevel] = useState<RoomNotifyLevel | undefined>(undefined)
+  const [mention, setMention] = useState<MentionQuery | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
 
   const areaRef = useRef<HTMLTextAreaElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const dividerRef = useRef<HTMLDivElement>(null)
-  const channelRef = useRef<ReturnType<typeof uniqueChannel> | null>(null)
+  const typingRef = useRef<TypingChannel | null>(null)
   const lastTypingSentRef = useRef<number | null>(null)
   // A ref as well as state: the realtime handler reads it, and must not have to
   // re-subscribe to see a new value.
@@ -167,6 +232,7 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
   const load = useCallback(async () => {
     setFailed(false)
     try {
+      setBody(readDraft(roomId))
       setEntryLastRead(getLastRead(roomId))
       const [rooms, page, why] = await Promise.all([
         listMyRooms(),
@@ -193,13 +259,20 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
   // ONE roster fetch per room. It feeds the XP ring, the level, the rank
   // medal, the section dot, the People panel AND mention resolution — the
   // alternative was five sources for five things beside one name.
-  useEffect(() => {
+  //
+  // ⚠ The failure is SURFACED, not swallowed. It used to be a bare
+  // `.catch(() => {})`, and when `get_space_people` was missing from the
+  // database the People panel calmly reported "Nobody else is in here yet" —
+  // a lie, told to the one person who could have fixed it. Same class of bug
+  // as the attendance screen that told a student they had no record at all.
+  const loadPeople = useCallback(() => {
+    setPeopleError(null)
     void listSpacePeople()
       .then(setPeople)
-      .catch(() => {
-        /* badges and mentions degrade to nothing */
-      })
+      .catch((e) => setPeopleError(errorText(e, 'Could not load who is in this room.')))
   }, [])
+
+  useEffect(loadPeople, [loadPeople])
 
   /**
    * The panel's own two reads, off the critical path and each failing soft:
@@ -215,6 +288,11 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
     void getRoomAudience(roomId)
       .then(setAudience)
       .catch(() => setAudience(null))
+    void getRoomLevel(roomId)
+      .then(setLevel)
+      // Until 0048 lands this column does not exist; the control stays hidden
+      // rather than offering a setting that cannot be saved.
+      .catch(() => setLevel(undefined))
   }, [roomId])
 
   useEffect(loadPanel, [loadPanel])
@@ -296,25 +374,34 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
         },
         () => void refreshNewest(),
       )
-      .on('broadcast', { event: 'typing' }, (payload) => {
-        const name = (payload?.payload as { name?: string } | undefined)?.name
-        if (!name) return
-        setTypers((cur) => noteTyping(cur, name))
-      })
       .subscribe()
-    channelRef.current = channel
-    return () => {
-      channelRef.current = null
-      void supabase.removeChannel(channel)
-    }
+    return () => void supabase.removeChannel(channel)
   }, [roomId, refreshNewest])
+
+  /**
+   * Typing rides its OWN channel, on a SHARED topic.
+   *
+   * It used to ride the channel above — and that channel's topic carries a
+   * random suffix, so two people in one room were on two different topics and
+   * a broadcast could never reach the other. `postgres_changes` did not care
+   * (those are server-side subscriptions), which is why everything else worked
+   * and only this was dead. See lib/typing-channel.ts.
+   */
+  useEffect(() => {
+    if (!roomId) return
+    const ch = joinTypingChannel(roomId, (name) => setTypers((cur) => noteTyping(cur, name)))
+    typingRef.current = ch
+    return () => {
+      typingRef.current = null
+      ch.leave()
+    }
+  }, [roomId])
 
   function announceTyping() {
     const now = Date.now()
     if (!shouldBroadcast(lastTypingSentRef.current, now)) return
     lastTypingSentRef.current = now
-    const name = student?.me?.display_name ?? 'Instructor'
-    void channelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { name } })
+    typingRef.current?.announce(student?.me?.display_name ?? 'Instructor')
   }
 
   async function loadOlder() {
@@ -343,6 +430,8 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
         mentions: resolveMentions(text, mentionCandidates),
       })
       setBody('')
+      writeDraft(roomId, '')
+      setMention(null)
       setReplyTo(null)
       await refreshNewest()
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -378,8 +467,32 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
     }
   }
 
+  /**
+   * The header's Mute pill and the panel's three-way control are ONE setting.
+   *
+   * Both land here, so `muted` on the room and `level` in the panel can never
+   * show different answers — the same reason `space_room_prefs.muted` is a
+   * generated column server-side.
+   */
+  async function changeLevel(next: RoomNotifyLevel) {
+    if (!room) return
+    const before = level
+    setLevel(next)
+    setRoom({ ...room, muted: next === 'none' })
+    try {
+      await setRoomLevel(room.id, next)
+    } catch (e) {
+      setLevel(before)
+      setRoom({ ...room, muted: before === 'none' })
+      toast(errorText(e, 'Could not change that.'), 'error')
+    }
+  }
+
   async function toggleMute() {
     if (!room) return
+    // Before 0048 there is no `level` to read, so fall back to the boolean the
+    // room already carries. Same call either way once it lands.
+    if (level) return changeLevel(level === 'none' ? 'mentions' : 'none')
     try {
       const next = await setRoomMuted(room.id, !room.muted)
       setRoom({ ...room, muted: next })
@@ -429,6 +542,29 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
     dividerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
+  /** Keep the @picker in step with what is under the caret. */
+  function syncMention(value: string, caret: number) {
+    const q = mentionQuery(value.slice(0, caret))
+    setMention(q)
+    setMentionIndex(0)
+  }
+
+  function chooseMention(c: MentionCandidate) {
+    const el = areaRef.current
+    if (!el || !mention) return
+    const caret = el.selectionStart ?? body.length
+    const next = applyMention(body, mention.start, caret, c.displayName)
+    setBody(next.value)
+    writeDraft(roomId, next.value)
+    setMention(null)
+    // Focus and caret restored in the same frame, or the picker closing steals
+    // the cursor to the end of the message.
+    requestAnimationFrame(() => {
+      el.focus()
+      el.setSelectionRange(next.caret, next.caret)
+    })
+  }
+
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people])
   const mentionCandidates: MentionCandidate[] = useMemo(
     () => people.map((p) => ({ id: p.id, displayName: p.displayName })),
@@ -440,6 +576,10 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
   const mentionNames = useMemo(
     () => [...people.map((p) => p.displayName), 'Instructor'],
     [people],
+  )
+  const mentionMatches = useMemo(
+    () => (mention ? matchMentions(mention.query, mentionCandidates) : []),
+    [mention, mentionCandidates],
   )
 
   const divider = useMemo(
@@ -463,9 +603,12 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
       messages={messages}
       pins={pins}
       myStudentId={myStudentId}
-      isInstructor={myStudentId === null}
       unreadCount={unreadCount}
       variant={variant}
+      peopleError={peopleError}
+      onRetryPeople={loadPeople}
+      level={level}
+      onSetLevel={(next) => void changeLevel(next)}
       onToggleMute={variant === 'screen' ? () => void toggleMute() : undefined}
       onJump={jumpToParent}
       onJumpToUnread={jumpToUnread}
@@ -667,9 +810,10 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
                       onReport={setReportTarget}
                       onJumpToParent={jumpToParent}
                       onOpenPerson={setPersonTarget}
-                      onPin={
-                        myStudentId === null ? (msg, next) => void togglePin(msg, next) : undefined
-                      }
+                      // Anyone who can POST can pin — the same one answer the
+                      // composer reads, so the two can never disagree about a
+                      // timed-out student.
+                      onPin={block === null ? (msg, next) => void togglePin(msg, next) : undefined}
                       pinned={pinnedIds.has(m.id)}
                     />
                   </div>
@@ -710,7 +854,60 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
                 </div>
               )}
 
-              {typing && <p className="mb-1 truncate px-1 text-2xs italic text-muted">{typing}</p>}
+              {/* The @picker sits ABOVE the composer and below the reply quote,
+                  so the list never covers the field you are typing into. */}
+              {mentionMatches.length > 0 && (
+                <div
+                  role="listbox"
+                  aria-label="Mention someone"
+                  className="mb-2 max-h-56 overflow-y-auto rounded-xl border border-line bg-card-2 p-1"
+                >
+                  {mentionMatches.map((c, i) => {
+                    const person = peopleById.get(c.id)
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        role="option"
+                        aria-selected={i === mentionIndex}
+                        // pointerDown, not click: the textarea's onBlur closes
+                        // the picker, and blur lands first on a click.
+                        onPointerDown={(e) => {
+                          e.preventDefault()
+                          chooseMention(c)
+                        }}
+                        onMouseEnter={() => setMentionIndex(i)}
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors',
+                          i === mentionIndex ? 'bg-accent-solid/15' : 'hover:bg-card',
+                        )}
+                      >
+                        <Avatar
+                          name={c.displayName}
+                          url={person?.avatarUrl ?? null}
+                          className="h-6 w-6 shrink-0"
+                          textClassName="text-2xs"
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                          {c.displayName}
+                        </span>
+                        {person && (
+                          <span className="shrink-0 text-2xs tabular-nums text-muted">
+                            Lv {getLevelProgress(person.semesterPoints).level}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {typing && (
+                <p className="mb-1 flex items-center gap-1.5 truncate px-1 text-2xs italic text-muted">
+                  <TypingDots />
+                  {typing}
+                </p>
+              )}
 
               {block ? (
                 <p className="px-1 py-1.5 text-xs font-medium text-warn">{block}</p>
@@ -720,10 +917,45 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
                     ref={areaRef}
                     value={body}
                     onChange={(e) => {
-                      setBody(e.target.value)
-                      if (e.target.value.trim()) announceTyping()
+                      const next = e.target.value
+                      setBody(next)
+                      writeDraft(roomId, next)
+                      syncMention(next, e.target.selectionStart ?? next.length)
+                      if (next.trim()) announceTyping()
                     }}
+                    onKeyUp={(e) =>
+                      // Arrow keys and clicks move the caret without changing
+                      // the text, and the picker follows the CARET.
+                      syncMention(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)
+                    }
+                    onClick={(e) =>
+                      syncMention(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)
+                    }
+                    onBlur={() => setMention(null)}
                     onKeyDown={(e) => {
+                      // The mention picker owns these keys while it is open, or
+                      // Enter would send "@ma" instead of choosing Maria.
+                      if (mentionMatches.length > 0) {
+                        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                          e.preventDefault()
+                          setMentionIndex(
+                            (i) =>
+                              (i + (e.key === 'ArrowDown' ? 1 : -1) + mentionMatches.length) %
+                              mentionMatches.length,
+                          )
+                          return
+                        }
+                        if (e.key === 'Enter' || e.key === 'Tab') {
+                          e.preventDefault()
+                          chooseMention(mentionMatches[mentionIndex])
+                          return
+                        }
+                        if (e.key === 'Escape') {
+                          e.preventDefault()
+                          setMention(null)
+                          return
+                        }
+                      }
                       // Enter sends; Shift+Enter is a newline. The usual chat
                       // contract — and on a phone the on-screen Return key
                       // still inserts a newline, because it does not report

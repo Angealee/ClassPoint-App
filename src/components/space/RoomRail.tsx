@@ -3,12 +3,20 @@ import { Avatar } from '@/components/ui/Avatar'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Input } from '@/components/ui/Input'
 import { IconButton } from '@/components/ui/IconButton'
+import { ErrorState } from '@/components/ui/EmptyState'
 import { BellIcon, SearchIcon, XIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { getLevelProgress } from '@/lib/leveling'
 import { sectionColor } from '@/lib/sectionColor'
 import { parseInline, parseMessageBody } from '@/lib/message-body'
-import type { RoomAudience, RoomPin, SpaceMessage, SpacePerson, SpaceRoom } from '@/lib/types'
+import type {
+  RoomAudience,
+  RoomNotifyLevel,
+  RoomPin,
+  SpaceMessage,
+  SpacePerson,
+  SpaceRoom,
+} from '@/lib/types'
 import type { CSSProperties } from 'react'
 
 /**
@@ -41,6 +49,12 @@ const TABS: { value: Tab; label: string }[] = [
 
 /** Gold, silver, bronze — the same ramp the message rows use. */
 const MEDAL: Record<number, string> = { 1: 'text-reward', 2: 'text-muted', 3: 'text-warn' }
+
+const LEVELS: { value: RoomNotifyLevel; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'mentions', label: 'Mentions' },
+  { value: 'none', label: 'Off' },
+]
 
 /** Below this, "Top of the room" would just be the room listed twice. */
 const TOP_MIN_MEMBERS = 8
@@ -204,9 +218,12 @@ export function RoomRail({
   messages,
   pins,
   myStudentId,
-  isInstructor,
   unreadCount,
   variant = 'rail',
+  peopleError,
+  onRetryPeople,
+  level,
+  onSetLevel,
   onJump,
   onJumpToUnread,
   onOpenPerson,
@@ -221,7 +238,6 @@ export function RoomRail({
   messages: SpaceMessage[]
   pins: RoomPin[]
   myStudentId: string | null
-  isInstructor: boolean
   unreadCount: number
   /**
    * `rail` sits beside the thread, where the chat header already names the room
@@ -229,6 +245,16 @@ export function RoomRail({
    * its own on a phone and brings the identity block the reference expects.
    */
   variant?: 'rail' | 'screen'
+  /**
+   * Set when the roster fetch failed. It is rendered instead of the list —
+   * "Nobody else is in here yet" is a LIE when the truth is "that request did
+   * not come back", and it is told to the one person who could fix it.
+   */
+  peopleError?: string | null
+  onRetryPeople?: () => void
+  /** Undefined until it has loaded; the control is hidden until then. */
+  level?: RoomNotifyLevel
+  onSetLevel?: (level: RoomNotifyLevel) => void
   onJump: (messageId: string) => void
   onJumpToUnread: () => void
   onOpenPerson: (m: SpaceMessage) => void
@@ -363,10 +389,15 @@ export function RoomRail({
           />
           <div className="min-w-0">
             <h3 className="truncate font-display text-lg font-bold">{room?.name ?? 'Room'}</h3>
+            {/* The SERVER's count, not the length of the list below it. They
+                disagree exactly when the roster fetch failed, and in that case
+                the number that is true is the one the room actually has. */}
             <p className="truncate text-xs text-muted">
               {room?.kind === 'dm'
                 ? 'Private · your instructor can review reported threads'
-                : `${memberTotal} ${memberTotal === 1 ? 'person' : 'people'}`}
+                : `${room?.memberCount ?? memberTotal} ${
+                    (room?.memberCount ?? memberTotal) === 1 ? 'person' : 'people'
+                  }`}
             </p>
           </div>
           <div className="mt-1 flex items-center gap-6">
@@ -400,6 +431,25 @@ export function RoomRail({
             Jump ↑
           </span>
         </button>
+      )}
+
+      {/* A room SETTING, so it sits with search above the tabs rather than
+          inside one of them — and it is the same control in both variants, so
+          the rail and the phone panel cannot offer different options. The
+          round Mute button above is a shortcut into the same state, never a
+          second source of it. */}
+      {level && onSetLevel && (
+        <div>
+          <p className="px-1 pb-1 text-2xs font-semibold uppercase tracking-wide text-muted">
+            Notify me
+          </p>
+          <SegmentedControl
+            value={level}
+            onChange={onSetLevel}
+            label="Notifications for this room"
+            options={LEVELS}
+          />
+        </div>
       )}
 
       <Input
@@ -447,7 +497,15 @@ export function RoomRail({
             label="Room panel"
           />
 
-          {tab === 'people' && (
+          {tab === 'people' && peopleError ? (
+            <ErrorState
+              inline
+              onRetry={onRetryPeople}
+              detail="Everyone is still in the room — this is the list that did not load."
+            >
+              {peopleError}
+            </ErrorState>
+          ) : tab === 'people' ? (
             <div className="space-y-3">
               {top.length > 0 && (
                 <div>
@@ -488,16 +546,12 @@ export function RoomRail({
                 {members.length === 0 && <Empty>Nobody else is in here yet.</Empty>}
               </div>
             </div>
-          )}
+          ) : null}
 
           {tab === 'pinned' && (
             <div>
               {pins.length === 0 ? (
-                <Empty>
-                  {isInstructor
-                    ? 'Nothing pinned. Hold a message and choose Pin.'
-                    : 'Nothing pinned yet.'}
-                </Empty>
+                <Empty>Nothing pinned. Hold a message and choose Pin.</Empty>
               ) : (
                 pins.map((p) => (
                   <JumpLine
@@ -507,7 +561,7 @@ export function RoomRail({
                     when={timeAgo(p.createdAt)}
                     onJump={() => onJump(p.messageId)}
                     trailing={
-                      isInstructor && onUnpin ? (
+                      p.canUnpin && onUnpin ? (
                         <IconButton
                           label="Unpin"
                           variant="danger"

@@ -4,6 +4,7 @@ import type {
   ReactionCode,
   RoomAudience,
   RoomKind,
+  RoomNotifyLevel,
   RoomPin,
   SpaceMessage,
   SpaceRoom,
@@ -169,6 +170,8 @@ interface PinRow {
   body: string | null
   created_at: string
   pinned_at: string
+  pinned_by: string | null
+  can_unpin: boolean
 }
 
 /** Newest pin first. A hidden or deleted message keeps its row but loses its body. */
@@ -182,6 +185,8 @@ export async function listRoomPins(roomId: string): Promise<RoomPin[]> {
     body: r.body,
     createdAt: r.created_at,
     pinnedAt: r.pinned_at,
+    pinnedBy: r.pinned_by,
+    canUnpin: !!r.can_unpin,
   }))
 }
 
@@ -238,7 +243,7 @@ export async function setRoomControls(
   })
 }
 
-/** Pin a message. Instructor only; the room caps out at 10. */
+/** Pin a message. Anyone who can post; the room caps out at 10. */
 export async function pinMessage(roomId: string, messageId: string): Promise<void> {
   await rpc('pin_message', { p_room: roomId, p_message: messageId })
 }
@@ -266,4 +271,33 @@ export async function readDmThread(
     body: r.body,
     createdAt: r.created_at,
   }))
+}
+
+// ── Notification level per room (migration 0048) ────────────────────────────
+
+/**
+ * Read your own level for a room.
+ *
+ * A direct select rather than an RPC: `space_room_prefs_select` already scopes
+ * the table to `student_id = cp_my_student_id()`, so there is nothing an RPC
+ * would add except another function to keep in step. A row only exists once you
+ * have changed something, hence the default.
+ */
+export async function getRoomLevel(roomId: string): Promise<RoomNotifyLevel> {
+  const { data, error } = await supabase
+    .from('space_room_prefs')
+    .select('level')
+    .eq('room_id', roomId)
+    .maybeSingle()
+  if (error) throw error
+  const level = data?.level
+  return level === 'all' || level === 'none' ? level : 'mentions'
+}
+
+export async function setRoomLevel(
+  roomId: string,
+  level: RoomNotifyLevel,
+): Promise<RoomNotifyLevel> {
+  return ((await rpc<string>('set_room_level', { p_room: roomId, p_level: level })) ??
+    level) as RoomNotifyLevel
 }

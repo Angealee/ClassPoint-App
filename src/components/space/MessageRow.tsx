@@ -143,20 +143,68 @@ function Inline({ text, names }: { text: string; names: readonly string[] }) {
   )
 }
 
+/**
+ * Copy-to-clipboard, with the confirmation ON the button.
+ *
+ * A toast would be the app's usual answer, but this fires from inside a message
+ * row and the point of copying a code block is that you are about to paste it —
+ * a banner at the other end of the screen is the wrong place to look.
+ */
+function useCopy() {
+  const [done, setDone] = useState(false)
+  useEffect(() => {
+    if (!done) return
+    const t = window.setTimeout(() => setDone(false), 1400)
+    return () => window.clearTimeout(t)
+  }, [done])
+  const copy = (text: string) => {
+    // `clipboard` is undefined on an insecure origin; failing silently is right
+    // here, because the alternative is an error toast for a convenience.
+    void navigator.clipboard?.writeText(text).then(
+      () => setDone(true),
+      () => {},
+    )
+  }
+  return { done, copy }
+}
+
+function CodeBlock({ content }: { content: string }) {
+  const { done, copy } = useCopy()
+  return (
+    <div className="group/code relative my-1">
+      {/* Its OWN horizontal scroll: art keeps its shape instead of rewrapping
+          into noise, and it still cannot push the page sideways. */}
+      <pre className="overflow-x-auto rounded-lg border border-line bg-card px-2.5 py-2 pr-12 font-mono text-xs leading-tight text-ink">
+        {content}
+      </pre>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          copy(content)
+        }}
+        aria-label={done ? 'Copied' : 'Copy code'}
+        // Always visible on touch (where there is no hover to reveal it) and on
+        // focus; the mouse gets it on hover so a quiet room stays quiet.
+        className={cn(
+          'absolute right-1.5 top-1.5 rounded-lg border border-line bg-card-2 px-2 py-1 text-2xs font-semibold transition-opacity',
+          'opacity-100 md:opacity-0 md:group-hover/code:opacity-100 md:focus-visible:opacity-100',
+          done ? 'text-success' : 'text-muted hover:text-ink',
+        )}
+      >
+        {done ? 'Copied' : 'Copy'}
+      </button>
+    </div>
+  )
+}
+
 function Body({ body, names }: { body: string; names: readonly string[] }) {
   const parts = parseMessageBody(body)
   return (
     <>
       {parts.map((p, i) =>
         p.kind === 'mono' ? (
-          // Its OWN horizontal scroll: art keeps its shape instead of
-          // rewrapping into noise, and it still cannot push the page sideways.
-          <pre
-            key={i}
-            className="my-1 overflow-x-auto rounded-lg border border-line bg-card px-2.5 py-2 font-mono text-xs leading-tight text-ink"
-          >
-            {p.content}
-          </pre>
+          <CodeBlock key={i} content={p.content} />
         ) : (
           <span key={i} className="whitespace-pre-wrap break-words">
             <Inline text={p.content} names={names} />
@@ -211,6 +259,7 @@ export function MessageRow({
   canReact: boolean
 }) {
   const [held, setHeld] = useState(false)
+  const { done: copied, copy } = useCopy()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [burst, setBurst] = useState(0)
   const timerRef = useRef<number | null>(null)
@@ -520,6 +569,22 @@ export function MessageRow({
               >
                 Reply
               </button>
+              {message.body && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    copy(message.body ?? '')
+                    setHeld(false)
+                  }}
+                  aria-label={copied ? 'Copied' : 'Copy message'}
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-2xs font-semibold transition-colors hover:bg-card-2',
+                    copied ? 'text-success' : 'text-muted hover:text-ink',
+                  )}
+                >
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              )}
               {onPin && (
                 <button
                   type="button"

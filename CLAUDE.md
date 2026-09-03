@@ -138,7 +138,17 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   **0046 is WRITTEN AND NOT YET APPLIED** — until it is, `get_room_pins` throws and the
   room panel's Pinned tab is simply empty (the 0034 SectionGrid precedent: a separate
   try/catch, so a missing RPC never takes the screen down with it).
-  **Next number: 0047.**
+  **0047 is WRITTEN AND NOT YET APPLIED** — it re-creates `get_space_people()`, which
+  0042 renamed AFTER 0042 had been pasted. Confirmed missing in the live database on
+  2026-09-03 (`42883: function public.get_space_people() does not exist`), which is why
+  the room panel showed nobody and no name in chat carried a level. It is independent of
+  0046 and can be pasted in either order.
+  **0048 is WRITTEN AND NOT YET APPLIED** — per-room notification level. It must go AFTER
+  0046 only because of numbering; its real dependency is 0043. Until it lands,
+  `getRoomLevel` throws, the "Notify me" control stays hidden, and the header's Mute pill
+  falls back to 0043's `set_room_muted` — so nothing breaks, there is just no three-way
+  setting yet.
+  **Next number: 0049.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -1738,6 +1748,84 @@ messages → page scrolls 0px and the composer sits at the bottom; 24 messages �
 295px and the composer sticks 20px above the fold. At 375 the rail computes `display: none`,
 the composer clears the tab bar in both cases, and the ⋯ button opens a 375×812 panel at
 left 0 with a Back button.
+
+**THE TYPING INDICATOR NEVER WORKED, AND `uniqueChannel` IS WHY.** Typing rode the room's
+`uniqueChannel('room-<id>')`, whose topic carries a random suffix so a remount cannot be
+handed a dying channel. That is right for `postgres_changes` — those are SERVER-side
+subscriptions, so two clients on `room-x-a1b2` and `room-x-c3d4` still both get the row
+events, and everything else looked fine. **But BROADCAST is delivered to the TOPIC.** Two
+people in one room were on two different topics, so a broadcast could never reach the other
+and the indicator appeared for nobody. Nothing errored; the message went to a topic whose
+only listener was the sender, who is excluded by default.
+`src/lib/typing-channel.ts` gives typing a SHARED topic and answers the hazard three ways:
+ONE `.on()` binding made at creation with consumers in a Set the handler fans out to (so
+nothing calls `.on()` on a joined channel); refcounting; and a **DEFERRED teardown** (2s),
+because a remount releases and re-acquires within a frame and a synchronous teardown is
+exactly how the next acquire gets a channel that is still unsubscribing.
+**`postgres_changes` stays on the unique channel — do not merge the two.**
+
+**Anyone who can POST can pin (the user's call, 2026-09-03); only the instructor or whoever
+pinned it can UNPIN.** 0046's gate is `cp_room_post_block()` returning null — the same one
+answer the composer's disabled state reads — so a timed-out student cannot pin their way
+around being muted, and an announce-only room stays the instructor's. Unpinning is narrower
+because otherwise the first student to disagree can quietly remove the rules post.
+`get_room_pins` returns a server-computed `can_unpin` rather than leaving the client to
+re-derive a permission the RPC enforces anyway.
+
+Since 0048 (Notification level per room): `space_room_prefs.level` — `all` / `mentions` /
+`none`, defaulting to `mentions`, which is what every room did before the setting existed.
+**`muted` is now `generated always as (level = 'none') stored`**, and that is the whole
+trick: `list_my_rooms()` returns `coalesce(pref.muted, false)`, so growing its return type
+would have meant a drop-first + re-grant of a 60-line function for a column the room list
+already has. One writer, one derived reader, `list_my_rooms` untouched.
+**Ownership moves `set_room_muted` and `send_message` 0043 → 0048.** The fan-out grows a
+second audience: `direct` (mentioned, replied to, in this DM — 0043's behaviour) and `all`,
+which is **driven by the prefs table**, not the roster, and excludes anyone already in
+`direct` so one message cannot queue two rows for the same person. `everything` re-derives
+membership from the ROOM rather than calling `cp_can_read_room()`, which answers for the
+CALLER — here the question is whether the TARGET still belongs in the room.
+**`send_message`'s 137-line body was copied forward programmatically, not retyped**; a
+copy-forward of that size is exactly where a transcription error lives.
+
+**THE EMPTY PEOPLE PANEL WAS A SILENT CATCH, AND THE RENAME BEHIND IT IS THE REAL LESSON.**
+`get_space_people` REPLACED `list_lounge_classmates` inside migration 0042 during the chat
+rework — an edit to a file that had already been pasted. Anyone who applied 0042 before that
+edit has the old function and not the new one, so `listSpacePeople()` 404s. The client then
+swallowed it (`.catch(() => {})`) and the panel reported **"Nobody else is in here yet"** —
+a lie, told to the only person who could fix it, and the same class of bug as the attendance
+screen that once told a student they had no record at all. It also explains a second
+symptom: no `Lv N` chip beside any name in the thread, because that reads the same roster.
+**Renaming a function inside an APPLIED migration is a silent breaking change.** A rename
+belongs in a new numbered file, or the old name stays as a delegate. The fix now surfaces:
+`peopleError` + a `Retry`, and the room-panel header shows the SERVER's `memberCount`, not
+the length of a list that failed to load.
+
+**Typing an @mention** — `mentionQuery` / `matchMentions` / `applyMention` in `mentions.ts`,
+pinned by 8 more tests. The query is anchored to an `@` at the start or after whitespace, so
+an email address never opens the picker, and it allows exactly ONE space because half this
+class has a two-word name and "@Maria S" has to keep matching. **The trailing space
+`applyMention` inserts is load-bearing**, not a nicety: `resolveMentions` requires the name
+not to be followed by a word character, so without it the mention the picker just inserted
+would not resolve. The popover is a real `listbox`, sits ABOVE the composer, and its options
+commit on **`pointerDown`, not `click`** — the textarea's `onBlur` closes the picker and blur
+lands first on a click. While it is open it owns Enter, Tab, ↑/↓ and Escape, or Enter would
+send "@ma" instead of choosing Maria.
+
+**Drafts are localStorage per room** (`cp_room_draft_v1:<roomId>`), restored in `load()` and
+cleared on a successful send. Not a table, and the reason is not cost: the only thing worse
+than losing a draft is the server keeping a copy of what you decided not to send.
+
+**Copy lives in two places and both use `navigator.clipboard` with a silent failure path**
+(it is undefined on an insecure origin, and an error toast for a convenience is worse than
+nothing). The confirmation is ON the button rather than in a toast, because the point of
+copying is that you are about to paste and a banner at the other end of the screen is the
+wrong place to look. The code block's button is `opacity-100 md:opacity-0
+md:group-hover/code:opacity-100` — always there on touch, where there is no hover to reveal
+it — and the `<pre>` carries `pr-12` so the button never sits on top of the code.
+
+**The typing indicator is three framer-motion dots**, not a CSS keyframe like the leaderboard
+flame: exactly one exists at a time, so the forty-springs argument does not apply, and
+`MotionConfig reducedMotion="user"` switches it off with no second rule to remember.
 
 ⚠ **Mount layout probes inside `Shell`, not beside it.** An earlier probe rendered at the
 router root and its `body` overflowed by exactly the chat header's `-mx-4`/`-mx-8` bleed —

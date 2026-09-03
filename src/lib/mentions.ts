@@ -65,3 +65,72 @@ export function resolveMentions(body: string, candidates: MentionCandidate[]): s
   }
   return found
 }
+
+// ── Typing an @mention ──────────────────────────────────────────────────────
+
+/** Longer than any real name anyone will type before giving up. */
+const MAX_QUERY = 24
+
+export interface MentionQuery {
+  /** What the caret is currently searching for, without the `@`. */
+  query: string
+  /** Index of the `@` in the full value, for replacing on select. */
+  start: number
+}
+
+/**
+ * The @mention being typed at the caret, or null.
+ *
+ * Anchored to an `@` that starts the string or follows whitespace, so an email
+ * address never opens the picker. The query may hold ONE space, because half
+ * the names in this class are two words and "@Maria S" has to keep matching;
+ * past that the query stops matching anybody and the picker closes on its own,
+ * which is the right behaviour for a sentence that happens to contain an `@`.
+ */
+export function mentionQuery(beforeCaret: string): MentionQuery | null {
+  const at = beforeCaret.lastIndexOf('@')
+  if (at === -1) return null
+  if (at > 0 && !/\s/.test(beforeCaret[at - 1])) return null
+
+  const query = beforeCaret.slice(at + 1)
+  if (query.length > MAX_QUERY) return null
+  if (/[@\n]/.test(query)) return null
+  // At most one space — see above.
+  if ((query.match(/ /g) ?? []).length > 1) return null
+  return { query, start: at }
+}
+
+/** People whose name starts with, or contains, what has been typed so far. */
+export function matchMentions(
+  query: string,
+  candidates: MentionCandidate[],
+  limit = 6,
+): MentionCandidate[] {
+  const q = query.trim().toLowerCase()
+  const scored = candidates
+    .map((c) => ({ c, i: c.displayName.toLowerCase().indexOf(q) }))
+    .filter((x) => q === '' || x.i !== -1)
+    // A prefix match is what you meant; a mid-name match is a fallback.
+    .sort((a, b) => a.i - b.i || a.c.displayName.localeCompare(b.c.displayName))
+  return scored.slice(0, limit).map((x) => x.c)
+}
+
+/**
+ * Insert a chosen name over the query being typed.
+ *
+ * The trailing space is not a nicety: without it the next thing typed runs into
+ * the name, and `resolveMentions` requires the name not to be followed by a
+ * word character — so the mention this picker just inserted would not resolve.
+ */
+export function applyMention(
+  value: string,
+  start: number,
+  caret: number,
+  displayName: string,
+): { value: string; caret: number } {
+  const insert = `@${displayName} `
+  return {
+    value: value.slice(0, start) + insert + value.slice(caret),
+    caret: start + insert.length,
+  }
+}

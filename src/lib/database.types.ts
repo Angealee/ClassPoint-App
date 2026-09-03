@@ -385,6 +385,13 @@ export interface Database {
       space_room_prefs: Row<{
         student_id: UUID
         room_id: UUID
+        /** 0048 — 'all' | 'mentions' | 'none'. The only writable one. */
+        level: string
+        /**
+         * GENERATED from `level` since 0048 (`level = 'none'`). Still returned
+         * by `list_my_rooms`, which is why the column kept its name — but it
+         * cannot be written, and nothing should try.
+         */
         muted: boolean
       }>
 

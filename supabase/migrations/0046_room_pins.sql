@@ -20,10 +20,22 @@
 --   pinned before this migration is lost.
 --
 -- ── WHO CAN PIN ─────────────────────────────────────────────────────────────
---   The instructor only, exactly as 0043's `pin_room_message` already required.
---   Students read the list; they do not curate it. `pin_room_message` is
---   REPLACED here (an ownership move) rather than left beside the new
---   functions — two ways to pin is how the list and the column drift apart.
+--   ANYONE WHO CAN POST IN THE ROOM (the instructor's call). 0043's
+--   `pin_room_message` was instructor-only; the useful message in a beta room
+--   is usually spotted by whoever is testing, not by the instructor.
+--
+--   The gate is `cp_room_post_block()` returning null — the SAME one answer the
+--   composer's disabled state reads — so a student under a timeout cannot pin
+--   their way around being muted, and an announce-only room stays the
+--   instructor's. One rule, one function, no way for the two to disagree.
+--
+--   UNPINNING IS NARROWER: the instructor, or whoever pinned it. Otherwise the
+--   first student to disagree can quietly remove the rules post, and the room
+--   has no record of it happening.
+--
+--   `pin_room_message` is REPLACED here (an ownership move) rather than left
+--   beside the new functions — two ways to pin is how the list and the column
+--   drift apart.
 --
 --   No `audit_log` row and therefore NO widening of `audit_log_action_check`:
 --   pinning is not destructive and is visible to the whole room by definition.
@@ -88,7 +100,9 @@ returns table (
   avatar_url   text,
   body         text,
   created_at   timestamptz,
-  pinned_at    timestamptz
+  pinned_at    timestamptz,
+  pinned_by    uuid,
+  can_unpin    boolean
 )
 language sql
 stable
@@ -106,7 +120,11 @@ as $$
       else m.body
     end,
     m.created_at,
-    p.created_at
+    p.created_at,
+    p.pinned_by,
+    -- Computed HERE rather than left to the client: the UI must not have to
+    -- re-derive a permission the RPC is going to enforce anyway.
+    (public.is_instructor() or p.pinned_by = public.cp_my_student_id())
   from public.space_pins p
   join public.space_messages m on m.id = p.message_id
  where p.room_id = p_room
@@ -132,9 +150,13 @@ set search_path = public
 as $$
 declare
   v_count int;
+  v_block text;
 begin
-  if not public.is_instructor() then
-    raise exception 'Only the instructor can pin a message.';
+  -- The SAME answer the composer's disabled state reads, so "can post" and
+  -- "can pin" cannot drift apart. A timed-out student is refused here too.
+  v_block := public.cp_room_post_block(p_room);
+  if v_block is not null then
+    raise exception '%', v_block;
   end if;
 
   if not exists (
@@ -169,8 +191,15 @@ security definer
 set search_path = public
 as $$
 begin
-  if not public.is_instructor() then
-    raise exception 'Only the instructor can unpin a message.';
+  -- Narrower than pinning on purpose: without this the first student to
+  -- disagree can quietly remove the rules post.
+  if not exists (
+    select 1 from public.space_pins
+     where room_id = p_room
+       and message_id = p_message
+       and (public.is_instructor() or pinned_by = public.cp_my_student_id())
+  ) then
+    raise exception 'You can only unpin something you pinned.';
   end if;
 
   delete from public.space_pins where room_id = p_room and message_id = p_message;
@@ -206,11 +235,12 @@ security definer
 set search_path = public
 as $$
 begin
-  if not public.is_instructor() then
-    raise exception 'Only the instructor can pin a message.';
-  end if;
-
   if p_message is null then
+    -- Clearing every pin stays the instructor's, exactly as this function's
+    -- old "unpin" meaning was.
+    if not public.is_instructor() then
+      raise exception 'Only the instructor can clear the pins.';
+    end if;
     delete from public.space_pins where room_id = p_room;
     update public.space_rooms set pinned_message_id = null where id = p_room;
   else
@@ -231,12 +261,21 @@ grant execute on function public.pin_room_message(uuid, uuid) to authenticated;
 --
 --   3. Pin 11 different messages — the 11th raises, and the list stays at 10.
 --
---   4. As a STUDENT in that room: select * from public.get_room_pins('<room>');
---      returns the same rows. As a student NOT in the room: 0 rows.
+--   4. As a STUDENT in that room: pin_message SUCCEEDS, and get_room_pins
+--      returns the same rows with can_unpin true for their own pin and false
+--      for the instructor's. As a student NOT in the room: 0 rows.
 --
---   5. select public.unpin_message('<room>', '<message>');
+--   5. THE ONE THAT WOULD FAIL SILENTLY: time a student out
+--      (select public.timeout_student(...)), then have them call pin_message.
+--      It must raise with the timeout's own wording — the same sentence the
+--      composer shows — not succeed.
+--
+--   6. As that student, unpin the INSTRUCTOR's pin: raises
+--      'You can only unpin something you pinned.'
+--
+--   7. select public.unpin_message('<room>', '<message>');
 --      space_rooms.pinned_message_id now points at the next-newest pin, or is
 --      null when none are left.
 --
---   6. Re-run this whole file. Nothing errors, nothing duplicates.
+--   8. Re-run this whole file. Nothing errors, nothing duplicates.
 -- ============================================================================

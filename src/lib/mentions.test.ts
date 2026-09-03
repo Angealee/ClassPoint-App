@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveMentions, type MentionCandidate } from './mentions'
+import {resolveMentions, type MentionCandidate, mentionQuery, matchMentions, applyMention } from './mentions'
 
 /**
  * The three load-bearing cases are the last three in the first block. Each one
@@ -71,3 +71,57 @@ describe('resolveMentions', () => {
   })
 })
 
+
+describe('mentionQuery', () => {
+  it('opens on a bare @ at the start and after a space', () => {
+    expect(mentionQuery('@')).toEqual({ query: '', start: 0 })
+    expect(mentionQuery('hey @ma')).toEqual({ query: 'ma', start: 4 })
+  })
+
+  it('does NOT open inside an email address', () => {
+    expect(mentionQuery('koby@dct.edu.ph')).toBeNull()
+  })
+
+  it('allows one space, so a two-word name keeps matching', () => {
+    expect(mentionQuery('@Maria S')?.query).toBe('Maria S')
+    expect(mentionQuery('@Maria Santos said hi')).toBeNull()
+  })
+
+  it('closes on a second @ or a newline', () => {
+    expect(mentionQuery('@a@b')).toBeNull()
+    expect(mentionQuery('@a\nb')).toBeNull()
+  })
+})
+
+describe('matchMentions', () => {
+  const people = [
+    { id: '1', displayName: 'Maria Santos' },
+    { id: '2', displayName: 'Mario Cruz' },
+    { id: '3', displayName: 'Ann' },
+  ]
+
+  it('ranks a prefix match above a mid-name one', () => {
+    const got = matchMentions('ar', people)
+    // "Maria"/"Mario" match at index 1; "Ann" does not match at all.
+    expect(got.map((c) => c.displayName)).toEqual(['Maria Santos', 'Mario Cruz'])
+  })
+
+  it('returns everyone for an empty query', () => {
+    expect(matchMentions('', people)).toHaveLength(3)
+  })
+})
+
+describe('applyMention', () => {
+  it('replaces the typed query and leaves a trailing space', () => {
+    // The space is load-bearing: resolveMentions requires the name not to be
+    // followed by a word character, so without it the mention would not resolve.
+    const { value, caret } = applyMention('hey @mar', 4, 8, 'Maria Santos')
+    expect(value).toBe('hey @Maria Santos ')
+    expect(caret).toBe(value.length)
+    expect(resolveMentions(value, [{ id: '1', displayName: 'Maria Santos' }])).toEqual(['1'])
+  })
+
+  it('keeps whatever followed the caret', () => {
+    expect(applyMention('@ma tapos', 0, 3, 'Maria').value).toBe('@Maria  tapos')
+  })
+})

@@ -1079,6 +1079,14 @@ export interface RoomPin {
   body: string | null
   createdAt: string
   pinnedAt: string
+  /** Null when the instructor pinned it. */
+  pinnedBy: string | null
+  /**
+   * Server-computed: the instructor, or whoever pinned it. Anyone who can post
+   * may PIN, but only those two may unpin — otherwise the first student to
+   * disagree can quietly remove the rules post.
+   */
+  canUnpin: boolean
 }
 
 /** Mirrors the cap enforced inside `pin_message`. */
@@ -1096,3 +1104,13 @@ export interface RoomAudience {
   memberIds: string[] | null
   hasInstructor: boolean
 }
+
+/**
+ * How much a room notifies you (migration 0048).
+ *
+ * `mentions` is the default and is what every room did before there was a
+ * setting: mentions, replies to you, and DMs. `all` is every message in the
+ * room; `none` is what the old `muted` boolean meant, and `space_room_prefs.
+ * muted` is now GENERATED from this so the two cannot disagree.
+ */
+export type RoomNotifyLevel = 'all' | 'mentions' | 'none'
