@@ -8,6 +8,7 @@ import { UpdatePrompt } from '@/components/pwa/UpdatePrompt'
 import { InstallPrompt } from '@/components/pwa/InstallPrompt'
 import { OfflineBanner } from '@/components/pwa/OfflineBanner'
 import { router } from '@/router'
+import { Analytics } from "@vercel/analytics/next"
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <PwaInstallProvider>
             <AuthProvider>
               <RouterProvider router={router} />
+              <Analytics />
               <OfflineBanner />
               <UpdatePrompt />
               <InstallPrompt />
