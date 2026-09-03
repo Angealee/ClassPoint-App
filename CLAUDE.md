@@ -135,7 +135,10 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   The long "0033–0040 are unapplied / this one is LOUD" warning that used to live here
   is gone because it was describing a state that no longer exists — and a stale warning
   is worse than none, since the next reader cannot tell which half is still true.
-  **Next number: 0046.**
+  **0046 is WRITTEN AND NOT YET APPLIED** — until it is, `get_room_pins` throws and the
+  room panel's Pinned tab is simply empty (the 0034 SectionGrid precedent: a separate
+  try/catch, so a missing RPC never takes the screen down with it).
+  **Next number: 0047.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -1657,6 +1660,90 @@ the instructor's roster.
 **Type sizes in Space use the named steps only.** `text-[8px]`/`[9px]`/`[10px]`/`[11px]`
 crept back in while these screens were being built; they are `text-2xs` and `text-xs` now,
 per Era 6.0 Phase 4 (104 arbitrary sizes → 5 named steps, zero remaining).
+
+Since 0046 (The room panel): `space_pins` — several pinned messages per room instead of
+0043's single `space_rooms.pinned_message_id`, capped at **10 inside `pin_message`** (a
+CHECK cannot count sibling rows). Instructor-only to pin, exactly as 0043 already required.
+**`pinned_message_id` is NOT abandoned and is NOT a second source of truth:**
+`list_my_rooms` already returns it and changing that return type means a drop-first +
+re-grant dance for a column nothing renders, so the pin RPCs keep it pointing at the NEWEST
+pin and are its only writers. Existing single pins are backfilled. **Ownership move:
+`pin_room_message` 0043 → 0046**, kept as a thin delegate rather than deleted — two ways to
+pin is exactly how the list and the column would drift. No `audit_log` row, so
+`audit_log_action_check` needed no widening.
+
+**`components/space/RoomRail.tsx` is ONE component with TWO mounts** — the desktop rail
+beside the thread and the sheet behind the ⋯ button on a phone. A parallel mobile copy is
+how the two drift, and this codebase has four separate cases of exactly that.
+**Everything in it is DERIVED, not fetched**, except pins: members come from the roster
+`ChatRoom` already loads for the XP rings and mentions, and Shared / search / @You are read
+out of the messages already on screen. The consequence is stated ON SCREEN rather than
+hidden — search and Shared cover the loaded history, and the panel says so.
+`getRoomAudience` needs **no new RPC**: `space_rooms` carries a SELECT policy gated on
+`cp_can_read_room()`, so `section_id` is readable directly, and only a `dm` has real member
+rows. **"Top of the room" is hidden below 8 members** — under that the top five ARE the
+room, and printing them twice is the redundancy that makes a panel feel like filler.
+
+**`Shell` gained `wide`, and it grows to the RIGHT ONLY** (the user's call, after a first
+attempt that removed both caps and slid the whole shell to x=0). The left margin is the one
+a centred `max-w-6xl` would have had — `ml-[max(0rem,calc((100%-72rem)/2))] mr-0` — so the
+sidebar does not jump sideways when you open a room and jump back when you leave it; only
+the dead strip on the right is spent. **`w-auto`, not `w-full`:** with a left margin,
+`width: 100%` measures the full viewport and is then pushed right by the margin, which
+overflowed the page by exactly that margin (measured: `scrollWidth` 2252 in a 1885 viewport).
+The rail grows with the viewport (`15rem` at `lg`, `18rem` at `xl`, `22rem` at `2xl`) rather
+than the thread taking all of it. **`src/lib/routes-shape.ts` decides which routes are
+wide** and is pinned by a test: `ChatRoom` is mounted twice (student and instructor), so it
+matches the shared tail rather than either prefix, and the room LIST deliberately stays in
+the reading column.
+
+**When `wide`, the whole chain from `<main>` down to the routed screen is a column flex**,
+with the message list as the `flex-1` child. That is what pins the composer to the bottom of
+the viewport in a room with three messages in it — the thread takes the slack instead of the
+composer floating up to meet the last message. The height comes from the `min-h-[100dvh]`
+the shell already has, so nothing has to agree with a `calc(100dvh - …)`. Reaching the route
+wrapper needs `[&>.cp-route-in]:flex-1` — `RoutedOutlet` owns that div and cannot be given a
+class from the layout.
+
+⚠ **`lg:grid-rows-[minmax(0,1fr)]` on the room grid is load-bearing.** Without an explicit
+row the grid sizes it to content, and the rail — capped at a viewport-relative height —
+became the tallest thing in the row and pushed the PAGE 45px past the viewport in a
+two-message room. The cap is also `10rem`, not `7rem`: 6rem is the sticky offset and the
+rest is the chrome above and below it (main's `pt-8`/`pb-12` plus the gap). At `7rem` the
+rail was taller than the space it sits in. Measured after: a two-message room scrolls 0px,
+a 24-message room scrolls 295px, and the rail is 778px tall in both.
+
+**On a phone the panel is a FULL SCREEN with a back button, not a bottom sheet** (the
+user's call, from a Messenger reference). It is a destination — who is here, what is
+pinned, what was shared — and a half-height sheet made a 40-person roster a scroller inside
+a scroller. `Sheet` gained an additive **`variant="screen"`**: no backdrop, `inset-0`, a
+sticky back bar carrying the only way out, and a push-in from the right instead of a rise
+from the bottom. The ~21 existing sheets omit the prop and are byte-identical. The title
+goes `sr-only` there, because the content brings its own identity block — 80px avatar, room
+name, member count, and round Mute / Search actions — which is the shape the reference has
+and which would restate the chat header one line above it on the desktop rail. Hence
+`RoomRail`'s `variant`, not a second component.
+
+⚠ **`requestAnimationFrame` is STARVED while the Browser pane is hidden, not merely
+throttled.** A 90-frame wait timed out at 45s, and the screen panel sat at its `initial`
+`x: 100%` forever — which looks exactly like a broken animation. Same artifact as the
+compositing note in the Era 6.0 Phase 6 section, with a second symptom to recognise. To
+measure a framer-motion panel's geometry, override `transform: none !important` and read
+`offsetWidth`/`offsetHeight`, which ignore transforms.
+
+Verified by a probe mounted INSIDE a real `Shell` (removed, residue-checked). At 1900×950:
+a normal screen is unchanged (shell 374→1526, `main` still `display: block`); a room keeps
+the same left edge and runs to the viewport edge, with zero horizontal overflow. Two
+messages → page scrolls 0px and the composer sits at the bottom; 24 messages → scrolls
+295px and the composer sticks 20px above the fold. At 375 the rail computes `display: none`,
+the composer clears the tab bar in both cases, and the ⋯ button opens a 375×812 panel at
+left 0 with a Back button.
+
+⚠ **Mount layout probes inside `Shell`, not beside it.** An earlier probe rendered at the
+router root and its `body` overflowed by exactly the chat header's `-mx-4`/`-mx-8` bleed —
+which `Shell`'s own `px-4`/`md:px-8` cancels — so the number was a lie about the real app.
+Anything that measures the shell's width, padding or flex chain has to be a child route of
+a real `<Shell>`.
 
 Verified by probe route at 375×812 in both themes (removed, residue-checked): no horizontal
 overflow (`scrollWidth === clientWidth === 375`); a plain row's background computes

@@ -1,7 +1,10 @@
 import { rpc } from './_internal'
+import { supabase } from '@/lib/supabase'
 import type {
   ReactionCode,
+  RoomAudience,
   RoomKind,
+  RoomPin,
   SpaceMessage,
   SpaceRoom,
 } from '@/lib/types'
@@ -156,6 +159,72 @@ export async function setRoomMuted(roomId: string, muted: boolean): Promise<bool
   return !!(await rpc<boolean>('set_room_muted', { p_room: roomId, p_muted: muted }))
 }
 
+// ── The room panel (migration 0046) ─────────────────────────────────────────
+
+interface PinRow {
+  message_id: string
+  author_id: string | null
+  display_name: string
+  avatar_url: string | null
+  body: string | null
+  created_at: string
+  pinned_at: string
+}
+
+/** Newest pin first. A hidden or deleted message keeps its row but loses its body. */
+export async function listRoomPins(roomId: string): Promise<RoomPin[]> {
+  const rows = await rpc<PinRow[]>('get_room_pins', { p_room: roomId })
+  return (rows ?? []).map((r) => ({
+    messageId: r.message_id,
+    authorId: r.author_id,
+    displayName: r.display_name,
+    avatarUrl: r.avatar_url,
+    body: r.body,
+    createdAt: r.created_at,
+    pinnedAt: r.pinned_at,
+  }))
+}
+
+/**
+ * Who is in this room, resolved WITHOUT a new RPC.
+ *
+ * `list_my_rooms` does not return `section_id`, but `space_rooms` carries a
+ * SELECT policy gated on `cp_can_read_room()` — so the two facts the audience
+ * needs are readable directly, and the roster to match them against is the one
+ * `listSpacePeople()` already fetched for the XP rings and mentions.
+ *
+ * The one place a component may touch `.from()` is a Realtime subscription, so
+ * this read lives here rather than in the screen.
+ */
+export async function getRoomAudience(roomId: string): Promise<RoomAudience> {
+  const { data: room, error } = await supabase
+    .from('space_rooms')
+    .select('kind, section_id')
+    .eq('id', roomId)
+    .maybeSingle()
+  if (error) throw error
+
+  const kind = (room?.kind ?? 'section') as RoomKind
+  if (kind !== 'dm') {
+    return { kind, sectionId: room?.section_id ?? null, memberIds: null, hasInstructor: true }
+  }
+
+  const { data: members, error: memberError } = await supabase
+    .from('space_room_members')
+    .select('student_id')
+    .eq('room_id', roomId)
+  if (memberError) throw memberError
+
+  const rows = members ?? []
+  return {
+    kind,
+    sectionId: null,
+    memberIds: rows.map((m) => m.student_id).filter((id): id is string => id !== null),
+    // A null student_id in a DM IS the instructor (0020's convention).
+    hasInstructor: rows.some((m) => m.student_id === null),
+  }
+}
+
 // ── Instructor ──────────────────────────────────────────────────────────────
 
 export async function setRoomControls(
@@ -169,9 +238,13 @@ export async function setRoomControls(
   })
 }
 
-/** Pass null to unpin. */
-export async function pinRoomMessage(roomId: string, messageId: string | null): Promise<void> {
-  await rpc('pin_room_message', { p_room: roomId, p_message: messageId })
+/** Pin a message. Instructor only; the room caps out at 10. */
+export async function pinMessage(roomId: string, messageId: string): Promise<void> {
+  await rpc('pin_message', { p_room: roomId, p_message: messageId })
+}
+
+export async function unpinMessage(roomId: string, messageId: string): Promise<void> {
+  await rpc('unpin_message', { p_room: roomId, p_message: messageId })
 }
 
 /**

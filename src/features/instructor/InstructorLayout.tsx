@@ -8,7 +8,8 @@ import {
   useRef,
   useState,
 } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { isChatRoom } from '@/lib/routes-shape'
 import { motion } from 'framer-motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
 import { Splash } from '@/components/layout/Splash'
@@ -138,6 +139,7 @@ function OpsButton() {
 export function InstructorLayout() {
   const { signOut } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [sections, setSections] = useState<Section[]>([])
   const [selectedSectionId, setSelectedSectionId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -285,6 +287,7 @@ export function InstructorLayout() {
     >
       <Shell
         nav={nav}
+        wide={isChatRoom(pathname)}
         badge={
           <span className="ml-1 rounded-lg bg-accent-solid/10 px-2 py-0.5 text-xs font-semibold text-accent">
             Instructor

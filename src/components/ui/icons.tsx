@@ -385,3 +385,39 @@ export function ChevronDownIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+/**
+ * The ⋯ overflow button.
+ *
+ * FILLED dots, not stroked circles — at the 16-20px this renders at, a 1.75px
+ * outline around a 1px-radius circle leaves no interior and the three read as
+ * smudges. Same reasoning as FlameIcon.
+ */
+export function MoreIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props} fill="currentColor" strokeWidth={0}>
+      <circle cx="5" cy="12" r="1.75" />
+      <circle cx="12" cy="12" r="1.75" />
+      <circle cx="19" cy="12" r="1.75" />
+    </svg>
+  )
+}
+
+/** A right-hand side panel — the desktop rail toggle. */
+export function PanelIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M15 4v16" />
+    </svg>
+  )
+}
+
+export function PinIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 17v5" />
+      <path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z" />
+    </svg>
+  )
+}

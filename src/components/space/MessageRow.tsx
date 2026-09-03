@@ -181,6 +181,8 @@ export function MessageRow({
   onReport,
   onJumpToParent,
   onOpenPerson,
+  onPin,
+  pinned,
   canReact,
 }: {
   message: SpaceMessage
@@ -203,9 +205,12 @@ export function MessageRow({
   onReport?: (m: SpaceMessage) => void
   onJumpToParent?: (id: string) => void
   onOpenPerson?: (m: SpaceMessage) => void
+  /** Instructor only — the toolbar hides this entirely for everyone else. */
+  onPin?: (m: SpaceMessage, pinned: boolean) => void
+  pinned?: boolean
   canReact: boolean
 }) {
-  const [pinned, setPinned] = useState(false)
+  const [held, setHeld] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [burst, setBurst] = useState(0)
   const timerRef = useRef<number | null>(null)
@@ -221,14 +226,14 @@ export function MessageRow({
   const medal = person?.rank != null && person.rank <= 3 ? MEDAL[person.rank] : null
 
   useEffect(() => {
-    if (!pinned && !pickerOpen) return
+    if (!held && !pickerOpen) return
     const close = () => {
-      setPinned(false)
+      setHeld(false)
       setPickerOpen(false)
     }
     window.addEventListener('pointerdown', close)
     return () => window.removeEventListener('pointerdown', close)
-  }, [pinned, pickerOpen])
+  }, [held, pickerOpen])
 
   function clearTimer() {
     if (timerRef.current !== null) {
@@ -242,7 +247,7 @@ export function MessageRow({
     if (e.pointerType === 'mouse') return // mouse gets hover
     startRef.current = { x: e.clientX, y: e.clientY }
     clearTimer()
-    timerRef.current = window.setTimeout(() => setPinned(true), LONG_PRESS_MS)
+    timerRef.current = window.setTimeout(() => setHeld(true), LONG_PRESS_MS)
   }
   function onPointerMove(e: React.PointerEvent) {
     const s = startRef.current
@@ -280,7 +285,7 @@ export function MessageRow({
     return () => window.clearTimeout(t)
   }, [burst])
 
-  const actionsVisible = pinned || pickerOpen
+  const actionsVisible = held || pickerOpen
 
   return (
     <div
@@ -484,7 +489,7 @@ export function MessageRow({
                 onClick={() => {
                   onReact(message, code)
                   setPickerOpen(false)
-                  setPinned(false)
+                  setHeld(false)
                 }}
                 aria-label={`React ${code}`}
                 className="rounded-full px-1 text-sm transition-transform hover:scale-125"
@@ -508,19 +513,35 @@ export function MessageRow({
                 type="button"
                 onClick={() => {
                   onReply(message)
-                  setPinned(false)
+                  setHeld(false)
                 }}
                 aria-label="Reply"
                 className="rounded-full px-2 py-0.5 text-2xs font-semibold text-muted transition-colors hover:bg-card-2 hover:text-ink"
               >
                 Reply
               </button>
+              {onPin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onPin(message, !pinned)
+                    setHeld(false)
+                  }}
+                  aria-label={pinned ? 'Unpin' : 'Pin'}
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-2xs font-semibold transition-colors hover:bg-card-2',
+                    pinned ? 'text-reward' : 'text-muted hover:text-ink',
+                  )}
+                >
+                  {pinned ? 'Unpin' : 'Pin'}
+                </button>
+              )}
               {message.canDelete ? (
                 <button
                   type="button"
                   onClick={() => {
                     onDelete(message)
-                    setPinned(false)
+                    setHeld(false)
                   }}
                   aria-label="Delete"
                   className="rounded-full px-2 py-0.5 text-2xs font-semibold text-muted transition-colors hover:bg-card-2 hover:text-danger"
@@ -533,7 +554,7 @@ export function MessageRow({
                     type="button"
                     onClick={() => {
                       onReport(message)
-                      setPinned(false)
+                      setHeld(false)
                     }}
                     aria-label="Report"
                     className="rounded-full px-2 py-0.5 text-2xs font-semibold text-muted transition-colors hover:bg-card-2 hover:text-danger"

@@ -7,6 +7,17 @@ interface SheetProps {
   onClose: () => void
   title?: string
   children: ReactNode
+  /**
+   * `'screen'` fills the viewport and exits through a back button instead of a
+   * grab handle — the shape a phone wants when the panel IS a destination
+   * (a room's details) rather than a short decision.
+   *
+   * Additive: every one of the ~21 existing Sheets omits it and is unchanged,
+   * including the animation. In screen mode the title still labels the dialog
+   * for a screen reader but is not drawn, because the content brings its own
+   * identity block below the back bar.
+   */
+  variant?: 'sheet' | 'screen'
 }
 
 /** Everything focusable inside the panel, in DOM order. */
@@ -26,7 +37,8 @@ const FOCUSABLE =
  * trapping it in the header strip on mobile / the narrow sidebar on desktop.
  * The portal escapes any such containing block.
  */
-export function Sheet({ open, onClose, title, children }: SheetProps) {
+export function Sheet({ open, onClose, title, children, variant = 'sheet' }: SheetProps) {
+  const screen = variant === 'screen'
   const dragControls = useDragControls()
   const panelRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
@@ -121,14 +133,22 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center sm:items-center">
-          <motion.div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
+        <div
+          className={
+            screen
+              ? 'fixed inset-0 z-40'
+              : 'fixed inset-0 z-40 flex items-end justify-center sm:items-center'
+          }
+        >
+          {!screen && (
+            <motion.div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onClose}
+            />
+          )}
           <motion.div
             ref={panelRef}
             role="dialog"
@@ -137,28 +157,67 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
             // this the announcement is just "dialog".
             aria-labelledby={title ? titleId : undefined}
             tabIndex={-1}
-            className="relative flex max-h-[90dvh] w-full max-w-md flex-col rounded-t-3xl border border-line bg-canvas shadow-2xl outline-none sm:rounded-3xl"
-            initial={{ y: '100%', opacity: 0.6 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: '100%', opacity: 0.6 }}
+            className={
+              screen
+                ? 'relative flex h-full w-full flex-col bg-canvas outline-none'
+                : 'relative flex max-h-[90dvh] w-full max-w-md flex-col rounded-t-3xl border border-line bg-canvas shadow-2xl outline-none sm:rounded-3xl'
+            }
+            // A screen PUSHES in from the right, the way a phone's detail view
+            // does; a sheet rises from the bottom. Both are switched off for
+            // reduced motion by App.tsx's MotionConfig.
+            initial={screen ? { x: '100%' } : { y: '100%', opacity: 0.6 }}
+            animate={screen ? { x: 0 } : { y: 0, opacity: 1 }}
+            exit={screen ? { x: '100%' } : { y: '100%', opacity: 0.6 }}
             transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-            drag="y"
+            drag={screen ? false : 'y'}
             dragListener={false}
             dragControls={dragControls}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.5 }}
             onDragEnd={onDragEnd}
           >
-            {/* Grab handle — the only drag surface, so content can scroll freely. */}
-            <div
-              onPointerDown={(e) => dragControls.start(e)}
-              className="shrink-0 cursor-grab touch-none pb-2 pt-3 active:cursor-grabbing"
-              aria-hidden="true"
-            >
-              <div className="mx-auto h-1.5 w-10 rounded-full bg-line" />
-            </div>
+            {screen ? (
+              // Sticky, because this bar carries the ONLY way out — the same
+              // reason the chat room's own header is sticky.
+              <div className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-line bg-canvas/95 px-2 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-md">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Back"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-ink transition-colors hover:bg-card-2"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path d="M19 12H5" />
+                    <path d="m12 19-7-7 7-7" />
+                  </svg>
+                </button>
+                {title && (
+                  <h2 id={titleId} className="sr-only">
+                    {title}
+                  </h2>
+                )}
+              </div>
+            ) : (
+              /* Grab handle — the only drag surface, so content can scroll freely. */
+              <div
+                onPointerDown={(e) => dragControls.start(e)}
+                className="shrink-0 cursor-grab touch-none pb-2 pt-3 active:cursor-grabbing"
+                aria-hidden="true"
+              >
+                <div className="mx-auto h-1.5 w-10 rounded-full bg-line" />
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-              {title && (
+              {title && !screen && (
                 <h2 id={titleId} className="mb-4 font-display text-lg font-bold">
                   {title}
                 </h2>

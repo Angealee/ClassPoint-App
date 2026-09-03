@@ -158,6 +158,7 @@ export function Shell({
   badge,
   actions,
   accountSlot,
+  wide = false,
 }: {
   /** The desktop sidebar's nav. Also the mobile tab bar's, unless `tabNav` overrides. */
   nav: NavItem[]
@@ -178,10 +179,35 @@ export function Shell({
    * footer then renders exactly as it did before this slot existed.
    */
   accountSlot?: ReactNode
+  /**
+   * Let the routed screen use the whole width instead of the 672px reading
+   * column — for a chat room, whose side panel needs somewhere to be.
+   *
+   * It grows to the RIGHT ONLY (the user's call). The left margin is the one a
+   * centred `max-w-6xl` would have had, so the sidebar does not jump sideways
+   * when you open a room and jump back when you leave it — only the dead strip
+   * on the right is spent. `mx-auto` cannot express that, hence the explicit
+   * margin; `max(0rem, …)` collapses it on anything narrower than the cap.
+   *
+   * ⚠ The mobile tab bar keeps `max-w-2xl` regardless — it is `md:hidden` and a
+   * phone has no room to widen into.
+   */
+  wide?: boolean
 }) {
   const reduce = useReducedMotion()
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-6xl">
+    <div
+      className={cn(
+        'flex min-h-[100dvh]',
+        wide
+          ? // `w-auto`, NOT `w-full`: with a left margin, `width: 100%` measures
+            // the FULL viewport and then gets pushed right by the margin, which
+            // overflowed the page by exactly that margin. Auto width lets the
+            // margin box fill what is left.
+            'ml-[max(0rem,calc((100%-72rem)/2))] mr-0 w-auto max-w-none'
+          : 'mx-auto w-full max-w-6xl',
+      )}
+    >
       {/* Desktop sidebar.
           w-64, not w-60: at 240px the "Student Space" label had exactly ONE
           pixel of slack beside its BETA chip (label box 97px, text 98px) and
@@ -268,8 +294,28 @@ export function Shell({
           </div>
         </header>
 
-        <main className="flex-1 px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-8">
-          <div className="mx-auto w-full max-w-2xl">
+        {/* When `wide`, the whole chain from <main> down to the routed screen
+            becomes a column flex so a screen can put something at the BOTTOM of
+            the viewport without knowing how tall this chrome is. `main` is
+            already `flex-1` inside a `min-h-[100dvh]` column, so the height
+            comes from the layout that exists rather than from a
+            `calc(100dvh - …)` that has to agree with four paddings.
+            `[&>.cp-route-in]` reaches the route wrapper, which `RoutedOutlet`
+            owns and cannot be given a class from here. */}
+        <main
+          className={cn(
+            'flex-1 px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-8',
+            wide && 'flex flex-col',
+          )}
+        >
+          <div
+            className={cn(
+              'mx-auto w-full',
+              wide
+                ? 'flex max-w-none flex-1 flex-col [&>.cp-route-in]:flex [&>.cp-route-in]:flex-1 [&>.cp-route-in]:flex-col'
+                : 'max-w-2xl',
+            )}
+          >
             <Suspense fallback={<RouteFallback />}>
               <RoutedOutlet />
             </Suspense>

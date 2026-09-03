@@ -11,18 +11,25 @@ import { useToast } from '@/components/ui/Toast'
 import { XIcon } from '@/components/ui/icons'
 import { MessageRow } from '@/components/space/MessageRow'
 import { AstronautArt } from '@/components/space/AstronautArt'
+import { RoomRail } from '@/components/space/RoomRail'
 import { ReportSheet } from '@/components/space/ReportSheet'
+import { IconButton } from '@/components/ui/IconButton'
+import { MoreIcon, PanelIcon } from '@/components/ui/icons'
 import { useStudentDataOptional } from '@/features/student/StudentData'
 import {
   deleteMyMessage,
+  getRoomAudience,
   getRoomMessages,
   getRoomPostBlock,
   listMyRooms,
+  listRoomPins,
   listSpacePeople,
+  pinMessage,
   startDm,
   reactToMessage,
   sendMessage,
   setRoomMuted,
+  unpinMessage,
   type MessageCursor,
 } from '@/lib/api'
 import { supabase, uniqueChannel } from '@/lib/supabase'
@@ -38,10 +45,24 @@ import { cn } from '@/lib/cn'
 import {
   MAX_MESSAGE_LENGTH,
   type ReactionCode,
+  type RoomAudience,
+  type RoomPin,
   type SpaceMessage,
   type SpacePerson,
   type SpaceRoom,
 } from '@/lib/types'
+
+/** Remembered per device, so the rail does not reopen on every room. */
+const RAIL_KEY = 'cp_room_rail_v1'
+
+function readRailPref(): boolean {
+  try {
+    return window.localStorage.getItem(RAIL_KEY) !== '0'
+  } catch {
+    // A private window or blocked site data — default to showing it.
+    return true
+  }
+}
 
 const PAGE = 40
 /** A new group starts after this long, even from the same person. */
@@ -55,12 +76,25 @@ const TIME_GAP_MS = 30 * 60 * 1000
  * One conversation. Mounted at `/app/space/chat/:roomId` for students, and
  * under `/teach/space` for the instructor — `basePath` is the only difference.
  *
- * ── THE LAYOUT, AND WHY THERE ARE NO MAGIC NUMBERS ─────────────────────────
+ * ── THE LAYOUT ─────────────────────────────────────────────────────────────
  * The composer clears the fixed mobile tab bar via `StickyBar`
  * (`sticky bottom-19 md:bottom-4`), which already owns that height in one
  * place. The HEADER is sticky for the mirror-image reason: in a long room it
  * scrolled away and took the back button with it, which is how you end up
  * stuck inside a conversation with no way out.
+ *
+ * Everything from `Shell`'s <main> down to here is a COLUMN FLEX when the route
+ * is `wide`, and the message list is the `flex-1` child. That is what keeps the
+ * composer at the bottom of the viewport in a room with three messages in it —
+ * the thread takes the slack instead of the composer floating up to meet the
+ * last message. The height comes from the `min-h-[100dvh]` the shell already
+ * has, so no `calc(100dvh - …)` has to agree with four paddings.
+ *
+ * ⚠ `lg:grid-rows-[minmax(0,1fr)]` is load-bearing. Without an explicit row the
+ * grid sizes it to content, and the rail — which is capped at a viewport-
+ * relative height — became the tallest thing in the row and pushed the PAGE
+ * past the viewport in a room with two messages. The row now takes its height
+ * from the grid, and the rail fills it.
  */
 
 function timeOf(iso: string): string {
@@ -116,6 +150,10 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
   const [missed, setMissed] = useState(0)
   const [typers, setTypers] = useState<TypingEntry[]>([])
   const [, forceTick] = useState(0)
+  const [pins, setPins] = useState<RoomPin[]>([])
+  const [audience, setAudience] = useState<RoomAudience | null>(null)
+  const [railOpen, setRailOpen] = useState(readRailPref)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   const areaRef = useRef<HTMLTextAreaElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -153,8 +191,8 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
   }, [load])
 
   // ONE roster fetch per room. It feeds the XP ring, the level, the rank
-  // medal, the section dot AND mention resolution — the alternative was four
-  // sources for four badges beside one name.
+  // medal, the section dot, the People panel AND mention resolution — the
+  // alternative was five sources for five things beside one name.
   useEffect(() => {
     void listSpacePeople()
       .then(setPeople)
@@ -162,6 +200,24 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
         /* badges and mentions degrade to nothing */
       })
   }, [])
+
+  /**
+   * The panel's own two reads, off the critical path and each failing soft:
+   * an empty People list or an empty Pinned tab is a worse outcome than a
+   * blank rail, but neither is worth taking the thread down for. 0046 is the
+   * migration behind `get_room_pins` — until it is applied this throws and the
+   * Pinned tab is simply empty, exactly like the 0034 SectionGrid precedent.
+   */
+  const loadPanel = useCallback(() => {
+    void listRoomPins(roomId)
+      .then(setPins)
+      .catch(() => setPins([]))
+    void getRoomAudience(roomId)
+      .then(setAudience)
+      .catch(() => setAudience(null))
+  }, [roomId])
+
+  useEffect(loadPanel, [loadPanel])
 
   useEffect(() => {
     const onScroll = () => {
@@ -339,9 +395,38 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
       toast('That message is further back — load older to reach it.', 'info')
       return
     }
+    // Closing the sheet first, or the jump scrolls a page nobody can see.
+    setPanelOpen(false)
     el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     el.classList.add('ring-2', 'ring-accent-solid/60')
     window.setTimeout(() => el.classList.remove('ring-2', 'ring-accent-solid/60'), 1400)
+  }
+
+  async function togglePin(m: SpaceMessage, next: boolean) {
+    try {
+      if (next) await pinMessage(roomId, m.id)
+      else await unpinMessage(roomId, m.id)
+      setPins(await listRoomPins(roomId))
+      toast(next ? 'Pinned.' : 'Unpinned.', 'success')
+    } catch (e) {
+      toast(errorText(e, 'Could not change the pins.'), 'error')
+    }
+  }
+
+  function toggleRail() {
+    setRailOpen((v) => {
+      try {
+        window.localStorage.setItem(RAIL_KEY, v ? '0' : '1')
+      } catch {
+        /* the rail still toggles; it just will not be remembered */
+      }
+      return !v
+    })
+  }
+
+  function jumpToUnread() {
+    setPanelOpen(false)
+    dividerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people])
@@ -365,8 +450,39 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
   const over = body.length > MAX_MESSAGE_LENGTH
   const canSend = body.trim().length > 0 && !over && !sending && block === null
 
+  const pinnedIds = useMemo(() => new Set(pins.map((p) => p.messageId)), [pins])
+  // `divider` is the index of the first unseen message, or -1 when there is
+  // nothing to divide — so the count is everything from there on.
+  const unreadCount = divider >= 0 ? messages.length - divider : 0
+
+  const renderPanel = (variant: 'rail' | 'screen') => (
+    <RoomRail
+      room={room}
+      audience={audience}
+      people={people}
+      messages={messages}
+      pins={pins}
+      myStudentId={myStudentId}
+      isInstructor={myStudentId === null}
+      unreadCount={unreadCount}
+      variant={variant}
+      onToggleMute={variant === 'screen' ? () => void toggleMute() : undefined}
+      onJump={jumpToParent}
+      onJumpToUnread={jumpToUnread}
+      // Close the panel sheet FIRST on mobile — two portalled overlays stacking
+      // their focus traps is a bug this app has already shipped once.
+      onOpenPerson={(m) => {
+        setPanelOpen(false)
+        setPersonTarget(m)
+      }}
+      onUnpin={(id) => void togglePin({ id } as SpaceMessage, false)}
+    />
+  )
+
   return (
-    <div className="space-y-3">
+    // A column, so the thread can take the slack and the composer can sit at
+    // the bottom of the viewport when a room only has three messages in it.
+    <div className="flex flex-1 flex-col gap-3">
       {/* Sticky: in a long room this scrolled away and took the back button with
           it, which is how you get stuck inside a conversation. The negative
           margins let the blurred bar span the full content width. */}
@@ -383,13 +499,33 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
           fallback={`${basePath}/chats`}
           actions={
             room ? (
-              <button
-                type="button"
-                onClick={() => void toggleMute()}
-                className="shrink-0 rounded-full border border-line px-2.5 py-1 text-2xs font-semibold text-muted transition-colors hover:text-ink"
-              >
-                {room.muted ? 'Unmute' : 'Mute'}
-              </button>
+              // gap-2 is the IconButton adjacency floor for `md`: two 36px
+              // buttons with 8px between them have exactly touching 44px hit
+              // areas, and any less means a tap near the seam hits the wrong one.
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void toggleMute()}
+                  className="shrink-0 rounded-full border border-line px-2.5 py-1 text-2xs font-semibold text-muted transition-colors hover:text-ink"
+                >
+                  {room.muted ? 'Unmute' : 'Mute'}
+                </button>
+                {/* Two controls, one job, split by CSS rather than by a JS media
+                    query: the sheet portals to <body>, so it cannot simply be
+                    hidden at lg. Same reasoning as the account menu. */}
+                <IconButton
+                  label={railOpen ? 'Hide room panel' : 'Show room panel'}
+                  className="hidden lg:inline-flex"
+                  icon={<PanelIcon className="h-5 w-5" />}
+                  onClick={toggleRail}
+                />
+                <IconButton
+                  label="Room menu"
+                  className="lg:hidden"
+                  icon={<MoreIcon className="h-5 w-5" />}
+                  onClick={() => setPanelOpen(true)}
+                />
+              </div>
             ) : undefined
           }
         />
@@ -406,7 +542,20 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
       ) : failed ? (
         <ErrorState onRetry={() => void load()}>Could not open this room.</ErrorState>
       ) : (
-        <>
+        // The rail lives BESIDE the thread from lg up, and the whole grid
+        // collapses to one column below it — where the same panel is one tap
+        // away behind the ⋯ button instead.
+        <div
+          className={cn(
+            'flex flex-1 flex-col lg:grid lg:grid-rows-[minmax(0,1fr)] lg:items-stretch lg:gap-4',
+            // The rail grows with the screen rather than the thread taking all
+            // of it: at 1024 a fixed 288px would leave the thread 400px, and at
+            // 2560 a 288px rail beside a 2200px thread looks like an accident.
+            railOpen &&
+              'lg:grid-cols-[minmax(0,1fr)_15rem] xl:grid-cols-[minmax(0,1fr)_18rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]',
+          )}
+        >
+          <div className="flex min-w-0 flex-1 flex-col">
           {!exhausted && messages.length > 0 && (
             <Button
               variant="ghost"
@@ -420,13 +569,18 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
 
           {messages.length === 0 ? (
             <EmptyState
+              className="flex-1"
               icon={<AstronautArt variant="space" size="md" />}
               description="Say something first — somebody has to."
             >
               Nobody has said anything yet.
             </EmptyState>
           ) : (
-            <div>
+            // `flex-1` is what pins the composer to the bottom of a nearly-empty
+            // room: the thread takes the slack instead of the composer floating
+            // up to meet the last message. `pb-3` keeps the newest message clear
+            // of the composer's card when the two meet at full scroll.
+            <div className="flex-1 pb-3">
               {messages.map((m, i) => {
                 const prev = messages[i - 1]
                 const next = messages[i + 1]
@@ -513,6 +667,10 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
                       onReport={setReportTarget}
                       onJumpToParent={jumpToParent}
                       onOpenPerson={setPersonTarget}
+                      onPin={
+                        myStudentId === null ? (msg, next) => void togglePin(msg, next) : undefined
+                      }
+                      pinned={pinnedIds.has(m.id)}
                     />
                   </div>
                 )
@@ -604,8 +762,38 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
               )}
             </Card>
           </StickyBar>
-        </>
+          </div>
+
+          {railOpen && (
+            // Its own scroller, so a 40-person roster does not drag the thread
+            // down with it. `overflow-y-auto` makes overflow-x `auto` too per
+            // spec — which is fine here because nothing inside bleeds past the
+            // padding, and it is exactly why nothing inside may start to.
+            /* A FULL-HEIGHT column, not a card that stops where its content
+               does — `lg:items-stretch` on the grid is what makes it fill.
+               The cap is 10rem, not 7: 6rem is the sticky offset and the rest
+               is the chrome above and below (main's pt-8/pb-12 plus the gap).
+               At 7rem the rail was TALLER than the space it sits in and pushed
+               the page 45px past the viewport in a two-message room. */
+            <aside className="sticky top-24 hidden max-h-[calc(100dvh-10rem)] overflow-y-auto rounded-2xl border border-line bg-card/40 p-2 lg:block">
+              {renderPanel('rail')}
+            </aside>
+          )}
+        </div>
       )}
+
+      {/* The same panel on a phone — but a FULL SCREEN with a back button, not
+          a bottom sheet. It is a destination (who is here, what is pinned, what
+          was shared), and a half-height sheet made a 40-person roster scroll
+          inside a scroller. ONE component, two mounts. */}
+      <Sheet
+        variant="screen"
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        title={room?.name ?? 'Room'}
+      >
+        <div className="pb-2">{renderPanel('screen')}</div>
+      </Sheet>
 
       {/* Tapping an avatar. Three things, all of which already exist elsewhere —
           this is a shortcut, not a new feature. */}

@@ -1067,3 +1067,32 @@ export interface SpacePerson {
   /** From the twice-daily snapshot, so it matches the leaderboard exactly. */
   rank: number | null
 }
+
+/** One pinned message (migration 0046). At most `MAX_ROOM_PINS` per room. */
+export interface RoomPin {
+  messageId: string
+  /** Null when the instructor sent it. */
+  authorId: string | null
+  displayName: string
+  avatarUrl: string | null
+  /** Null for a deleted message, or a hidden one you may not read. */
+  body: string | null
+  createdAt: string
+  pinnedAt: string
+}
+
+/** Mirrors the cap enforced inside `pin_message`. */
+export const MAX_ROOM_PINS = 10
+
+/**
+ * Enough to work out who a room's members are, without a members table for the
+ * two derived kinds. `section` matches on `sectionId`; `global` is everyone
+ * with Space access; only a `dm` has real rows.
+ */
+export interface RoomAudience {
+  kind: RoomKind
+  sectionId: string | null
+  /** DM only — null for the derived kinds. */
+  memberIds: string[] | null
+  hasInstructor: boolean
+}

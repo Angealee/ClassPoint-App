@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
+import { isChatRoom } from '@/lib/routes-shape'
 import { SidebarAccount } from '@/components/layout/AccountMenu'
 import { MobileMenu } from '@/components/layout/MobileMenu'
 import { StudentDataProvider, useStudentData } from '@/features/student/StudentData'
@@ -104,6 +106,7 @@ function StudentShell() {
   const { hasUnseenAchievements, spaceAccess } = useStudentData()
   const { signOut } = useAuth()
   const isDesktop = useIsDesktop()
+  const { pathname } = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [signOutOpen, setSignOutOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -162,6 +165,7 @@ function StudentShell() {
       <Shell
         nav={nav}
         tabNav={tabNav}
+        wide={isChatRoom(pathname)}
         actions={<NotificationBell />}
         accountSlot={
           isDesktop ? (

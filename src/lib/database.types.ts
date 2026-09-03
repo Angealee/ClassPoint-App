@@ -326,6 +326,11 @@ export interface Database {
         dm_key: string | null
         slow_mode_seconds: number
         announce_only: boolean
+        /**
+         * The NEWEST pin, denormalised so `list_my_rooms` can return it without
+         * a join. The LIST lives in `space_pins` (0046) and is the thing to
+         * read; the pin RPCs are the only writers of both, so they cannot drift.
+         */
         pinned_message_id: UUID | null
         /** Trigger-maintained, so the room list is one query. */
         last_message_at: Timestamp | null
@@ -381,6 +386,18 @@ export interface Database {
         student_id: UUID
         room_id: UUID
         muted: boolean
+      }>
+
+      /**
+       * 0046 — several pinned messages per room, capped at 10 inside
+       * `pin_message`. `pinned_by` null = the instructor (0020's convention).
+       */
+      space_pins: Row<{
+        id: UUID
+        room_id: UUID
+        message_id: UUID
+        pinned_by: UUID | null
+        created_at: Timestamp
       }>
 
       /**
