@@ -18,6 +18,10 @@ import { IconButton } from '@/components/ui/IconButton'
 import { MoreIcon, PanelIcon } from '@/components/ui/icons'
 import { useStudentDataOptional } from '@/features/student/StudentData'
 import {
+  StudentProfilePreview,
+  type PreviewTarget,
+} from '@/features/student/StudentProfilePreview'
+import {
   deleteMyMessage,
   getRoomAudience,
   getRoomLevel,
@@ -196,6 +200,7 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
   const [block, setBlock] = useState<string | null>(null)
   const [people, setPeople] = useState<SpacePerson[]>([])
   const [personTarget, setPersonTarget] = useState<SpaceMessage | null>(null)
+  const [profileTarget, setProfileTarget] = useState<PreviewTarget | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [exhausted, setExhausted] = useState(false)
@@ -1062,14 +1067,25 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
 
                 {t.authorStudentId && (
                   <>
+                    {/* There is no ROUTE for someone else's profile — it is a
+                        sheet, the same one the leaderboard opens. This used to
+                        `navigate('/app/profile')`, which is YOUR profile: the
+                        button worked, went somewhere, and showed the wrong
+                        person, which is the worst shape a bug can take. */}
                     <Button
                       variant="outline"
                       className="w-full"
                       onClick={() => {
                         setPersonTarget(null)
-                        navigate(`/app/profile`)
+                        setProfileTarget({
+                          student_id: t.authorStudentId!,
+                          display_name: t.displayName,
+                          section_id: person?.sectionId ?? '',
+                          points: person?.semesterPoints ?? 0,
+                          avatar_url: t.avatarUrl,
+                          rank: person?.rank ?? null,
+                        })
                       }}
-                      disabled={!myStudentId}
                     >
                       View profile
                     </Button>
@@ -1110,6 +1126,19 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
           })()}
         </div>
       </Sheet>
+
+      {/* The SAME sheet the leaderboard opens, so a classmate's profile looks
+          identical wherever you tap it. `sectionLabel` is the room's own name
+          when the room IS a section — in Global the members span sections and
+          the preview simply shows the level, which is honest rather than a
+          guessed label. */}
+      <StudentProfilePreview
+        target={profileTarget}
+        open={!!profileTarget}
+        onClose={() => setProfileTarget(null)}
+        isMe={!!profileTarget && myStudentId === profileTarget.student_id}
+        sectionLabel={room?.kind === 'section' ? room.name : ''}
+      />
 
       <ReportSheet
         open={!!reportTarget}

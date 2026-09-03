@@ -1749,6 +1749,34 @@ messages → page scrolls 0px and the composer sits at the bottom; 24 messages �
 the composer clears the tab bar in both cases, and the ⋯ button opens a 375×812 panel at
 left 0 with a Back button.
 
+**"View profile" IN CHAT OPENED YOUR OWN PROFILE.** It called `navigate('/app/profile')` —
+there IS no route for someone else's profile; it is `StudentProfilePreview`, a sheet, the
+same one the leaderboard opens. The button worked, went somewhere, and showed the wrong
+person, which is the worst shape a bug can take: nothing errors and nothing looks broken.
+ChatRoom now builds a `PreviewTarget` from the `SpacePerson` it already has and opens that
+sheet, so a classmate's profile is identical wherever you tap it. `sectionLabel` became a
+joined list rather than an interpolation (`{label} · Level N`), because a caller with no
+section name to give — Global spans sections — otherwise rendered a stranded "· Level 3".
+
+Room list + hub (2026-09-03, no migration). Decisions (user): **cards with presence** ·
+**keep the message density, polish the edges** · **the Space hub next**.
+
+**"Presence" here is TWO facts and they are deliberately not blurred.** TYPING is real and
+live: `Chats` subscribes to every room's typing broadcast, so "Maria is typing…" appears on
+the card before you open the room — only possible because typing moved to a shared topic.
+RECENT is that the room had a message in the last 10 minutes; that is message recency, NOT
+"people are online", which this app cannot know. It is a small dot at the corner of the room
+glyph, LABELLED "Active in the last 10 minutes" rather than badged as "online". **A ring
+around the whole avatar was the first attempt and was wrong** — it fought the unread card's
+own accent border, and two coloured outlines on one 48px glyph is noise.
+
+**The hub was two identical cards with a chevron** — a menu restating the nav. It now
+answers the question you open it with: is anything happening? An open event (the only thing
+with a deadline and the only thing that pays points) outranks everything, then the Lounge
+card carries the newest post and the Chats card carries an unread count and the latest room.
+Three reads, all off the critical path and each failing soft — a failed read costs a preview
+line, never the screen, and every card still routes.
+
 **THE TYPING INDICATOR NEVER WORKED, AND `uniqueChannel` IS WHY.** Typing rode the room's
 `uniqueChannel('room-<id>')`, whose topic carries a random suffix so a remount cannot be
 handed a dying channel. That is right for `postgres_changes` — those are SERVER-side

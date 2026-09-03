@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
@@ -5,6 +6,10 @@ import { AstronautArt } from '@/components/space/AstronautArt'
 import { BetaBanner } from '@/components/space/BetaBanner'
 import { useStudentData } from '@/features/student/StudentData'
 import { isMuted, spaceChip } from '@/lib/space-gate'
+import { getLoungeFeed, getOpenEvent, listMyRooms } from '@/lib/api'
+import { isRoomUnread } from '@/lib/unread'
+import { countdownTo } from '@/lib/time'
+import type { LoungeEvent, LoungePost, SpaceRoom } from '@/lib/types'
 
 /**
  * `/app/space` — one route, three states.
@@ -120,13 +125,48 @@ function PausedView() {
 }
 
 /**
- * The hub: the two rooms of Student Space. Chats is still a placeholder until
- * Phase 4 — announced rather than hidden, so the shape of the place is legible
- * before it is finished.
+ * The hub.
+ *
+ * It used to be two identical cards with a chevron — a menu that told you
+ * nothing you could not read off the nav. It now answers the question you
+ * actually open it with: IS ANYTHING HAPPENING?
+ *
+ * Three reads, all OFF the critical path and each failing soft: an open event,
+ * the newest Lounge post, and your rooms. A failed read costs a preview line,
+ * never the screen — the cards still route.
  */
 function OpenView() {
   const { spaceAccess } = useStudentData()
   const muted = isMuted(spaceAccess)
+
+  const [event, setEvent] = useState<LoungeEvent | null>(null)
+  const [latest, setLatest] = useState<LoungePost | null>(null)
+  const [rooms, setRooms] = useState<SpaceRoom[] | null>(null)
+  const [, forceTick] = useState(0)
+
+  useEffect(() => {
+    void getOpenEvent()
+      .then(setEvent)
+      .catch(() => setEvent(null))
+    void getLoungeFeed('latest', { limit: 1 })
+      .then((rows) => setLatest(rows[0] ?? null))
+      .catch(() => setLatest(null))
+    void listMyRooms()
+      .then(setRooms)
+      .catch(() => setRooms(null))
+  }, [])
+
+  // The event countdown is the one thing here that has to move.
+  useEffect(() => {
+    if (!event?.closesAt) return
+    const t = setInterval(() => forceTick((n) => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [event?.closesAt])
+
+  // An arrow, not a bare reference: `isRoomUnread`'s optional second argument
+  // is a store, and `.filter` would hand it the index.
+  const unreadRooms = (rooms ?? []).filter((r) => isRoomUnread(r))
+  const newest = (rooms ?? []).find((r) => r.lastMessageAt)
 
   return (
     <div className="space-y-4">
@@ -145,15 +185,62 @@ function OpenView() {
         </Card>
       )}
 
+      {/* An open event outranks everything: it is the only thing here with a
+          deadline, and the only one that pays points. */}
+      {event && (
+        <Link to="/app/space/lounge" className="block">
+          <Card
+            pad="roomy"
+            interactive
+            className="border-reward-solid/35 bg-reward-solid/8"
+          >
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 shrink-0 rounded-lg bg-reward-solid/15 px-2 py-1 text-2xs font-bold uppercase tracking-wide text-reward">
+                Event
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-ink">{event.question}</p>
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+                  <span className="font-semibold text-reward">+{event.points} pts</span>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    {event.answerCount} {event.answerCount === 1 ? 'answer' : 'answers'}
+                  </span>
+                  {event.closesAt && (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span className="whitespace-nowrap">
+                        closes {countdownTo(new Date(event.closesAt))}
+                      </span>
+                    </>
+                  )}
+                </p>
+                {event.myAnswer && (
+                  <p className="mt-1 truncate text-xs text-success">
+                    You answered: {event.myAnswer}
+                  </p>
+                )}
+              </div>
+            </div>
+          </Card>
+        </Link>
+      )}
+
       <Link to="/app/space/lounge" className="block">
         <Card pad="roomy" interactive>
           <div className="flex items-center gap-4">
             <AstronautArt variant="lounge" size="md" />
             <div className="min-w-0 flex-1">
               <p className="font-display text-lg font-bold">Student Lounge</p>
-              <p className="text-sm text-muted">
-                Post, give a W, shout out a classmate.
-              </p>
+              {/* The newest post, not a description of what a Lounge is. */}
+              {latest?.body ? (
+                <p className="truncate text-sm text-muted">
+                  <span className="font-semibold text-ink">{latest.displayName}:</span>{' '}
+                  {latest.body}
+                </p>
+              ) : (
+                <p className="text-sm text-muted">Post, give a W, shout out a classmate.</p>
+              )}
             </div>
             <span className="shrink-0 text-lg text-muted">›</span>
           </div>
@@ -165,10 +252,24 @@ function OpenView() {
           <div className="flex items-center gap-4">
             <AstronautArt variant="space" size="md" />
             <div className="min-w-0 flex-1">
-              <p className="font-display text-lg font-bold">Chats</p>
-              <p className="text-sm text-muted">
-                Your section, the whole class, and direct messages.
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="font-display text-lg font-bold">Chats</p>
+                {unreadRooms.length > 0 && (
+                  <Chip tone="accent" size="sm">
+                    {unreadRooms.length} new
+                  </Chip>
+                )}
+              </div>
+              {newest?.lastMessageBody ? (
+                <p className="truncate text-sm text-muted">
+                  <span className="font-semibold text-ink">{newest.name}</span> ·{' '}
+                  {newest.lastMessageBy}: {newest.lastMessageBody}
+                </p>
+              ) : (
+                <p className="text-sm text-muted">
+                  Your section, the whole class, and direct messages.
+                </p>
+              )}
             </div>
             <span className="shrink-0 text-lg text-muted">›</span>
           </div>

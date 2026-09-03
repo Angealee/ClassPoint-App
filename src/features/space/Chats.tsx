@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { Card, Rows } from '@/components/ui/Card'
+import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
 import { Chip } from '@/components/ui/Chip'
 import { Input } from '@/components/ui/Input'
@@ -16,17 +17,60 @@ import { useStudentDataOptional } from '@/features/student/StudentData'
 import { errorText } from '@/lib/errors'
 import { isRoomUnread } from '@/lib/unread'
 import { timeAgo } from '@/lib/time'
+import { noteTyping, typingLabel, type TypingEntry } from '@/lib/typing'
+import { joinTypingChannel } from '@/lib/typing-channel'
 import { cn } from '@/lib/cn'
 import type { SpaceRoom } from '@/lib/types'
 
 /**
- * `/app/space/chats` — every room you are in.
+ * `/app/space/chats` — every room you are in, as cards with live presence.
  *
- * The unread dot is computed ENTIRELY on this device: `isRoomUnread` compares
- * the room's `last_message_at` against a localStorage pointer. Nothing about
+ * ── WHAT "PRESENCE" MEANS HERE, EXACTLY ────────────────────────────────────
+ * Two different facts, and they are deliberately not blurred together:
+ *
+ *   TYPING — real presence, live. Each room's typing broadcast is subscribed
+ *   from this screen, so "Maria is typing…" appears on the card before you
+ *   open the room. This is only possible because typing moved to a SHARED
+ *   topic (lib/typing-channel.ts); on the old per-subscription topic nobody
+ *   could hear anybody.
+ *
+ *   RECENT — the room had a message in the last 10 minutes. That is message
+ *   recency, NOT "people are online", and this app has no way to know the
+ *   latter. So it is drawn as a quiet ring on the room's glyph and named
+ *   honestly in the label, rather than as a green "online" dot that would be
+ *   claiming something untrue.
+ *
+ * The unread dot is still computed ENTIRELY on this device: `isRoomUnread`
+ * compares `last_message_at` against a localStorage pointer. Nothing about
  * what you have read is ever sent, which is what makes "no seen feature" a
  * property of the system rather than a promise. See lib/unread.ts.
  */
+
+/** A message this recently counts as the room being warm. */
+const RECENT_MS = 10 * 60 * 1000
+
+function isRecent(iso: string | null): boolean {
+  if (!iso) return false
+  const t = Date.parse(iso)
+  return Number.isFinite(t) && Date.now() - t < RECENT_MS
+}
+
+/** Three dots, the same ones the chat composer shows. */
+function TypingDots() {
+  return (
+    <span aria-hidden="true" className="flex shrink-0 items-end gap-0.5">
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          className="h-1 w-1 rounded-full bg-accent-solid"
+          animate={{ y: [0, -3, 0], opacity: [0.4, 1, 0.4] }}
+          transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut', delay: i * 0.15 }}
+        />
+      ))}
+    </span>
+  )
+}
+
 export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
   const navigate = useNavigate()
   const myStudentId = useStudentDataOptional()?.me?.id ?? null
@@ -36,9 +80,13 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [people, setPeople] = useState<{ id: string; displayName: string; avatarUrl: string | null }[]>([])
+  const [people, setPeople] = useState<
+    { id: string; displayName: string; avatarUrl: string | null }[]
+  >([])
   const [search, setSearch] = useState('')
   const [starting, setStarting] = useState(false)
+  const [typers, setTypers] = useState<Record<string, TypingEntry[]>>({})
+  const [, forceTick] = useState(0)
 
   const load = useCallback(async () => {
     setFailed(false)
@@ -54,6 +102,30 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
   useEffect(() => {
     void load()
   }, [load])
+
+  // A stable key, so the effect below does not resubscribe on every refetch of
+  // the same rooms — the same stable-id rule the realtime channels follow.
+  const roomIds = useMemo(() => rooms.map((r) => r.id).join(','), [rooms])
+
+  useEffect(() => {
+    if (!roomIds) return
+    const ids = roomIds.split(',')
+    const handles = ids.map((id) =>
+      joinTypingChannel(id, (name) =>
+        setTypers((cur) => ({ ...cur, [id]: noteTyping(cur[id] ?? [], name) })),
+      ),
+    )
+    return () => handles.forEach((h) => h.leave())
+  }, [roomIds])
+
+  // Re-render once a second while anyone is typing, so a stale name clears on
+  // time rather than when the next broadcast happens to arrive.
+  const anyTyping = Object.values(typers).some((t) => t.length > 0)
+  useEffect(() => {
+    if (!anyTyping) return
+    const t = setInterval(() => forceTick((n) => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [anyTyping])
 
   useEffect(() => {
     if (!pickerOpen || people.length > 0) return
@@ -90,41 +162,91 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
     ? people.filter((p) => p.displayName.toLowerCase().includes(search.trim().toLowerCase()))
     : people
 
-  function RoomRow({ room }: { room: SpaceRoom }) {
+  function RoomCard({ room }: { room: SpaceRoom }) {
     const unread = isRoomUnread(room)
+    const typing = typingLabel(typers[room.id] ?? [])
+    const warm = isRecent(room.lastMessageAt)
+
     return (
       <Link
         to={`${basePath}/chat/${room.id}`}
-        className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-card-2"
+        className={cn(
+          'group flex items-center gap-3 rounded-2xl border p-3 transition-colors',
+          unread ? 'border-accent-solid/35 bg-accent-solid/6' : 'border-line bg-card hover:bg-card-2',
+        )}
       >
-        <Avatar
-          name={room.name}
-          className={cn('h-10 w-10', room.kind !== 'dm' && 'rounded-xl')}
-          textClassName="text-xs"
-        />
+        <span className="relative shrink-0">
+          <Avatar
+            name={room.name}
+            className={cn('h-12 w-12', room.kind !== 'dm' && 'rounded-2xl')}
+            textClassName="text-sm"
+          />
+          {/* A DOT at the corner, not a ring around the whole glyph: the ring
+              fought the unread card's own accent border, and two coloured
+              outlines on one 48px avatar is noise. The dot is the position
+              every messaging app already uses for this. */}
+          {warm && (
+            <span
+              aria-label="Active in the last 10 minutes"
+              className="pointer-events-none absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-success-solid ring-2 ring-canvas"
+            />
+          )}
+        </span>
+
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="min-w-0 truncate text-sm font-semibold">{room.name}</span>
+            <span
+              className={cn(
+                'min-w-0 truncate text-sm',
+                unread ? 'font-bold text-ink' : 'font-semibold',
+              )}
+            >
+              {room.name}
+            </span>
             {room.announceOnly && (
               <Chip tone="warn" size="sm">
                 Announce
               </Chip>
             )}
-            {room.muted && <span className="shrink-0 text-2xs text-muted">muted</span>}
           </div>
-          <p className="truncate text-xs text-muted">
-            {room.lastMessageBody
-              ? `${room.lastMessageBy}: ${room.lastMessageBody}`
-              : 'No messages yet'}
+
+          {/* Typing WINS over the last message: it is the newer fact, and it is
+              the one that makes the list feel alive. */}
+          {typing ? (
+            <p className="flex items-center gap-1.5 truncate text-xs font-medium text-accent">
+              <TypingDots />
+              {typing}
+            </p>
+          ) : (
+            <p className="truncate text-xs text-muted">
+              {room.lastMessageBody
+                ? `${room.lastMessageBy}: ${room.lastMessageBody}`
+                : 'No messages yet'}
+            </p>
+          )}
+
+          <p className="mt-0.5 flex items-center gap-1.5 text-2xs text-muted">
+            <span>
+              {room.memberCount} {room.memberCount === 1 ? 'person' : 'people'}
+            </span>
+            {room.muted && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>muted</span>
+              </>
+            )}
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
+
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
           {room.lastMessageAt && (
             <span className="text-2xs text-muted">{timeAgo(room.lastMessageAt)}</span>
           )}
           {/* Muted rooms still show a dot: mute is about notifications, not
               about pretending nothing happened. */}
-          {unread && <span className="h-2 w-2 rounded-full bg-accent-solid" aria-label="Unread" />}
+          {unread && (
+            <span className="h-2.5 w-2.5 rounded-full bg-accent-solid" aria-label="Unread" />
+          )}
         </div>
       </Link>
     )
@@ -146,11 +268,11 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
             {groups.length === 0 ? (
               <EmptyState>No rooms yet.</EmptyState>
             ) : (
-              <Rows>
+              <div className="space-y-2">
                 {groups.map((r) => (
-                  <RoomRow key={r.id} room={r} />
+                  <RoomCard key={r.id} room={r} />
                 ))}
-              </Rows>
+              </div>
             )}
           </div>
 
@@ -173,11 +295,11 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
                 No direct messages yet.
               </EmptyState>
             ) : (
-              <Rows>
+              <div className="space-y-2">
                 {dms.map((r) => (
-                  <RoomRow key={r.id} room={r} />
+                  <RoomCard key={r.id} room={r} />
                 ))}
-              </Rows>
+              </div>
             )}
           </div>
 
@@ -185,23 +307,18 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
               picker — it is the one conversation a muted student can still
               start, and it should never be hard to find. */}
           {isStudentView && (
-          <Card
-            interactive
-            pad="roomy"
-            onClick={() => void openDm(null)}
-            className="cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-solid/12 text-xs font-bold text-accent">
-                IN
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">Message your instructor</p>
-                <p className="text-xs text-muted">Private, and always available.</p>
+            <Card interactive pad="roomy" onClick={() => void openDm(null)} className="cursor-pointer">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-solid/12 text-xs font-bold text-accent">
+                  IN
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">Message your instructor</p>
+                  <p className="text-xs text-muted">Private, and always available.</p>
+                </div>
+                <span className="shrink-0 text-lg text-muted">›</span>
               </div>
-              <span className="shrink-0 text-lg text-muted">›</span>
-            </div>
-          </Card>
+            </Card>
           )}
         </>
       )}

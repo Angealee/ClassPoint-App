@@ -164,8 +164,11 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
                   {profile.display_title}
                 </p>
               )}
+              {/* Joined rather than interpolated: a caller that has no section
+                  name to give (the chat, where a Global room spans sections)
+                  would otherwise render a stranded "· Level 3". */}
               <p className="truncate text-sm text-muted">
-                {sectionLabel} · Level {progress.level}
+                {[sectionLabel, `Level ${progress.level}`].filter(Boolean).join(' · ')}
               </p>
             </div>
           </div>
