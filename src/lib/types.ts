@@ -1114,3 +1114,34 @@ export interface RoomAudience {
  * muted` is now GENERATED from this so the two cannot disagree.
  */
 export type RoomNotifyLevel = 'all' | 'mentions' | 'none'
+
+// ============================================================================
+// Peer Evaluation · groups (migration 0049)
+// ============================================================================
+
+/** Mirrors the CHECK on `peer_groups.name`. */
+export const PEER_GROUP_NAME_MAX = 40
+
+/** One member of a group, as `get_section_groups` returns them. */
+export interface PeerGroupMember {
+  id: string
+  displayName: string
+  avatarUrl: string | null
+}
+
+/**
+ * A team inside one section.
+ *
+ * `members` excludes archived students while their membership ROW survives, so
+ * a restored student comes back to the team they were on. That means
+ * `memberCount` is the live headcount, not the number of rows in the table —
+ * which is the figure the builder should show either way.
+ */
+export interface PeerGroup {
+  id: string
+  name: string
+  sortOrder: number
+  memberCount: number
+  members: PeerGroupMember[]
+  createdAt: string
+}

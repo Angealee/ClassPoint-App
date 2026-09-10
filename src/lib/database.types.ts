@@ -502,6 +502,33 @@ export interface Database {
         student_id: UUID | null
         detail: string | null
       }>
+
+      /**
+       * 0049 — peer groups. Instructor-select only; every write goes through a
+       * security-definer RPC, so there is no insert/update/delete policy for a
+       * stray `.from()` call to satisfy.
+       */
+      peer_groups: Row<{
+        id: UUID
+        section_id: UUID
+        name: string
+        sort_order: number
+        archived_at: Timestamp | null
+        created_at: Timestamp
+      }>
+
+      /**
+       * 0049 — membership. `section_id` is denormalised from the group so
+       * that `unique (section_id, student_id)` can express one group per student. A
+       * BEFORE trigger overwrites whatever is passed, so never rely on setting
+       * it from here.
+       */
+      peer_group_members: Row<{
+        group_id: UUID
+        student_id: UUID
+        section_id: UUID
+        created_at: Timestamp
+      }>
     }
 
     Views: Record<string, never>
