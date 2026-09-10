@@ -148,7 +148,16 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   `getRoomLevel` throws, the "Notify me" control stays hidden, and the header's Mute pill
   falls back to 0043's `set_room_muted` — so nothing breaks, there is just no three-way
   setting yet.
-  **Next number: 0049.**
+  **0049 is WRITTEN AND NOT YET APPLIED** — peer groups. It depends on nothing after
+  0041 and can be pasted before or after 0046–0048. Until it lands, `/teach/peer` shows
+  its ErrorState and the rest of the app is untouched — the screen is new, so there is no
+  working surface for it to take down.
+  **0050 is WRITTEN AND NOT YET APPLIED** — peer evaluations. It MUST go after 0049,
+  which widened `audit_log_action_check` with the `peer_eval` value 0050 writes, and it
+  needs 0041 for `app_flags` and `cp_my_student_id`. Until it lands, `/app/peer` and the
+  Evaluations tab of `/teach/peer` show their error states; the Groups tab beside it needs
+  only 0049.
+  **Next number: 0051.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -1868,6 +1877,180 @@ toolbar; a fast double-tap reacts and bursts while a 500ms one and a tap on a li
 `href` resolves to `https://…` with `rel="noopener noreferrer nofollow"`; the empty room
 renders the 64px pixel-art astronaut at `image-rendering: pixelated`.
 **Not verified on a real authenticated screen.**
+
+Since 0049 (Peer groups — Peer Evaluation Phase 1): `peer_groups` + `peer_group_members`.
+Reusable teams inside a section, shipped before any evaluation exists because organising a
+class into teams is work the instructor already does on paper. **Nothing in this feature
+touches `point_events`** — points are never turned into a grade, and Peer Evaluation stays
+structurally out of the ledger rather than staying out of it by convention.
+
+**`peer_group_members.section_id` is denormalised, and the reason is a constraint that
+cannot otherwise be written.** One group per student per section is `unique (section_id,
+student_id)`; reached through a join it could only be a trigger, and a trigger is a rule
+you can forget to fire. Same justification as `space_rooms.dm_key`. A BEFORE trigger
+(`cp_peer_member_section`) overwrites whatever the caller passes, so the copy cannot go
+stale. **No `semester_id` anywhere in the file** — a section has been semester-scoped since
+0027 and a second copy of that fact is a second thing that can drift.
+
+**TICKING A STUDENT WHO IS ALREADY ON A TEAM MOVES THEM, SILENTLY, AT THE DATABASE LEVEL.**
+The builder is group-first (the user's call, 2026-09-10): each group card opens a sheet of
+the section roster with checkboxes. That shape lets the same student be ticked in two
+sheets, and the unique constraint would reject the second save with an index name for a
+message. So `set_peer_group_members` removes the student from any other group in the same
+section first. The save therefore always succeeds — which makes it **the screen's job to
+show the move before it happens**: every already-placed row wears its current group as a
+Chip, and the summary above Save counts how many will move. A move the instructor did not
+see coming is the one failure mode this shape can produce.
+It takes the FULL intended membership, never add/remove deltas: the sheet holds the
+complete answer, and a delta API lets the screen and the table disagree about a checkbox
+that toggled twice.
+
+**Unassigned students WARN, they never block** (user's call) — a collapsed count at the top
+of the builder, names on tap. The `set_active_semester` `unplaced` precedent: leaving
+someone behind is often deliberate, and a screen that argues about it is one the instructor
+learns to work around. Phase 2's group-scoped evaluation shows them as **not applicable**,
+never as missing.
+
+**Group names start BLANK with a placeholder** (user's call), unlike the sequential default
+that was on the table. Unlike a section name in the rollover wizard a wrong group name is
+renamed in a tap, so the reason is not risk — it is that a section of "Group 1…Group 8"
+nobody edited is worse than eight names typed once.
+
+**`audit_log_action_check` was widened ONCE for both phases**, adding `'peer_group'` AND
+`'peer_eval'` even though nothing writes the second until 0050. That constraint has already
+been silently narrowed twice by a drop-and-recreate that forgot a value, and widening it in
+two files is two chances to do it again. All twelve prior values re-listed.
+
+RLS is **instructor-select only on both tables, with no write policies at all**. Students
+get no read deliberately: Phase 2 hands a student their groupmates through
+`get_peer_evaluation()`, scoped to one evaluation they are in. A blanket read of the
+membership table would let any student enumerate every team in their section whether or not
+an evaluation exists — a roster nobody asked to publish.
+Archiving releases the members and keeps the row (Phase 2 snapshots `group_id` on every
+submission), frees the name (the unique index is partial), writes one audit row carrying
+the membership it had, and is idempotent so a retried tap writes no second row.
+`get_section_groups` filters archived STUDENTS out of `members`/`member_count` while their
+row survives holding the unique slot — so restoring a student (0023) puts them back on the
+team they were on.
+
+Client: `src/lib/api/peer.ts`; `PeerGroups.tsx` at `/teach/peer`, reached from a new
+`ClipboardIcon` in the instructor Shell's `actions` slot — **stateless by requirement and
+carrying NO badge**, because that slot mounts twice (desktop sidebar + mobile header). A
+count later means hoisting it into `InstructorLayout` the way redemptions and excuses
+already are. **`listRosterBasics` in `core.ts` is deliberately NOT `listStudents`**: that
+one also fetches `student_secrets` to merge every claim token into the row, which a group
+builder has no business pulling over the wire — the same call `getSectionHeadcounts` makes
+for the same reason.
+
+**No changelog entry for this phase.** `changelog.ts` drives the student-facing "What's
+new", and Phase 1 has no student-facing surface at all. The draft entry starts in Phase 2.
+
+Since 0050 (Peer evaluations — Peer Evaluation Phase 2): six tables —
+`peer_evaluations`, `peer_evaluation_sections`, `peer_criteria`, `peer_submissions`,
+`peer_ratings`, `peer_comments` — plus the submit RPC, close/extend/reopen, the
+per-minute cron `classpoint-close-due-peer-evals`, and the kill switch
+`app_flags.peer_eval` (seeded ENABLED). **Results are deliberately NOT readable yet**;
+0051 adds aggregation, release and export. Still nothing touches `point_events`.
+
+**SUBMISSION IS FINAL (the user's call, 2026-09-10)** — `unique (evaluation_id,
+evaluator_id)` and a plain INSERT, no upsert, no `updated_at`. This is the OPPOSITE of
+0045's editable event answers and the difference is the point: an event answer is a race
+where an edit costs nobody anything, a peer rating is a judgement about a classmate the
+instructor will read. The cost is that a misclick is permanent, so the form's
+ConfirmDialog says so before it sends and the RPC's rejection says it again. The
+double-submit path is guarded TWICE — an early `exists` check for the ordinary case, and
+the unique constraint for the stale-tab race that check cannot close.
+
+**`submit_peer_evaluation` IS THE SECURITY BOUNDARY, AND IT IS WHERE THE REFERENCE APP
+HAD NOTHING.** peer2peer trusted an `evaluatorId` from the request body, never
+range-checked a score, never checked a criterion belonged to the evaluation, blocked
+self-rating with a client-side `filter`, and displayed a deadline it never enforced. Here
+the evaluator comes from `cp_my_student_id()` and cannot be passed in; the ratee set must
+EXACTLY equal the derived peer set **in both directions** (one direction alone lets either
+a missing peer or a stranger through, and those are different bugs); every criterion must
+be covered for every ratee exactly once; and **every score must be a value that appears in
+THAT criterion's own scale — membership, not a range**, because on a 1/3/5 scale the
+number 2 lies between the ends and is still not an answer anyone can give.
+
+**`cp_peer_set(eval, student)` is the ONE definition of who your peers are.** The form,
+the submit validation, the completion view and the "it's open" notification all ask it.
+A second copy would let the form show a classmate the submit RPC then refuses. Its OUT
+column is `peer_id`, **not `student_id`** — a RETURNS TABLE column becomes a variable in
+scope and would shadow `peer_group_members.student_id`. It returns EMPTY rather than
+raising for an unplaced student, which is what lets a caller tell "not on a team" apart
+from "something went wrong".
+
+**`peer_ratings` and `peer_comments` are INSTRUCTOR-SELECT ONLY, with no student branch at
+all — not even "rows addressed to me".** A student holding the peer list could difference
+those rows against the totals and reconstruct who said what. 0051's released results reach
+students through an aggregating RPC and nothing else. Same discipline as 0045: sealing
+lives in RLS, never in the client.
+
+**Criteria and scope LOCK on the first submission** (`update_peer_evaluation` raises).
+peer2peer destroyed every submitted response whenever criteria were edited, silently.
+Title, instructions and deadline stay editable forever because none of them changes what a
+submitted rating MEANT. `p_set_closes_at` is a separate boolean because **null is a real
+value there** (no deadline) and cannot also mean "leave it alone" — without it every title
+fix would clear the deadline.
+
+**`cp_peer_scale_clean()` exists because a CHECK cannot walk an array.** The table CHECK
+covers what it can (an array of 2–10 elements); distinctness, ascending order, label
+length and the 0–100 envelope are enforced in the function, which is the only writer's
+gate. Values must ASCEND, and that is load-bearing rather than tidy: 0051 normalises a
+percentage against the first and last values. **`src/lib/peer-scale.ts` mirrors it and is
+pinned by 18 tests** — the load-bearing one is `isOnScale`, which rejects 2 on a 1/3/5
+scale. Change one side, change the other, same commit (the `lounge-answers.ts` rule).
+
+**Create IS open IS notify.** Criteria and sections arrive with the evaluation in one RPC,
+so there is never a window where a student opens one and finds it empty — which also means
+creating it pushes. Only students who ACTUALLY have peers are notified (an unplaced
+student would otherwise be pushed toward a form that can only tell them they are not on a
+team). Audit row BEFORE dispatch, chunked at 50 (the 0034 lesson). Two new notification
+types, `peer_eval_open` and `peer_eval_results`; `notifications.type` has no CHECK so
+nothing needed widening.
+
+**`cp_close_peer_core` is idempotent and has NO instructor check** — the cron calls it too,
+and three things can close one evaluation (the instructor, the cron, a retried request).
+**`reopen_peer_evaluation` CLEARS `closes_at`**, or the cron would close it again within
+the minute and the button would look broken. It refuses once results are released.
+
+**`applicable` is the third completion state peer2peer could not express.** A student with
+nobody to rate is NOT outstanding; listing them as missing sends the instructor chasing
+someone with nothing to do. `get_peer_completion` orders outstanding students FIRST — the
+list exists to be chased, and ordering by name puts the answer on page two.
+
+Client: `src/lib/api/peer.ts` grows the evaluation half; `src/lib/peer-scale.ts` +
+`peer-scale.test.ts`; `components/peer/` (PeerCard, ScaleRow); `/app/peer` and
+`/app/peer/:evaluationId`; `/teach/peer` is now `PeerConsole` (Evaluations | Groups,
+mirrored to `?tab=`, hosting Phase 1's `PeerGroups embedded`) and
+`/teach/peer/:evaluationId` is `PeerResultsBoard` (completion only until 0051 — named for
+what it becomes so the route does not move under anyone).
+**Student nav label is "Peer eval"** (user's call) with `ClipboardIcon`, a SIXTH
+`SIDEBAR_NAV` entry; `TAB_ROUTES` stays at three, so on a phone it lives in the Menu
+overlay beside Student Space and Profile.
+
+**DRAFTS ARE localStorage ONLY, and the consequence is stated on the instructor's screen.**
+Key is `cp_peer_draft_${studentId}_${evaluationId}_v1` — the student id is in there because
+a shared phone must never hand one student another's half-finished opinion of their
+classmates (the `cp_seen_level_${studentId}_${semesterId}` precedent, and it matters more
+here). There is no draft table, so **the instructor cannot see partial progress**; the
+completion card says so in words rather than letting a progress bar imply a percentage
+that does not exist.
+
+**`Input` gained `wrapperClassName`, the same defect `Select` shipped with for months.**
+Its root is `<div className="w-full">` while `className` lands on the `<input>`, so
+`className="flex-1"` in a flex row sized the control while the wrapper kept its own width.
+No existing call site was passing layout classes to `Input`, so this is additive and
+changes nothing that shipped. Sizing goes to the wrapper, appearance to the control.
+
+**`PeerPerson` is one shape for group members and evaluation peers** (`PeerGroupMember` is
+now an alias). They are the same three fields drawn by the same rows, and two names for it
+is where the four-way drift of the points row started.
+
+`ScaleRow` renders BUTTONS, not a slider: a scale can be sparse or binary, and a slider
+implies every point between the ends is available when the server checks membership. The
+value is printed beside the label only when the two differ — on a 1-to-10 scale the label
+IS the number, and "1 1" reads as a bug.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

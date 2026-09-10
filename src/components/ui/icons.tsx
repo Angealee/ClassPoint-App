@@ -421,3 +421,21 @@ export function PinIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+/**
+ * Clipboard with a tick — Peer Evaluation.
+ *
+ * A rubric being filled in, which is what the feature is. Nothing else in the
+ * app claims it: `StarIcon` already means an achievement and `TargetIcon`
+ * already means the next milestone, so reusing either would give one glyph two
+ * meanings across the student and instructor areas.
+ */
+export function ClipboardIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M9 4h6v3H9z" />
+      <path d="M9 5.5H6.5A1.5 1.5 0 0 0 5 7v12.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V7a1.5 1.5 0 0 0-1.5-1.5H15" />
+      <path d="m9 13.5 2 2 4-4" />
+    </svg>
+  )
+}

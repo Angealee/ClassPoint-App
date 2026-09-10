@@ -443,6 +443,44 @@ export const DRAFT_5_0_0: ChangelogEntry = {
   ],
 }
 
+/**
+ * Peer Evaluation — accumulating, NOT announced.
+ *
+ * A separate draft from DRAFT_5_0_0 on purpose: Student Space and this are two
+ * different releases, and merging them would produce one entry that blows past
+ * the 8-section cap changelog.test.ts pins on a live entry. Whichever ships
+ * first moves into CHANGELOG on its own.
+ *
+ * Phase 3 adds the results section. Nothing here mentions groups, the composer
+ * or the completion view — all of that is instructor-only, which is exactly the
+ * half that got cut from 4.0.0.
+ */
+export const DRAFT_5_1_0: ChangelogEntry = {
+  version: '5.1.0',
+  date: '2026-09-10',
+  title: 'Peer eval',
+  sections: [
+    {
+      heading: 'Rate the classmates you worked with',
+      major: true,
+      items: [
+        'A new Peer eval tab. When your instructor opens one for your class, it shows up there and you get a notification.',
+        'One card per classmate. Open it, answer each question, and add a comment if you want to.',
+        'Your name is never shown to the people you rate. Your instructor can see it.',
+        'Half-finished answers are kept on your own phone, so you can close the app and come back to it.',
+      ],
+    },
+    {
+      heading: 'Before you hit submit',
+      items: [
+        'You get one submission and it cannot be changed afterwards, so the app asks you to confirm.',
+        'If there is a deadline it is on the screen, and it is real — once it passes, the form stops accepting answers.',
+        'None of this touches your points. Rating someone honestly cannot cost you or them anything.',
+      ],
+    },
+  ],
+}
+
 export const LATEST_VERSION = CHANGELOG[0]?.version ?? '0.0.0'
 
 const SEEN_KEY = 'cp_seen_changelog_version'

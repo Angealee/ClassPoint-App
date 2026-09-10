@@ -640,6 +640,10 @@ export type NotificationType =
   | 'space_report'
   /** A Random Event was posted (0045). */
   | 'space_event'
+  /** A peer evaluation opened for your section (0050). */
+  | 'peer_eval_open'
+  /** Your peer feedback was released (0051). */
+  | 'peer_eval_results'
   | 'test'
 
 /** One row of the student's notification history (the bell). */
@@ -1122,12 +1126,22 @@ export type RoomNotifyLevel = 'all' | 'mentions' | 'none'
 /** Mirrors the CHECK on `peer_groups.name`. */
 export const PEER_GROUP_NAME_MAX = 40
 
-/** One member of a group, as `get_section_groups` returns them. */
-export interface PeerGroupMember {
+/**
+ * A classmate as every peer surface renders them: id, chosen name, photo.
+ *
+ * ONE shape for group members and for the peers on an evaluation form. They
+ * are the same three fields drawn by the same rows, so a second name for it
+ * would be the start of the drift this codebase has watched happen four times
+ * to the points row.
+ */
+export interface PeerPerson {
   id: string
   displayName: string
   avatarUrl: string | null
 }
+
+/** One member of a group, as `get_section_groups` returns them. */
+export type PeerGroupMember = PeerPerson
 
 /**
  * A team inside one section.
@@ -1144,4 +1158,143 @@ export interface PeerGroup {
   memberCount: number
   members: PeerGroupMember[]
   createdAt: string
+}
+
+/**
+ * A roster row with no secrets attached — see `listRosterBasics`.
+ *
+ * `fullName` is the roster name the instructor sorts and searches by;
+ * `displayName` is what the student chose to be called, and is what any surface
+ * a student can see must use.
+ */
+export interface RosterPerson {
+  id: string
+  fullName: string
+  displayName: string
+  avatarUrl: string | null
+}
+
+// ============================================================================
+// Peer Evaluation · evaluations and submission (migration 0050)
+// ============================================================================
+
+/** Mirrors the CHECKs on `peer_evaluations` and `peer_comments`. */
+export const PEER_TITLE_MAX = 80
+export const PEER_INSTRUCTIONS_MAX = 600
+export const PEER_CRITERION_LABEL_MAX = 60
+export const PEER_COMMENT_MAX = 400
+/** Enforced inside `create_peer_evaluation`, not by a CHECK. */
+export const PEER_MAX_CRITERIA = 10
+
+/** One option on a criterion's rating scale. */
+export interface PeerScaleOption {
+  value: number
+  label: string
+}
+
+export interface PeerCriterion {
+  id: string
+  label: string
+  scale: PeerScaleOption[]
+}
+
+/**
+ * Section-wide or group-scoped, chosen once at creation and locked the moment
+ * anyone submits — changing it afterwards would change who a submitted rating
+ * was about.
+ */
+export type PeerEvalScope = 'section' | 'group'
+export type PeerEvalStatus = 'open' | 'closed'
+
+/** 'paused' means the kill switch is off, not that a student is excluded. */
+export type PeerEvalState = 'open' | 'paused'
+
+/** A row in the student's list at `/app/peer`. */
+export interface PeerEvaluationSummary {
+  id: string
+  title: string
+  instructions: string | null
+  subjectCode: string
+  subjectName: string
+  scope: PeerEvalScope
+  status: PeerEvalStatus
+  closesAt: string | null
+  resultsReleasedAt: string | null
+  /**
+   * How many classmates this student must rate.
+   *
+   * ZERO IS MEANINGFUL, not an error: in a group-scoped evaluation it means
+   * they have not been placed on a team. The list says so rather than showing
+   * an empty form.
+   */
+  peerCount: number
+  submittedAt: string | null
+  createdAt: string
+}
+
+/** The whole form, as `get_peer_evaluation` returns it in one call. */
+export interface PeerEvaluationForm {
+  id: string
+  title: string
+  instructions: string | null
+  subjectCode: string
+  subjectName: string
+  scope: PeerEvalScope
+  status: PeerEvalStatus
+  closesAt: string | null
+  submittedAt: string | null
+  criteria: PeerCriterion[]
+  peers: PeerPerson[]
+}
+
+/** One rating, as the submit RPC wants it. Snake_case: see `submitPeerEvaluation`. */
+export interface PeerRatingInput {
+  ratee_id: string
+  criterion_id: string
+  score: number
+}
+
+export interface PeerCommentInput {
+  ratee_id: string
+  body: string
+}
+
+/** A row in the instructor's list at `/teach/peer`. */
+export interface PeerEvaluationListItem {
+  id: string
+  title: string
+  subjectCode: string
+  subjectName: string
+  scope: PeerEvalScope
+  status: PeerEvalStatus
+  closesAt: string | null
+  closedAt: string | null
+  resultsReleasedAt: string | null
+  sectionNames: string[]
+  criteriaCount: number
+  submittedCount: number
+  /** Only students who actually have someone to rate. */
+  expectedCount: number
+  createdAt: string
+}
+
+/** One row of the completion view. */
+export interface PeerCompletionRow {
+  studentId: string
+  displayName: string
+  fullName: string
+  avatarUrl: string | null
+  sectionName: string
+  /** Null in a section-scoped evaluation, or when they are on no team. */
+  groupName: string | null
+  peerCount: number
+  submittedAt: string | null
+  /**
+   * False when they have nobody to rate.
+   *
+   * The third state peer2peer could not express. Such a student is NOT
+   * outstanding, and listing them as missing sends the instructor chasing
+   * someone with nothing to do.
+   */
+  applicable: boolean
 }

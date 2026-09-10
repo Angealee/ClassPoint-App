@@ -21,6 +21,7 @@ import type {
   ProfileVisitorPage,
   PublicPointEvent,
   PublicProfile,
+  RosterPerson,
   Section,
   SectionStudent,
   StudentSelf,
@@ -312,6 +313,35 @@ export async function deleteSection(id: string): Promise<void> {
   }
   const { error } = await supabase.from('sections').delete().eq('id', id)
   if (error) throw error
+}
+
+/**
+ * The active roster of one section, and nothing else.
+ *
+ * Deliberately NOT `listStudents`: that one also fetches `student_secrets` to
+ * merge every student's claim token into the row, which is right for the roster
+ * screen that displays them and wrong everywhere else. A group builder has no
+ * business pulling secrets over the wire — the same call `getSectionHeadcounts`
+ * makes for the same reason.
+ *
+ * Sorted by roster name, which is the order the instructor reads a class list
+ * in, not by display name.
+ */
+export async function listRosterBasics(sectionId: string): Promise<RosterPerson[]> {
+  const { data, error } = await supabase
+    .from('students')
+    .select('id, full_name, display_name, avatar_url')
+    .eq('section_id', sectionId)
+    .is('archived_at', null)
+  if (error) throw error
+  return (data ?? [])
+    .map((s) => ({
+      id: s.id as string,
+      fullName: s.full_name as string,
+      displayName: s.display_name as string,
+      avatarUrl: (s.avatar_url as string | null) ?? null,
+    }))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName))
 }
 
 /**

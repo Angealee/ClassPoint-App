@@ -5,17 +5,27 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string
   hint?: string
   error?: string
+  /**
+   * Layout classes for the WRAPPER, not the control.
+   *
+   * `className` lands on the <input>, so a caller sizing this in a flex row
+   * with `className="flex-1"` caps the visible box while the wrapper stays
+   * `w-full` and keeps its own width. Exactly the bug `Select` shipped with
+   * for months (see its own note): width, max-width and flex go here;
+   * height, text size and colour stay in `className`.
+   */
+  wrapperClassName?: string
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, hint, error, className, id, ...props },
+  { label, hint, error, className, wrapperClassName, id, ...props },
   ref,
 ) {
   const autoId = useId()
   const inputId = id ?? autoId
 
   return (
-    <div className="w-full">
+    <div className={cn('w-full', wrapperClassName)}>
       {label && (
         <label htmlFor={inputId} className="mb-1.5 block text-sm font-medium text-ink">
           {label}

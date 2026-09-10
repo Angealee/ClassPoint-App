@@ -105,6 +105,22 @@ const Redemptions = lazy(() =>
   import('@/features/instructor/Redemptions').then((m) => ({ default: m.Redemptions })),
 )
 const Ops = lazy(() => import('@/features/instructor/Ops').then((m) => ({ default: m.Ops })))
+const PeerConsole = lazy(() =>
+  import('@/features/instructor/PeerConsole').then((m) => ({ default: m.PeerConsole })),
+)
+const PeerResultsBoard = lazy(() =>
+  import('@/features/instructor/PeerResultsBoard').then((m) => ({
+    default: m.PeerResultsBoard,
+  })),
+)
+const PeerEvaluations = lazy(() =>
+  import('@/features/peer/PeerEvaluations').then((m) => ({ default: m.PeerEvaluations })),
+)
+const PeerEvaluationForm = lazy(() =>
+  import('@/features/peer/PeerEvaluationForm').then((m) => ({
+    default: m.PeerEvaluationForm,
+  })),
+)
 const StudentRecord = lazy(() =>
   import('@/features/instructor/StudentRecord').then((m) => ({ default: m.StudentRecord })),
 )
@@ -156,6 +172,8 @@ export const router = createBrowserRouter([
           { path: 'space/chat/:roomId', element: <ChatRoom /> },
           { path: 'space/post/:postId', element: <LoungePostDetail /> },
         { path: 'achievements', element: <Achievements /> },
+          { path: 'peer', element: <PeerEvaluations /> },
+          { path: 'peer/:evaluationId', element: <PeerEvaluationForm /> },
         ],
       },
     ],
@@ -177,6 +195,8 @@ export const router = createBrowserRouter([
           { path: 'redemptions', element: <Redemptions /> },
           { path: 'semesters', element: <ManageSemesters /> },
           { path: 'ops', element: <Ops /> },
+          { path: 'peer', element: <PeerConsole /> },
+          { path: 'peer/:evaluationId', element: <PeerResultsBoard /> },
           { path: 'space', element: <InstructorSpace /> },
           { path: 'space/chats', element: <InstructorChats /> },
           { path: 'space/chat/:roomId', element: <InstructorChatRoom /> },

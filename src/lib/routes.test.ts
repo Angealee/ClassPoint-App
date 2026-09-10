@@ -72,9 +72,11 @@ const MUST_BE_LINKED = [
   '/app/achievements',
   '/app/attendance/stats',
   '/app/settings',
+  '/app/peer',
   '/app/spenders',
   // Instructor
   '/teach/ops',
+  '/teach/peer',
   '/teach/space',
   '/teach/space/chats',
   '/teach/redemptions',

@@ -15,6 +15,7 @@ import { Shell, type NavItem } from '@/components/layout/Shell'
 import { Splash } from '@/components/layout/Splash'
 import { WhatsNew } from '@/features/WhatsNew'
 import {
+  ClipboardIcon,
   ClockIcon,
   LogOutIcon,
   QrIcon,
@@ -132,6 +133,28 @@ function OpsButton() {
       round
       onClick={() => navigate('/teach/ops')}
       icon={<ShieldIcon className="h-5 w-5" />}
+    />
+  )
+}
+
+/**
+ * Peer Evaluation entry point (0049).
+ *
+ * Stateless, like OpsButton and for the same reason: Shell renders `actions` in
+ * BOTH the desktop sidebar and the mobile header, so this mounts twice. It
+ * carries no badge deliberately — a count here would need a fetch or a
+ * subscription, and the way to add one later is to hoist the number into this
+ * layout the way the redemptions and excuses counts already are.
+ */
+function PeerButton() {
+  const navigate = useNavigate()
+  return (
+    <IconButton
+      label="Peer evaluation"
+      variant="outline"
+      round
+      onClick={() => navigate('/teach/peer')}
+      icon={<ClipboardIcon className="h-5 w-5" />}
     />
   )
 }
@@ -298,6 +321,7 @@ export function InstructorLayout() {
           // single unit instead of spreading them apart.
           <div className="flex items-center gap-2">
             <RedemptionInbox count={pendingRedemptions + pendingExcuses + pendingReports} />
+            <PeerButton />
             <OpsButton />
                         <IconButton
               label="Sign out"

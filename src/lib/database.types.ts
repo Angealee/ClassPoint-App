@@ -529,6 +529,86 @@ export interface Database {
         section_id: UUID
         created_at: Timestamp
       }>
+      /**
+       * 0050 — one peer evaluation. Students in a targeted section may select
+       * it; every write goes through a security-definer RPC.
+       */
+      peer_evaluations: Row<{
+        id: UUID
+        semester_id: UUID
+        subject_id: UUID
+        title: string
+        instructions: string | null
+        scope: 'section' | 'group'
+        status: 'open' | 'closed'
+        closes_at: Timestamp | null
+        closed_at: Timestamp | null
+        results_released_at: Timestamp | null
+        created_at: Timestamp
+      }>
+
+      /** 0050 — which sections an evaluation targets. Composite PK, so no dupes. */
+      peer_evaluation_sections: Row<{
+        evaluation_id: UUID
+        section_id: UUID
+      }>
+
+      /**
+       * 0050 — a question and its own rating scale.
+       *
+       * `scale` is `[{value:number,label:string}]`. The element shape is
+       * validated by `cp_peer_scale_clean()`, not by a CHECK — a CHECK cannot
+       * walk the array to prove the values ascend.
+       */
+      peer_criteria: Row<{
+        id: UUID
+        evaluation_id: UUID
+        label: string
+        scale: unknown
+        sort_order: number
+        created_at: Timestamp
+      }>
+
+      /**
+       * 0050 — one submission per student per evaluation, enforced by a unique
+       * constraint. `group_id` is a SNAPSHOT, so regrouping never rewrites
+       * history.
+       */
+      peer_submissions: Row<{
+        id: UUID
+        evaluation_id: UUID
+        evaluator_id: UUID
+        section_id: UUID
+        group_id: UUID | null
+        submitted_at: Timestamp
+      }>
+
+      /**
+       * 0050 — ⚠ INSTRUCTOR-SELECT ONLY. A student never reads these, not even
+       * rows addressed to them: with the peer list in hand, differencing rows
+       * against the totals reconstructs who said what.
+       */
+      peer_ratings: Row<{
+        id: UUID
+        submission_id: UUID
+        evaluation_id: UUID
+        evaluator_id: UUID
+        ratee_id: UUID
+        criterion_id: UUID
+        score: number
+        created_at: Timestamp
+      }>
+
+      /** 0050 — one comment per peer. Instructor-select only, same reason. */
+      peer_comments: Row<{
+        submission_id: UUID
+        ratee_id: UUID
+        evaluator_id: UUID
+        evaluation_id: UUID
+        body: string
+        hidden_at: Timestamp | null
+        created_at: Timestamp
+      }>
     }
 
     Views: Record<string, never>

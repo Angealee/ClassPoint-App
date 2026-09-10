@@ -23,6 +23,7 @@ import {
   HomeIcon,
   MenuIcon,
   SaturnIcon,
+  ClipboardIcon,
   ScanIcon,
   TrophyIcon,
   UserIcon,
@@ -31,7 +32,7 @@ import {
 const ONBOARDED_KEY = 'cp_onboarded'
 
 /**
- * The five destinations, in sidebar order.
+ * The six destinations, in sidebar order.
  *
  * Student Space sits second — directly under Home — because it is the feature
  * being launched and burying it under a menu is how a beta goes unused. Profile
@@ -42,15 +43,16 @@ const SIDEBAR_NAV = [
   { to: '/app/space', label: 'Student Space', Icon: SaturnIcon },
   { to: '/app/leaderboard', label: 'Ranks', Icon: TrophyIcon },
   { to: '/app/attendance', label: 'Attend', Icon: ScanIcon },
+  { to: '/app/peer', label: 'Peer eval', Icon: ClipboardIcon },
   { to: '/app/profile', label: 'Profile', Icon: UserIcon },
 ] as const
 
 /**
  * The mobile bottom bar carries three of those plus the menu.
  *
- * Five tabs is the comfortable limit on a phone and this would be the fifth, so
- * Student Space and Profile live in the menu overlay — which mirrors the full
- * sidebar, so nothing is more than two taps away.
+ * Five tabs is the comfortable limit on a phone and the bar is already full, so
+ * Student Space, Peer eval and Profile live in the menu overlay — which mirrors
+ * the full sidebar, so nothing is more than two taps away.
  */
 const TAB_ROUTES = ['/app', '/app/leaderboard', '/app/attendance'] as const
 
