@@ -1,7 +1,11 @@
 import { rpc } from './_internal'
 import type {
+  MyPeerResults,
   PeerCommentInput,
+  PeerCommentRow,
   PeerCompletionRow,
+  PeerCriterionResult,
+  PeerResultRow,
   PeerEvalScope,
   PeerEvalState,
   PeerEvalStatus,
@@ -324,4 +328,126 @@ export async function getPeerCompletion(evaluationId: string): Promise<PeerCompl
 /** The kill switch, answered once in SQL. The client only renders the answer. */
 export async function getPeerEvalState(): Promise<PeerEvalState> {
   return await rpc<PeerEvalState>('cp_peer_eval_state')
+}
+
+// ── Results (migration 0051) ─────────────────────────────────────────────────
+
+interface ResultRow {
+  student_id: string
+  display_name: string
+  full_name: string
+  avatar_url: string | null
+  section_name: string
+  group_name: string | null
+  rater_count: number
+  overall_pct: number | string | null
+  overall_raw: number | string | null
+  same_scale: boolean
+  criteria: PeerCriterionResult[] | null
+  comments: PeerCommentRow[] | null
+}
+
+/**
+ * Postgres `numeric` arrives as a STRING over PostgREST, not a number.
+ *
+ * It is sent as text to preserve arbitrary precision, and `"81.3" * 1` works in
+ * JavaScript while `"81.3".toFixed(1)` does not — so a screen that skips this
+ * fails only on the formatting call, not on the arithmetic beside it.
+ */
+function num(v: number | string | null): number | null {
+  if (v === null || v === undefined) return null
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+function mapCriteria(list: PeerCriterionResult[] | null): PeerCriterionResult[] {
+  return (list ?? []).map((c) => ({
+    ...c,
+    avg: num(c.avg as unknown as number | string) ?? 0,
+    pct: num(c.pct as unknown as number | string) ?? 0,
+    scaleMin: num(c.scaleMin as unknown as number | string) ?? 0,
+    scaleMax: num(c.scaleMax as unknown as number | string) ?? 0,
+  }))
+}
+
+/**
+ * The instructor's results board.
+ *
+ * Aggregated in SQL, and that is not a preference: a 40-student section-wide
+ * evaluation with 4 criteria is 6,240 rating rows, and PostgREST truncates any
+ * response at 1000 rows SILENTLY. Doing this in the client would report wrong
+ * averages that look right.
+ *
+ * Includes students nobody rated, with `raterCount` 0 and null averages — the
+ * gap is the finding.
+ */
+export async function getPeerResults(
+  evaluationId: string,
+  sectionId?: string,
+): Promise<PeerResultRow[]> {
+  const rows = await rpc<ResultRow[]>('get_peer_results', {
+    p_eval: evaluationId,
+    p_section: sectionId ?? null,
+  })
+  return (rows ?? []).map((r) => ({
+    studentId: r.student_id,
+    displayName: r.display_name,
+    fullName: r.full_name,
+    avatarUrl: r.avatar_url,
+    sectionName: r.section_name,
+    groupName: r.group_name,
+    raterCount: r.rater_count ?? 0,
+    overallPct: num(r.overall_pct),
+    overallRaw: num(r.overall_raw),
+    sameScale: !!r.same_scale,
+    criteria: mapCriteria(r.criteria),
+    comments: r.comments ?? [],
+  }))
+}
+
+/**
+ * A student's own results. Raises until they are released.
+ *
+ * The comments come back as bare strings with the three-rater floor already
+ * applied by the server — this function cannot leak an evaluator id because
+ * the RPC never puts one in the payload.
+ */
+export async function getMyPeerResults(evaluationId: string): Promise<MyPeerResults> {
+  const raw = await rpc<MyPeerResults>('get_my_peer_results', { p_eval: evaluationId })
+  return {
+    ...raw,
+    overallPct: num(raw.overallPct as unknown as number | string),
+    overallRaw: num(raw.overallRaw as unknown as number | string),
+    criteria: mapCriteria(raw.criteria),
+    comments: raw.comments ?? [],
+  }
+}
+
+/**
+ * Release. Returns how many students were notified; 0 means it was already
+ * released, so a retried tap cannot push a second time at a whole class.
+ *
+ * Refuses while the evaluation is still open: showing a figure that then moves
+ * is worse than showing it late, because the second version is the one students
+ * assume was doctored.
+ */
+export async function releasePeerResults(evaluationId: string): Promise<number> {
+  return await rpc<number>('release_peer_results', { p_eval: evaluationId })
+}
+
+/**
+ * Hide or restore one comment. The row is never destroyed — the instructor can
+ * still read it, which is the question you actually ask when the student comes
+ * to talk about it.
+ */
+export async function setPeerCommentHidden(
+  submissionId: string,
+  rateeId: string,
+  hidden: boolean,
+): Promise<void> {
+  await rpc('set_peer_comment_hidden', {
+    p_submission: submissionId,
+    p_ratee: rateeId,
+    p_hidden: hidden,
+  })
 }

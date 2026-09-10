@@ -8,31 +8,44 @@ import { Meter } from '@/components/ui/Meter'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { PersonRow } from '@/components/ui/PersonRow'
 import { SectionLabel } from '@/components/ui/SectionLabel'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
+import { DownloadIcon } from '@/components/ui/icons'
+import { PeerResultCard } from '@/components/peer/PeerResultCard'
 import {
   closePeerEvaluation,
   extendPeerEvaluation,
   getPeerCompletion,
+  getPeerResults,
   listPeerEvaluations,
+  releasePeerResults,
   reopenPeerEvaluation,
+  setPeerCommentHidden,
 } from '@/lib/api'
+import { exportPeerScores } from '@/lib/export-peer'
 import { errorText } from '@/lib/errors'
 import { countdownTo, timeAgo } from '@/lib/time'
-import type { PeerCompletionRow, PeerEvaluationListItem } from '@/lib/types'
+import type { PeerCompletionRow, PeerEvaluationListItem, PeerResultRow } from '@/lib/types'
 
-type Confirming = 'close' | 'reopen' | null
+type Confirming = 'close' | 'reopen' | 'release' | null
+type BoardTab = 'results' | 'completion'
 
 /**
  * One evaluation: who has submitted, and the controls that end it.
  *
- * ── RESULTS ARE NOT HERE YET ───────────────────────────────────────────────
- * Phase 3 adds the aggregation, the release and the export to this screen. The
- * name is already `PeerResultsBoard` so the route does not move under anyone
- * when it does. Until then the screen answers the only question the database
- * will answer: who has submitted, who has not, and who was never expected to.
+ * ── TWO VIEWS, AND WHICH ONE OPENS DEPENDS ON THE STATE ────────────────────
+ * While it is open the only answerable question is who has submitted, so the
+ * Completion view is all there is. Once it closes, Results opens by default —
+ * that is what you came back for. Aggregation happens in SQL: a section-wide
+ * evaluation is thousands of rating rows and PostgREST truncates at 1000
+ * silently.
+ *
+ * The results fetch sits in its OWN try, the 0034 SectionGrid precedent. Its
+ * RPC ships in 0051, so before that migration is applied only this tab is
+ * missing rather than the whole screen.
  *
  * ── THREE STATES, NOT TWO ──────────────────────────────────────────────────
  * `applicable` is false for a student with nobody to rate — in a group-scoped
@@ -45,6 +58,9 @@ export function PeerResultsBoard() {
 
   const [meta, setMeta] = useState<PeerEvaluationListItem | null>(null)
   const [rows, setRows] = useState<PeerCompletionRow[]>([])
+  const [results, setResults] = useState<PeerResultRow[]>([])
+  const [tab, setTab] = useState<BoardTab>('completion')
+  const [exporting, setExporting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<Confirming>(null)
@@ -62,8 +78,23 @@ export function PeerResultsBoard() {
         listPeerEvaluations(),
         getPeerCompletion(evaluationId),
       ])
-      setMeta(all.find((e) => e.id === evaluationId) ?? null)
+      const found = all.find((e) => e.id === evaluationId) ?? null
+      setMeta(found)
       setRows(completion)
+
+      // Results are a SEPARATE try, the 0034 SectionGrid precedent: this RPC
+      // ships in 0051, so until that migration is applied the call throws and
+      // only the Results tab is missing. Folding it into the fetch above would
+      // take the completion view down with it.
+      if (found && found.status === 'closed') {
+        try {
+          const r = await getPeerResults(evaluationId)
+          setResults(r)
+          setTab('results')
+        } catch {
+          setResults([])
+        }
+      }
     } catch (e) {
       setLoadError(errorText(e, "Couldn't load that evaluation."))
     } finally {
@@ -94,6 +125,16 @@ export function PeerResultsBoard() {
       } else if (confirming === 'reopen') {
         await reopenPeerEvaluation(meta.id)
         toast('Reopened. Set a new deadline if you want one.', 'success')
+      } else if (confirming === 'release') {
+        const n = await releasePeerResults(meta.id)
+        // Report what the SERVER reached, not what we predicted. Zero means it
+        // was already released, which is worth saying plainly.
+        toast(
+          n === 0
+            ? 'Results were already released.'
+            : `Released to ${n} student${n === 1 ? '' : 's'}.`,
+          'success',
+        )
       }
       setConfirming(null)
       await load()
@@ -117,6 +158,43 @@ export function PeerResultsBoard() {
       toast(errorText(e, "Couldn't change the deadline."), 'error')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function hideComment(submissionId: string, rateeId: string, hidden: boolean) {
+    try {
+      await setPeerCommentHidden(submissionId, rateeId, hidden)
+      // Patch in place rather than refetching: the instructor is mid-read on an
+      // expanded card, and a reload collapses everything they had open.
+      setResults((prev) =>
+        prev.map((r) =>
+          r.studentId !== rateeId
+            ? r
+            : {
+                ...r,
+                comments: r.comments.map((c) =>
+                  c.submissionId === submissionId
+                    ? { ...c, hiddenAt: hidden ? new Date().toISOString() : null }
+                    : c,
+                ),
+              },
+        ),
+      )
+      toast(hidden ? 'Hidden from that student.' : 'Restored.', 'success')
+    } catch (e) {
+      toast(errorText(e, "Couldn't change that comment."), 'error')
+    }
+  }
+
+  async function runExport() {
+    if (!meta) return
+    setExporting(true)
+    try {
+      await exportPeerScores(meta)
+    } catch (e) {
+      toast(errorText(e, "Couldn't build that workbook."), 'error')
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -208,7 +286,79 @@ export function PeerResultsBoard() {
           </div>
         </Card>
 
-        {split.outstanding.length > 0 && (
+        {!open && (
+          <Card>
+            <SectionLabel>Results</SectionLabel>
+            {meta.resultsReleasedAt ? (
+              <p className="text-xs text-muted">
+                Released {timeAgo(meta.resultsReleasedAt)}. Every student who was
+                rated can read their own feedback.
+              </p>
+            ) : (
+              <p className="text-xs text-muted">
+                Students cannot see anything until you release. You can read
+                everything below first.
+              </p>
+            )}
+
+            <div className="mt-4 flex gap-2">
+              <Button
+                className="min-w-0 flex-1"
+                disabled={meta.resultsReleasedAt !== null}
+                onClick={() => setConfirming('release')}
+              >
+                {meta.resultsReleasedAt !== null ? 'Released' : 'Release to students'}
+              </Button>
+              <Button
+                variant="outline"
+                loading={exporting}
+                icon={<DownloadIcon className="h-4 w-4" />}
+                onClick={() => void runExport()}
+              >
+                Export
+              </Button>
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              {/* Said here rather than discovered later: an instructor who
+                  expects the comments in the sheet will otherwise mail it
+                  believing the words travelled with it. */}
+              The workbook holds scores only. Comments stay in the app.
+            </p>
+          </Card>
+        )}
+
+        {!open && results.length > 0 && (
+          <SegmentedControl
+            label="Board view"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'results', label: 'Results' },
+              { value: 'completion', label: 'Completion' },
+            ]}
+          />
+        )}
+
+        {tab === 'results' && !open && results.length > 0 && (
+          <div className="space-y-3">
+            {results.map((r) => (
+              <PeerResultCard
+                key={r.studentId}
+                row={r}
+                onToggleComment={(submissionId, hidden) =>
+                  void hideComment(submissionId, r.studentId, hidden)
+                }
+              />
+            ))}
+            <p className="px-1 text-xs text-muted">
+              Lowest first. A student nobody rated sorts last, because that is a
+              gap in the data rather than a low score.
+            </p>
+          </div>
+        )}
+
+        {(tab === 'completion' || open || results.length === 0) &&
+          split.outstanding.length > 0 && (
           <div>
             <SectionLabel>
               Still to submit ({split.outstanding.length})
@@ -221,7 +371,7 @@ export function PeerResultsBoard() {
           </div>
         )}
 
-        {split.done.length > 0 && (
+        {(tab === 'completion' || open || results.length === 0) && split.done.length > 0 && (
           <div>
             <SectionLabel>Submitted ({split.done.length})</SectionLabel>
             <Card pad="none" className="divide-y divide-line">
@@ -232,7 +382,7 @@ export function PeerResultsBoard() {
           </div>
         )}
 
-        {split.skipped.length > 0 && (
+        {(tab === 'completion' || open || results.length === 0) && split.skipped.length > 0 && (
           <div>
             <SectionLabel>Not applicable ({split.skipped.length})</SectionLabel>
             <Card pad="none" className="divide-y divide-line">
@@ -250,21 +400,37 @@ export function PeerResultsBoard() {
 
       <ConfirmDialog
         open={confirming !== null}
-        title={confirming === 'close' ? 'Close this evaluation?' : 'Reopen this evaluation?'}
+        title={
+          confirming === 'close'
+            ? 'Close this evaluation?'
+            : confirming === 'release'
+              ? 'Release these results?'
+              : 'Reopen this evaluation?'
+        }
         message={
           confirming === 'close'
             ? `${split.outstanding.length} student${
                 split.outstanding.length === 1 ? '' : 's'
               } have not submitted. They will not be able to after this.`
-            : 'Students who have not submitted will be able to again. Anyone who already submitted still cannot change their answers.'
+            : confirming === 'release'
+              ? 'Every student who was rated gets a notification and can read their own scores and comments from then on.'
+              : 'Students who have not submitted will be able to again. Anyone who already submitted still cannot change their answers.'
         }
         detail={
           confirming === 'reopen'
             ? 'The deadline is cleared, or the automatic close would shut it again within the minute.'
-            : undefined
+            : confirming === 'release'
+              ? 'This cannot be undone, and the evaluation can no longer be reopened. Hide any comment you do not want sent on, first.'
+              : undefined
         }
         variant={confirming === 'close' ? 'danger' : 'default'}
-        confirmLabel={confirming === 'close' ? 'Close it' : 'Reopen it'}
+        confirmLabel={
+          confirming === 'close'
+            ? 'Close it'
+            : confirming === 'release'
+              ? 'Release'
+              : 'Reopen it'
+        }
         busy={busy}
         onConfirm={() => void act()}
         onClose={() => setConfirming(null)}

@@ -1298,3 +1298,90 @@ export interface PeerCompletionRow {
    */
   applicable: boolean
 }
+
+// ============================================================================
+// Peer Evaluation · results (migration 0051)
+// ============================================================================
+
+/**
+ * Below this many raters a student's COMMENTS are withheld from them.
+ *
+ * ⚠ Mirrors `c_min_raters` in `get_my_peer_results`, which is where it is
+ * ENFORCED. This copy exists only so a screen can explain the rule; a client
+ * that forgot it would show nothing, never leak anything.
+ */
+export const PEER_MIN_RATERS_FOR_COMMENTS = 3
+
+/** One criterion's aggregate for one student. */
+export interface PeerCriterionResult {
+  id: string
+  label: string
+  /** The mean rating on this criterion's own scale. */
+  avg: number
+  /** That mean min-max normalised against the scale's ends. */
+  pct: number
+  scaleMin: number
+  scaleMax: number
+  /** How many ratings went into it. Absent on the student's own view. */
+  ratings?: number
+}
+
+/** One comment, as the INSTRUCTOR sees it: attributed. */
+export interface PeerCommentRow {
+  submissionId: string
+  body: string
+  evaluatorId: string
+  evaluatorName: string
+  hiddenAt: string | null
+  createdAt: string
+}
+
+/** One student's row on the instructor's results board. */
+export interface PeerResultRow {
+  studentId: string
+  displayName: string
+  fullName: string
+  avatarUrl: string | null
+  sectionName: string
+  groupName: string | null
+  /** How many different classmates rated them. Zero is a real answer. */
+  raterCount: number
+  /** Null when nobody rated them. */
+  overallPct: number | null
+  overallRaw: number | null
+  /**
+   * Whether every criterion shares one scale.
+   *
+   * False makes `overallRaw` a mean across mixed scales, which is a number
+   * without a unit. The percentages stay comparable either way, so the screen
+   * keeps the headline and captions the raw figure.
+   */
+  sameScale: boolean
+  criteria: PeerCriterionResult[]
+  comments: PeerCommentRow[]
+}
+
+/**
+ * What a student gets back about themselves.
+ *
+ * `comments` are BARE STRINGS. Not objects with the evaluator stripped out —
+ * the shape has no room for a name, so there is no field anyone can forget to
+ * remove.
+ */
+export interface MyPeerResults {
+  id: string
+  title: string
+  subjectCode: string
+  subjectName: string
+  releasedAt: string
+  raterCount: number
+  sameScale: boolean
+  overallPct: number | null
+  overallRaw: number | null
+  criteria: PeerCriterionResult[]
+  comments: string[]
+  /** True when too few people rated them for a comment to stay anonymous. */
+  commentsWithheld: boolean
+  /** The threshold the server applied, so the screen can say the real number. */
+  minRaters: number
+}

@@ -12,9 +12,9 @@ import type { PeerScaleOption } from '@/lib/types'
  * Change one side, change the other, in the same commit — the rule
  * `lounge-answers.ts` already carries for the same reason.
  *
- * The percent formula is NOT here yet. It lands in Phase 3 alongside the SQL
- * that computes the same number, so the two arrive together rather than one
- * sitting unused and slowly going stale.
+ * `percentOf` at the foot of this file mirrors `cp_peer_scores()` in 0051 and
+ * carries the same warning. Both halves of this file are pinned by
+ * `peer-scale.test.ts`.
  */
 
 export const SCALE_MIN_OPTIONS = 2
@@ -123,4 +123,41 @@ export function isOnScale(scale: PeerScaleOption[], score: number): boolean {
   // A range check would accept 2 on a scale of 1/3/5. The submit RPC asks the
   // same question the same way, against the stored jsonb.
   return scale.some((o) => o.value === score)
+}
+
+/**
+ * A criterion average as a percentage of that criterion's own scale.
+ *
+ * ⚠ MIRRORS `cp_peer_scores()` IN MIGRATION 0051 AND IS PINNED BY A TEST.
+ * The instructor's board and the student's own results both come from the SQL;
+ * this exists so the export and any client-side preview compute the identical
+ * number. A drift here puts two different figures on one student's feedback.
+ *
+ * MIN-MAX, not `avg / max`. On a 1-to-5 scale a straight 1 is the worst rating
+ * available and must read 0%, not 20%. The two formulas agree only when the
+ * scale starts at 0, which is why the difference is easy to miss on a Yes/No
+ * criterion and impossible to miss on a 1-to-5 one.
+ *
+ * Returns null for an empty scale or one with no range, because there is no
+ * honest percentage for "every rating is simultaneously best and worst". The
+ * SQL answers 0 there and only reaches it on data predating the ascending rule.
+ */
+export function percentOf(scale: PeerScaleOption[], avg: number | null): number | null {
+  if (avg === null || !Array.isArray(scale) || scale.length < 2) return null
+  const lo = scale[0].value
+  const hi = scale[scale.length - 1].value
+  if (hi <= lo) return null
+  return ((avg - lo) / (hi - lo)) * 100
+}
+
+/**
+ * Round once, at the end.
+ *
+ * peer2peer averaged already-rounded numbers and compounded the error across
+ * four criteria. Every average in this feature is carried unrounded until it is
+ * displayed, and this is the only place it stops being exact.
+ */
+export function roundTo(value: number, places: number): number {
+  const f = 10 ** places
+  return Math.round(value * f) / f
 }

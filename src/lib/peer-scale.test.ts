@@ -3,6 +3,8 @@ import {
   SCALE_PRESETS,
   isOnScale,
   normalizeScale,
+  percentOf,
+  roundTo,
   scaleError,
 } from './peer-scale'
 import type { PeerScaleOption } from './types'
@@ -162,5 +164,99 @@ describe('isOnScale', () => {
     ]
     // Guards against anyone "simplifying" this to a truthiness check.
     expect(isOnScale(yesno, 0)).toBe(true)
+  })
+})
+
+/**
+ * The percent formula, mirroring `cp_peer_scores()` in migration 0051.
+ *
+ * Every expected value below is computed by hand rather than by calling the
+ * function under test, which is the only way a mirror test is worth anything.
+ */
+describe('percentOf', () => {
+  const five: PeerScaleOption[] = SCALE_PRESETS[0].scale
+  const yesno: PeerScaleOption[] = SCALE_PRESETS[2].scale
+  const ten: PeerScaleOption[] = SCALE_PRESETS[1].scale
+
+  /**
+   * THE ONE THAT MATTERS. `avg / max` would answer 20 here, and 20% is a lie:
+   * on a 1-to-5 scale a straight 1 is the worst rating anyone can give.
+   */
+  it('reads the bottom of a 1-to-5 scale as 0, not 20', () => {
+    expect(percentOf(five, 1)).toBe(0)
+  })
+
+  it('reads the top as 100', () => {
+    expect(percentOf(five, 5)).toBe(100)
+    expect(percentOf(ten, 10)).toBe(100)
+    expect(percentOf(yesno, 1)).toBe(100)
+  })
+
+  it('reads the midpoint as 50', () => {
+    // (3 - 1) / (5 - 1) = 0.5
+    expect(percentOf(five, 3)).toBe(50)
+    // (5.5 - 1) / (10 - 1) = 0.5
+    expect(percentOf(ten, 5.5)).toBe(50)
+  })
+
+  it('matches hand-computed values off the midpoint', () => {
+    // (4.25 - 1) / 4 = 0.8125
+    expect(percentOf(five, 4.25)).toBeCloseTo(81.25, 10)
+    // (2 - 1) / 9 = 0.111…
+    expect(percentOf(ten, 2)).toBeCloseTo(11.1111111111, 8)
+  })
+
+  it('agrees with avg/max ONLY on a zero-based scale', () => {
+    // The coincidence that hides the bug: on 0/1 both formulas give 0 and 100.
+    expect(percentOf(yesno, 0)).toBe(0)
+    expect(percentOf(yesno, 0.5)).toBe(50)
+  })
+
+  it('normalises against the ends of a SPARSE scale, not its option count', () => {
+    const sparse: PeerScaleOption[] = [
+      { value: 1, label: 'Poor' },
+      { value: 3, label: 'Okay' },
+      { value: 5, label: 'Great' },
+    ]
+    // Three options, but the range is still 1 to 5.
+    expect(percentOf(sparse, 3)).toBe(50)
+  })
+
+  it('returns null rather than a number it cannot justify', () => {
+    expect(percentOf(five, null)).toBeNull()
+    expect(percentOf([], 3)).toBeNull()
+    expect(percentOf([{ value: 2, label: 'Only' }], 2)).toBeNull()
+    // No range: every rating is simultaneously the best and the worst.
+    expect(
+      percentOf(
+        [
+          { value: 3, label: 'A' },
+          { value: 3, label: 'B' },
+        ],
+        3,
+      ),
+    ).toBeNull()
+  })
+})
+
+describe('roundTo', () => {
+  it('rounds once, at the requested precision', () => {
+    expect(roundTo(81.2549, 1)).toBe(81.3)
+    expect(roundTo(81.2549, 2)).toBe(81.25)
+    expect(roundTo(3, 2)).toBe(3)
+  })
+
+  /**
+   * The compounding peer2peer shipped: rounding each criterion to a whole
+   * number and then averaging drifts from averaging first. Pinned so nobody
+   * "simplifies" the unrounded carry out of the result screens.
+   */
+  it('differs from averaging pre-rounded values', () => {
+    const exact = [81.25, 62.5, 43.75]
+    const avgOfExact = roundTo(exact.reduce((a, b) => a + b, 0) / 3, 1)
+    const preRounded = exact.map((v) => Math.round(v))
+    const avgOfRounded = roundTo(preRounded.reduce((a, b) => a + b, 0) / 3, 1)
+    expect(avgOfExact).toBe(62.5)
+    expect(avgOfRounded).not.toBe(avgOfExact)
   })
 })

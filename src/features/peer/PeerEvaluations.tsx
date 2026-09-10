@@ -116,18 +116,27 @@ function EvalRow({ item }: { item: PeerEvaluationSummary }) {
   const submitted = item.submittedAt !== null
   const unplaced = item.peerCount === 0
 
-  const chip = submitted
-    ? { label: 'Submitted', tone: 'success' as const }
-    : unplaced
-      ? { label: 'Not your class', tone: 'neutral' as const }
-      : closed
-        ? { label: 'Missed', tone: 'danger' as const }
-        : { label: 'To do', tone: 'accent' as const }
+  const released = item.resultsReleasedAt !== null
+
+  const chip = released
+    ? { label: 'Results in', tone: 'reward' as const }
+    : submitted
+      ? { label: 'Submitted', tone: 'success' as const }
+      : unplaced
+        ? { label: 'Not your class', tone: 'neutral' as const }
+        : closed
+          ? { label: 'Missed', tone: 'danger' as const }
+          : { label: 'To do', tone: 'accent' as const }
 
   // Whether tapping it does anything. A closed one you never answered has
   // nothing behind it, and a card that opens onto a dead end is worse than one
   // that plainly does not open.
-  const openable = !unplaced && (!closed || submitted)
+  const openable = released || (!unplaced && (!closed || submitted))
+
+  // Released results are the destination once they exist, even for a student
+  // who never submitted: their classmates still rated them, and that feedback
+  // is the thing they came to read.
+  const to = released ? `/app/peer/${item.id}/results` : `/app/peer/${item.id}`
 
   const body = (
     <Card interactive={openable} className={!openable ? 'opacity-70' : undefined}>
@@ -144,9 +153,11 @@ function EvalRow({ item }: { item: PeerEvaluationSummary }) {
       </div>
 
       <p className="mt-2 text-xs text-muted">
-        {unplaced
-          ? 'You have not been placed in a group for this one. Ask your instructor if that looks wrong.'
-          : submitted
+        {released
+          ? 'Feedback from your classmates is ready to read.'
+          : unplaced
+            ? 'You have not been placed in a group for this one. Ask your instructor if that looks wrong.'
+            : submitted
             ? 'Your answers are in. They cannot be changed.'
             : closed
               ? 'This closed before you submitted.'
@@ -159,7 +170,7 @@ function EvalRow({ item }: { item: PeerEvaluationSummary }) {
 
   if (!openable) return body
   return (
-    <Link to={`/app/peer/${item.id}`} className="block">
+    <Link to={to} className="block">
       {body}
     </Link>
   )

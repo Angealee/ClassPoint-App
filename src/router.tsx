@@ -121,6 +121,9 @@ const PeerEvaluationForm = lazy(() =>
     default: m.PeerEvaluationForm,
   })),
 )
+const PeerResults = lazy(() =>
+  import('@/features/peer/PeerResults').then((m) => ({ default: m.PeerResults })),
+)
 const StudentRecord = lazy(() =>
   import('@/features/instructor/StudentRecord').then((m) => ({ default: m.StudentRecord })),
 )
@@ -174,6 +177,7 @@ export const router = createBrowserRouter([
         { path: 'achievements', element: <Achievements /> },
           { path: 'peer', element: <PeerEvaluations /> },
           { path: 'peer/:evaluationId', element: <PeerEvaluationForm /> },
+          { path: 'peer/:evaluationId/results', element: <PeerResults /> },
         ],
       },
     ],
