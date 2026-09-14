@@ -599,6 +599,16 @@ export interface Database {
         created_at: Timestamp
       }>
 
+      /**
+       * 0052 — the teams an evaluation is aimed at. NO ROWS means all groups in
+       * its sections, which is what every evaluation created before 0052 has.
+       * Instructor-select only.
+       */
+      peer_evaluation_groups: Row<{
+        evaluation_id: UUID
+        group_id: UUID
+      }>
+
       /** 0050 — one comment per peer. Instructor-select only, same reason. */
       peer_comments: Row<{
         submission_id: UUID

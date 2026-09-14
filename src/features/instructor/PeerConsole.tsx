@@ -139,6 +139,7 @@ function EvaluationCard({ item }: { item: PeerEvaluationListItem }) {
             <h3 className="truncate text-sm font-semibold">{item.title}</h3>
             <p className="mt-0.5 truncate text-xs text-muted">
               {item.subjectCode} · {item.sectionNames.join(', ') || 'No sections'}
+              {item.groupNames.length > 0 && ` · ${item.groupNames.join(', ')}`}
             </p>
           </div>
           <Chip tone={open ? 'accent' : 'neutral'} size="sm">

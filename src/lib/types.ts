@@ -1271,6 +1271,11 @@ export interface PeerEvaluationListItem {
   closedAt: string | null
   resultsReleasedAt: string | null
   sectionNames: string[]
+  /**
+   * The teams it is aimed at (0052). EMPTY means all groups in those sections,
+   * or a section-wide evaluation — not "no teams".
+   */
+  groupNames: string[]
   criteriaCount: number
   submittedCount: number
   /** Only students who actually have someone to rate. */

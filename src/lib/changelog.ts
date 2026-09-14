@@ -478,6 +478,15 @@ export const DRAFT_5_1_0: ChangelogEntry = {
         'None of this touches your points. Rating someone honestly cannot cost you or them anything.',
       ],
     },
+    {
+      heading: 'And you get your own feedback back',
+      major: true,
+      items: [
+        'Once your instructor releases the results, you get a notification and can read what your classmates said about you.',
+        'You see an overall score, a breakdown for each question, and the comments — never who wrote them.',
+        'If fewer than three people rated you, the comments are held back: in a group that small it would be obvious who said what. Your scores still show.',
+      ],
+    },
   ],
 }
 

@@ -193,6 +193,8 @@ interface EvalListRow {
   closed_at: string | null
   results_released_at: string | null
   section_names: string[] | null
+  /** 0052. Absent on a database still at 0051, hence the `?? []` below. */
+  group_names?: string[] | null
   criteria_count: number
   submitted_count: number
   expected_count: number
@@ -214,6 +216,7 @@ export async function listPeerEvaluations(semesterId?: string): Promise<PeerEval
     closedAt: r.closed_at,
     resultsReleasedAt: r.results_released_at,
     sectionNames: r.section_names ?? [],
+    groupNames: r.group_names ?? [],
     criteriaCount: r.criteria_count ?? 0,
     submittedCount: r.submitted_count ?? 0,
     expectedCount: r.expected_count ?? 0,
@@ -227,6 +230,15 @@ export interface CreatePeerEvaluationArgs {
   instructions: string
   scope: PeerEvalScope
   sectionIds: string[]
+  /**
+   * The teams taking part (0052), or null for ALL groups in those sections.
+   *
+   * Null is not "none" — it is the pre-0052 meaning, and the composer sends it
+   * whenever every group is left ticked so that ignoring the picker behaves
+   * exactly as it did before, including for groups created later. Never send
+   * an empty array to mean "nobody": the server reads that as all groups too.
+   */
+  groupIds: string[] | null
   criteria: { label: string; scale: PeerScaleOption[] }[]
   /** ISO string, or null for "closed by hand only". */
   closesAt: string | null
@@ -249,6 +261,10 @@ export async function createPeerEvaluation(args: CreatePeerEvaluationArgs): Prom
     p_sections: args.sectionIds,
     p_criteria: args.criteria,
     p_closes_at: args.closesAt,
+    // Omitted rather than sent as null when absent, so this call still resolves
+    // against a database that has not had 0052 pasted yet — the old function
+    // has no p_groups parameter and PostgREST matches on the names it is sent.
+    ...(args.groupIds && args.groupIds.length > 0 ? { p_groups: args.groupIds } : {}),
   })
 }
 
@@ -265,6 +281,8 @@ export async function updatePeerEvaluation(
     title?: string
     instructions?: string
     sectionIds?: string[]
+    /** Empty array = reset to all groups. Omit to leave the groups alone. */
+    groupIds?: string[]
     criteria?: { label: string; scale: PeerScaleOption[] }[]
     closesAt?: string | null
   },
@@ -277,6 +295,7 @@ export async function updatePeerEvaluation(
     p_criteria: patch.criteria ?? null,
     p_closes_at: patch.closesAt ?? null,
     p_set_closes_at: 'closesAt' in patch,
+    ...(patch.groupIds !== undefined ? { p_groups: patch.groupIds } : {}),
   })
 }
 
@@ -449,5 +468,27 @@ export async function setPeerCommentHidden(
     p_submission: submissionId,
     p_ratee: rateeId,
     p_hidden: hidden,
+  })
+}
+
+// ── Deleting (migration 0053) ────────────────────────────────────────────────
+
+/**
+ * Hard-delete an evaluation and everything under it. Returns how many
+ * submissions went with it.
+ *
+ * The server refuses unless the evaluation is CLOSED and NOT RELEASED, and it
+ * compares `typedTitle` against the real title itself. Pass what the person
+ * actually TYPED, never the title from state: a stale tab showing an old title
+ * after a rename must be refused, and sending the stored title would turn that
+ * check into one that can never fail.
+ *
+ * A full snapshot, every rating and comment included, is written to the audit
+ * log before anything is removed.
+ */
+export async function deletePeerEvaluation(evaluationId: string, typedTitle: string): Promise<number> {
+  return await rpc<number>('delete_peer_evaluation', {
+    p_eval: evaluationId,
+    p_confirm_title: typedTitle,
   })
 }

@@ -157,7 +157,17 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   needs 0041 for `app_flags` and `cp_my_student_id`. Until it lands, `/app/peer` and the
   Evaluations tab of `/teach/peer` show their error states; the Groups tab beside it needs
   only 0049.
-  **Next number: 0051.**
+  **0051 is WRITTEN AND NOT YET APPLIED** — peer results. It MUST go after 0050, and it
+  takes ownership of `cp_nightly_backup` from 0032, so 0032 must not be edited. Until it
+  lands, the Results tab and the release control on `/teach/peer/:id` are missing (a
+  separate try/catch, so the completion view is unaffected) and `/app/peer/:id/results`
+  shows its error state.
+  **0052 is WRITTEN AND NOT YET APPLIED** — target an evaluation at specific groups. It
+  MUST go after 0051 (it takes `get_peer_results` and `cp_nightly_backup` from it). Until
+  it lands, an evaluation opened with every group ticked works exactly as before, while
+  one with any group unticked fails to create with a readable error rather than opening
+  for the whole section.
+  **Next number: 0053.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -2052,6 +2062,152 @@ implies every point between the ends is available when the server checks members
 value is printed beside the label only when the two differ — on a 1-to-10 scale the label
 IS the number, and "1 1" reads as a bug.
 
+Since 0051 (Peer results — Peer Evaluation Phase 3, the last): NO NEW TABLES. Aggregation,
+release, comment hiding, and an **ownership move of `cp_nightly_backup` 0032 → 0051**
+adding all eight peer tables. 0032 must not be edited.
+
+**AGGREGATION IS IN SQL BECAUSE THE ALTERNATIVE IS SILENTLY WRONG.** A 40-student
+section-wide evaluation with 4 criteria is 40 × 39 × 4 = 6,240 rating rows, and PostgREST
+truncates any response at 1000 rows without saying so — the 0031 lesson. A client-side
+average over a truncated set looks completely fine and is not.
+
+**The percent formula is MIN-MAX, not `avg / max`,** and the difference is the whole
+reason it needed pinning: on a 1-to-5 scale a straight 1 is the worst rating available and
+must read **0%, not 20%**. The two formulas agree only when a scale starts at zero, which
+is exactly why a Yes/No criterion hides the bug and a 1-to-5 one exposes it.
+`cp_peer_scores()` is the ONE place it exists in SQL — both result RPCs read it, neither
+re-derives it. `percentOf` in `src/lib/peer-scale.ts` mirrors it for the export, with every
+expected value in its test computed by hand rather than from the function under test.
+**Averages are carried UNROUNDED and rounded once at the end**; peer2peer averaged
+already-rounded numbers and compounded the error across four criteria (`roundTo`'s second
+test pins that the two disagree).
+
+**THE THREE-RATER FLOOR (the user's call, 2026-09-10): below 3 raters COMMENTS are
+withheld and numbers are not.** In a pair, one comment is one person's voice and
+"anonymous" is a fiction, while an average is still hard to attribute to a sentence.
+Enforced in `get_my_peer_results`, never in the client — the client is never sent the rows
+it would have to decide not to draw. `commentsWithheld` and `minRaters` come back so the
+screen can state the real number instead of implying nobody wrote anything.
+
+**A student's comments arrive as BARE STRINGS.** Not objects with the evaluator stripped
+out: the shape has no room for a name, so there is no field anyone can forget to remove in
+a later edit. Hidden comments never leave the database at all.
+
+**`get_peer_results` includes students NOBODY RATED** (`raterCount` 0, null averages) and
+sorts them LAST, not first — that is a gap in the data, not a low score, and the card wears
+a neutral chip rather than a zero that would be averaged and compared. Everyone else sorts
+**lowest first**: this board is read to find who needs a conversation, and alphabetical
+order buries the answer on page two.
+
+**`sameScale` exists because averaging raw means across a 1-to-5 and a 0/1 criterion gives
+a number with no unit.** The percentages stay comparable either way, so the headline is
+always the percent and the raw figure is captioned "across different scales" when it is
+one. Decision 13 said show the raw mean; this is how it is shown without lying.
+
+**Release refuses while the evaluation is open** — a figure that moves after a student has
+seen it is worse than a late one, because the second version is the one they assume was
+doctored. It is idempotent (returns 0 when already released), so a retried tap cannot push
+twice at a whole class, and it notifies only students who were actually rated. Notification
+copy is **neutral and factual** (the user's call): "Peer feedback ready". This can carry
+criticism, so a cheerful push is the wrong doorbell. Releasing also permanently blocks
+`reopen_peer_evaluation`.
+
+**Hiding a comment sets a timestamp and is allowed AFTER release.** Catching it late is the
+ordinary case, and a screen that refuses at exactly the moment it matters is worse than
+none. The instructor can still read it, which is the question you actually ask when the
+student comes to talk about it. One audit row each way. The client patches the row in place
+rather than refetching, because a reload collapses every card the instructor had open.
+
+**`src/lib/export-peer.ts` is SCORES ONLY** (decision 16). A comment is a student's words
+about a classmate written on a promise of anonymity, and a spreadsheet gets mailed, copied
+to a shared drive and opened on a projector. **Column headers come from the CRITERIA list,
+never from the first student's score array** — that is the bug that empties peer2peer's
+header row whenever the first student received no ratings. An unrated cell is BLANK, not 0,
+because a spreadsheet 0 gets averaged as one.
+
+Client: `getPeerResults` / `getMyPeerResults` / `releasePeerResults` / `setPeerCommentHidden`
+in `api/peer.ts`; `components/peer/PeerResultCard.tsx` (expandable, one card per student —
+the user's call over a table, which needs its own horizontal scroller at 375px);
+`/app/peer/:evaluationId/results` (`PeerResults`). The student list routes a released
+evaluation to the results screen instead of the form, **including for a student who never
+submitted** — their classmates still rated them, and that feedback is what they came for.
+**`getPeerResults` is fetched in a SEPARATE try/catch** (the 0034 SectionGrid precedent), so
+before 0051 is applied only the Results tab is missing rather than the whole screen.
+
+⚠ **Postgres `numeric` arrives over PostgREST as a STRING**, not a number — it is sent as
+text to preserve precision. `num()` in `api/peer.ts` coerces every one of them. A screen
+that skips this still does arithmetic correctly (`"81.3" * 1` works) and fails only on
+`.toFixed()`, which is the worst place for it to surface.
+
+Since 0052 (Target an evaluation at specific groups, 2026-09-14): `peer_evaluation_groups`.
+A "Within groups" evaluation used to mean every group in its sections, so the instructor
+could not aim one at a single team. Decisions (user): **groups listed under each ticked
+section, all pre-ticked** · **students on unpicked teams never see the evaluation at all**.
+
+**NO ROWS MEANS ALL GROUPS, and that is what made this safe to add to a live feature.**
+Every evaluation created before 0052 has no rows, so it keeps its exact meaning with no
+backfill. The composer follows the same rule: when every group is left ticked it sends
+NO list, so ignoring the picker behaves exactly as before, including for a group created
+after the evaluation opens. The server test is "does this evaluation have ANY rows",
+never "any rows for a live group" — if every picked group is later archived the
+evaluation must reach nobody, not silently widen back to the whole section.
+
+**`cp_peer_in_audience(eval, student)` is the ONE answer to "is this student part of
+it"**, and everything that decides membership asks it: `cp_peer_set` (so submit
+refuses), `cp_peer_eval_targets_me` (which backs the RLS policies — narrowing it is what
+makes a narrowed evaluation INVISIBLE to other teams rather than merely unanswerable),
+`get_peer_completion` and `get_peer_results`. Revoked from the API roles; every caller is
+a definer. **A student who SUBMITTED or WAS RATED stays attached** to their evaluation
+after a regroup — `targets_me`, completion and results each keep them — because their
+words are already in it and history must not vanish over a team change.
+
+**Ownership moves:** `cp_peer_eval_targets_me`, `cp_peer_set`, `get_peer_completion`
+0050 → 0052 (same signatures, `create or replace`); `list_peer_evaluations` 0050 → 0052
+(return type GROWS by `group_names`, drop-first); `create_peer_evaluation` and
+`update_peer_evaluation` 0050 → 0052 (**signature grows** by `p_groups`, so the OLD exact
+signature is dropped first — a `create or replace` with a new parameter list makes an
+overload and PostgREST rejects every call as ambiguous, the 0028 lesson);
+`get_peer_results` and `cp_nightly_backup` 0051 → 0052. **0050 and 0051 were NOT edited.**
+The carried-forward bodies were diffed against their sources after writing, and every
+difference is an intended one.
+
+**A 0050 bug fixed on the way through:** `cp_peer_set`'s group branch matched membership
+without checking the section. `peer_group_members` allows one row per student PER SECTION,
+so a student promoted at rollover keeps last semester's row and would have been handed
+last semester's teammates. Both sides of the join now require the current section.
+
+`p_groups` in `create_peer_evaluation` is written BEFORE the notification query, because
+that query asks `cp_peer_set` who has peers. Written after, a narrowed evaluation would
+push the whole section. Each picked group must be live and inside one of the chosen
+sections, and only a within-groups evaluation may name any. In `update_peer_evaluation`,
+null leaves groups alone and an EMPTY array resets to all groups; a sections change
+prunes any picked group whose section left.
+
+**`src/lib/peer-audience.ts` decides what the composer sends, pinned by 10 tests,
+because every failure mode is silent** — the evaluation opens either way and only the
+wrong students get the push. Rules: section scope → null; nothing unticked inside a
+TICKED section → null; anything unticked → the exact remaining list, including every
+group of sections the instructor never touched; an untick left over from a section since
+unticked does not count; **an empty list is refused, never sent** (the server would read
+it as all groups, the opposite of clearing every box); and a narrowed list is refused
+while any ticked section's groups are still loading or failed, since sending it then
+would drop that section. An all-groups evaluation is never blocked by a slow fetch.
+Verified to bite: breaking the null default fails 3 of the 10.
+
+**`createPeerEvaluation` OMITS `p_groups` rather than sending null when there is no
+list**, so it still resolves against a database without 0052 — PostgREST matches on the
+argument names it is sent. A narrowed create against a pre-0052 database fails loudly
+instead of opening for the whole section.
+
+The composer stores the UNticked groups, not the ticked ones: groups arrive after a
+section is ticked, and an inverse set makes them ticked by default with no effect to
+reconcile. Each group row shows its member count, with "No one to rate" for a group of
+one. The confirm dialog names the teams and says nobody else in the section will see it;
+with more than one section in play each group carries its section, since two sections can
+each have a "Team Alpha". Group names now show on the console card and the results board
+subtitle — without them, one evaluation for a whole section and one for a single team
+read identically.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
@@ -2085,7 +2241,7 @@ past redemptions must keep their meaning. `points` is capped at 50 by CHECK beca
 RPC itself refuses more, so a pricier item could be displayed but never requested.
 Student shop = card grid atop `UsePoints` (unaffordable items shown greyed with the gap
 — the reason to keep earning); instructor UI = a third tab on `/teach/redemptions`
-(Points | Excuses | Rewards). **Ownership move: `cp_nightly_backup` 0027 → 0032.**
+(Points | Excuses | Rewards). **Ownership move: `cp_nightly_backup` 0027 → 0032** (moved again to 0051).
 
 Since 0031 (Attendance aggregates — the 1000-row truncation fix): PostgREST caps any
 response at 1000 rows and truncates SILENTLY; a two-subject section crosses that in

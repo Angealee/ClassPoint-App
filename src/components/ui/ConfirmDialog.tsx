@@ -23,6 +23,16 @@ interface ConfirmDialogProps {
    * feature — a double-tap habit cannot blow through it.
    */
   challengeText?: string
+  /**
+   * Reports what is typed into the challenge box.
+   *
+   * For callers whose SERVER re-checks the typed text, so it can be sent along
+   * with the request rather than trusting that the button was enabled. A
+   * separate prop rather than an argument to `onConfirm`, because thirteen
+   * existing callers pass a bare function there and would start receiving a
+   * string they never asked for.
+   */
+  onChallengeChange?: (value: string) => void
   /** Optional input rendered above the buttons (e.g. a decision note). */
   children?: ReactNode
   onConfirm: () => void
@@ -45,6 +55,7 @@ export function ConfirmDialog({
   variant = 'danger',
   busy = false,
   challengeText,
+  onChallengeChange,
   children,
   onConfirm,
   onClose,
@@ -83,13 +94,16 @@ export function ConfirmDialog({
             </p>
             <input
               value={typed}
-              onChange={(e) => setTyped(e.target.value)}
+              onChange={(e) => {
+                setTyped(e.target.value)
+                onChallengeChange?.(e.target.value)
+              }}
               placeholder={challengeText}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
-              className="h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm outline-none placeholder:text-muted/50 focus:ring-2 focus:ring-ring/40"
+              className="h-11 w-full rounded-xl border border-line bg-canvas px-3 text-base outline-none placeholder:text-muted/50 focus:ring-2 focus:ring-ring/40"
             />
           </div>
         )}
