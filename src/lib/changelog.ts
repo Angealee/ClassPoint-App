@@ -465,15 +465,15 @@ export const DRAFT_5_1_0: ChangelogEntry = {
       major: true,
       items: [
         'A new Peer eval tab. When your instructor opens one for your class, it shows up there and you get a notification.',
-        'One card per classmate. Open it, answer each question, and add a comment if you want to.',
+        'One card per classmate. Tap a number for each question, add a comment if you want to, then Next takes you to whoever is still waiting.',
         'Your name is never shown to the people you rate. Your instructor can see it.',
-        'Half-finished answers are kept on your own phone, so you can close the app and come back to it.',
+        'Faces along the top show who you have finished. Your answers save on your phone as you go, so you can close the app and come back.',
       ],
     },
     {
       heading: 'Before you hit submit',
       items: [
-        'You get one submission and it cannot be changed afterwards, so the app asks you to confirm.',
+        'You get one submission and it cannot be changed afterwards, so you see every answer on one screen first and can go back to fix any of them.',
         'If there is a deadline it is on the screen, and it is real — once it passes, the form stops accepting answers.',
         'None of this touches your points. Rating someone honestly cannot cost you or them anything.',
       ],
@@ -483,7 +483,7 @@ export const DRAFT_5_1_0: ChangelogEntry = {
       major: true,
       items: [
         'Once your instructor releases the results, you get a notification and can read what your classmates said about you.',
-        'You see an overall score, a breakdown for each question, and the comments — never who wrote them.',
+        'You see an overall score, a breakdown for each question, your strongest question and the one with the most room to grow, and the comments — never who wrote them.',
         'If fewer than three people rated you, the comments are held back: in a group that small it would be obvious who said what. Your scores still show.',
       ],
     },

@@ -125,9 +125,18 @@ export function PeerResultCard({
                     >
                       <p className="whitespace-pre-wrap text-sm">{c.body}</p>
                       <div className="mt-2 flex items-center justify-between gap-3">
-                        <span className="min-w-0 truncate text-xs text-muted">
-                          {c.evaluatorName} · {timeAgo(c.createdAt)}
-                          {c.hiddenAt && ' · hidden from them'}
+                        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
+                          {/* A permanent mark: a comment you restored keeps it,
+                              so "flagged and let through" stays visible. */}
+                          {c.flagged && (
+                            <Chip tone="warn" size="sm">
+                              Flagged
+                            </Chip>
+                          )}
+                          <span className="min-w-0 truncate">
+                            {c.evaluatorName} · {timeAgo(c.createdAt)}
+                            {c.hiddenAt && ' · hidden from them'}
+                          </span>
                         </span>
                         <Button
                           size="sm"

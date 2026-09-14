@@ -1,6 +1,8 @@
+import { supabase } from '@/lib/supabase'
 import { rpc } from './_internal'
 import type {
   MyPeerResults,
+  PeerEvaluationTemplate,
   PeerCommentInput,
   PeerCommentRow,
   PeerCompletionRow,
@@ -420,7 +422,9 @@ export async function getPeerResults(
     overallRaw: num(r.overall_raw),
     sameScale: !!r.same_scale,
     criteria: mapCriteria(r.criteria),
-    comments: r.comments ?? [],
+    // `flagged` arrives with 0054. Defaulted so a database still at 0053
+    // reads as "nothing flagged" rather than leaking undefined into the board.
+    comments: (r.comments ?? []).map((c) => ({ ...c, flagged: !!c.flagged })),
   }))
 }
 
@@ -490,5 +494,80 @@ export async function deletePeerEvaluation(evaluationId: string, typedTitle: str
   return await rpc<number>('delete_peer_evaluation', {
     p_eval: evaluationId,
     p_confirm_title: typedTitle,
+  })
+}
+
+// ── Duplicate and shuffle (migration 0054) ───────────────────────────────────
+
+/**
+ * Everything the composer needs to pre-fill a copy of an evaluation.
+ *
+ * Read straight from the tables: the instructor can select all four, and a
+ * one-off RPC would be a second definition of an evaluation's shape. The group
+ * read fails SOFT to "all groups", because `peer_evaluation_groups` only exists
+ * from 0052 and a template that loses its narrowing is still a correct copy of
+ * everything else — the composer shows the groups ticked, so nothing is hidden.
+ */
+export async function getPeerEvaluationTemplate(
+  evaluationId: string,
+): Promise<PeerEvaluationTemplate> {
+  const [evalRes, critRes, secRes] = await Promise.all([
+    supabase
+      .from('peer_evaluations')
+      .select('title, instructions, scope, subject_id')
+      .eq('id', evaluationId)
+      .single(),
+    supabase
+      .from('peer_criteria')
+      .select('label, scale, sort_order')
+      .eq('evaluation_id', evaluationId)
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('peer_evaluation_sections')
+      .select('section_id')
+      .eq('evaluation_id', evaluationId),
+  ])
+  if (evalRes.error) throw evalRes.error
+  if (critRes.error) throw critRes.error
+  if (secRes.error) throw secRes.error
+
+  let groupIds: string[] = []
+  const groupRes = await supabase
+    .from('peer_evaluation_groups')
+    .select('group_id')
+    .eq('evaluation_id', evaluationId)
+  if (!groupRes.error) groupIds = (groupRes.data ?? []).map((g) => g.group_id as string)
+
+  const e = evalRes.data
+  return {
+    title: e.title as string,
+    instructions: (e.instructions as string | null) ?? '',
+    scope: e.scope as PeerEvalScope,
+    subjectId: e.subject_id as string,
+    sectionIds: (secRes.data ?? []).map((s) => s.section_id as string),
+    groupIds,
+    criteria: (critRes.data ?? []).map((c) => ({
+      label: c.label as string,
+      scale: (c.scale as PeerScaleOption[]) ?? [],
+    })),
+  }
+}
+
+/**
+ * Save a whole shuffle in one transaction. Returns how many groups were made.
+ *
+ * The plan is drawn by `lib/peer-shuffle.ts` so what is saved is exactly what
+ * was previewed. `replace` archives every live group in the section first;
+ * any refusal rolls the whole thing back, archiving included.
+ */
+export async function applyPeerGroupPlan(
+  sectionId: string,
+  replace: boolean,
+  groups: { name: string; studentIds: string[] }[],
+): Promise<number> {
+  return await rpc<number>('apply_peer_group_plan', {
+    p_section: sectionId,
+    p_replace: replace,
+    p_groups: groups,
   })
 }

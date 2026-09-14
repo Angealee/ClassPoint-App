@@ -27,6 +27,7 @@ import {
   setPeerCommentHidden,
 } from '@/lib/api'
 import { exportPeerScores } from '@/lib/export-peer'
+import { byTeam, classSummary } from '@/lib/peer-summary'
 import { errorText } from '@/lib/errors'
 import { countdownTo, timeAgo } from '@/lib/time'
 import type { PeerCompletionRow, PeerEvaluationListItem, PeerResultRow } from '@/lib/types'
@@ -85,6 +86,8 @@ export function PeerResultsBoard() {
   // What was actually TYPED, sent to the server so it can compare it itself.
   // Never substitute the stored title: that would make the check unable to fail.
   const [typedTitle, setTypedTitle] = useState('')
+  const [view, setView] = useState<'lowest' | 'team'>('lowest')
+  const [query, setQuery] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -265,6 +268,25 @@ export function PeerResultsBoard() {
   const canDelete = !open && !released
   const showResults = results.length > 0 && meta.submittedCount > 0
 
+  // Computed from the rows already on screen, so the summary can never disagree
+  // with the cards beneath it. The summary always covers the whole class; the
+  // search narrows only the list.
+  const summary = classSummary(results)
+  const needle = query.trim().toLowerCase()
+  const shown = needle
+    ? results.filter(
+        (r) =>
+          r.fullName.toLowerCase().includes(needle) ||
+          r.displayName.toLowerCase().includes(needle),
+      )
+    : results
+  const hasTeams = results.some((r) => r.groupName)
+  // Flagged AND still hidden: the ones waiting on a decision. A flagged comment
+  // you restored has had its decision, and leaves this queue.
+  const flaggedWaiting = results.flatMap((r) =>
+    r.comments.filter((c) => c.flagged && c.hiddenAt !== null).map((c) => ({ row: r, comment: c })),
+  )
+
   return (
     <div className="mx-auto w-full max-w-2xl">
       <PageHeader
@@ -274,9 +296,20 @@ export function PeerResultsBoard() {
           .join(' · ')}
         fallback="/teach/peer"
         actions={
-          <Chip tone={open ? 'accent' : 'neutral'} size="sm">
-            {open ? 'Open' : 'Closed'}
-          </Chip>
+          <div className="flex items-center gap-2">
+            <Chip tone={open ? 'accent' : 'neutral'} size="sm">
+              {open ? 'Open' : 'Closed'}
+            </Chip>
+            {/* Opens the composer pre-filled on the console. Nothing is created
+                until Open is pressed there, so this is safe to tap. */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate(`/teach/peer?duplicate=${meta.id}`)}
+            >
+              Duplicate
+            </Button>
+          </div>
         }
       />
 
@@ -408,19 +441,140 @@ export function PeerResultsBoard() {
                 </p>
               </Card>
             )}
-            {results.map((r) => (
-              <PeerResultCard
-                key={r.studentId}
-                row={r}
-                onToggleComment={(submissionId, hidden) =>
-                  void hideComment(submissionId, r.studentId, hidden)
-                }
+
+            {flaggedWaiting.length > 0 && (
+              // First on the board, because these are the only rows that need a
+              // decision before release. Auto-hidden at submit (0054).
+              <Card className="border-warn/30 bg-warn-solid/8">
+                <p className="text-sm font-semibold text-warn">
+                  {flaggedWaiting.length} flagged comment{flaggedWaiting.length === 1 ? '' : 's'}{' '}
+                  hidden from students
+                </p>
+                <p className="mt-0.5 text-xs text-muted">
+                  They matched the banned-word list. Restore any that are fair; the rest stay
+                  hidden, including after release.
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {flaggedWaiting.map(({ row, comment }) => (
+                    <li key={comment.submissionId + row.studentId} className="rounded-xl border border-line bg-card p-3">
+                      <p className="text-xs text-muted">
+                        About <span className="font-semibold text-ink">{row.fullName}</span>, from{' '}
+                        {comment.evaluatorName}
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm">{comment.body}</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-2"
+                        onClick={() => void hideComment(comment.submissionId, row.studentId, false)}
+                      >
+                        Restore
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+
+            {summary.ratedCount > 0 && (
+              <Card>
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className="text-sm font-semibold">Class average</h2>
+                  <span className="text-lg font-bold tabular-nums">
+                    {Math.round(summary.overallPct ?? 0)}
+                    <span className="text-xs font-semibold text-muted">%</span>
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-muted">
+                  {summary.ratedCount} of {summary.totalCount} students rated. Each student counts
+                  once.
+                </p>
+                <div className="mt-3 space-y-3">
+                  {summary.criteria.map((c) => (
+                    <div key={c.id}>
+                      <div className="mb-1 flex items-baseline justify-between gap-3">
+                        <span className="min-w-0 flex-1 truncate text-sm">{c.label}</span>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums">
+                          {Math.round(c.pct)}%
+                          <span className="text-xs font-normal text-muted">
+                            {' '}
+                            · {c.avg.toFixed(1)} / {c.scaleMax}
+                          </span>
+                        </span>
+                      </div>
+                      <Meter value={c.pct} max={100} />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <Input
+                wrapperClassName="min-w-0 flex-1"
+                aria-label="Search students"
+                placeholder="Search a name"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
               />
-            ))}
-            <p className="px-1 text-xs text-muted">
-              Lowest first. A student nobody rated sorts last, because that is a
-              gap in the data rather than a low score.
-            </p>
+              {hasTeams && (
+                <SegmentedControl
+                  label="Arrange results"
+                  className="sm:w-56"
+                  value={view}
+                  onChange={setView}
+                  options={[
+                    { value: 'lowest', label: 'Lowest first' },
+                    { value: 'team', label: 'By team' },
+                  ]}
+                />
+              )}
+            </div>
+
+            {shown.length === 0 ? (
+              <EmptyState>Nobody matches “{query.trim()}”.</EmptyState>
+            ) : view === 'team' && hasTeams ? (
+              byTeam(shown).map((t) => (
+                <div key={t.team} className="space-y-3">
+                  <SectionLabel
+                    action={
+                      t.pct !== null ? (
+                        <span className="text-xs font-semibold tabular-nums text-muted">
+                          Team average {Math.round(t.pct)}%
+                        </span>
+                      ) : undefined
+                    }
+                  >
+                    {t.team}
+                  </SectionLabel>
+                  {t.rows.map((r) => (
+                    <PeerResultCard
+                      key={r.studentId}
+                      row={r}
+                      onToggleComment={(submissionId, hidden) =>
+                        void hideComment(submissionId, r.studentId, hidden)
+                      }
+                    />
+                  ))}
+                </div>
+              ))
+            ) : (
+              <>
+                {shown.map((r) => (
+                  <PeerResultCard
+                    key={r.studentId}
+                    row={r}
+                    onToggleComment={(submissionId, hidden) =>
+                      void hideComment(submissionId, r.studentId, hidden)
+                    }
+                  />
+                ))}
+                <p className="px-1 text-xs text-muted">
+                  Lowest first. A student nobody rated sorts last, because that is a
+                  gap in the data rather than a low score.
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -508,7 +662,9 @@ export function PeerResultsBoard() {
           confirming === 'reopen'
             ? 'The deadline is cleared, or the automatic close would shut it again within the minute.'
             : confirming === 'release'
-              ? 'This cannot be undone, and the evaluation can no longer be reopened. Hide any comment you do not want sent on, first.'
+              ? flaggedWaiting.length > 0
+                ? `This cannot be undone, and the evaluation can no longer be reopened. ${flaggedWaiting.length} flagged comment${flaggedWaiting.length === 1 ? ' stays' : 's stay'} hidden unless you restore ${flaggedWaiting.length === 1 ? 'it' : 'them'} first.`
+                : 'This cannot be undone, and the evaluation can no longer be reopened. Hide any comment you do not want sent on, first.'
               : undefined
         }
         variant={confirming === 'close' ? 'danger' : 'default'}

@@ -1338,6 +1338,11 @@ export interface PeerCommentRow {
   evaluatorId: string
   evaluatorName: string
   hiddenAt: string | null
+  /**
+   * The banned-word filter matched at submit (0054). Permanent: a comment you
+   * restored stays flagged. Whether the student sees it is `hiddenAt`.
+   */
+  flagged: boolean
   createdAt: string
 }
 
@@ -1389,4 +1394,26 @@ export interface MyPeerResults {
   commentsWithheld: boolean
   /** The threshold the server applied, so the screen can say the real number. */
   minRaters: number
+}
+
+// ============================================================================
+// Peer Evaluation · duplicate and shuffle (migration 0054)
+// ============================================================================
+
+/**
+ * An existing evaluation's shape, for pre-filling the composer (Duplicate).
+ *
+ * Nothing is created from this until the instructor presses Open, so there is
+ * no server-side draft. The deadline is deliberately absent: a copied deadline
+ * is almost always already in the past.
+ */
+export interface PeerEvaluationTemplate {
+  title: string
+  instructions: string
+  scope: PeerEvalScope
+  subjectId: string
+  sectionIds: string[]
+  /** Empty means all groups in those sections (0052's rule), not none. */
+  groupIds: string[]
+  criteria: { label: string; scale: PeerScaleOption[] }[]
 }

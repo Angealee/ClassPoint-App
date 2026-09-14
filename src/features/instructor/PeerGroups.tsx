@@ -26,6 +26,7 @@ import {
 import { PEER_GROUP_NAME_MAX, type PeerGroup, type RosterPerson } from '@/lib/types'
 import { errorText } from '@/lib/errors'
 import { useInstructor } from './InstructorLayout'
+import { PeerShuffleSheet } from './PeerShuffleSheet'
 
 /**
  * Peer groups — Peer Evaluation, Phase 1 (migration 0049).
@@ -70,6 +71,7 @@ export function PeerGroups({ embedded = false }: { embedded?: boolean } = {}) {
   const [archiving, setArchiving] = useState<PeerGroup | null>(null)
   const [archiveBusy, setArchiveBusy] = useState(false)
   const [showUnassigned, setShowUnassigned] = useState(false)
+  const [shuffleOpen, setShuffleOpen] = useState(false)
 
   const sectionId = selectedSectionId
   const sectionName = sections.find((s) => s.id === sectionId)?.name ?? 'this section'
@@ -178,17 +180,29 @@ export function PeerGroups({ embedded = false }: { embedded?: boolean } = {}) {
 
             <SectionLabel
               action={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  icon={<PlusIcon className="h-4 w-4" />}
-                  onClick={() => {
-                    setEditing(null)
-                    setComposerOpen(true)
-                  }}
-                >
-                  New group
-                </Button>
+                // gap-2 between two text buttons, which carry no expanded hit
+                // area — the IconButton adjacency rule does not apply here.
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={roster.length < 2}
+                    onClick={() => setShuffleOpen(true)}
+                  >
+                    Shuffle
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    icon={<PlusIcon className="h-4 w-4" />}
+                    onClick={() => {
+                      setEditing(null)
+                      setComposerOpen(true)
+                    }}
+                  >
+                    New group
+                  </Button>
+                </div>
               }
             >
               {groups.length === 0
@@ -200,6 +214,12 @@ export function PeerGroups({ embedded = false }: { embedded?: boolean } = {}) {
               <EmptyState
                 icon={<ClipboardIcon />}
                 description={`Everyone in ${sectionName} is unassigned until you make one.`}
+                action={
+                  roster.length >= 2 ? (
+                    // The fastest start for a whole class: one draw, adjust after.
+                    <Button onClick={() => setShuffleOpen(true)}>Shuffle into groups</Button>
+                  ) : undefined
+                }
               >
                 No groups in this section yet.
               </EmptyState>
@@ -222,6 +242,20 @@ export function PeerGroups({ embedded = false }: { embedded?: boolean } = {}) {
           </>
         )}
       </div>
+
+      <PeerShuffleSheet
+        open={shuffleOpen}
+        sectionId={sectionId}
+        sectionName={sectionName}
+        roster={roster}
+        groups={groups}
+        unassigned={unassigned}
+        onClose={() => setShuffleOpen(false)}
+        onSaved={() => {
+          setShuffleOpen(false)
+          void load()
+        }}
+      />
 
       <GroupComposer
         open={composerOpen}

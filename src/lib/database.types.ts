@@ -617,6 +617,8 @@ export interface Database {
         evaluation_id: UUID
         body: string
         hidden_at: Timestamp | null
+        /** 0054 — the banned-word filter matched at submit. Permanent. */
+        flagged: boolean
         created_at: Timestamp
       }>
     }

@@ -167,7 +167,15 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   it lands, an evaluation opened with every group ticked works exactly as before, while
   one with any group unticked fails to create with a readable error rather than opening
   for the whole section.
-  **Next number: 0053.**
+  **0053 is WRITTEN AND NOT YET APPLIED** — hard-delete a peer evaluation. It MUST go
+  after 0052, because its audit snapshot reads `peer_evaluation_groups`. Until it lands,
+  the Danger zone button shows and the delete fails with a readable error; nothing is
+  removed. Live results need no migration beyond 0051.
+  **0054 is WRITTEN AND NOT YET APPLIED** — flagged comments and group shuffles. It MUST go
+  after 0053, and takes `submit_peer_evaluation` from 0050 and `get_peer_results` from 0052.
+  Until it lands, the board shows no flags (defaulted to false client-side) and saving a
+  shuffle fails with a readable error. Duplicate and every UI change need no migration.
+  **Next number: 0055.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -2207,6 +2215,148 @@ with more than one section in play each group carries its section, since two sec
 each have a "Team Alpha". Group names now show on the console card and the results board
 subtitle — without them, one evaluation for a whole section and one for a single team
 read identically.
+
+Since 0053 (Hard-delete a peer evaluation, 2026-09-14) + live results (no migration).
+Decisions (user): **results visible live as submissions arrive** · **delete only when
+CLOSED and NOT RELEASED** · **the audit log keeps a FULL snapshot** · **delete lives at
+the bottom of the evaluation's own screen**.
+
+**Live results needed no migration.** `get_peer_results` was always instructor-gated and
+never looked at status; only `PeerResultsBoard` held results back until close. It now
+fetches them as soon as `submittedCount > 0`. While open, Completion stays the default tab
+(the list you chase) and the Results tab carries a "Live, still changing" card. Release
+to STUDENTS still requires closing, so nothing a student sees can move. Export stays
+closed-only, since a partial sheet gets mailed as if final.
+
+**`delete_peer_evaluation(eval, typed_title)` is one DELETE wrapped in validation** —
+every peer table already cascades from `peer_evaluations`, and `audit_log_action_check`
+has accepted `'hard_delete'` since 0023, so nothing needed widening. Refused while OPEN
+(it would pull the form from under someone mid-sentence) and, permanently, once RELEASED
+(students have already read that feedback). **Every check runs AFTER `for update`**:
+`release_peer_results` locks the same row, so validating before the lock would let a
+release commit in the gap and the delete destroy feedback that was just sent.
+
+**The server compares the TYPED title itself, using the dialog's exact rule (trimmed,
+case-insensitive)** — stricter would refuse a match the screen just accepted. The case
+it actually catches is a stale tab: rename in one tab, confirm a delete in another still
+showing the old title, and the server refuses. So the client sends what was TYPED, never
+the stored title, which would make the check unable to fail.
+**`ConfirmDialog` gained `onChallengeChange`**, a separate optional prop, rather than
+passing the typed text to `onConfirm` — thirteen existing callers pass a bare function
+there and would start receiving a string they never asked for. **Its challenge input also
+went `text-sm` → `text-base`**: it was the one form control still zooming the page on
+iPhone, on exactly the path hard-delete-student and semester activation depend on.
+
+**The audit snapshot is complete and deliberately compact.** It carries the evaluation,
+subject, sections, picked groups, criteria with scales, every submission, every rating
+and every comment WITH its author, pruned with the rest of `audit_log` at 365 days.
+**Ratings are `[evaluator, ratee, criterion, score]` tuples indexing into `people` and
+`criteria` arrays in the same row** (with a `ratingsFormat` key so the row explains
+itself), because `listAuditLog` in Ops downloads `row_data` for every row it lists: a
+40-student section-wide evaluation is 6,240 ratings, ~800 KB as UUID-bearing objects
+versus ~100 KB as tuples, and every index still maps back to a UUID. The audit row is
+written BEFORE the delete in the same transaction, so a failed delete leaves no record of
+a deletion that did not happen. The notifications the evaluation sent are deleted with
+it, since they would deep-link to nothing.
+
+The Danger zone card is the last thing on `PeerResultsBoard` and the button stays
+VISIBLE but disabled with the blocking rule written above it, rather than vanishing —
+an instructor who cannot find a delete button does not learn why. Success navigates with
+`replace`, so Back cannot return to a screen for something that no longer exists.
+
+Since 0054 (Flagged comments + group shuffles) and a peer-eval UI batch (2026-09-14).
+Decisions (user): **shuffle into groups** (choose each time, unassigned-only by default ·
+leftovers spread · "Group N" names) · **duplicate an evaluation** · **banned-word comments
+hidden until reviewed** · **number-row rating buttons with the label underneath** · **a
+Next button under the comment** · **review screen, then the usual confirm** · **"Saved on
+this device"** · **class summary + By team + search on the results board** · **full-screen
+composer** · **neutral "Strongest / Room to grow"**.
+
+**A peer comment with a banned word is SAVED, FLAGGED and HIDDEN, not refused.** The list
+includes Filipino words like "bobo" and "tanga" that a blunt but honest comment can use, so
+refusing (the Lounge's rule) would teach students to soften feedback the instructor needs.
+`peer_comments.flagged` is SEPARATE from `hidden_at`: hiding is the instructor's control,
+flagged is a permanent record that the filter tripped, so a restored comment stays
+flagged. **The student is not told** — that would make the filter a probing tool.
+`cp_contains_banned_word(text)` is the one definition for anything new; the inline copies
+in 0020 and 0042 predate it and live in applied files. The backfill touches only
+`flagged = false` rows, which is what stops a re-run re-hiding a comment the instructor
+restored, and hides only where results are unreleased (a released comment has been read).
+**Ownership moves:** `submit_peer_evaluation` 0050 → 0054 and `get_peer_results`
+0052 → 0054, both bodies extracted programmatically from their owners, modified by
+split/join, and DIFFED — every difference intended. The board lists flagged-and-hidden
+comments first as their own queue with Restore, and the release confirm says how many stay
+hidden.
+
+**THE CLIENT DRAWS THE SHUFFLE; `apply_peer_group_plan` ONLY WRITES IT.** The instructor
+previews and redraws; a server-side draw would save a different result from the one on
+screen. One transaction, so a failure at group six cannot leave a section half-regrouped,
+and every refusal can truthfully say "Nothing was changed" (replace mode's archiving
+rolls back too). Unassigned-only mode refuses a student who has since been placed; replace
+mode archives every live group first and writes ONE audit row listing them with members.
+**`src/lib/peer-shuffle.ts` + 19 tests:** group count is `floor(n / size)` with students
+dealt evenly, so sizes differ by at most one and none falls below the size asked for (the
+one exception: a pool smaller than a single group becomes that group). 11 in groups of 4
+comes out 6 and 5 — the preview prints real sizes rather than the rule inventing a smaller
+group. Names continue after the highest existing "Group N", not the count, and skip taken
+names with the unique index's own comparison (trimmed, case-insensitive).
+
+⚠ **GROUPS OF 3 ALSO LOSE THEIR COMMENTS, NOT ONLY PAIRS.** In a group of N each student
+has N − 1 raters, and 0051 withholds comments below 3 raters — so the real threshold is a
+group of **4**. The shuffle preview warns whenever any planned group is under 4. (The
+option text offered when this was decided mentioned only pairs; the sheet states the real
+rule.)
+
+**Duplicate needs no migration and creates nothing.** `getPeerEvaluationTemplate` reads the
+four tables directly (instructor RLS allows it; an RPC would be a second definition of an
+evaluation's shape) and the group read fails SOFT to "all groups" before 0052. The
+evaluation screen links to `/teach/peer?duplicate=<id>`; the console reads it ONCE, opens
+the composer pre-filled, and strips it — a one-shot is right here because losing it loses
+no data. Title gets " (copy)" inside the 80-char limit; the deadline is never copied; a
+past semester's subject is left blank; the template's picked groups are converted into the
+composer's UNticked set the first time each section's groups load, so an archived group
+simply isn't there rather than being re-included.
+
+**Rating buttons were broken at phone width, and were measured, not assumed.** A labelled
+1-to-5 scale was ~420px of "4 Very good" buttons in ~310px of card and wrapped onto two
+ragged rows. `ScaleRow` is now equal columns showing numbers, 44px tall, with ONE caption
+line: the two end labels before choosing, the chosen label after (fixed height, so a choice
+never nudges the page). Yes/No keeps two wide labelled buttons; a 1-to-10 scale takes two
+rows of five with no caption. **Measured by probe at 375×812 (removed, residue-checked):**
+1-to-5 on one row at 57×44, Yes/No 151px each, 1-to-10 two rows, zero horizontal overflow.
+**`describeOption` in `peer-scale.ts` is the one rule for writing a chosen option** — the
+probe caught the review screen printing "0 · No" beside a button that said "No", because
+the two places had each decided the format. Pinned by 4 tests.
+
+**Next sits UNDER the comment box, deliberately.** Auto-advancing after the last rating
+would close the card before the student reached the optional comment. The bottom button is
+never a dead grey "Rate 2 more": it names and opens the next classmate still waiting, then
+becomes "Review and submit". Avatar chips at the top show who is done and jump to anyone.
+Opening a card SCROLLS after `SCROLL_AFTER_MS` (260), because the previous card is still
+collapsing and scrolling at once aims at where the next card is mid-animation.
+"Saved on this device" turns into a danger line if localStorage throws — it must never
+claim a save that failed.
+
+**`PeerReviewSheet` is full screen and its Submit opens the SAME ConfirmDialog as before**,
+so the rule that hard-to-undo actions go through a confirm still holds. No negative-margin
+bleed on its sticky footer: inside an `overflow-y` scroller the other axis computes to auto
+(the profile-sheet lesson).
+
+**`src/lib/peer-summary.ts` + 6 tests: each student counts ONCE** in class averages. Pooling
+every rating would weight a student rated by five above one rated by three. Unrated
+students are left out of every average but counted in the total. `byTeam` sorts teams
+numeric-aware (Group 10 after Group 2) with "No team" last. The summary always covers the
+whole class; search narrows only the list. **`src/lib/peer-strengths.ts` + 8 tests**
+compares on PERCENT (raw averages are not comparable across scales), says nothing with
+one question or when everything ties within the SQL's rounding, and names tied questions
+together rather than picking the first.
+
+**The composer is `Sheet variant="screen"`** — the screen variant draws no title, so the
+heading lives in the content — as are the shuffle and review sheets.
+
+⚠ **`preview_start` can report a port the dev server is not on.** It said 63022; Vite, with
+5173 taken, actually bound 5174 (see `preview_logs`), so the tab showed a Chrome error page
+and every probe read an empty `/`. Read the real port from the logs before measuring.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

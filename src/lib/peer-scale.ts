@@ -161,3 +161,26 @@ export function roundTo(value: number, places: number): number {
   const f = 10 ** places
   return Math.round(value * f) / f
 }
+
+/**
+ * How one chosen option is written out, everywhere it is written out.
+ *
+ * ONE rule for the form's caption and the review screen, because the review
+ * once printed "0 · No" for a Yes/No question whose buttons said only "No" —
+ * the two places had each decided the format for themselves.
+ *   • Not an option on this scale → null.
+ *   • The label IS the number (a 1-to-10 scale) → "7", never "7 · 7".
+ *   • A two-option scale with word labels (Yes/No) → "No". Its 0 and 1 are
+ *     storage, not something a student chose.
+ *   • Otherwise → "4 · Very good".
+ */
+export function describeOption(scale: PeerScaleOption[], value: number | null | undefined): string | null {
+  if (value === null || value === undefined) return null
+  const opt = scale.find((o) => o.value === value)
+  if (!opt) return null
+  const label = opt.label.trim()
+  if (label === String(opt.value)) return label
+  const wordLabels = scale.some((o) => o.label.trim() !== String(o.value))
+  if (wordLabels && scale.length === 2) return label
+  return `${opt.value} · ${label}`
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SCALE_PRESETS,
+  describeOption,
   isOnScale,
   normalizeScale,
   percentOf,
@@ -258,5 +259,34 @@ describe('roundTo', () => {
     const avgOfRounded = roundTo(preRounded.reduce((a, b) => a + b, 0) / 3, 1)
     expect(avgOfExact).toBe(62.5)
     expect(avgOfRounded).not.toBe(avgOfExact)
+  })
+})
+
+describe('describeOption', () => {
+  const five = SCALE_PRESETS[0].scale
+  const ten = SCALE_PRESETS[1].scale
+  const yesno = SCALE_PRESETS[2].scale
+
+  it('writes a labelled option as number and word', () => {
+    expect(describeOption(five, 4)).toBe('4 · Very good')
+  })
+
+  it('writes a bare number when the label is the number', () => {
+    expect(describeOption(ten, 7)).toBe('7')
+  })
+
+  /**
+   * THE ONE THAT MATTERS. The review screen printed "0 · No" while the form's
+   * button said "No". A student never chose a 0.
+   */
+  it('writes only the word for a two-option word scale', () => {
+    expect(describeOption(yesno, 0)).toBe('No')
+    expect(describeOption(yesno, 1)).toBe('Yes')
+  })
+
+  it('returns null for an unanswered or off-scale value', () => {
+    expect(describeOption(five, null)).toBeNull()
+    expect(describeOption(five, undefined)).toBeNull()
+    expect(describeOption(five, 9)).toBeNull()
   })
 })

@@ -21,6 +21,7 @@ import {
   PEER_MAX_CRITERIA,
   PEER_TITLE_MAX,
   type PeerEvalScope,
+  type PeerEvaluationTemplate,
   type PeerGroup,
   type PeerScaleOption,
 } from '@/lib/types'
@@ -66,10 +67,17 @@ function newCriterion(): DraftCriterion {
  */
 export function PeerComposer({
   open,
+  template = null,
   onClose,
   onCreated,
 }: {
   open: boolean
+  /**
+   * Pre-fill from an existing evaluation (Duplicate). Nothing is created until
+   * Open is pressed, so there is no server-side draft to clean up if the
+   * instructor backs out.
+   */
+  template?: PeerEvaluationTemplate | null
   onClose: () => void
   onCreated: (id: string) => void
 }) {
@@ -97,22 +105,53 @@ export function PeerComposer({
   const [groupsBySection, setGroupsBySection] = useState<Record<string, SectionGroups>>({})
   const [unpicked, setUnpicked] = useState<Set<string>>(new Set())
   const requested = useRef<Set<string>>(new Set())
+  /**
+   * A duplicated evaluation's picked groups, applied to each section the FIRST
+   * time its groups load. Stored as ticked ids, converted into the composer's
+   * UNticked set against the real list — so a group archived since the
+   * original simply is not there, rather than being silently re-included.
+   */
+  const templateGroups = useRef<Set<string>>(new Set())
+  const templateApplied = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     if (!open) return
     // Groups can change between opens (the Groups tab is one tap away), so a
     // reopened composer fetches them fresh rather than trusting the last copy.
     requested.current = new Set()
+    templateApplied.current = new Set()
+    templateGroups.current = new Set(template?.groupIds ?? [])
     setGroupsBySection({})
     setUnpicked(new Set())
-    setSubjectId(subjects[0]?.id ?? '')
-    setTitle('')
-    setInstructions('')
-    setScope('group')
-    setPicked(new Set())
-    setCriteria([newCriterion()])
+    // The deadline is never copied: the original's is almost always past.
     setDeadline('')
-  }, [open, subjects])
+
+    if (template) {
+      // A subject from a past semester is not offered this semester; leaving it
+      // blank asks for a real choice rather than filing under a dead subject.
+      setSubjectId(subjects.some((s) => s.id === template.subjectId) ? template.subjectId : '')
+      // Room for the suffix inside the 80-character limit, so the copy never
+      // opens already over it.
+      setTitle(`${template.title.slice(0, PEER_TITLE_MAX - 7)} (copy)`)
+      setInstructions(template.instructions)
+      setScope(template.scope)
+      // Sections that no longer take the subject are pruned by the eligibility
+      // effect below, exactly as if the instructor had changed subject.
+      setPicked(new Set(template.sectionIds))
+      setCriteria(
+        template.criteria.length > 0
+          ? template.criteria.map((c) => ({ ...newCriterion(), label: c.label, scale: c.scale }))
+          : [newCriterion()],
+      )
+    } else {
+      setSubjectId(subjects[0]?.id ?? '')
+      setTitle('')
+      setInstructions('')
+      setScope('group')
+      setPicked(new Set())
+      setCriteria([newCriterion()])
+    }
+  }, [open, subjects, template])
 
   /**
    * Only sections that actually take the chosen subject.
@@ -156,6 +195,18 @@ export function PeerComposer({
     try {
       const groups = await getSectionGroups(sectionId)
       setGroupsBySection((prev) => ({ ...prev, [sectionId]: { status: 'ready', groups } }))
+
+      // Once per section, and only for a duplicate that was narrowed. An empty
+      // template list means "all groups", which needs nothing unticked.
+      if (templateGroups.current.size > 0 && !templateApplied.current.has(sectionId)) {
+        templateApplied.current.add(sectionId)
+        const keep = templateGroups.current
+        setUnpicked((prev) => {
+          const next = new Set(prev)
+          for (const g of groups) if (!keep.has(g.id)) next.add(g.id)
+          return next
+        })
+      }
     } catch {
       setGroupsBySection((prev) => ({ ...prev, [sectionId]: { status: 'error', groups: [] } }))
     }
@@ -279,8 +330,29 @@ export function PeerComposer({
 
   return (
     <>
-      <Sheet open={open} onClose={onClose} title="New peer evaluation">
-        <div className="space-y-4">
+      {/* Full screen rather than a bottom sheet (the instructor's call): subject,
+          title, instructions, scope, sections with their groups, criteria with
+          their scales and a deadline is a long form, and a half-height sheet
+          made it a scroller inside a scroller. The screen variant draws no title,
+          so the heading lives in the content. */}
+      <Sheet
+        open={open}
+        onClose={onClose}
+        title={template ? 'Duplicate peer evaluation' : 'New peer evaluation'}
+        variant="screen"
+      >
+        <div className="mx-auto w-full max-w-2xl space-y-4 pt-4">
+          <div>
+            <h1 className="font-display text-xl font-bold">
+              {template ? 'Duplicate evaluation' : 'New peer evaluation'}
+            </h1>
+            {template && (
+              <p className="mt-1 text-sm text-muted">
+                Copied from the original. Check the title, sections and groups; the deadline
+                starts empty.
+              </p>
+            )}
+          </div>
           <Select
             label="Subject"
             value={subjectId}

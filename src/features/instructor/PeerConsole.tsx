@@ -9,10 +9,11 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ClipboardIcon, PlusIcon } from '@/components/ui/icons'
-import { listPeerEvaluations } from '@/lib/api'
+import { getPeerEvaluationTemplate, listPeerEvaluations } from '@/lib/api'
+import { useToast } from '@/components/ui/Toast'
 import { errorText } from '@/lib/errors'
 import { countdownTo, timeAgo } from '@/lib/time'
-import type { PeerEvaluationListItem } from '@/lib/types'
+import type { PeerEvaluationListItem, PeerEvaluationTemplate } from '@/lib/types'
 import { PeerComposer } from './PeerComposer'
 import { PeerGroups } from './PeerGroups'
 
@@ -65,6 +66,9 @@ export function PeerConsole() {
 }
 
 function EvaluationList() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { toast } = useToast()
+  const [template, setTemplate] = useState<PeerEvaluationTemplate | null>(null)
   const [items, setItems] = useState<PeerEvaluationListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -86,13 +90,49 @@ function EvaluationList() {
     void load()
   }, [load])
 
+  /**
+   * `?duplicate=<id>` arrives from an evaluation's own screen. It is a ONE-SHOT
+   * and is stripped once read — unlike the attendance review param, losing it
+   * costs nothing, because no data exists yet: the composer simply isn't open.
+   */
+  const duplicateId = searchParams.get('duplicate')
+  useEffect(() => {
+    if (!duplicateId) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const t = await getPeerEvaluationTemplate(duplicateId)
+        if (cancelled) return
+        setTemplate(t)
+        setComposerOpen(true)
+      } catch (e) {
+        if (!cancelled) toast(errorText(e, "Couldn't copy that evaluation."), 'error')
+      } finally {
+        if (!cancelled) {
+          const next = new URLSearchParams(searchParams)
+          next.delete('duplicate')
+          setSearchParams(next, { replace: true })
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // searchParams deliberately omitted: stripping the param changes it, and
+    // re-running on that change would be a loop with nothing to do.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duplicateId])
+
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
         <Button
           size="sm"
           icon={<PlusIcon className="h-4 w-4" />}
-          onClick={() => setComposerOpen(true)}
+          onClick={() => {
+            setTemplate(null)
+            setComposerOpen(true)
+          }}
         >
           New evaluation
         </Button>
@@ -115,6 +155,7 @@ function EvaluationList() {
 
       <PeerComposer
         open={composerOpen}
+        template={template}
         onClose={() => setComposerOpen(false)}
         onCreated={() => {
           setComposerOpen(false)

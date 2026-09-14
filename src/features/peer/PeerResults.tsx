@@ -8,6 +8,7 @@ import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { getMyPeerResults } from '@/lib/api'
 import { errorText } from '@/lib/errors'
+import { joinLabels, strengthsOf } from '@/lib/peer-strengths'
 import type { MyPeerResults } from '@/lib/types'
 
 /**
@@ -55,6 +56,9 @@ export function PeerResults() {
   if (!data) return null
 
   const rated = data.raterCount > 0 && data.overallPct !== null
+  // Null with one question, or when every question scored the same — see
+  // lib/peer-strengths for why it says nothing rather than inventing a winner.
+  const strengths = rated ? strengthsOf(data.criteria) : null
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -85,6 +89,25 @@ export function PeerResults() {
               {data.raterCount} classmate{data.raterCount === 1 ? '' : 's'}
             </p>
           </Card>
+
+          {strengths && (
+            // Neutral wording (the instructor's call), matching the plain voice
+            // of the results notification. Framing for the number above, not a
+            // second verdict: both lines point at questions the student can
+            // read the detail of directly below.
+            <Card className="grid grid-cols-2 gap-3">
+              <div className="min-w-0">
+                <p className="text-xs text-muted">Strongest</p>
+                <p className="mt-0.5 text-sm font-semibold text-success">
+                  {joinLabels(strengths.strongest)}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted">Room to grow</p>
+                <p className="mt-0.5 text-sm font-semibold">{joinLabels(strengths.roomToGrow)}</p>
+              </div>
+            </Card>
+          )}
 
           <div>
             <SectionLabel>By question</SectionLabel>
