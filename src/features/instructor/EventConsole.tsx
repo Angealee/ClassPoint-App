@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Sheet } from '@/components/ui/Sheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { Avatar } from '@/components/ui/Avatar'
-import { BoltIcon, CheckIcon, SearchIcon } from '@/components/ui/icons'
+import { BoltIcon, CheckIcon, ExpandIcon, SearchIcon, XIcon } from '@/components/ui/icons'
 import { QrCode } from '@/components/attendance/QrCode'
 import { useInstructor } from './InstructorLayout'
 import {
@@ -155,7 +157,20 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
   const [ending, setEnding] = useState(false)
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  // Fullscreen "present" QR — same as the class session, so a whole hall can scan.
+  const [presenting, setPresenting] = useState(false)
+  const [bigSize, setBigSize] = useState(320)
   const startedMs = new Date(event.startedAt).getTime()
+
+  // Size the fullscreen QR to the smaller viewport edge.
+  useEffect(() => {
+    if (!presenting) return
+    const calc = () =>
+      setBigSize(Math.max(220, Math.min(560, Math.min(window.innerWidth, window.innerHeight) - 96)))
+    calc()
+    window.addEventListener('resize', calc)
+    return () => window.removeEventListener('resize', calc)
+  }, [presenting])
 
   // Rotating QR — same pattern as the class session, against the event secret.
   useEffect(() => {
@@ -215,7 +230,15 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
     <div className="space-y-5">
       <PageHeader title={event.name} subtitle="Live event check-in" fallback="/teach/attendance" />
 
-      <Card pad="roomy" className="flex flex-col items-center gap-3">
+      <Card pad="roomy" className="relative flex flex-col items-center gap-3">
+        <IconButton
+          label="Present QR fullscreen"
+          variant="outline"
+          round
+          onClick={() => setPresenting(true)}
+          className="absolute right-3 top-3"
+          icon={<ExpandIcon className="h-4 w-4" />}
+        />
         <div className="rounded-2xl bg-white p-3 shadow-sm">
           {payload ? (
             <QrCode value={payload} size={232} />
@@ -277,6 +300,51 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
           End event
         </Button>
       </div>
+
+      {/* Fullscreen "present" QR — for a projector / shared screen at a big event. */}
+      <AnimatePresence>
+        {presenting && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-canvas p-6"
+          >
+            <IconButton
+              label="Exit fullscreen"
+              variant="outline"
+              size="lg"
+              round
+              onClick={() => setPresenting(false)}
+              className="absolute right-4 top-4"
+              icon={<XIcon className="h-6 w-6" />}
+            />
+            <div className="text-center">
+              <p className="font-display text-2xl font-bold">{event.name}</p>
+              <p className="text-sm text-muted">Scan to check in</p>
+            </div>
+            <div className="rounded-3xl bg-white p-5 shadow-lg">
+              {payload ? (
+                <QrCode value={payload} size={bigSize} />
+              ) : (
+                <div
+                  className="animate-pulse rounded-xl bg-card-2"
+                  style={{ height: bigSize, width: bigSize }}
+                />
+              )}
+            </div>
+            <div className="text-center">
+              <p className="font-display text-4xl font-bold tabular-nums text-reward">
+                {stats?.total ?? 0}
+              </p>
+              <p className="text-sm text-muted">
+                checked in · code refreshes in <span className="tabular-nums">{rotateIn}s</span>
+                {event.pointsPerScan > 0 ? ` · +${event.pointsPerScan} pts each` : ''}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <ManualAddSheet
         open={addOpen}

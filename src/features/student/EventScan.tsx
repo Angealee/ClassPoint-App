@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -9,6 +9,7 @@ import { BoltIcon, CheckIcon, ScanIcon } from '@/components/ui/icons'
 import { QrScanner } from '@/components/attendance/QrScanner'
 import { getMyEventHistory, scanEventAttendance } from '@/lib/api'
 import { parseEventPayload } from '@/lib/qr'
+import { readEventScanCapture } from '@/lib/event-scan-capture'
 import { vibrate } from '@/lib/haptics'
 import type { EventHistoryEntry, EventScanResult } from '@/lib/types'
 import { useStudentData } from './StudentData'
@@ -35,7 +36,36 @@ export function EventScan() {
   const [error, setError] = useState<string | null>(null)
   const detectedRef = useRef(false)
 
-  async function onDetect(text: string) {
+  const submit = useCallback(
+    async (eventId: string, windowIndex: number, code: string) => {
+      detectedRef.current = true
+      setScanning(false)
+      setSubmitting(true)
+      setError(null)
+      try {
+        const r = await scanEventAttendance(eventId, windowIndex, code)
+        setResult(r)
+        noteEventCheckedIn()
+        vibrate('point')
+      } catch (e) {
+        setError(errorText(e))
+        detectedRef.current = false
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    [noteEventCheckedIn],
+  )
+
+  // A native-camera scan of the event QR lands on /scan, which stashes it and
+  // routes here — submit it once on arrival (the id is in the code, so this works
+  // even before liveEvent has loaded over realtime).
+  useEffect(() => {
+    const cap = readEventScanCapture()
+    if (cap) void submit(cap.eventId, cap.windowIndex, cap.code)
+  }, [submit])
+
+  function onDetect(text: string) {
     if (detectedRef.current) return
     const parsed = parseEventPayload(text)
     if (!parsed) {
@@ -43,26 +73,14 @@ export function EventScan() {
       setScanning(false)
       return
     }
-    if (!liveEvent || parsed.eventId !== liveEvent.id) {
+    // Reject only on a real mismatch; a null liveEvent (realtime lag) still
+    // submits — the server validates the event.
+    if (liveEvent && parsed.eventId !== liveEvent.id) {
       setError('That QR is for a different event.')
       setScanning(false)
       return
     }
-    detectedRef.current = true
-    setScanning(false)
-    setSubmitting(true)
-    setError(null)
-    try {
-      const r = await scanEventAttendance(parsed.eventId, parsed.windowIndex, parsed.code)
-      setResult(r)
-      noteEventCheckedIn()
-      vibrate('point')
-    } catch (e) {
-      setError(errorText(e))
-      detectedRef.current = false
-    } finally {
-      setSubmitting(false)
-    }
+    void submit(parsed.eventId, parsed.windowIndex, parsed.code)
   }
 
   function startScan() {
@@ -81,16 +99,16 @@ export function EventScan() {
         fallback="/app"
       />
 
-      {!liveEvent ? (
-        <EmptyState
-          icon={<ScanIcon />}
-          description="When one starts, you'll see it on your home screen."
-        >
-          No event is running right now.
-        </EmptyState>
-      ) : result ? (
+      {/* result and submitting sit ABOVE the liveEvent check so a native-camera
+          auto-submit shows even before liveEvent has loaded over realtime. */}
+      {result ? (
         <ResultView result={result} onDone={() => navigate('/app')} />
-      ) : (
+      ) : submitting ? (
+        <Card pad="roomy" className="flex flex-col items-center gap-3 py-10 text-sm text-muted">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-accent-solid" />
+          Checking you in…
+        </Card>
+      ) : liveEvent ? (
         <Card pad="roomy" className="space-y-4 text-center">
           <div>
             <p className="font-display text-xl font-bold">{liveEvent.name}</p>
@@ -101,7 +119,7 @@ export function EventScan() {
             )}
           </div>
 
-          {liveEventChecked && !scanning && !submitting ? (
+          {liveEventChecked && !scanning ? (
             <div className="flex flex-col items-center gap-2 py-4">
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-success-solid/15 text-success">
                 <CheckIcon className="h-6 w-6" />
@@ -116,11 +134,6 @@ export function EventScan() {
                 Cancel
               </Button>
             </div>
-          ) : submitting ? (
-            <div className="flex flex-col items-center gap-3 py-8 text-sm text-muted">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-accent-solid" />
-              Checking you in…
-            </div>
           ) : (
             <Button size="lg" className="w-full" onClick={startScan}>
               <ScanIcon className="h-5 w-5" /> Scan to check in
@@ -129,6 +142,13 @@ export function EventScan() {
 
           {error && <p className="text-sm text-danger">{error}</p>}
         </Card>
+      ) : (
+        <EmptyState
+          icon={<ScanIcon />}
+          description={error ? undefined : "When one starts, you'll see it on your home screen."}
+        >
+          {error ?? 'No event is running right now.'}
+        </EmptyState>
       )}
 
       <RecentEvents studentId={me?.id} />

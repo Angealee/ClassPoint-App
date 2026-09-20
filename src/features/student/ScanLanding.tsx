@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Splash } from '@/components/layout/Splash'
 import { useAuth } from '@/lib/auth'
-import { parsePayload } from '@/lib/qr'
+import { parseEventPayload, parsePayload } from '@/lib/qr'
 import { enqueue, syncOfflineScans } from '@/lib/offline-scans'
+import { writeEventScanCapture } from '@/lib/event-scan-capture'
 import { ScanIcon } from '@/components/ui/icons'
 
 /**
@@ -23,22 +24,29 @@ export function ScanLanding() {
   const { loading, user, role } = useAuth()
   const navigate = useNavigate()
   const capturedRef = useRef(false)
+  // True when the scanned QR is a GLOBAL EVENT (CP1E), not a class QR (0055).
+  const eventRef = useRef(false)
   const [bad, setBad] = useState(false)
 
   // Capture the proof once, immediately, independent of auth state.
   useEffect(() => {
     if (capturedRef.current) return
     capturedRef.current = true
-    const parsed = parsePayload(window.location.hash.replace(/^#/, ''))
-    if (!parsed) {
-      setBad(true)
+    const hash = window.location.hash.replace(/^#/, '')
+    // Class QR → the offline queue (unchanged).
+    const parsed = parsePayload(hash)
+    if (parsed) {
+      enqueue({ sessionId: parsed.sessionId, windowIndex: parsed.windowIndex, code: parsed.code })
       return
     }
-    enqueue({
-      sessionId: parsed.sessionId,
-      windowIndex: parsed.windowIndex,
-      code: parsed.code,
-    })
+    // Global-event QR → stash for the event screen to submit.
+    const ev = parseEventPayload(hash)
+    if (ev) {
+      eventRef.current = true
+      writeEventScanCapture({ eventId: ev.eventId, windowIndex: ev.windowIndex, code: ev.code })
+      return
+    }
+    setBad(true)
   }, [])
 
   // Route once auth resolves.
@@ -49,9 +57,15 @@ export function ScanLanding() {
       return
     }
     if (role === 'student') {
-      // Fire-and-forget: Attendance shows the queued/result card either way.
-      void syncOfflineScans()
-      navigate('/app/attendance', { replace: true })
+      if (eventRef.current) {
+        // The event screen reads the captured scan and submits it on arrival.
+        navigate('/app/event', { replace: true })
+      } else {
+        // Fire-and-forget: Attendance shows the queued/result card either way.
+        void syncOfflineScans()
+        navigate('/app/attendance', { replace: true })
+      }
+      return
     }
     // Instructor falls through to the notice below.
   }, [bad, loading, user, role, navigate])
