@@ -12,6 +12,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { StatusChip } from '@/components/attendance/StatusChip'
+import { StudentEventHistory } from '@/components/attendance/StudentEventHistory'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
 import {
   BoltIcon,
@@ -338,6 +339,10 @@ export function StudentRecord() {
           </div>
         )}
       </div>
+
+      {/* Global event check-ins (0055) — separate from class attendance above;
+          self-fetching, renders nothing when this student has no events. */}
+      <StudentEventHistory studentId={student.id} />
 
       {/* Achievements */}
       {unlocked.length > 0 && (

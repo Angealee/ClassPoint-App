@@ -32,6 +32,7 @@ export function PageHeader({
   fallback,
   actions,
   backLabel = 'Back',
+  onBack,
   className,
 }: {
   title: string
@@ -41,11 +42,21 @@ export function PageHeader({
   /** Optional trailing content (a button, a chip). */
   actions?: ReactNode
   backLabel?: string
+  /**
+   * Override the back action — for a header that switches an IN-COMPONENT view
+   * (no route change), where `navigate` would be wrong. `fallback` is ignored
+   * when this is set.
+   */
+  onBack?: () => void
   className?: string
 }) {
   const navigate = useNavigate()
 
   function goBack() {
+    if (onBack) {
+      onBack()
+      return
+    }
     const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
     if (idx > 0) navigate(-1)
     else navigate(fallback, { replace: true })

@@ -9,6 +9,7 @@ import { Sheet } from '@/components/ui/Sheet'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ScanIcon, CheckIcon, WarningIcon } from '@/components/ui/icons'
 import { QrScanner } from '@/components/attendance/QrScanner'
+import { StudentEventHistory } from '@/components/attendance/StudentEventHistory'
 import { StatusChip, STATUS_META } from '@/components/attendance/StatusChip'
 import { useStudentData } from '@/features/student/StudentData'
 import { listMyAttendance, scanAttendance } from '@/lib/api'
@@ -347,6 +348,11 @@ export function Attendance() {
           ))}
         </div>
       )}
+
+      {/* Global event check-ins (0055) — a SEPARATE section, kept out of the
+          term groups and the show-up rate above (an event is never class
+          attendance). Renders nothing when the student has no events. */}
+      {me && <StudentEventHistory studentId={me.id} />}
 
       {/* Scan sheet */}
       <Sheet open={scanOpen} onClose={closeScan} title="Scan attendance">

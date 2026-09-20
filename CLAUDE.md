@@ -2459,6 +2459,31 @@ transaction-local and PostgREST runs one statement per transaction and does not 
 **Not verified on a real authenticated screen** — until 0056 is applied every >0-point event
 scan fails; verified by typecheck, the 309-test suite and build only.
 
+Event monitor + history (2026-09-21, NO migration — reads only). Decisions (user): **show who
+checked in** · **event check-ins on BOTH the student attendance screen and the instructor
+student record** · **a recent-events list with read-only review of finished events**.
+`getEventAttendees(eventId)` is a direct embed select on `event_attendance`
+(`students(display_name, avatar_url)`, `sections(name)`, `point_events(points)`), instructor-
+gated by the table's own RLS (`is_instructor() or own`) — **no new RPC and no migration**,
+so it works against the already-applied 0055. Cast-through-unknown like `getMyEventHistory`
+(hand-written schema types embeds as `SelectQueryError`). Bounded by the active-semester
+roster, so it stays under PostgREST's 1000-row cap. `listRecentEvents(limit)` reads
+`event_sessions` newest-first WITHOUT the secret (review is read-only, no QR to render).
+**The monitor's attendee list refetches only when the polled `get_event_stats` total CHANGES**
+(`AttendeeList`'s `version` prop = `stats.total`), so the live list updates as people scan
+without a full roster query every 4s; in review mode `version` is constant so it fetches once.
+An event never grows a check-in it can lose (no un-check-in), so a count-gated refetch cannot
+miss a row. `EventReview` reopens an ENDED event read-only (total + per-section + attendees, no
+QR/manual-add/End) — the scan and manual-add RPCs already refuse an ended event, so this just
+doesn't offer them. **`components/attendance/StudentEventHistory.tsx` is the ONE definition**
+of a student's event list — used on the event scan screen (was an inline `RecentEvents`,
+extracted to avoid a 4th copy), on `/app/attendance` (its OWN section, deliberately OUTSIDE
+the term groups and `tally`, so an event never touches a show-up rate/streak), and on
+`/teach/student/:id` (self-fetching by studentId, instructor RLS lets it read any student's
+`event_attendance`). **`PageHeader` gained an optional `onBack`** for a header that switches an
+in-component view (the review ↔ setup toggle is state, not a route); `fallback` is ignored when
+`onBack` is set and stays required so no existing caller changed.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained

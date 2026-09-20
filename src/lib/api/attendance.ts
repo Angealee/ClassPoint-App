@@ -8,6 +8,7 @@ import type {
   AttendanceRosterRow,
   AttendanceStatus,
   ClassSession,
+  EventAttendee,
   EventHistoryEntry,
   EventScanResult,
   EventSession,
@@ -827,6 +828,57 @@ export async function getEventStats(eventId: string): Promise<EventStats> {
       count: Number(s.cnt) || 0,
     })),
   }
+}
+
+/**
+ * Recent events (active + ended), newest first — for the console's "Recent
+ * events" list, so a finished event can be reopened read-only to review who
+ * attended. No secret (review is read-only; there is no QR to render).
+ */
+export async function listRecentEvents(limit = 20): Promise<EventSession[]> {
+  const { data, error } = await supabase
+    .from('event_sessions')
+    .select(EVENT_COLS)
+    .order('started_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return ((data ?? []) as EventRow[]).map((r) => mapEvent(r))
+}
+
+/**
+ * Everyone who checked in to an event (newest first) — the instructor's live
+ * monitor list and the read-only review of a finished event. Instructor-only by
+ * RLS (event_attendance is instructor-or-own). Bounded by the active semester's
+ * roster, so it stays well under PostgREST's 1000-row cap.
+ */
+export async function getEventAttendees(eventId: string): Promise<EventAttendee[]> {
+  type Row = {
+    student_id: string
+    scanned_at: string
+    manual: boolean
+    students: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null
+    sections: { name: string } | { name: string }[] | null
+    point_events: { points: number } | { points: number }[] | null
+  }
+  const { data, error } = await supabase
+    .from('event_attendance')
+    .select(
+      'student_id, scanned_at, manual, students(display_name, avatar_url), sections(name), point_events(points)',
+    )
+    .eq('event_id', eventId)
+    .order('scanned_at', { ascending: false })
+  if (error) throw error
+  // Cast through `unknown`: the hand-written schema types embeds as
+  // SelectQueryError (Relationships: []), the same reason getMyEventHistory casts.
+  return ((data ?? []) as unknown as Row[]).map((r) => ({
+    studentId: r.student_id,
+    displayName: oneEmbed<{ display_name: string }>(r.students)?.display_name ?? 'Student',
+    avatarUrl: oneEmbed<{ avatar_url: string | null }>(r.students)?.avatar_url ?? null,
+    sectionName: oneEmbed<{ name: string }>(r.sections)?.name ?? null,
+    scannedAt: r.scanned_at,
+    manual: r.manual,
+    points: oneEmbed<{ points: number }>(r.point_events)?.points ?? 0,
+  }))
 }
 
 /** A student's own past event check-ins (newest first). */

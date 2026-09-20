@@ -499,6 +499,18 @@ export interface EventHistoryEntry {
   manual: boolean
 }
 
+/** One checked-in student, for the instructor's live monitor / event review. */
+export interface EventAttendee {
+  studentId: string
+  displayName: string
+  avatarUrl: string | null
+  sectionName: string | null
+  scannedAt: string
+  /** true when the instructor added this student by hand (no phone). */
+  manual: boolean
+  points: number
+}
+
 /** A student's own attendance entry for their history module. */
 export interface MyAttendanceEntry {
   recordId: string

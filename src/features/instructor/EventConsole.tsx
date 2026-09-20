@@ -10,13 +10,16 @@ import { Sheet } from '@/components/ui/Sheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { Avatar } from '@/components/ui/Avatar'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { BoltIcon, CheckIcon, ExpandIcon, SearchIcon, XIcon } from '@/components/ui/icons'
 import { QrCode } from '@/components/attendance/QrCode'
 import { useInstructor } from './InstructorLayout'
 import {
   endEventSession,
   getActiveEventForInstructor,
+  getEventAttendees,
   getEventStats,
+  listRecentEvents,
   listRosterBasics,
   markEventAttendance,
   startEventSession,
@@ -29,7 +32,7 @@ import {
   secondsUntilRotate,
 } from '@/lib/qr'
 import { errorText } from '@/lib/errors'
-import type { EventSession, EventStats } from '@/lib/types'
+import type { EventAttendee, EventSession, EventStats } from '@/lib/types'
 
 type Person = { id: string; fullName: string; displayName: string; avatarUrl: string | null }
 
@@ -43,6 +46,7 @@ type Person = { id: string; fullName: string; displayName: string; avatarUrl: st
  */
 export function EventConsole() {
   const [event, setEvent] = useState<EventSession | null>(null)
+  const [review, setReview] = useState<EventSession | null>(null)
   const [checking, setChecking] = useState(true)
 
   // Resume an already-running event on mount (a reload during the event).
@@ -57,19 +61,25 @@ export function EventConsole() {
     }
   }, [])
 
+  // A live event always wins — it is the thing that needs attention.
   if (event) {
     return <EventMonitor event={event} onEnded={() => setEvent(null)} />
   }
-  return <EventSetup checking={checking} onStarted={setEvent} />
+  if (review) {
+    return <EventReview event={review} onBack={() => setReview(null)} />
+  }
+  return <EventSetup checking={checking} onStarted={setEvent} onReview={setReview} />
 }
 
-/** Create form: name + flat points, then Start. */
+/** Create form: name + flat points, then Start. Plus a list of recent events. */
 function EventSetup({
   checking,
   onStarted,
+  onReview,
 }: {
   checking: boolean
   onStarted: (e: EventSession) => void
+  onReview: (e: EventSession) => void
 }) {
   const { toast } = useToast()
   const [name, setName] = useState('')
@@ -134,6 +144,62 @@ function EventSetup({
         >
           {checking ? 'Checking…' : 'Start event & show QR'}
         </Button>
+      </Card>
+
+      <RecentEventsList onReview={onReview} />
+    </div>
+  )
+}
+
+const eventDate = (iso: string) =>
+  new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+
+/**
+ * Past events, newest first — so a finished event can be reopened read-only to
+ * review who attended. Fetched once; fails silent (renders nothing) so a missing
+ * table never breaks the setup screen.
+ */
+function RecentEventsList({ onReview }: { onReview: (e: EventSession) => void }) {
+  const [events, setEvents] = useState<EventSession[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    listRecentEvents(20)
+      .then((rows) => !cancelled && setEvents(rows.filter((e) => e.status === 'ended')))
+      .catch(() => {})
+      .finally(() => !cancelled && setLoading(false))
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (loading || events.length === 0) return null
+
+  return (
+    <div>
+      <p className="mb-2 px-1 text-sm font-semibold text-muted">Past events</p>
+      <Card pad="none" className="divide-y divide-line">
+        {events.map((e) => (
+          <button
+            key={e.id}
+            type="button"
+            onClick={() => onReview(e)}
+            className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-card-2"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card-2 text-muted">
+              <BoltIcon className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{e.name}</p>
+              <p className="text-xs text-muted">
+                {eventDate(e.endedAt ?? e.startedAt)}
+                {e.pointsPerScan > 0 ? ` · +${e.pointsPerScan} pts each` : ''}
+              </p>
+            </div>
+            <span className="shrink-0 text-sm font-semibold text-accent">Review ›</span>
+          </button>
+        ))}
       </Card>
     </div>
   )
@@ -292,6 +358,10 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
         </div>
       )}
 
+      {/* Who checked in — refetched only when the polled count changes, so the
+          list stays live without a full roster query every 4 seconds. */}
+      <AttendeeList eventId={event.id} version={stats?.total ?? 0} />
+
       <div className="grid grid-cols-2 gap-3">
         <Button variant="outline" onClick={() => setAddOpen(true)}>
           Add by hand
@@ -362,6 +432,140 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
         onConfirm={() => void onEnd()}
         onClose={() => setConfirmEnd(false)}
       />
+    </div>
+  )
+}
+
+const clockTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+
+/**
+ * The list of checked-in students. `version` bumps (the polled total) trigger a
+ * refetch — so the live monitor updates as people scan, without querying the
+ * whole roster on every 4-second poll. In review mode `version` never changes,
+ * so it fetches exactly once.
+ */
+function AttendeeList({ eventId, version }: { eventId: string; version: number }) {
+  const [people, setPeople] = useState<EventAttendee[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    getEventAttendees(eventId)
+      .then((rows) => {
+        if (cancelled) return
+        setPeople(rows)
+        setLoaded(true)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [eventId, version])
+
+  if (loaded && people.length === 0) return null
+
+  return (
+    <div>
+      <p className="mb-2 px-1 text-sm font-semibold text-muted">
+        Checked in{people.length > 0 ? ` · ${people.length}` : ''}
+      </p>
+      <Card pad="none" className="divide-y divide-line">
+        {!loaded ? (
+          <p className="p-4 text-center text-sm text-muted">Loading…</p>
+        ) : (
+          people.map((p) => (
+            <div key={p.studentId} className="flex items-center gap-3 p-3">
+              <Avatar name={p.displayName} url={p.avatarUrl} className="h-9 w-9" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{p.displayName}</p>
+                <p className="truncate text-xs text-muted">
+                  {[
+                    p.sectionName,
+                    `in at ${clockTime(p.scannedAt)}`,
+                    p.manual ? 'by hand' : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              </div>
+              {p.points > 0 && (
+                <span className="shrink-0 text-sm font-semibold text-reward">+{p.points}</span>
+              )}
+            </div>
+          ))
+        )}
+      </Card>
+    </div>
+  )
+}
+
+/**
+ * Read-only review of a FINISHED event: total, per-section turnout and the full
+ * attendee list. No QR, no manual add, no End — the server refuses scans and
+ * manual adds on an ended event anyway (this just doesn't offer them).
+ */
+function EventReview({ event, onBack }: { event: EventSession; onBack: () => void }) {
+  const [stats, setStats] = useState<EventStats | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getEventStats(event.id)
+      .then((s) => !cancelled && setStats(s))
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [event.id])
+
+  const maxSection = useMemo(
+    () => stats?.bySection.reduce((m, s) => Math.max(m, s.count), 0) ?? 0,
+    [stats],
+  )
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title={event.name}
+        subtitle={`Ended ${eventDate(event.endedAt ?? event.startedAt)}`}
+        fallback="/teach/attendance"
+        onBack={onBack}
+      />
+
+      <Card pad="roomy" className="text-center">
+        <p className="font-display text-5xl font-bold tabular-nums text-reward">
+          {stats?.total ?? 0}
+        </p>
+        <p className="text-xs text-muted">
+          checked in{event.pointsPerScan > 0 ? ` · +${event.pointsPerScan} pts each` : ''}
+        </p>
+      </Card>
+
+      {stats && stats.bySection.length > 0 && (
+        <div>
+          <p className="mb-2 px-1 text-sm font-semibold text-muted">By section</p>
+          <Card className="space-y-2.5 p-4">
+            {stats.bySection.map((s) => (
+              <div key={s.sectionId ?? 'none'} className="flex items-center gap-3">
+                <span className="w-24 shrink-0 truncate text-sm font-medium">{s.sectionName}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-card-2">
+                  <div
+                    className="h-full rounded-full bg-accent-solid"
+                    style={{ width: `${maxSection ? (s.count / maxSection) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="w-8 shrink-0 text-right text-sm font-semibold tabular-nums">
+                  {s.count}
+                </span>
+              </div>
+            ))}
+          </Card>
+        </div>
+      )}
+
+      <AttendeeList eventId={event.id} version={0} />
+
+      {stats?.total === 0 && <EmptyState>Nobody checked in to this event.</EmptyState>}
     </div>
   )
 }
