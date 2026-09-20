@@ -14,6 +14,8 @@ import {
   getSpaceAccess,
   getActiveSemester,
   getActiveSessionForStudent,
+  getActiveEvent,
+  getMyEventStatus,
   getLeaderboardSnapshot,
   getMyAchievements,
   getMySessionStatus,
@@ -50,6 +52,7 @@ import type {
   AchievementState,
   AttendanceStatus,
   ClassSession,
+  EventSession,
   LeaderboardEntry,
   MyAttendanceEntry,
   PointEvent,
@@ -127,6 +130,16 @@ interface StudentDataValue {
    * already scanned.
    */
   liveStatus: AttendanceStatus | null
+  /**
+   * The GLOBAL check-in event running right now, or null (0055). Cross-section,
+   * so unlike `liveSession` it isn't keyed on the student's section — a single
+   * `event_sessions` subscription on the durable channel drives it for everyone.
+   */
+  liveEvent: EventSession | null
+  /** Whether this student has already checked in to `liveEvent`. */
+  liveEventChecked: boolean
+  /** Called by the event scan screen after a successful check-in (optimistic). */
+  noteEventCheckedIn: () => void
   /**
    * True when this student's section belongs to a semester that has ENDED
    * (0035). Their account, points, badges and history all still open — nothing
@@ -221,6 +234,9 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   // The section's running class, if any (0033), and our own status in it.
   const [liveSession, setLiveSession] = useState<ClassSession | null>(null)
   const [liveStatus, setLiveStatus] = useState<AttendanceStatus | null>(null)
+  // The GLOBAL check-in event, if any (0055), and whether we've checked in.
+  const [liveEvent, setLiveEvent] = useState<EventSession | null>(null)
+  const [liveEventChecked, setLiveEventChecked] = useState(false)
   // Attendance history, shared by the Dashboard teaser and the stats screen.
   const [attendance, setAttendance] = useState<MyAttendanceEntry[]>([])
   const [attendanceLoading, setAttendanceLoading] = useState(true)
@@ -478,6 +494,15 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         void getActiveSessionForStudent(mine.section_id)
           .then(setLiveSession)
           .catch(() => {})
+        // Is a GLOBAL event running right now (0055)? Cross-section, off the
+        // critical path — a failure just leaves the banner hidden.
+        void getActiveEvent()
+          .then((ev) => {
+            setLiveEvent(ev)
+            if (ev) void getMyEventStatus(ev.id, mine.id).then(setLiveEventChecked).catch(() => {})
+            else setLiveEventChecked(false)
+          })
+          .catch(() => {})
         // Independent of the main load — achievements populate the trophy
         // case as soon as they're ready without delaying the dashboard.
         void loadAchievements(mine.id).finally(() => setAchievementsLoading(false))
@@ -587,6 +612,27 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
           if (!sectionId) return
           void getActiveSessionForStudent(sectionId)
             .then(setLiveSession)
+            .catch(() => {})
+        },
+      )
+      // Global event awareness (0055). `event_sessions` is in the realtime
+      // publication; UNfiltered because an event is cross-section — every
+      // student watches the one table. Events start/end rarely, so the traffic
+      // is negligible, and we re-read rather than patch (an UPDATE that sets
+      // ended_at must clear the banner).
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'event_sessions' },
+        () => {
+          void getActiveEvent()
+            .then((ev) => {
+              setLiveEvent(ev)
+              if (ev && studentId) {
+                void getMyEventStatus(ev.id, studentId).then(setLiveEventChecked).catch(() => {})
+              } else {
+                setLiveEventChecked(false)
+              }
+            })
             .catch(() => {})
         },
       )
@@ -942,6 +988,10 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   const clearLevelUp = useCallback(() => setLevelUp(null), [])
   const clearAwayRecap = useCallback(() => setAwayEvents([]), [])
+  // The event scan screen flips this the moment a check-in succeeds, so the
+  // banner switches to "You're in" without waiting on a refetch (event_attendance
+  // isn't in realtime — see the migration).
+  const noteEventCheckedIn = useCallback(() => setLiveEventChecked(true), [])
 
   // "New badge" nudge: any unlocked achievement whose code the student hasn't
   // viewed in the trophy case yet. `achSeenBump` forces a recompute after marking.
@@ -1057,6 +1107,9 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       attendanceTick,
       liveSession,
       liveStatus,
+      liveEvent,
+      liveEventChecked,
+      noteEventCheckedIn,
       semesterEnded,
       attendance,
       attendanceLoading,
@@ -1073,7 +1126,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       spaceAccess,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loading, error, me, sections, leaderboard, capturedAt, events, awayEvents, clearAwayRecap, live, rank, sectionName, load, saveProfile, saveAvatar, clearAvatar, saveBanner, saveHeader, clearHeader, saveHeaderPos, removeBanner, levelUp, clearLevelUp, achievements, achievementsLoading, achievementsError, retryAchievements, attendanceTick, liveSession, liveStatus, semesterEnded, attendance, attendanceLoading, achievementProgress, unlockedAchievement, clearUnlockedAchievement, syncMyAchievements, hasUnseenAchievements, markAchievementsSeen, setDisplayTitleField, setPinnedAchievementsField, unreadCount, markAllRead, spaceAccess],
+    [loading, error, me, sections, leaderboard, capturedAt, events, awayEvents, clearAwayRecap, live, rank, sectionName, load, saveProfile, saveAvatar, clearAvatar, saveBanner, saveHeader, clearHeader, saveHeaderPos, removeBanner, levelUp, clearLevelUp, achievements, achievementsLoading, achievementsError, retryAchievements, attendanceTick, liveSession, liveStatus, liveEvent, liveEventChecked, noteEventCheckedIn, semesterEnded, attendance, attendanceLoading, achievementProgress, unlockedAchievement, clearUnlockedAchievement, syncMyAchievements, hasUnseenAchievements, markAchievementsSeen, setDisplayTitleField, setPinnedAchievementsField, unreadCount, markAllRead, spaceAccess],
   )
 
   return (

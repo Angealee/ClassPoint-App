@@ -175,7 +175,14 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   after 0053, and takes `submit_peer_evaluation` from 0050 and `get_peer_results` from 0052.
   Until it lands, the board shows no flags (defaulted to false client-side) and saving a
   shuffle fails with a readable error. Duplicate and every UI change need no migration.
-  **Next number: 0055.**
+  **0055 is WRITTEN AND NOT YET APPLIED** — global event attendance (its own isolated tables,
+  so it depends only on 0001–0041 machinery + 0045's `event` category, which it re-lists when
+  it widens `point_events_category_check`). It also makes an ownership move of
+  `cp_notify_point_event` (0025 → 0055), so paste it AFTER the 0042–0054 backlog. Until it
+  lands, `/teach/event` and `/app/event` show their error states and the "Event is starting"
+  banner never appears (the reads fail soft — `getActiveEvent`/`getActiveEventForInstructor`
+  are off the critical path); the rest of the app is untouched.
+  **Next number: 0056.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -2357,6 +2364,79 @@ heading lives in the content — as are the shuffle and review sheets.
 ⚠ **`preview_start` can report a port the dev server is not on.** It said 63022; Vite, with
 5173 taken, actually bound 5174 (see `preview_logs`), so the tab showed a Chrome error page
 and every probe read an empty `/`. Read the real port from the logs before measuring.
+
+Since 0055 (Global event attendance — a special/limited, large-scale check-in). Decisions
+(user, 2026-09-20, three question rounds): **its own isolated tables** · **flat points,
+once, into the ONE shared pool, silent** · **any active student, any section** · **rotating
+QR only** · **a dedicated Events screen off the Attendance tab** · **in-app scanner only** ·
+**manual-add + student event-history QOL** · **a new `event_attend` ledger category**.
+
+**ISOLATION IS THE WHOLE SAFETY STORY — `scan_attendance` and `class_sessions` are NEVER
+touched.** `event_sessions` / `event_session_secrets` / `event_attendance` are a parallel
+world with their own scan RPC, so an event can't inflate a streak, a show-up rate or any
+achievement metric, and it can't weaken the class-scan section guard. `class_sessions.section_id`
+is NOT NULL and usually carries a subject; an event has neither, which is the second reason
+it is not a class row. `event_attendance` stamps the student's `section_id` AT SCAN TIME (the
+"record it in their respective section" requirement), nullable so a lost section never blocks
+a check-in.
+
+**THE SECTION GUARD IS THE INVERSE OF THE CLASS ONE, SO IT IS A SEPARATE FUNCTION.**
+`scan_attendance` raises when `v_student.section_id <> v_session.section_id`;
+`scan_event_attendance` omits that line entirely (any section) but still requires the student
+to be in the CURRENT semester. Weakening `scan_attendance` to serve both would have voided
+class-attendance security app-wide — the exact thing the isolation avoids.
+
+**SILENT AT SCALE FORCED A TOUCH ON THE MOST LOAD-BEARING TRIGGER, AND A NEW CATEGORY MADE IT
+LEGIBLE.** `cp_notify_point_event` pushes for every non-`redeem` award, and the Lounge relies
+on it pushing for `'event'`, so reusing `'event'` could not be silenced by category alone —
+a school-wide event would be hundreds of pushes. **Ownership move `cp_notify_point_event`
+0025 → 0055**, body carried forward VERBATIM, the ONLY change one skip line:
+`NEW.category in ('redeem', 'event_attend')`. A dedicated `'event_attend'` category (widening
+`point_events_category_check`, re-listing every value incl. 0045's `'event'`) keeps the ledger
+answerable — the same rule that rejected reusing `'activity'` for the Lounge. Widening the
+union surfaced `PointsHistory`'s `Record<PointCategory,…>` legend at compile time (added
+"Event check-in", gold like the other earned categories).
+
+**POINTS ARE AWARDED EXACTLY ONCE, ENFORCED BY THE INSERT ITSELF.** `unique (event_id,
+student_id)`; the RPC inserts `on conflict do nothing returning id`, and only if a row came
+back does it write the `point_events` row and back-fill `point_event_id`. A re-scan or a
+stale-tab double-tap can never double-pay. `points_per_scan = 0` records attendance with no
+ledger row (0 would violate `points <> 0`). The award is silent because of the trigger skip,
+so the student's confirmation is the scan screen + the ordinary in-app points toast on their
+OWN device (not a push — that is what "silent" meant).
+
+**SCALE: THE INSTRUCTOR MONITOR POLLS, IT DOES NOT SUBSCRIBE.** `event_attendance` is
+deliberately NOT in the realtime publication; `get_event_stats` (instructor-only) returns
+`total` + a `by_section` jsonb, polled every 4s. Subscribing would push hundreds of row
+events at a whole-school event. Only `event_sessions` is published — that drives the GLOBAL
+"Event is starting" banner, one `.on('event_sessions')` (UNfiltered — cross-section) added to
+the existing durable `student-self-*` channel, re-reading `getActiveEvent` rather than
+patching (an `ended_at` UPDATE must clear the banner). Events start/end rarely, so the
+unfiltered subscription is cheap. `getActiveEvent`/`getMyEventStatus` on StudentData feed
+`liveEvent`/`liveEventChecked`, both off the critical path; `noteEventCheckedIn()` flips the
+banner to "You're in" the instant the scan screen succeeds (event_attendance isn't realtime).
+The banner is gold, not the class banner's red — an event is points to earn.
+
+**The QR carries a DISTINCT `CP1E` prefix** (`qr.ts` `buildEventPayload`/`parseEventPayload`),
+so the class scanner (`parsePayload`, exactly `CP1`) and the event scanner reject each other's
+codes. Same HMAC (`computeCode` over `${id}.${window}`) and 15s window, so the server mirrors
+`scan_attendance` byte-for-byte against the event secret. v1 is in-app-scanner only; the
+payload is still built as a `/scan#…` deep link so native-camera support is a one-line route
+change later. `start_event_session` mirrors `start_class_session` (OUT columns `out_event_id`/
+`out_qr_secret`, the 42702 trap; resume-active-before-validate). One active event per active
+semester (partial unique index on `(semester_id) where status = 'active'`).
+
+Client: event functions in `api/attendance.ts` (NOT a new `events.ts` — that name is 0045's
+Lounge events); `EventSession`/`EventScanResult`/`EventStats`/`EventHistoryEntry` in types.ts.
+`/app/event` (`EventScan`) reached from `EventStartingBanner` on Home; `/teach/event`
+(`EventConsole` = create form → monitor with the rotating QR, polled counts, per-section
+bars, `ManualAddSheet`, and a ConfirmDialog-gated End) reached from a card in the Attendance
+tab header. `routes.test.ts` gained both paths. **`QrScanner` was enlarged + centred with a
+sweeping aim line and an icon torch** (was a 🔦 emoji — chrome uses icons); it is shared, so
+the class scan sheet got the same. Changelog: `DRAFT_EVENTS` (playful, NOT in `CHANGELOG` —
+invisible until the instructor says to announce it). **Not verified on a real authenticated
+screen** — the migration is unapplied, so every event surface is verified by typecheck, the
+309-test suite and build only.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

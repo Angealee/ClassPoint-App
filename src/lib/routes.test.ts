@@ -74,6 +74,9 @@ const MUST_BE_LINKED = [
   '/app/settings',
   '/app/peer',
   '/app/spenders',
+  // 0055 — the global event scan screen; linked from the "Event is starting"
+  // banner on Home, not a bottom tab.
+  '/app/event',
   // Instructor
   '/teach/ops',
   '/teach/peer',
@@ -81,6 +84,8 @@ const MUST_BE_LINKED = [
   '/teach/space/chats',
   '/teach/redemptions',
   '/teach/semesters',
+  // 0055 — the global event console; linked from the Attendance tab header.
+  '/teach/event',
 ]
 
 describe('route reachability', () => {

@@ -16,6 +16,7 @@ import type { AchievementState, MyAttendanceEntry } from '@/lib/types'
 import { useStudentData } from './StudentData'
 import { HomeHero, NextMilestone } from './HomeHero'
 import { LiveClassBanner } from './LiveClassBanner'
+import { EventStartingBanner } from './EventStartingBanner'
 import { SemesterEndedBanner } from './SemesterEndedBanner'
 
 /** How many feed rows the home screen shows before "See all". */
@@ -100,6 +101,8 @@ export function Dashboard() {
             cost no space on an ordinary day — and Home previously had no
             live-class signal at all, only a realtime-connection pill. */}
         <SemesterEndedBanner />
+        {/* A global event outranks a class banner — it's rare and time-boxed. */}
+        <EventStartingBanner />
         <LiveClassBanner onScan={() => navigate('/app/attendance?scan=1')} />
 
         {/* The scoreboard: level, points, XP, rank and streak as ONE object. */}

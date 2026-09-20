@@ -4,7 +4,14 @@
  * reusing `activity` so "how many points came from events?" stays answerable —
  * the ledger is the one place in this app that has to stay honest.
  */
-export type PointCategory = 'recitation' | 'activity' | 'penalty' | 'redeem' | 'event'
+export type PointCategory =
+  | 'recitation'
+  | 'activity'
+  | 'penalty'
+  | 'redeem'
+  | 'event'
+  /** 0055 — a global-event check-in award (silent, one shared pool). */
+  | 'event_attend'
 
 export interface Section {
   id: string
@@ -446,6 +453,50 @@ export interface ScanResult {
   already: boolean
   topic: string | null
   markedAt: string | null
+}
+
+// ── Global events (0055) — isolated from class attendance ───────────────────
+
+/** A live/started global check-in event the instructor is running (0055). */
+export interface EventSession {
+  id: string
+  name: string
+  pointsPerScan: number
+  status: 'active' | 'ended'
+  startedAt: string
+  endedAt: string | null
+  /** Rotating-QR secret — present only for the instructor who owns it. */
+  qrSecret?: string
+}
+
+/** What a student sees after scanning a global event QR. */
+export interface EventScanResult {
+  already: boolean
+  points: number
+  eventName: string
+  markedAt: string | null
+}
+
+/** One section's turnout, for the live event monitor. */
+export interface EventSectionCount {
+  sectionId: string | null
+  sectionName: string
+  count: number
+}
+
+/** Live event stats for the instructor monitor (polled, not realtime). */
+export interface EventStats {
+  total: number
+  bySection: EventSectionCount[]
+}
+
+/** A student's own past event check-in — their event history. */
+export interface EventHistoryEntry {
+  eventId: string
+  name: string
+  scannedAt: string
+  points: number
+  manual: boolean
 }
 
 /** A student's own attendance entry for their history module. */

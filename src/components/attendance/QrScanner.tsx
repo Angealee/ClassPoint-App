@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
+import { BoltIcon } from '@/components/ui/icons'
 
 /** Minimal shape of the parts of the native BarcodeDetector API we use. */
 interface NativeDetector {
@@ -160,14 +162,25 @@ export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
   }
 
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-xs overflow-hidden rounded-2xl bg-black">
+    // Bigger than the old max-w-xs so the QR is easy to aim on a phone, still
+    // centred (mx-auto) and capped so it never overflows a narrow viewport.
+    <div className="relative mx-auto aspect-square w-full max-w-[min(85vw,22rem)] overflow-hidden rounded-2xl bg-black">
       <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
-      {/* Viewfinder frame */}
+      {/* Viewfinder frame + sweeping aim line */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-6 top-6 h-8 w-8 rounded-tl-lg border-l-4 border-t-4 border-white/90" />
         <div className="absolute right-6 top-6 h-8 w-8 rounded-tr-lg border-r-4 border-t-4 border-white/90" />
         <div className="absolute bottom-6 left-6 h-8 w-8 rounded-bl-lg border-b-4 border-l-4 border-white/90" />
         <div className="absolute bottom-6 right-6 h-8 w-8 rounded-br-lg border-b-4 border-r-4 border-white/90" />
+        {!starting && (
+          <motion.div
+            aria-hidden
+            className="absolute inset-x-8 h-[3px] rounded-full bg-accent-solid/80"
+            initial={{ top: '16%' }}
+            animate={{ top: ['16%', '84%', '16%'] }}
+            transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        )}
       </div>
 
       {starting && (
@@ -183,9 +196,10 @@ export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
           onClick={() => void toggleTorch()}
           aria-pressed={torchOn}
           aria-label={torchOn ? 'Turn off flashlight' : 'Turn on flashlight'}
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 text-xs font-semibold text-white backdrop-blur"
+          className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/60 px-4 py-2 text-xs font-semibold text-white backdrop-blur"
         >
-          {torchOn ? '🔦 Light on' : '🔦 Light'}
+          <BoltIcon className="h-4 w-4" />
+          {torchOn ? 'Light on' : 'Light'}
         </button>
       )}
     </div>

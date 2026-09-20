@@ -37,6 +37,35 @@ export interface ChangelogEntry {
   sections?: ChangelogSection[]
 }
 
+/**
+ * DRAFT — global event check-in (0055). NOT in CHANGELOG yet, so it is invisible
+ * to users (LATEST_VERSION reads CHANGELOG[0]). Move it into the array with a
+ * bumped version once the instructor says to announce it. Version/date are
+ * placeholders until then.
+ */
+export const DRAFT_EVENTS: ChangelogEntry = {
+  version: '4.2.0',
+  date: '2026-09-20',
+  title: 'Big events, one scan',
+  sections: [
+    {
+      heading: 'Check in to a school-wide event',
+      major: true,
+      items: [
+        'When a big event kicks off, a gold banner lights up your home screen — tap it, scan the QR, and you are in from wherever you are sitting.',
+        'Any section scans the same code, and it still lands in your own section’s records.',
+        'Some events hand out points the moment you scan. One scan, points land, no waiting around.',
+      ],
+    },
+    {
+      heading: 'A comfier scanner',
+      items: [
+        'The in-app scanner is bigger, centred, and has a sweeping aim line — lining up a QR in a crowd is a lot easier now.',
+      ],
+    },
+  ],
+}
+
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {

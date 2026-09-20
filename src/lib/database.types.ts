@@ -111,7 +111,8 @@ export interface Database {
         id: UUID
         student_id: UUID
         points: number
-        category: 'recitation' | 'activity' | 'penalty' | 'redeem' | 'event'
+        /** 'event_attend' PENDING 0055 — silent global-event check-in award. */
+        category: 'recitation' | 'activity' | 'penalty' | 'redeem' | 'event' | 'event_attend'
         note: string | null
         created_at: Timestamp
         /** 0029 — stamped by the trg_stamp_semester trigger. */
@@ -160,6 +161,34 @@ export interface Database {
       }>
 
       class_session_secrets: Row<{ session_id: UUID; qr_secret: string }>
+
+      /** PENDING 0055 — global check-in events, isolated from class attendance. */
+      event_sessions: Row<{
+        id: UUID
+        semester_id: UUID
+        name: string
+        points_per_scan: number
+        status: 'active' | 'ended'
+        started_at: Timestamp
+        ended_at: Timestamp | null
+        created_by: UUID | null
+        created_at: Timestamp
+      }>
+
+      /** PENDING 0055 — the event's rotating-QR secret (instructor-only). */
+      event_session_secrets: Row<{ event_id: UUID; qr_secret: string }>
+
+      /** PENDING 0055 — one row per student per event; section stamped at scan. */
+      event_attendance: Row<{
+        id: UUID
+        event_id: UUID
+        student_id: UUID
+        section_id: UUID | null
+        scanned_at: Timestamp
+        point_event_id: UUID | null
+        manual: boolean
+        created_at: Timestamp
+      }>
 
       attendance_records: Row<{
         id: UUID

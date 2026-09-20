@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
-import { CalendarIcon, QrIcon } from '@/components/ui/icons'
+import { BoltIcon, CalendarIcon, QrIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
 import { AttendanceSession } from './AttendanceSession'
 import { AttendanceReview } from './AttendanceReview'
@@ -306,6 +306,25 @@ export function Attendance() {
           {sectionSelect}
         </div>
       </div>
+
+      {/* Global event — a separate, cross-section check-in for a special event
+          (0055). Its own screen so it never tangles with the per-section class flow. */}
+      <button
+        type="button"
+        onClick={() => navigate('/teach/event')}
+        className="flex w-full items-center gap-3 rounded-2xl border border-line bg-card p-4 text-left transition-colors hover:bg-card-2"
+      >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-reward-solid/15 text-reward">
+          <BoltIcon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">Global event check-in</p>
+          <p className="text-xs text-muted">
+            A school-wide QR any section can scan — for a special event.
+          </p>
+        </div>
+        <span className="shrink-0 text-xs font-semibold text-accent">Open →</span>
+      </button>
 
       {/* Start a class */}
       <Card className="space-y-4 p-5">

@@ -105,3 +105,56 @@ export async function buildCurrentPayload(
   const code = await computeCode(secret, sessionId, win)
   return buildPayload(sessionId, win, code)
 }
+
+// ── Global events (0055) ─────────────────────────────────────────────────────
+// A DISTINCT prefix ('CP1E') so the class scanner and the event scanner reject
+// each other's codes — parsePayload wants exactly 'CP1', parseEventPayload wants
+// 'CP1E'. Same HMAC (computeCode over `${id}.${window}`) and same 15s window, so
+// the server side mirrors scan_attendance byte-for-byte, just against the event
+// secret. v1 is in-app-scanner only; the payload is still built as a deep link so
+// native-camera support is a one-line route change later.
+
+const EVENT_PREFIX = 'CP1E'
+
+export interface ScannedEventPayload {
+  eventId: string
+  windowIndex: number
+  code: string
+}
+
+export function buildEventCore(eventId: string, windowIndex: number, code: string): string {
+  return `${EVENT_PREFIX}|${eventId}|${windowIndex}|${code}`
+}
+
+export function buildEventPayload(eventId: string, windowIndex: number, code: string): string {
+  const core = buildEventCore(eventId, windowIndex, code)
+  const origin =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : 'https://classpoint.app'
+  return `${origin}/scan#${core}`
+}
+
+/** Parse a scanned event string, or null if it isn't an event QR. */
+export function parseEventPayload(text: string): ScannedEventPayload | null {
+  let raw = text.trim()
+  const hash = raw.lastIndexOf('#')
+  if (hash !== -1) raw = raw.slice(hash + 1)
+  const parts = raw.split('|')
+  if (parts.length !== 4 || parts[0] !== EVENT_PREFIX) return null
+  const [, eventId, win, code] = parts
+  const windowIndex = Number(win)
+  if (!eventId || !Number.isFinite(windowIndex) || !code) return null
+  return { eventId, windowIndex, code }
+}
+
+/** The event's ready-to-render payload for the current window. */
+export async function buildCurrentEventPayload(
+  secret: string,
+  eventId: string,
+  nowMs: number = Date.now(),
+): Promise<string> {
+  const win = currentWindow(nowMs)
+  const code = await computeCode(secret, eventId, win)
+  return buildEventPayload(eventId, win, code)
+}

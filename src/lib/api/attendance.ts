@@ -8,6 +8,10 @@ import type {
   AttendanceRosterRow,
   AttendanceStatus,
   ClassSession,
+  EventHistoryEntry,
+  EventScanResult,
+  EventSession,
+  EventStats,
   MyAttendanceEntry,
   OfflineScanOutcome,
   ScanResult,
@@ -650,6 +654,204 @@ export async function listMyAttendance(studentId: string): Promise<MyAttendanceE
     status: r.status,
     scannedAt: r.scanned_at,
     syncedLate: r.synced_late,
+  }))
+}
+
+// ============================================================================
+// Global events (0055) — cross-section check-in, ISOLATED from class attendance
+// (its own tables + RPCs; scan_attendance and class_sessions are never touched).
+// ============================================================================
+
+interface EventRow {
+  id: string
+  name: string
+  points_per_scan: number
+  status: 'active' | 'ended'
+  started_at: string
+  ended_at: string | null
+}
+
+const EVENT_COLS = 'id, name, points_per_scan, status, started_at, ended_at'
+
+function mapEvent(r: EventRow, qrSecret?: string): EventSession {
+  return {
+    id: r.id,
+    name: r.name,
+    pointsPerScan: r.points_per_scan,
+    status: r.status,
+    startedAt: r.started_at,
+    endedAt: r.ended_at,
+    ...(qrSecret ? { qrSecret } : {}),
+  }
+}
+
+/** Instructor-only: read the rotating-QR secret for an event (RLS-gated). */
+async function getEventSecret(eventId: string): Promise<string | undefined> {
+  const { data, error } = await supabase
+    .from('event_session_secrets')
+    .select('qr_secret')
+    .eq('event_id', eventId)
+    .maybeSingle<{ qr_secret: string }>()
+  if (error) throw error
+  return data?.qr_secret ?? undefined
+}
+
+/**
+ * Start (or resume) the global event, returning it with its QR secret so the
+ * instructor's browser can render the rotating code. Resilient like
+ * startClassSession: if the id can't be read back we resume the active event
+ * (the RPC's INSERT already committed).
+ */
+export async function startEventSession(name: string, points: number): Promise<EventSession> {
+  return withAuthRetry(async () => {
+    const { data, error } = await supabase
+      .rpc('start_event_session', { p_name: name.trim(), p_points: points })
+      .maybeSingle<{ out_event_id: string; out_qr_secret: string }>()
+    if (error) throw error
+    const eventId = data?.out_event_id
+    const secret = data?.out_qr_secret
+    if (eventId) {
+      const row = await supabase
+        .from('event_sessions')
+        .select(EVENT_COLS)
+        .eq('id', eventId)
+        .maybeSingle<EventRow>()
+      if (!row.error && row.data) {
+        return mapEvent(row.data, secret ?? (await getEventSecret(eventId)))
+      }
+    }
+    const active = await getActiveEventForInstructor()
+    if (active) return active
+    throw new Error('Could not start the event. Try again.')
+  })
+}
+
+/** End the event — no more scans. */
+export async function endEventSession(eventId: string): Promise<void> {
+  await rpc('end_event_session', { p_event_id: eventId })
+}
+
+/**
+ * The running event WITH its QR secret, for the instructor monitor (resume after
+ * a reload). Newest-active, so a past semester's stuck event can't collide.
+ */
+export async function getActiveEventForInstructor(): Promise<EventSession | null> {
+  const { data, error } = await supabase
+    .from('event_sessions')
+    .select(EVENT_COLS)
+    .eq('status', 'active')
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle<EventRow>()
+  if (error) throw error
+  if (!data) return null
+  const secret = await getEventSecret(data.id)
+  return mapEvent(data, secret)
+}
+
+/**
+ * The running event as a STUDENT sees it — public fields only, no secret (they
+ * scan the code the instructor projects). Drives the "Event is starting" banner.
+ */
+export async function getActiveEvent(): Promise<EventSession | null> {
+  const { data, error } = await supabase
+    .from('event_sessions')
+    .select(EVENT_COLS)
+    .eq('status', 'active')
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle<EventRow>()
+  if (error) throw error
+  return data ? mapEvent(data) : null
+}
+
+/** Has this student already checked in to the event? (banner / scan screen). */
+export async function getMyEventStatus(eventId: string, studentId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('event_attendance')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('student_id', studentId)
+    .maybeSingle<{ id: string }>()
+  if (error) throw error
+  return !!data
+}
+
+/** Student check-in to a global event: validate the rotating code, award once. */
+export async function scanEventAttendance(
+  eventId: string,
+  windowIndex: number,
+  code: string,
+): Promise<EventScanResult> {
+  const { data, error } = await supabase
+    .rpc('scan_event_attendance', { p_event_id: eventId, p_window: windowIndex, p_code: code })
+    .single<{ already: boolean; points: number; event_name: string; marked_at: string | null }>()
+  if (error) throw error
+  return {
+    already: data.already,
+    points: data.points,
+    eventName: data.event_name,
+    markedAt: data.marked_at,
+  }
+}
+
+/** Instructor: manually add a student who couldn't scan (dead battery / no phone). */
+export async function markEventAttendance(
+  eventId: string,
+  studentId: string,
+): Promise<{ already: boolean; points: number }> {
+  const data = await withAuthRetry(async () => {
+    const res = await supabase
+      .rpc('mark_event_attendance', { p_event_id: eventId, p_student_id: studentId })
+      .single<{ already: boolean; points: number }>()
+    if (res.error) throw res.error
+    return res.data
+  })
+  return { already: data.already, points: data.points }
+}
+
+/** Instructor live-monitor stats: total + per-section counts (polled, not realtime). */
+export async function getEventStats(eventId: string): Promise<EventStats> {
+  const { data, error } = await supabase
+    .rpc('get_event_stats', { p_event_id: eventId })
+    .single<{
+      total: number
+      by_section: { section_id: string | null; section_name: string; cnt: number }[]
+    }>()
+  if (error) throw error
+  return {
+    total: Number(data.total) || 0,
+    bySection: (data.by_section ?? []).map((s) => ({
+      sectionId: s.section_id,
+      sectionName: s.section_name,
+      count: Number(s.cnt) || 0,
+    })),
+  }
+}
+
+/** A student's own past event check-ins (newest first). */
+export async function getMyEventHistory(studentId: string): Promise<EventHistoryEntry[]> {
+  type Row = {
+    event_id: string
+    scanned_at: string
+    manual: boolean
+    event_sessions: { name: string } | { name: string }[] | null
+    point_events: { points: number } | { points: number }[] | null
+  }
+  const { data, error } = await supabase
+    .from('event_attendance')
+    .select('event_id, scanned_at, manual, event_sessions(name), point_events(points)')
+    .eq('student_id', studentId)
+    .order('scanned_at', { ascending: false })
+  if (error) throw error
+  // Cast through `unknown`: the hand-written schema types embeds as
+  // SelectQueryError (Relationships: []), the same reason other embeds cast.
+  return ((data ?? []) as unknown as Row[]).map((r) => ({
+    eventId: r.event_id,
+    name: oneEmbed<{ name: string }>(r.event_sessions)?.name ?? 'Event',
+    scannedAt: r.scanned_at,
+    points: oneEmbed<{ points: number }>(r.point_events)?.points ?? 0,
+    manual: r.manual,
   }))
 }
 

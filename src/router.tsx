@@ -78,6 +78,12 @@ const SpendBoard = lazy(() =>
 const ScanLanding = lazy(() =>
   import('@/features/student/ScanLanding').then((m) => ({ default: m.ScanLanding })),
 )
+const EventScan = lazy(() =>
+  import('@/features/student/EventScan').then((m) => ({ default: m.EventScan })),
+)
+const EventConsole = lazy(() =>
+  import('@/features/instructor/EventConsole').then((m) => ({ default: m.EventConsole })),
+)
 const InstructorLayout = lazy(() =>
   import('@/features/instructor/InstructorLayout').then((m) => ({ default: m.InstructorLayout })),
 )
@@ -164,6 +170,7 @@ export const router = createBrowserRouter([
           { path: 'leaderboard', element: <Leaderboard /> },
           { path: 'attendance', element: <StudentAttendance /> },
           { path: 'attendance/stats', element: <AttendanceStats /> },
+          { path: 'event', element: <EventScan /> },
           { path: 'points', element: <UsePoints /> },
           { path: 'settings', element: <Settings /> },
           { path: 'history', element: <PointsHistory /> },
@@ -196,6 +203,7 @@ export const router = createBrowserRouter([
           { index: true, element: <Students /> },
           { path: 'attendance', element: <InstructorAttendance /> },
           { path: 'attendance/session/:sessionId', element: <SessionDetail /> },
+          { path: 'event', element: <EventConsole /> },
           { path: 'redemptions', element: <Redemptions /> },
           { path: 'semesters', element: <ManageSemesters /> },
           { path: 'ops', element: <Ops /> },
