@@ -175,14 +175,23 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   after 0053, and takes `submit_peer_evaluation` from 0050 and `get_peer_results` from 0052.
   Until it lands, the board shows no flags (defaulted to false client-side) and saving a
   shuffle fails with a readable error. Duplicate and every UI change need no migration.
-  **0055 is WRITTEN AND NOT YET APPLIED** — global event attendance (its own isolated tables,
-  so it depends only on 0001–0041 machinery + 0045's `event` category, which it re-lists when
-  it widens `point_events_category_check`). It also makes an ownership move of
-  `cp_notify_point_event` (0025 → 0055), so paste it AFTER the 0042–0054 backlog. Until it
-  lands, `/teach/event` and `/app/event` show their error states and the "Event is starting"
-  banner never appears (the reads fail soft — `getActiveEvent`/`getActiveEventForInstructor`
-  are off the critical path); the rest of the app is untouched.
-  **Next number: 0056.**
+  **0055 is APPLIED (confirmed by the user 2026-09-21)** — global event attendance (its own
+  isolated tables, so it depends only on 0001–0041 machinery + 0045's `event` category, which
+  it re-lists when it widens `point_events_category_check`). It also makes an ownership move of
+  `cp_notify_point_event` (0025 → 0055).
+  **0056 is WRITTEN AND NOT YET APPLIED** — the event-award guard bypass. 0055 shipped with a
+  latent bug: `scan_event_attendance` runs under the STUDENT's JWT (SECURITY DEFINER does not
+  change `auth.uid()`), its `point_events` insert fires `cp_recompute_points`, whose
+  `students` UPDATE trips `cp_guard_student_update` (0009) — so a real student scan died with
+  "You can only update your display name, photo, bio and interests." and nothing recorded.
+  Event check-in is the FIRST student-initiated self-award in the app, so nothing hit this
+  before. 0056 ownership-moves `cp_guard_student_update` (0009 → 0056), `scan_event_attendance`
+  and `mark_event_attendance` (both 0055 → 0056): the two RPCs raise a transaction-local GUC
+  `cp.event_award = 'on'` (via `set_config(..., true)`) right before their `point_events`
+  insert, and the guard early-returns when it sees the flag. `cp_recompute_points` is NOT
+  touched. Until 0056 lands, every event scan that awards >0 points fails with that guard
+  error and records no check-in; a 0-point event works (no ledger row, no recompute).
+  **Next number: 0057.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -2434,9 +2443,21 @@ bars, `ManualAddSheet`, and a ConfirmDialog-gated End) reached from a card in th
 tab header. `routes.test.ts` gained both paths. **`QrScanner` was enlarged + centred with a
 sweeping aim line and an icon torch** (was a 🔦 emoji — chrome uses icons); it is shared, so
 the class scan sheet got the same. Changelog: `DRAFT_EVENTS` (playful, NOT in `CHANGELOG` —
-invisible until the instructor says to announce it). **Not verified on a real authenticated
-screen** — the migration is unapplied, so every event surface is verified by typecheck, the
-309-test suite and build only.
+invisible until the instructor says to announce it).
+
+**0056 fixes a latent guard bug in 0055 (2026-09-21).** A real student scan awarding >0
+points died with `cp_guard_student_update`'s "You can only update your display name, photo,
+bio and interests." — the FIRST time this surfaced anywhere, because event check-in is the
+first student action that writes a `point_events` row for the student themselves (every other
+award runs as the instructor). SECURITY DEFINER does not change `auth.uid()`, so the scan runs
+as the student; its ledger insert fires `cp_recompute_points`, whose `students` UPDATE trips
+the profile guard. 0056 gates the guard behind a transaction-local GUC `cp.event_award` that
+`scan_event_attendance`/`mark_event_attendance` raise (`set_config(..., true)`) right before
+their insert — narrow, and `cp_recompute_points` stays untouched. Safe because the flag is
+transaction-local and PostgREST runs one statement per transaction and does not expose
+`set_config`, so a student cannot raise it and then issue an arbitrary `students` UPDATE.
+**Not verified on a real authenticated screen** — until 0056 is applied every >0-point event
+scan fails; verified by typecheck, the 309-test suite and build only.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
