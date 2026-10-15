@@ -1480,3 +1480,91 @@ export interface PeerEvaluationTemplate {
   groupIds: string[]
   criteria: { label: string; scale: PeerScaleOption[] }[]
 }
+
+// ============================================================================
+// Grades (migration 0057)
+//
+// Instructor-only, end to end: all three tables are instructor-gated in RLS
+// with no student branch at all. Nothing here touches point_events, in either
+// direction — points are never turned into a grade.
+//
+// The ARITHMETIC lives in src/lib/grading.ts and nowhere else, deliberately
+// without a SQL mirror. These are the shapes it works on.
+// ============================================================================
+
+/** One of the four things a term grade is made of. */
+export type GradeComponent = 'performance_task' | 'quiz' | 'recitation' | 'exam'
+
+/** Which figure a screen is showing — see ComponentSums. */
+export type GradeView = 'official' | 'soFar'
+
+/**
+ * What a term's grade is made of, for one subject.
+ *
+ * Every weight is a PROPORTION (0.5, never 50). `finalWeight` is this term's
+ * own share of the final computed grade — never a stored triple, because
+ * "30/30/40" reads like one and invites it.
+ */
+export interface GradePolicy {
+  subjectId: string
+  term: TermKey
+  /** Class Standing split — these three must sum to 1. */
+  ptWeight: number
+  quizWeight: number
+  recitWeight: number
+  /** Term split — these two must sum to 1. */
+  csWeight: number
+  examWeight: number
+  /** This term's share of the final grade. The three terms' must sum to 1. */
+  finalWeight: number
+  /** `(raw/total * span + base) * 100`. Base 0.6 gives the 60.00 floor. */
+  transmuteBase: number
+  transmuteSpan: number
+}
+
+/**
+ * One component's totals for one student.
+ *
+ * The two denominators answer different questions, and keeping both is what
+ * lets one screen show an official grade and an honest in-progress one:
+ *   • `sumMax` — every non-archived item, so an unmarked one counts as a zero.
+ *     This is what the spreadsheet does and what the official grade must be.
+ *   • `sumMaxMarked` — only the items this student has a score for. A missing
+ *     row means "not marked yet"; a real zero is stored as 0 and has a row.
+ */
+export interface ComponentSums {
+  sumScore: number
+  sumMax: number
+  sumMaxMarked: number
+}
+
+export type TermSums = Record<GradeComponent, ComponentSums>
+
+/** One score column: "Quiz 1", out of 20. Scoped to a section. */
+export interface GradeItem {
+  id: string
+  sectionId: string
+  subjectId: string
+  term: TermKey
+  component: GradeComponent
+  name: string
+  maxScore: number
+  position: number
+  /** Set when retired: leaves the denominator, keeps its scores. */
+  archivedAt: string | null
+}
+
+/** One mark. The ABSENCE of one of these means "not marked yet". */
+export interface GradeScore {
+  itemId: string
+  studentId: string
+  score: number
+}
+
+/** One student's raw component totals for one term (`get_section_grade_sums`). */
+export interface GradeSumsRow {
+  studentId: string
+  fullName: string
+  term: TermKey
+  sums: TermSums
+}

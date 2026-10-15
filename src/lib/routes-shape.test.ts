@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isChatRoom } from './routes-shape'
+import { isChatRoom, isGradeGrid, isWideRoute } from './routes-shape'
 
 describe('isChatRoom', () => {
   it('matches a room under BOTH mounts', () => {
@@ -25,5 +25,55 @@ describe('isChatRoom', () => {
   it('needs a room id, not a trailing slash', () => {
     expect(isChatRoom('/app/space/chat/')).toBe(false)
     expect(isChatRoom('/app/space/chat')).toBe(false)
+  })
+})
+
+describe('isGradeGrid', () => {
+  it('matches one grade sheet', () => {
+    expect(isGradeGrid('/teach/grades/sec-1/sub-2/finals')).toBe(true)
+  })
+
+  it('does NOT widen the landing list', () => {
+    // /teach/grades is a stack of section cards; stretching it across a 1440px
+    // display helps nobody. Same split as the chat room and its room list.
+    expect(isGradeGrid('/teach/grades')).toBe(false)
+    expect(isGradeGrid('/teach/grades/')).toBe(false)
+  })
+
+  it('needs all three segments', () => {
+    expect(isGradeGrid('/teach/grades/sec-1')).toBe(false)
+    expect(isGradeGrid('/teach/grades/sec-1/sub-2')).toBe(false)
+    expect(isGradeGrid('/teach/grades/sec-1/sub-2/finals/extra')).toBe(false)
+  })
+
+  it('does not match the print route', () => {
+    // Shell never renders there, so a true would be dead code that only
+    // confuses the next reader.
+    expect(isGradeGrid('/teach/grades/sec-1/sub-2/finals/print')).toBe(false)
+  })
+})
+
+describe('isWideRoute', () => {
+  it('covers both wide screens', () => {
+    expect(isWideRoute('/app/space/chat/abc-123')).toBe(true)
+    expect(isWideRoute('/teach/space/chat/abc-123')).toBe(true)
+    expect(isWideRoute('/teach/grades/sec-1/sub-2/prelim')).toBe(true)
+  })
+
+  it('leaves every other screen alone', () => {
+    // The one that bites: a third wide route added to only one of the two
+    // layouts. Both call isWideRoute, so this list is the whole contract.
+    for (const p of [
+      '/app',
+      '/app/space',
+      '/app/space/lounge',
+      '/app/space/chats',
+      '/teach',
+      '/teach/space',
+      '/teach/space/chats',
+      '/teach/grades',
+    ]) {
+      expect(isWideRoute(p), p).toBe(false)
+    }
   })
 })

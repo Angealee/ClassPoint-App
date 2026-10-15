@@ -14,3 +14,31 @@
 export function isChatRoom(pathname: string): boolean {
   return /\/space\/chat\/[^/]+$/.test(pathname)
 }
+
+/**
+ * One grade sheet: `/teach/grades/<section>/<subject>/<term>`.
+ *
+ * The scope lives in the PATH rather than in `?section=…` for exactly this
+ * reason — `Shell` only ever sees `pathname`, so a query-string scope would
+ * make the width undecidable here and the grid would be stuck in the 672px
+ * reading column.
+ *
+ * The LANDING at `/teach/grades` stays narrow: it is a list of section cards,
+ * and stretching a stack of rows across a 1440px display helps nobody. Same
+ * split as the chat room and its room list.
+ */
+export function isGradeGrid(pathname: string): boolean {
+  return /^\/teach\/grades\/[^/]+\/[^/]+\/[^/]+$/.test(pathname)
+}
+
+/**
+ * Should this route use the full width?
+ *
+ * BOTH layouts must call this one function. It is tempting to widen only
+ * `InstructorLayout` for an instructor-only screen, and that is precisely the
+ * divergence this file exists to prevent — the next wide route would then have
+ * to remember to touch two places.
+ */
+export function isWideRoute(pathname: string): boolean {
+  return isChatRoom(pathname) || isGradeGrid(pathname)
+}

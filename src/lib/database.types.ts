@@ -650,6 +650,58 @@ export interface Database {
         flagged: boolean
         created_at: Timestamp
       }>
+
+      /**
+       * PENDING 0057 — the weights, per subject per term.
+       *
+       * Every weight is a PROPORTION (0.5000, never 50), and `numeric`, so it
+       * arrives over PostgREST as a STRING — api/grades.ts coerces each one.
+       * No arithmetic is done with these in SQL: grading.ts is the only place
+       * in the codebase that multiplies by a weight.
+       */
+      grade_policies: Row<{
+        subject_id: UUID
+        term: 'prelim' | 'midterm' | 'finals'
+        pt_weight: number
+        quiz_weight: number
+        recit_weight: number
+        cs_weight: number
+        exam_weight: number
+        /** This term's share of the final grade. The three must sum to 1. */
+        final_weight: number
+        transmute_base: number
+        transmute_span: number
+        updated_at: Timestamp
+      }>
+
+      /** PENDING 0057 — one score column ("Quiz 1", out of 20). Per SECTION. */
+      grade_items: Row<{
+        id: UUID
+        section_id: UUID
+        subject_id: UUID
+        term: 'prelim' | 'midterm' | 'finals'
+        component: 'performance_task' | 'quiz' | 'recitation' | 'exam'
+        name: string
+        max_score: number
+        position: number
+        /** Retired: leaves the denominator, keeps its scores. */
+        archived_at: Timestamp | null
+        created_at: Timestamp
+      }>
+
+      /**
+       * PENDING 0057 — one student's mark on one item.
+       *
+       * THE ABSENCE OF A ROW IS MEANINGFUL: it means "not marked yet", which is
+       * what lets the app show an honest in-progress figure beside the official
+       * blanks-count-as-zero one. A student who scored nothing gets score 0.
+       */
+      grade_scores: Row<{
+        item_id: UUID
+        student_id: UUID
+        score: number
+        updated_at: Timestamp
+      }>
     }
 
     Views: Record<string, never>

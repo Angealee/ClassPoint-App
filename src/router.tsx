@@ -111,6 +111,12 @@ const Redemptions = lazy(() =>
   import('@/features/instructor/Redemptions').then((m) => ({ default: m.Redemptions })),
 )
 const Ops = lazy(() => import('@/features/instructor/Ops').then((m) => ({ default: m.Ops })))
+const GradesConsole = lazy(() =>
+  import('@/features/instructor/GradesConsole').then((m) => ({ default: m.GradesConsole })),
+)
+const GradeSheet = lazy(() =>
+  import('@/features/instructor/GradeSheet').then((m) => ({ default: m.GradeSheet })),
+)
 const PeerConsole = lazy(() =>
   import('@/features/instructor/PeerConsole').then((m) => ({ default: m.PeerConsole })),
 )
@@ -209,6 +215,11 @@ export const router = createBrowserRouter([
           { path: 'ops', element: <Ops /> },
           { path: 'peer', element: <PeerConsole /> },
           { path: 'peer/:evaluationId', element: <PeerResultsBoard /> },
+          { path: 'grades', element: <GradesConsole /> },
+          // The scope is in the PATH, not a query string: Shell only sees
+          // `pathname`, so this is what lets isWideRoute give the grid the
+          // whole width. It also makes one grade sheet a real deep link.
+          { path: 'grades/:sectionId/:subjectId/:term', element: <GradeSheet /> },
           { path: 'space', element: <InstructorSpace /> },
           { path: 'space/chats', element: <InstructorChats /> },
           { path: 'space/chat/:roomId', element: <InstructorChatRoom /> },

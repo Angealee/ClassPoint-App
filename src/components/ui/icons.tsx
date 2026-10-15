@@ -439,3 +439,19 @@ export function ClipboardIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+/**
+ * A grade sheet: a table with its header row and name column picked out.
+ *
+ * Stroked like every other icon here. The two interior lines are the frozen
+ * header and name column the grid itself has, so the glyph says "spreadsheet"
+ * rather than "generic grid".
+ */
+export function TableIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18M9 9v11" />
+    </svg>
+  )
+}

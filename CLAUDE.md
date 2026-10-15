@@ -191,7 +191,13 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   insert, and the guard early-returns when it sees the flag. `cp_recompute_points` is NOT
   touched. Until 0056 lands, every event scan that awards >0 points fails with that guard
   error and records no check-in; a 0-point event works (no ledger row, no recompute).
-  **Next number: 0057.**
+  **0057 is WRITTEN AND NOT YET APPLIED** — grades. It depends on nothing after
+  0027 (semesters/subjects/sections) and takes `cp_nightly_backup` from 0052, so
+  0052 must not be edited. Until it lands, `src/lib/grading.ts` and its 31 tests
+  are fully exercised (they are pure), but every call in `api/grades.ts` 400s —
+  so every grades fetch gets its OWN try/catch and `ErrorState` (the 0034
+  SectionGrid precedent), and nothing else in the instructor area is affected.
+  **Next number: 0058.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -2483,6 +2489,150 @@ the term groups and `tally`, so an event never touches a show-up rate/streak), a
 `event_attendance`). **`PageHeader` gained an optional `onBack`** for a header that switches an
 in-component view (the review ↔ setup toggle is state, not a route); `fallback` is ignored when
 `onBack` is set and stays required so no existing caller changed.
+
+Since 0057 (Grades — Phase 1: the data layer). The instructor's Excel grade sheet as
+data: `grade_policies` (weights per subject per term), `grade_items` (one score column —
+"Quiz 1", out of 20, per SECTION), `grade_scores` (one mark). Instructor-only in RLS with
+**no student branch at all**, so there is no "own rows" path to widen by accident. Nothing
+references `point_events` in either direction — points are never turned into a grade, and
+this stays structurally disjoint the way Peer Evaluation is.
+
+**THERE IS DELIBERATELY NO SQL MIRROR OF THE MATH, AND THAT IS THE OPPOSITE OF
+`peer-scale.ts`.** `src/lib/grading.ts` is the ONLY definition of every weight, the
+transmutation and all rounding; SQL's whole job is `sum(score)` / `sum(max_score)`,
+numbers that cannot drift. Those other files mirror because the server ACTS on their
+value (`cp_event_normalize` decides who is paid, `cp_peer_scale_clean` decides whether a
+rating is valid), so a client preview must agree with an authority. Nothing server-side
+ever acts on a grade: no RLS branch reads one, no trigger, no notification. A mirror here
+would be a second definition with nothing requiring it — the pattern that grew five copies
+of the show-up rate and four of the points row. **If you are about to put a weighting
+expression in a migration, stop.** The one thing both sides must agree on is WHICH ITEMS
+COUNT: `archived_at is null`, stated in `get_section_grade_sums` and in `sumsFromScores`.
+
+**THE ABSENCE OF A `grade_scores` ROW IS MEANINGFUL.** No row = "not marked yet"; a
+student who sat the quiz and scored nothing gets a row holding 0. That one distinction is
+what lets the app show the OFFICIAL grade (blanks count as zero, byte-identical to the
+spreadsheet) beside an honest in-progress figure, with no second state column — hence the
+three totals per component: `*_score`, `*_max` (every non-archived item) and `*_marked`
+(only what this student has a score for). Clearing a cell is a DELETE, not a write of 0.
+
+Transmutation is `(raw/total * span + base) * 100` with base 0.6, so **the lowest possible
+grade in this system is 60.00, not 0**. `componentScore` returns that floor rather than
+NaN when a component has no items (the instructor's call — Excel answers #DIV/0! there, so
+there is no behaviour to be faithful to), but `termGrade` returns **null** for a term with
+no items anywhere, and `finalGrade` returns null if any weighted term is missing. That
+last one is the bug the whole feature exists to remove: the live sheet reads 68.508 for a
+student with a 99.64 prelim and a 96.54 finals purely because Midterms is empty.
+**Everything is carried unrounded and rounded once at display** — pinned by the
+load-bearing test, where exam 35.58/50 → 88.464 → 94.61, and rounding that component
+first gives 94.60.
+
+`transmute_base` / `transmute_span` are COLUMNS, not constants: two columns today versus
+a migration against live grade data later. Weights are `numeric`, so the two row-level
+sums (PT+Quiz+Recit = 1, CS+Exam = 1) are real CHECKs — exact decimal arithmetic makes
+that safe where float would not. The three terms' `final_weight` summing to 1 is CROSS-ROW
+and cannot be a CHECK (a deferred trigger would make inserting the first row fail), so it
+is validated in `subjectPolicyError` and surfaces as a sentence. A subject is gradeable
+only once **all three** policy rows exist — a missing row is ambiguous, and defaulting its
+share to 0 would silently compute a final grade out of 70%. 0057 seeds them for every
+existing subject and `trg_seed_grade_policies` seeds new ones, **copying the weights of
+the most recent subject sharing the same code**, so a rollover does not hand the instructor
+three blank forms and a screen of dashes.
+
+`get_section_grade_sums` returns **one row per (student, term)**, and the shape is
+load-bearing: per (student, term, component) across a whole subject is 208 × 3 × 4 = 2,496
+rows, past PostgREST's silent 1000-row cap (the 0031 lesson). Its roster is active students
+in the section **plus anyone holding a score against this section's items** — items are
+keyed to a section, so a student moved mid-semester would otherwise vanish from the grid
+holding the marks they earned, with nothing on screen saying so (the `getSectionRegister`
+rule). `listGradeScores` pages via `fetchAllPages`: one section-term is ~800 cells, just
+under the cap, and three terms is well past it.
+
+**Ownership move `cp_nightly_backup` 0052 → 0057.** Body carried forward verbatim; the
+array gains the three grade tables **and 0055's `event_sessions` / `event_attendance`,
+which were never added**. Two behaviours change, both because grades write **no
+`audit_log` rows** (the instructor's call) and this mirror is therefore the only history a
+grade has: grade tables keep **365** daily snapshots rather than 14, and on schema drift
+their mirror is **parked under a dated name instead of dropped** — the generic handler
+recreates from scratch and explicitly sacrifices old snapshots, which is fine beside an
+audit log and a data-loss event without one. `audit_log_action_check` is untouched.
+
+`num()` (PostgREST sends `numeric` as a STRING) moved from a private helper in
+`api/peer.ts` into `api/_internal.ts`, where the other shared plumbing lives. Every weight
+and score goes through it.
+
+Grades — Phase 2: entering marks (no migration). **Grades took the FIFTH bottom tab**
+(Students · Attendance · Grades · History · Ranks). The `actions` slot already carries
+four round buttons and a fifth puts ~212px of controls in a 375px header — on the thing
+opened most often. Entering marks is weekly core work, unlike Ops or Peer Evaluation.
+
+**Two routes, and the scope is in the PATH on purpose.** `/teach/grades` is a narrow
+landing (section × subject cards, three term links each);
+`/teach/grades/:sectionId/:subjectId/:term` is the sheet. `Shell` only ever sees
+`pathname`, so a `?section=` scope would make the width undecidable and strand the grid in
+the 672px reading column. **`routes-shape.ts` gained `isGradeGrid` + `isWideRoute`, and
+BOTH layouts now call `isWideRoute`** — `isChatRoom` was deliberately not widened (its name
+would lie, and its own test asserts the room LIST is false). Touching only
+`InstructorLayout` would reintroduce exactly the divergence that file exists to prevent.
+
+**THE GRID'S INPUTS ARE UNCONTROLLED, AND NOTHING ELSE IN THIS CODEBASE IS.**
+`grep defaultValue src/` returned zero hits before this. A section-term is ~40 students ×
+~20 items = **800 inputs** (measured), and a controlled grid re-renders all of them on
+every keystroke. Each ROW owns its committed values in local state, the inputs hold the
+in-progress text, and a commit re-renders exactly one row. Nothing above the row re-renders
+while typing. The consequence to respect: **the DOM is the source of truth between
+commits**, so anything that changes values from outside — undo, a pasted column, a reload —
+writes the screen's authoritative map and remounts the editor with a fresh `key`. Both are
+deliberate one-off actions where a remount is free. The screen holds a `{ key, scores }`
+SNAPSHOT in state rather than passing the ref through, so nothing reads a ref during render.
+
+⚠ **`size={4}` ON THE CELL INPUT IS LOAD-BEARING, AND THE BUG IT FIXES IS INVISIBLE IN
+CODE.** An `<input>` has an intrinsic width of ~20 characters, and in an auto-layout table
+that is what sizes the column — `w-full` does NOT constrain it, because the column is sized
+from content first. Measured: each item column came out **228px**, making the table
+**5,343px**, with only four columns readable at a time. With `size={4}` the column is 87px,
+the table 2,499px, and **eight** columns fit. Any future table of inputs has the same trap.
+
+⚠ **THE SCROLLER OWNS BOTH AXES, AND `flex-1` DOES NOT BOUND IT.** A sticky element only
+sticks inside its own scroll container. With the height unbounded the page scrolled instead
+and the column headers slid away after about twelve rows (measured at `top: -503`), so you
+could not tell which quiz you were typing into. `flex-1 min-h-0` was tried first and does
+nothing: **every height in the Shell chain is a `min-h`**, so the column grows to its
+content (measured 1,539px tall and not scrolling). The fix is `max-h-[75dvh]` on the
+scroller — viewport-relative, so it needs no agreement with Shell's paddings (the
+`calc(100dvh - …)` trap), and a grid shorter than the cap simply never scrolls. Measured
+after: scroller 660px, both axes scrolling, header stuck at offset 0, name column stuck at
+offset 4, zero page overflow.
+
+**`type="text"` + `inputMode="decimal"`, NOT `type="number"`** — a deliberate break from the
+house pattern (`AwardBar.tsx` uses `numeric`). Number spinners hijack the mouse wheel over a
+scrolling grid, and `type="number"` cannot reliably tell `""` from invalid across browsers,
+which is precisely the blank-versus-zero distinction the whole feature rests on. Scores are
+decimal (37.5 / 48.25 / 35.58), so `numeric` would also hide the decimal point on iOS.
+Every cell is `text-base`: below 16px iOS Safari zooms the viewport and never zooms back.
+
+**One editor is mounted at a time, via `useIsDesktop()`** — the grid on desktop, the
+one-column-down-the-roster flow on a phone. Not `hidden md:block`: two editors would mean
+two inputs per cell, and the keyboard walk and the failed-cell flags both assume one.
+**Enter and ↑/↓ walk the column; left/right are deliberately unbound** — they would fight
+the text caret, and Tab already moves across.
+
+**Saving is a debounced coalescing upsert (600ms), and a FAILED write keeps the typed value
+on screen rather than reverting it.** The plan called for a per-cell revert; keeping the
+mark and flagging it is better and was changed on purpose — losing someone's work to a
+dropped connection is worse than showing it as unsaved, and the bar says "N marks not
+saved" with a Reload. `AttendanceSession`'s whole-roster snapshot-and-restore is the wrong
+shape here: it would undo edits made while the failed request was in flight. **Clearing a
+cell is a DELETE, not a write of 0** — it takes the item out of that student's "so far"
+denominator, where a 0 counts against them. A `beforeunload` guard covers the debounce
+window, and unmount flushes.
+
+`src/lib/grade-entry.ts` (+18 tests) owns what a typed cell means. It is **stricter than
+`Number()`** — which accepts `'1e3'`, `'0x10'` and `'-5'` — because a typo'd exponent
+becoming 1000 on a quiz out of 20 is exactly what nobody catches by eye. A pasted column
+**keeps interior blanks**: a column copied out of Excel has a gap where a student was
+unmarked, and dropping those shifts every score below the gap up a row, silently assigning
+marks to the wrong people. Only the first column of a block paste is taken.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
