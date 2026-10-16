@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isChatRoom, isGradeGrid, isWideRoute } from './routes-shape'
+import { isChatRoom, isGradeGrid, routeWidth } from './routes-shape'
 
 describe('isChatRoom', () => {
   it('matches a room under BOTH mounts', () => {
@@ -64,16 +64,24 @@ describe('isGradeGrid', () => {
   })
 })
 
-describe('isWideRoute', () => {
-  it('covers both wide screens', () => {
-    expect(isWideRoute('/app/space/chat/abc-123')).toBe(true)
-    expect(isWideRoute('/teach/space/chat/abc-123')).toBe(true)
-    expect(isWideRoute('/teach/grades/sec-1/sub-2/prelim')).toBe(true)
+describe('routeWidth', () => {
+  it('gives the grade sheet the whole window', () => {
+    // A grid is columns you can read; the gutter a centred layout would keep
+    // is worth ~380px of them on a 1920px display.
+    expect(routeWidth('/teach/grades/sec-1/sub-2/prelim')).toBe('full')
+    expect(routeWidth('/teach/grades/sec-1/sub-2/overall')).toBe('full')
   })
 
-  it('leaves every other screen alone', () => {
+  it('leaves the chat room on the grow-right rule', () => {
+    // Deliberately NOT 'full': the room list and a room sit side by side in
+    // use, and the sidebar must not shift as you move between them.
+    expect(routeWidth('/app/space/chat/abc-123')).toBe('wide')
+    expect(routeWidth('/teach/space/chat/abc-123')).toBe('wide')
+  })
+
+  it('leaves every other screen in the reading column', () => {
     // The one that bites: a third wide route added to only one of the two
-    // layouts. Both call isWideRoute, so this list is the whole contract.
+    // layouts. Both call routeWidth, so this list is the whole contract.
     for (const p of [
       '/app',
       '/app/space',
@@ -83,8 +91,9 @@ describe('isWideRoute', () => {
       '/teach/space',
       '/teach/space/chats',
       '/teach/grades',
+      '/teach/grades/sec-1/sub-2/print',
     ]) {
-      expect(isWideRoute(p), p).toBe(false)
+      expect(routeWidth(p), p).toBe('reading')
     }
   })
 })

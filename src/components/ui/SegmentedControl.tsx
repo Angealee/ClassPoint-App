@@ -19,6 +19,8 @@ export function SegmentedControl<T extends string>({
   options,
   className,
   label,
+  tone = 'accent',
+  size = 'md',
 }: {
   value: T
   onChange: (value: T) => void
@@ -26,7 +28,19 @@ export function SegmentedControl<T extends string>({
   className?: string
   /** Accessible name for the group, e.g. "History view". */
   label?: string
+  /**
+   * `accent` is the filled default and stays the primary control.
+   *
+   * `quiet` exists for a SECOND strip beside a first one: two filled accent
+   * strips in one row read as a single control with two active items, which is
+   * exactly how the grade sheet's term tabs and its So far / Official toggle
+   * were being misread. Quiet keeps the shape and the radiogroup semantics and
+   * drops the fill, so red only ever marks the primary choice.
+   */
+  tone?: 'accent' | 'quiet'
+  size?: 'sm' | 'md'
 }) {
+  const quiet = tone === 'quiet'
   return (
     <div
       role="radiogroup"
@@ -44,8 +58,15 @@ export function SegmentedControl<T extends string>({
             aria-checked={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              'h-10 rounded-xl text-sm font-semibold transition-colors',
-              active ? 'bg-accent-solid text-white' : 'bg-card-2 text-muted hover:text-ink',
+              'rounded-xl font-semibold transition-colors',
+              size === 'sm' ? 'h-8 px-3 text-xs' : 'h-10 text-sm',
+              quiet
+                ? active
+                  ? 'border border-line bg-card-2 text-ink'
+                  : 'border border-transparent text-muted hover:text-ink'
+                : active
+                  ? 'bg-accent-solid text-white'
+                  : 'bg-card-2 text-muted hover:text-ink',
             )}
           >
             {o.label}

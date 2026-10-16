@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { isWideRoute } from '@/lib/routes-shape'
+import { routeWidth } from '@/lib/routes-shape'
 import { motion } from 'framer-motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
 import { Splash } from '@/components/layout/Splash'
@@ -320,7 +320,7 @@ export function InstructorLayout() {
     >
       <Shell
         nav={nav}
-        wide={isWideRoute(pathname)}
+        width={routeWidth(pathname)}
         badge={
           <span className="ml-1 rounded-lg bg-accent-solid/10 px-2 py-0.5 text-xs font-semibold text-accent">
             Instructor

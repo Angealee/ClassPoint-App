@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
-import { isWideRoute } from '@/lib/routes-shape'
+import { routeWidth } from '@/lib/routes-shape'
 import { SidebarAccount } from '@/components/layout/AccountMenu'
 import { MobileMenu } from '@/components/layout/MobileMenu'
 import { StudentDataProvider, useStudentData } from '@/features/student/StudentData'
@@ -167,7 +167,7 @@ function StudentShell() {
       <Shell
         nav={nav}
         tabNav={tabNav}
-        wide={isWideRoute(pathname)}
+        width={routeWidth(pathname)}
         actions={<NotificationBell />}
         accountSlot={
           isDesktop ? (

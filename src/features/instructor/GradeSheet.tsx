@@ -94,6 +94,7 @@ export function GradeSheet() {
   const [itemsOpen, setItemsOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [noteOpen, setNoteOpen] = useState(false)
 
   const [view, setView] = useState<GradeView>(() => {
     try {
@@ -409,7 +410,7 @@ export function GradeSheet() {
   }
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
+    <div className="flex min-w-0 flex-1 flex-col md:min-h-0">
       <PageHeader
         title={title}
         subtitle={section && subject ? subject.name : undefined}
@@ -448,46 +449,65 @@ export function GradeSheet() {
           onChange={(next) => navigate(`/teach/grades/${sectionId}/${subjectId}/${next}`)}
           options={TABS.map((t) => ({ value: t, label: TAB_LABEL[t] }))}
         />
-        {!isOverall && <SegmentedControl
-          label="Which figure"
-          value={view}
-          onChange={(next) => {
-            setView(next)
-            try {
-              localStorage.setItem(VIEW_KEY, next)
-            } catch {
-              // A blocked store costs the preference, never the screen.
-            }
-          }}
-          options={[
-            { value: 'soFar', label: 'So far' },
-            { value: 'official', label: 'Official' },
-          ]}
-        />}
+        {/* QUIET, not accent. Two filled strips side by side read as one
+            control with two active items — the term tabs own the red, because
+            they are the thing that changes what you are looking at. */}
+        {!isOverall && (
+          <SegmentedControl
+            label="Which figure"
+            tone="quiet"
+            size="sm"
+            value={view}
+            onChange={(next) => {
+              setView(next)
+              try {
+                localStorage.setItem(VIEW_KEY, next)
+              } catch {
+                // A blocked store costs the preference, never the screen.
+              }
+            }}
+            options={[
+              { value: 'soFar', label: 'So far' },
+              { value: 'official', label: 'Official' },
+            ]}
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => setNoteOpen((o) => !o)}
+          aria-expanded={noteOpen}
+          className="ml-auto text-xs text-muted underline-offset-2 hover:underline"
+        >
+          {noteOpen ? 'Hide' : 'What do these mean?'}
+        </button>
       </div>
 
-      <p className="mb-4 text-xs text-muted">
-        {isOverall ? (
-          <>
-            The <b className="text-ink">final computed grade</b> weighs the three terms against
-            each other. A term with no marks is never treated as a zero — the grade is withheld
-            and the missing term is named instead.
-          </>
-        ) : view === 'soFar' ? (
-          <>
-            <b className="text-ink">So far</b> counts only what you have marked, so two
-            students&rsquo; figures are not comparable with each other. An empty cell means
-            &ldquo;not marked yet&rdquo; — type <b className="text-ink">0</b> for a student who
-            scored nothing.
-          </>
-        ) : (
-          <>
-            <b className="text-ink">Official</b> counts every column, so anything unmarked
-            scores zero — this is the figure that matches your spreadsheet, and it only means
-            what it says once the term is fully entered.
-          </>
-        )}
-      </p>
+      {/* Collapsed by default: it is a two-line explanation you need once, on a
+          screen that wants every row it can get. */}
+      {noteOpen && (
+        <p className="mb-4 text-xs text-muted">
+          {isOverall ? (
+            <>
+              The <b className="text-ink">final computed grade</b> weighs the three terms
+              against each other. A term with no marks is never treated as a zero — the grade
+              is withheld and the missing term is named instead.
+            </>
+          ) : view === 'soFar' ? (
+            <>
+              <b className="text-ink">So far</b> counts only what you have marked, so two
+              students&rsquo; figures are not comparable with each other. A dash means nothing
+              is marked in that component yet; an empty cell means &ldquo;not marked
+              yet&rdquo; — type <b className="text-ink">0</b> for a student who scored nothing.
+            </>
+          ) : (
+            <>
+              <b className="text-ink">Official</b> counts every column, so anything unmarked
+              scores zero — this is the figure that matches your spreadsheet, and it only means
+              what it says once the term is fully entered.
+            </>
+          )}
+        </p>
+      )}
 
       {policyProblem && (
         <Card pad="tight" className="mb-4 border-warn bg-warn-solid/10 text-sm text-warn">

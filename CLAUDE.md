@@ -2803,6 +2803,45 @@ anyone, and students the sheet never mentions get their own warning block — th
 signal the wrong file was loaded. The final `ConfirmDialog` states columns created vs
 reused, marks written, **marks replaced**, rows skipped and students getting nothing.
 
+Grades — grid UI pass (2026-10-16, no migration), from the first real screenshot with the
+instructor's own roster in it. Decisions (user): **pin Term Grade right** · **quieten the
+view toggle** · **dash instead of the floor in So far** · **tighter rows, a divider before
+the computed columns, collapse the explanatory note**.
+
+⚠ **AN AUTO-LAYOUT COLUMN SIZES TO ITS HEADER, NOT ITS INPUT — `size={4}` only ever
+capped half of it.** A column named "Sample Recitation" grew to ~180px while its cells
+stayed at 88px, so a few long names shoved the term grade off the right edge. The `th` now
+carries `w-22 min-w-22 max-w-22` with `truncate` and the full name in `title`. Measured
+after: every item column 87px with that same name. **This is the second half of the
+`size={4}` lesson — cap BOTH the control and the header.**
+
+**Term Grade is `sticky right-0`.** The name column was already frozen left; the number the
+screen exists to produce was the one thing that scrolled away. Name on one edge, grade on
+the other, marks scrolling between them. Verified pinned under a 400px horizontal scroll.
+
+**Rows went 46px → 32px** (input `h-9` → `h-8`, cells `py-0`), which is **20 students
+visible instead of 13** at 900px tall. `text-base` is untouched — that is the iOS zoom rule,
+not a type choice, and shrinking the box does not shrink the text.
+
+**In the "So far" view a component with nothing marked renders "—", not 60.00.** The floor
+is correct and Official still shows it, but on a part-marked term it filled the screen with
+identical numbers. Display only; no arithmetic moved. ⚠ **The probe caught the half-fix:**
+every component showed a dash while **Class standing still read 60.00** beside them, because
+it has no null to fall back to. It now dashes when all three of its components are unmarked.
+
+**`SegmentedControl` gained `tone="quiet"` and `size="sm"`.** Two filled accent strips in
+one row read as a single control with two active items — exactly how the term tabs and the
+So far / Official toggle were being misread. Quiet keeps the shape and the radiogroup
+semantics and drops the fill, so red only ever marks which term you are in. **Additive: the
+default path emits the identical class set, so all ten existing callers are byte-identical.**
+
+Measured across widths, page overflow 0 at every one: scroller 697px at 1024, 969 at 1440,
+1209 at 1920 against a 1270px table. ⚠ **At 1920 the grid still scrolls ~60px while 384px
+of gutter sits empty on the left** — that is `Shell`'s `wide` contract (grow right only, so
+the sidebar never jumps), inherited from the chat room. Correct there and arguable here; it
+only bites in the narrow band where the table is slightly wider than the scroller, since a
+20-item term scrolls regardless. Left alone deliberately rather than forking the width rule.
+
 Verified end to end by probe (removed, residue-checked) against a deliberately awkward
 fixture — a reversed-order exact match, a name differing by one initial, two students
 sharing a name, one student absent from the sheet, and a TOTAL row. Result: 1 exact, 1

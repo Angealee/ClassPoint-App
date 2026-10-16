@@ -1,8 +1,12 @@
 import { memo, useCallback, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
-import { cn } from '@/lib/cn'
+import { Button } from '@/components/ui/Button'
+ import { EmptyState } from '@/components/ui/EmptyState'
+ import { TableIcon } from '@/components/ui/icons'
+ import { cn } from '@/lib/cn'
 import {
   cellKey,
   classStanding,
+  CS_COMPONENTS,
   componentScores,
   COMPONENT_LABEL,
   displayGrade,
@@ -17,7 +21,7 @@ import {
   parsePastedColumn,
   parseScoreInput,
 } from '@/lib/grade-entry'
-import type { GradeItem, GradePolicy, GradeView, RosterPerson } from '@/lib/types'
+import type { GradeComponent, GradeItem, GradePolicy, GradeView, RosterPerson } from '@/lib/types'
 
 /**
  * The spreadsheet: students down, score columns across.
@@ -56,6 +60,8 @@ interface GradeGridProps {
   onCommit: (edit: CellEdit, previous: number | null) => void
   /** A column pasted from Excel, applied in one go by the parent. */
   onPasteColumn: (itemId: string, startIndex: number, values: string[]) => void
+  /** Opens the Columns sheet from the empty state. */
+  onAddColumn?: () => void
 }
 
 export function GradeGrid({
@@ -67,6 +73,7 @@ export function GradeGrid({
   failed,
   onCommit,
   onPasteColumn,
+  onAddColumn,
 }: GradeGridProps) {
   const inputs = useRef(new Map<string, HTMLInputElement>())
 
@@ -101,9 +108,19 @@ export function GradeGrid({
 
   if (items.length === 0) {
     return (
-      <p className="px-1 py-6 text-sm text-muted">
-        No score columns yet. Add one to start entering marks.
-      </p>
+      <EmptyState
+        icon={<TableIcon className="h-6 w-6" />}
+        description="A column is one quiz, one activity or the exam — add the first and the roster appears underneath it."
+        action={
+          onAddColumn ? (
+            <Button size="sm" onClick={onAddColumn}>
+              Add a column
+            </Button>
+          ) : undefined
+        }
+      >
+        No score columns in this term yet.
+      </EmptyState>
     )
   }
 
@@ -117,13 +134,18 @@ export function GradeGrid({
     // and the column headers slid away after about twelve rows (measured at
     // -503px), so you could no longer tell which quiz you were typing into.
     //
-    // `max-h` is what bounds it. `flex-1` was tried first and does nothing:
-    // every height in the shell chain is a `min-h`, so the column grows to its
-    // content and the scroller never gets a ceiling (measured 1,539px tall and
-    // not scrolling). A viewport-relative cap needs no agreement with Shell's
-    // paddings — the trap CLAUDE.md records for `calc(100dvh - …)` layouts —
-    // and a grid shorter than the cap simply never scrolls.
-    <div className="-mx-1 max-h-[75dvh] overflow-auto overscroll-contain px-1 pb-2">
+    // `flex-1 min-h-0` NOW WORKS, and it did not before. The first attempt
+    // failed because every height in the Shell chain was a `min-h`, so the
+    // column grew to its content and this never got a ceiling (measured
+    // 1,539px tall and not scrolling); the fix then was a `max-h-[75dvh]` cap.
+    // `width="full"` pins the viewport height on desktop and passes `min-h-0`
+    // all the way down, so the grid can finally take exactly the room that is
+    // left instead of a guessed fraction of the window.
+    //
+    // `max-h-[75dvh]` survives as the MOBILE fallback, where the page still
+    // scrolls normally, and `min-h-64` means a broken chain can only ever make
+    // this short — never zero-height, which would look like a failed render.
+    <div className="-mx-1 min-h-64 max-h-[75dvh] overflow-auto overscroll-contain px-1 pb-2 md:max-h-none md:min-h-0 md:flex-1">
       <table className="w-max border-separate border-spacing-0 text-sm">
         <thead>
           <tr>
@@ -137,31 +159,46 @@ export function GradeGrid({
               <th
                 key={item.id}
                 scope="col"
-                className="sticky top-0 z-20 min-w-22 border-b border-line bg-card px-2 py-2 text-center font-semibold"
-                title={`${COMPONENT_LABEL[item.component]} · out of ${item.maxScore}`}
+                // ⚠ `max-w` IS LOAD-BEARING, and its absence was a real bug: an
+                // auto-layout column sizes to its widest content, and that is
+                // the HEADER, not the input. `size={4}` caps the cell at ~88px
+                // while a name like "Sample Recitation" pushed its column to
+                // ~180px, so a few long names shoved the term grade off screen.
+                // The cap plus `truncate` keeps every column the same width,
+                // and the full name stays in the title.
+                className="sticky top-0 z-20 w-22 min-w-22 max-w-22 border-b border-line bg-card px-2 py-1.5 text-center font-semibold"
+                title={`${item.name} · ${COMPONENT_LABEL[item.component]} · out of ${item.maxScore}`}
               >
                 <span className="block truncate">{item.name}</span>
                 <span className="block text-2xs font-normal text-muted">/{item.maxScore}</span>
               </th>
             ))}
-            {GRADE_COMPONENTS.map((c) => (
+            {GRADE_COMPONENTS.map((c, i) => (
               <th
                 key={c}
                 scope="col"
-                className="sticky top-0 z-20 min-w-20 border-b border-line bg-card-2 px-2 py-2 text-center text-2xs font-semibold text-muted"
+                className={cn(
+                  'sticky top-0 z-20 min-w-20 border-b border-line bg-card-2 px-2 py-1.5 text-center text-2xs font-semibold text-muted',
+                  // Where typing ends and arithmetic begins. Without it the two
+                  // halves blend and a derived column invites a click.
+                  i === 0 && 'border-l-2 border-l-line',
+                )}
               >
                 {COMPONENT_LABEL[c]}
               </th>
             ))}
             <th
               scope="col"
-              className="sticky top-0 z-20 min-w-20 border-b border-line bg-card-2 px-2 py-2 text-center text-2xs font-semibold text-muted"
+              className="sticky top-0 z-20 min-w-20 border-b border-line bg-card-2 px-2 py-1.5 text-center text-2xs font-semibold text-muted"
             >
               Class standing
             </th>
+            {/* Pinned to the right edge: the name says who a row is, this says
+                what it comes to, and the marks scroll between them. It is the
+                point of the screen and was the one column you could not see. */}
             <th
               scope="col"
-              className="sticky top-0 z-20 min-w-20 border-b border-line bg-card-2 px-2 py-2 text-center font-semibold"
+              className="sticky right-0 top-0 z-30 min-w-20 border-b border-l-2 border-line border-l-line bg-card-2 px-2 py-1.5 text-center font-semibold"
             >
               Term grade
             </th>
@@ -242,7 +279,23 @@ const GradeRow = memo(function GradeRow({
     for (const [itemId, v] of values) if (v !== null) marked.set(itemId, v)
     const sums = sumsFromScores(items, marked)
     const comps = componentScores(sums, policy, view)
-    return { comps, cs: classStanding(comps, policy), term: termGrade(sums, policy, view) }
+    // Which components have nothing marked for this student — the "So far"
+    // view renders a dash there instead of the floor.
+    const unmarked = {} as Record<GradeComponent, boolean>
+    for (const c of GRADE_COMPONENTS) {
+      unmarked[c] = view === 'soFar' && sums[c].sumMaxMarked <= 0
+    }
+    // Class standing follows its own components: with nothing marked in any of
+    // the three it would otherwise read 60.00 beside three dashes, which is the
+    // same floor the dashes exist to stop showing.
+    const csUnmarked = CS_COMPONENTS.every((c) => unmarked[c])
+    return {
+      comps,
+      unmarked,
+      csUnmarked,
+      cs: classStanding(comps, policy),
+      term: termGrade(sums, policy, view),
+    }
   }, [values, items, policy, view])
 
   function commit(item: GradeItem, el: HTMLInputElement) {
@@ -297,7 +350,7 @@ const GradeRow = memo(function GradeRow({
     <tr className="group">
       <th
         scope="row"
-        className="sticky left-0 z-10 max-w-52 truncate border-b border-line bg-card px-3 py-1 text-left font-normal group-hover:bg-card-2"
+        className="sticky left-0 z-10 max-w-52 truncate border-b border-line bg-card px-3 py-0 text-left font-normal group-hover:bg-card-2"
       >
         {student.fullName}
       </th>
@@ -336,7 +389,7 @@ const GradeRow = memo(function GradeRow({
               className={cn(
                 // text-base is not a style choice: below 16px iOS Safari zooms
                 // the viewport on focus and never zooms back.
-                'h-9 w-full bg-transparent px-2 text-center text-base tabular-nums outline-none',
+                'h-8 w-full bg-transparent px-2 text-center text-base tabular-nums outline-none',
                 'focus:bg-accent-solid/10 focus:ring-2 focus:ring-[var(--color-ring)]',
                 isBad && 'bg-danger-solid/10 text-danger',
                 !isBad && over && 'bg-warn-solid/10 text-warn',
@@ -347,18 +400,26 @@ const GradeRow = memo(function GradeRow({
         )
       })}
 
-      {GRADE_COMPONENTS.map((c) => (
+      {GRADE_COMPONENTS.map((c, i) => (
         <td
           key={c}
-          className="border-b border-line bg-card-2/50 px-2 py-1 text-center text-xs tabular-nums text-muted"
+          className={cn(
+            'border-b border-line bg-card-2/50 px-2 py-0 text-center text-xs tabular-nums text-muted',
+            i === 0 && 'border-l-2 border-l-line',
+          )}
         >
-          {displayGrade(figures.comps[c])}
+          {/* "So far" asks how a student is doing on what has been MARKED, and
+              for a component with nothing marked the honest answer is nothing
+              yet — not the 60.00 floor, which filled the screen with identical
+              numbers. Official still shows it, because there it really does
+              count. Display only: no arithmetic moves. */}
+          {figures.unmarked[c] ? <span className="text-muted/50">—</span> : displayGrade(figures.comps[c])}
         </td>
       ))}
-      <td className="border-b border-line bg-card-2/50 px-2 py-1 text-center text-xs tabular-nums text-muted">
-        {displayGrade(figures.cs)}
+      <td className="border-b border-line bg-card-2/50 px-2 py-0 text-center text-xs tabular-nums text-muted">
+        {figures.csUnmarked ? <span className="text-muted/50">—</span> : displayGrade(figures.cs)}
       </td>
-      <td className="border-b border-line bg-card-2/50 px-2 py-1 text-center font-display font-bold tabular-nums">
+      <td className="sticky right-0 z-10 border-b border-l-2 border-line border-l-line bg-card-2 px-2 py-0 text-center font-display font-bold tabular-nums group-hover:bg-card">
         {displayGrade(figures.term)}
       </td>
     </tr>
