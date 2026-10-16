@@ -315,3 +315,14 @@ export function orderedItems<T extends { component: GradeComponent; position: nu
 export function displayGrade(value: number | null): string {
   return value === null ? '—' : roundTo(value, 2).toFixed(2)
 }
+
+/**
+ * The key a score is held under while a grid is on screen.
+ *
+ * Lives here rather than beside the grid because the exporter needs the same
+ * map and a lib must not import from a feature — the same reason `fileName`
+ * moved out of a private scope in `attendance-io.ts`.
+ */
+export function cellKey(itemId: string, studentId: string): string {
+  return `${itemId}:${studentId}`
+}

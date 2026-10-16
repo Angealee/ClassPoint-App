@@ -1,6 +1,7 @@
 import { memo, useCallback, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
 import { cn } from '@/lib/cn'
 import {
+  cellKey,
   classStanding,
   componentScores,
   COMPONENT_LABEL,
@@ -40,10 +41,6 @@ export interface CellEdit {
   itemId: string
   studentId: string
   value: number | null
-}
-
-export function cellKey(itemId: string, studentId: string): string {
-  return `${itemId}:${studentId}`
 }
 
 interface GradeGridProps {

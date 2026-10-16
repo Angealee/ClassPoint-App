@@ -3,9 +3,9 @@ import { Rows } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { Meter } from '@/components/ui/Meter'
 import { cn } from '@/lib/cn'
-import { COMPONENT_LABEL, GRADE_COMPONENTS } from '@/lib/grading'
+import { cellKey, COMPONENT_LABEL, GRADE_COMPONENTS } from '@/lib/grading'
 import { formatScoreInput, isOverMax, parseScoreInput } from '@/lib/grade-entry'
-import { cellKey, type CellEdit } from './GradeGrid'
+import { type CellEdit } from './GradeGrid'
 import type { GradeItem, RosterPerson } from '@/lib/types'
 
 /**

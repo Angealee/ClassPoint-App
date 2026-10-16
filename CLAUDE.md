@@ -2634,6 +2634,117 @@ becoming 1000 on a quiz out of 20 is exactly what nobody catches by eye. A paste
 unmarked, and dropping those shifts every score below the gap up a row, silently assigning
 marks to the wrong people. Only the first column of a block paste is taken.
 
+Grades — Phase 3: weights and the final grade (no migration). Decisions (user, 2026-10-15):
+**a sheet from the subject card** · **summary + the biggest movers** · **percent entry with
+the CS/Exam pair auto-balanced** · **the Overall view ships in this phase**.
+
+**THE WEIGHTS EDITOR OPENS FROM THE LANDING, NOT FROM A GRADE SHEET, BECAUSE WEIGHTS ARE
+SUBJECT-WIDE.** A sheet is scoped to one section; editing weights from inside it would
+imply the change applied to that section alone, when it reaches every section taking the
+subject. The console card is the only place a subject appears without a section, so the
+scope on screen matches the scope being edited, and the confirm states the real count.
+
+**Weights are typed as percentages and stored as proportions.** The two-field splits
+(Class Standing / Exam) **balance each other** and therefore cannot be made invalid; the
+three-field ones show a running total and refuse to save until it reads 100%, because
+auto-balancing three fields means guessing which of the other two was meant. Verified by
+probe at 375px: typing 70 into Class Standing set Exam to 30; Quizzes at 40 made the chip
+read 115%, showed the error and left Save disabled.
+
+**`src/lib/grade-impact.ts` (+12 tests) computes the confirm's numbers from `grading.ts`
+itself** — a preview computed any other way would be a second opinion about the thing it is
+previewing. Two rules it exists to enforce. **`VISIBLE_DELTA` (0.005):** grades show to two
+decimals, so a smaller move is invisible, and floating point guarantees that re-saving the
+SAME weights yields deltas around 1e-15 — without the threshold the dialog would announce
+all forty grades moving every time, which trains the instructor to ignore the one time it
+is telling the truth. **A grade that APPEARS or VANISHES is counted apart from one that
+moves**, because averaging "null became 78" as a delta is meaningless and it is the loudest
+thing a weight change can do. The average is SIGNED, so one student up 4 and one down 4
+reads as a redistribution rather than a four-point inflation.
+
+⚠ **A test meant to nudge one weight harmlessly found a real behaviour and now pins it:**
+raising a single `final_weight` takes the three to 100.001%, and `grading.ts` refuses a
+misconfigured policy outright rather than renormalising — so every grade DISAPPEARS. The
+preview reports that loudly instead of as a rounding-sized move. Only a shift *between* two
+terms keeps the sum intact.
+
+**The transmutation sits behind a disclosure with a typed-name `ConfirmDialog` challenge.**
+It is a column rather than a constant so it *can* change, but changing it moves every grade
+the subject has ever produced — the one edit here that earns the same treatment as
+hard-delete-student.
+
+**The Overall view is the FOURTH TAB on the grade sheet, riding the same `:term` segment**
+(`/teach/grades/:section/:subject/overall`). One route serves all four views, so each stays
+a real deep link and `isWideRoute` can still decide the width from `pathname` alone. It
+reads the aggregate RPC, never raw cells — three terms of a section is ~2,400 score rows,
+past the 1000-row cap. **It is where the app finally refuses to lie:** a student with 100
+in Prelim and Finals and no Midterm reads **"No Midterm"**, not the 70.00 the spreadsheet
+computes — and 70 looks like a passing grade. A term weighted at 0% is deliberately not
+counted as missing. Verified by probe: 2 of 3 students graded, the third withheld and named.
+
+Grades — Phase 4: outputs (no migration). Decisions (user, 2026-10-16): **both export
+buttons** · **every item column plus the computed ones** · **the Overall sheet is the
+printed one** · **every item in the per-student breakdown**.
+
+**`src/lib/export-grades.ts` (+9 tests) obeys two rules, both inherited from mistakes this
+codebase already made.** **An unmarked cell is BLANK, never 0** — a spreadsheet 0 gets
+averaged as one, so writing zeros would destroy the blank-versus-zero distinction the whole
+feature rests on the moment anyone put `=AVERAGE()` under the column (the `export-peer.ts`
+rule for an unrated student). **Computed figures go out UNROUNDED** — the app shows two
+decimals, but a spreadsheet is where people re-check arithmetic, and Excel can format what
+it is given while it cannot recover precision thrown away. A withheld final is blank with
+the reason in its own **Note** column: a number there is the lie, and "No Midterm" in the
+grade column would put text where every downstream formula expects a number.
+"This term" downloads one sheet; "Whole subject" (on Overall) builds four — three terms
+plus Overall — and **re-fetches the other two terms rather than holding all three in
+memory**, since the screen only ever shows one and three terms is ~2,400 cells.
+
+**`fileName` is now EXPORTED from `attendance-io.ts` rather than copied.** It encodes a
+collision rule (two subjects of one section exported the same day used to overwrite each
+other), and this codebase has already merged the same rule back together four separate
+times after it was duplicated.
+
+**`cellKey` moved from `GradeGrid.tsx` into `grading.ts`** — the exporter needs the same
+map and **a lib must not import from a feature**. Same reasoning as `fileName`.
+
+**BOTH PRINT ROUTES ARE PORTRAIT, and the landscape matrix was dropped.** The sheet that
+actually gets signed and handed in is names × three terms × final — five columns, portrait,
+with a Note column and a signature block. The full item-by-item working lives on a
+student's own printout instead, where it belongs. Both sit outside `InstructorLayout` (the
+`StudentReport` precedent) and each loads the term calendar itself.
+
+⚠ **`useForcedLightTheme` is the decision that stopped a second copy of everything.**
+`StudentReport` carries its own namespaced light-only stylesheet so dark mode cannot leak
+onto paper — correct, but it means any component it prints must exist twice, once in tokens
+and once in literals. The theme is a single `dark` class on `documentElement`, so removing
+it for the life of the route gives every token its light value and **`StudentGradeBreakdown`
+is ONE component on the record page and on the printout**. It restores the class on
+unmount, or going Back from a printout would silently relight the whole app. Verified in
+the browser: dark on → removed while mounted → restored on leaving.
+
+**`listGradeScores` gained an optional `studentId`.** The breakdown wants ~120 cells;
+without the filter one record page pulled the whole class's marks for every item of every
+term — roughly 4,800 rows to render one person.
+
+⚠ **`isGradeGrid` now matches the four tab names, not a wildcard segment.**
+`/teach/grades/<section>/<subject>/print` is ALSO three segments and a wildcard matched it.
+Harmless in practice (the print route renders outside `Shell`, which never asks about
+width) — but a predicate that answers true for a URL it does not describe is how the next
+reader gets misled. Pinned by two more tests.
+
+The breakdown is **collapsed per subject on the record page and force-expanded in print**:
+it is the full working — every mark, every component's transmuted score, class standing,
+exam, term and final — which is what you want when a student asks, and too long to leave
+open on a record that already carries attendance, points and achievements.
+
+⚠ **A THIRD Browser-pane measurement artifact, beside the compositing and rAF ones above:
+a hidden or collapsed pane reports `clientWidth === 0`**, so every element reads as
+overflowing and `scrollWidth - clientWidth` looks like a catastrophic layout bug. It showed
+as 368px of phantom overflow on a page that measured 0 at 1280 and at 375. **Set an
+explicit viewport with `resize_window` before trusting any geometry.** Screenshots also
+time out outright while the window is hidden — read the DOM instead, which is the stronger
+check anyway.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained

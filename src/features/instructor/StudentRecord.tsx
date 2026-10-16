@@ -4,7 +4,7 @@ import { rateTone } from '@/lib/attendance'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
@@ -35,6 +35,7 @@ import { groupByWeek, termLabel, weekLabel } from '@/lib/term'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import { useInstructor } from './InstructorLayout'
+import { StudentGradeBreakdown } from './StudentGradeBreakdown'
 import { ResetPinSheet } from './ResetPinSheet'
 import type {
   AchievementState,
@@ -52,7 +53,7 @@ const shortDate = (iso: string) =>
 export function StudentRecord() {
   const { studentId = '' } = useParams()
   const navigate = useNavigate()
-  const { sections } = useInstructor()
+  const { sections, subjectsForSection } = useInstructor()
   const { toast } = useToast()
 
   const [student, setStudent] = useState<InstructorStudentDetail | null>(null)
@@ -343,6 +344,29 @@ export function StudentRecord() {
       {/* Global event check-ins (0055) — separate from class attendance above;
           self-fetching, renders nothing when this student has no events. */}
       <StudentEventHistory studentId={student.id} />
+
+      {/* Grades (0057). Collapsed per subject — this is the full working, which
+          is what you want when a student asks, and too long to leave open on a
+          record that already carries attendance, points and achievements. */}
+      <div>
+        <SectionLabel
+          action={
+            <Link
+              to={`/teach/student/${student.id}/grades/print`}
+              className="text-xs text-accent"
+            >
+              Print
+            </Link>
+          }
+        >
+          Grades
+        </SectionLabel>
+        <StudentGradeBreakdown
+          studentId={student.id}
+          sectionId={student.sectionId}
+          subjects={subjectsForSection(student.sectionId)}
+        />
+      </div>
 
       {/* Achievements */}
       {unlocked.length > 0 && (

@@ -240,7 +240,17 @@ export async function setGradeItemArchived(id: string, archived: boolean): Promi
  *
  * Ordered by the primary key, which is unique, so pages cannot skip or repeat.
  */
-export async function listGradeScores(itemIds: string[]): Promise<GradeScore[]> {
+export async function listGradeScores(
+  itemIds: string[],
+  /**
+   * Narrow to one student.
+   *
+   * The per-student breakdown wants ~120 cells; without this it would pull the
+   * whole class's marks for every item of every term — roughly 4,800 rows — to
+   * render one person's record.
+   */
+  studentId?: string,
+): Promise<GradeScore[]> {
   if (itemIds.length === 0) return []
 
   const out: GradeScore[] = []
@@ -250,15 +260,14 @@ export async function listGradeScores(itemIds: string[]): Promise<GradeScore[]> 
       item_id: string
       student_id: string
       score: number | string
-    }>((from, to) =>
-      supabase
+    }>((from, to) => {
+      let q = supabase
         .from('grade_scores')
         .select('item_id, student_id, score')
         .in('item_id', chunk)
-        .order('item_id')
-        .order('student_id')
-        .range(from, to),
-    )
+      if (studentId) q = q.eq('student_id', studentId)
+      return q.order('item_id').order('student_id').range(from, to)
+    })
     for (const r of rows) {
       out.push({ itemId: r.item_id, studentId: r.student_id, score: num(r.score) ?? 0 })
     }

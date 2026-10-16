@@ -117,6 +117,12 @@ const GradesConsole = lazy(() =>
 const GradeSheet = lazy(() =>
   import('@/features/instructor/GradeSheet').then((m) => ({ default: m.GradeSheet })),
 )
+const GradesPrint = lazy(() =>
+  import('@/features/instructor/GradesPrint').then((m) => ({ default: m.GradesPrint })),
+)
+const StudentGradesPrint = lazy(() =>
+  import('@/features/instructor/GradesPrint').then((m) => ({ default: m.StudentGradesPrint })),
+)
 const PeerConsole = lazy(() =>
   import('@/features/instructor/PeerConsole').then((m) => ({ default: m.PeerConsole })),
 )
@@ -237,6 +243,18 @@ export const router = createBrowserRouter([
       {
         path: 'student/:studentId/report',
         element: withSplash(<StudentReport />),
+        errorElement: <RouteError />,
+      },
+      // Both print routes sit OUTSIDE InstructorLayout — no Shell, no tabs —
+      // so each loads the term calendar itself (the StudentReport precedent).
+      {
+        path: 'grades/:sectionId/:subjectId/print',
+        element: withSplash(<GradesPrint />),
+        errorElement: <RouteError />,
+      },
+      {
+        path: 'student/:studentId/grades/print',
+        element: withSplash(<StudentGradesPrint />),
         errorElement: <RouteError />,
       },
     ],

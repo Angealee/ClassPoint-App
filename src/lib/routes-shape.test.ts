@@ -46,10 +46,21 @@ describe('isGradeGrid', () => {
     expect(isGradeGrid('/teach/grades/sec-1/sub-2/finals/extra')).toBe(false)
   })
 
-  it('does not match the print route', () => {
-    // Shell never renders there, so a true would be dead code that only
-    // confuses the next reader.
-    expect(isGradeGrid('/teach/grades/sec-1/sub-2/finals/print')).toBe(false)
+  it('matches the Overall tab too', () => {
+    // It rides the same :term segment so one route serves all four views.
+    expect(isGradeGrid('/teach/grades/sec-1/sub-2/overall')).toBe(true)
+  })
+
+  it('does NOT match the print route', () => {
+    // The real shape: /teach/grades/<section>/<subject>/print is ALSO three
+    // segments, so a wildcard matched it. Shell never renders there, so a true
+    // is dead code — and a predicate answering for a URL it does not describe
+    // is how the next reader gets misled.
+    expect(isGradeGrid('/teach/grades/sec-1/sub-2/print')).toBe(false)
+  })
+
+  it('does not match an unknown tab', () => {
+    expect(isGradeGrid('/teach/grades/sec-1/sub-2/summer')).toBe(false)
   })
 })
 

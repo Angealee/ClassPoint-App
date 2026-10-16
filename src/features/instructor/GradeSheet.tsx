@@ -14,16 +14,25 @@ import {
   listGradePolicies,
   listGradeScores,
   listRosterBasics,
+  getSectionGradeSums,
   saveGradeScores,
 } from '@/lib/api'
-import { defaultPolicy, orderedItems, policyError } from '@/lib/grading'
+import { cellKey, defaultPolicy, orderedItems, policyError } from '@/lib/grading'
 import { errorText } from '@/lib/errors'
 import { useIsDesktop } from '@/lib/useIsDesktop'
-import { GradeGrid, cellKey, type CellEdit } from './GradeGrid'
+import { GradeGrid, type CellEdit } from './GradeGrid'
+import { OverallTable } from './OverallTable'
 import { GradeItemEntry } from './GradeItemEntry'
 import { GradeItemsSheet } from './GradeItemsSheet'
 import { useInstructor } from './InstructorLayout'
-import type { GradeItem, GradePolicy, GradeView, RosterPerson, TermKey } from '@/lib/types'
+import type {
+  GradeItem,
+  GradePolicy,
+  GradeSumsRow,
+  GradeView,
+  RosterPerson,
+  TermKey,
+} from '@/lib/types'
 
 const TERMS: TermKey[] = ['prelim', 'midterm', 'finals']
 const TERM_LABEL: Record<TermKey, string> = {
@@ -37,8 +46,21 @@ const FLUSH_MS = 600
 
 const VIEW_KEY = 'cp_grade_view_v1'
 
-function isTerm(value: string | undefined): value is TermKey {
-  return value === 'prelim' || value === 'midterm' || value === 'finals'
+/**
+ * The fourth tab is not a term.
+ *
+ * `overall` rides the same `:term` segment so one route serves all four views —
+ * which keeps every one of them a real deep link, and keeps `isWideRoute` able
+ * to decide the width from `pathname` alone.
+ */
+type SheetTab = TermKey | 'overall'
+const TABS: SheetTab[] = [...TERMS, 'overall']
+const TAB_LABEL: Record<SheetTab, string> = { ...TERM_LABEL, overall: 'Overall' }
+
+function isTab(value: string | undefined): value is SheetTab {
+  return (
+    value === 'prelim' || value === 'midterm' || value === 'finals' || value === 'overall'
+  )
 }
 
 /**
@@ -55,16 +77,21 @@ export function GradeSheet() {
   const { toast } = useToast()
   const isDesktop = useIsDesktop()
 
-  const term: TermKey = isTerm(termParam) ? termParam : 'prelim'
+  const tab: SheetTab = isTab(termParam) ? termParam : 'prelim'
+  const isOverall = tab === 'overall'
+  const term: TermKey = isOverall ? 'prelim' : tab
   const section = sections.find((s) => s.id === sectionId)
   const subject = subjects.find((s) => s.id === subjectId)
 
   const [students, setStudents] = useState<RosterPerson[]>([])
   const [items, setItems] = useState<GradeItem[]>([])
   const [policy, setPolicy] = useState<GradePolicy | null>(null)
+  const [policies, setPolicies] = useState<GradePolicy[]>([])
+  const [overallRows, setOverallRows] = useState<GradeSumsRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [itemsOpen, setItemsOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const [view, setView] = useState<GradeView>(() => {
     try {
@@ -106,10 +133,20 @@ export function GradeSheet() {
     setLoading(true)
     setLoadError(null)
     try {
-      const [roster, itemRows, policies] = await Promise.all([
+      const policyRows = await listGradePolicies(subjectId)
+      setPolicies(policyRows)
+      setPolicy(policyRows.find((p) => p.term === term) ?? null)
+
+      if (isOverall) {
+        // The aggregate, never the raw cells: three terms of a section is
+        // ~2,400 score rows, past PostgREST's silent 1000-row cap.
+        setOverallRows(await getSectionGradeSums(sectionId, subjectId))
+        return
+      }
+
+      const [roster, itemRows] = await Promise.all([
         listRosterBasics(sectionId),
         listGradeItems(sectionId, subjectId, term),
-        listGradePolicies(subjectId),
       ])
       const live = itemRows.filter((i) => i.archivedAt === null)
       const scoreRows = await listGradeScores(live.map((i) => i.id))
@@ -120,7 +157,6 @@ export function GradeSheet() {
 
       setStudents(roster)
       setItems(itemRows)
-      setPolicy(policies.find((p) => p.term === term) ?? null)
       rebuild()
       pendingRef.current.clear()
       setDirty(0)
@@ -134,7 +170,7 @@ export function GradeSheet() {
     } finally {
       setLoading(false)
     }
-  }, [sectionId, subjectId, term, rebuild])
+  }, [sectionId, subjectId, term, isOverall, rebuild])
 
   useEffect(() => {
     void load()
@@ -279,6 +315,73 @@ export function GradeSheet() {
     [items],
   )
 
+  const effectivePolicy = policy ?? defaultPolicy(subjectId, term)
+
+  /**
+   * Download this term, or the whole subject from the Overall tab.
+   *
+   * The whole-subject path re-fetches the other two terms rather than holding
+   * all three in memory: the screen only ever shows one, and three terms of
+   * cells is ~2,400 rows that would otherwise be loaded to sit unused.
+   */
+  const onExport = useCallback(async () => {
+    if (!section || !subject) return
+    setExporting(true)
+    try {
+      const { exportSubjectGrades, exportTermGrades } = await import('@/lib/export-grades')
+
+      if (!isOverall) {
+        await exportTermGrades(
+          section.name,
+          subject.code,
+          term,
+          students,
+          liveItems,
+          grid.scores,
+          effectivePolicy,
+        )
+        return
+      }
+
+      const roster = students.length > 0 ? students : await listRosterBasics(sectionId)
+      const perTerm = await Promise.all(
+        TERMS.map(async (t) => {
+          const itemRows = (await listGradeItems(sectionId, subjectId, t)).filter(
+            (i) => i.archivedAt === null,
+          )
+          const scoreRows = await listGradeScores(itemRows.map((i) => i.id))
+          const map = new Map<string, number>()
+          for (const s of scoreRows) map.set(cellKey(s.itemId, s.studentId), s.score)
+          return {
+            term: t,
+            items: itemRows,
+            scores: map,
+            policy: policies.find((p) => p.term === t) ?? defaultPolicy(subjectId, t),
+          }
+        }),
+      )
+      await exportSubjectGrades(section.name, subject.code, roster, perTerm, overallRows, policies)
+    } catch (e) {
+      toast(errorText(e, 'Could not build that workbook.'), 'error')
+    } finally {
+      setExporting(false)
+    }
+  }, [
+    section,
+    subject,
+    isOverall,
+    term,
+    students,
+    liveItems,
+    grid.scores,
+    effectivePolicy,
+    sectionId,
+    subjectId,
+    policies,
+    overallRows,
+    toast,
+  ])
+
   const markedCounts = useMemo(() => {
     const m = new Map<string, number>()
     for (const key of grid.scores.keys()) {
@@ -290,7 +393,6 @@ export function GradeSheet() {
     // the Columns sheet always match what is on screen.
   }, [grid.scores])
 
-  const effectivePolicy = policy ?? defaultPolicy(subjectId, term)
   const policyProblem = policy === null ? null : policyError(policy)
 
   const title = section && subject ? `${subject.code} · ${section.name}` : 'Grades'
@@ -311,20 +413,35 @@ export function GradeSheet() {
         subtitle={section && subject ? subject.name : undefined}
         fallback="/teach/grades"
         actions={
-          <Button size="sm" variant="outline" onClick={() => setItemsOpen(true)}>
-            Columns
-          </Button>
+          <div className="flex items-center gap-2">
+            {isOverall ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate(`/teach/grades/${sectionId}/${subjectId}/print`)}
+              >
+                Print
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => setItemsOpen(true)}>
+                Columns
+              </Button>
+            )}
+            <Button size="sm" variant="outline" loading={exporting} onClick={() => void onExport()}>
+              Export
+            </Button>
+          </div>
         }
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <SegmentedControl
           label="Term"
-          value={term}
+          value={tab}
           onChange={(next) => navigate(`/teach/grades/${sectionId}/${subjectId}/${next}`)}
-          options={TERMS.map((t) => ({ value: t, label: TERM_LABEL[t] }))}
+          options={TABS.map((t) => ({ value: t, label: TAB_LABEL[t] }))}
         />
-        <SegmentedControl
+        {!isOverall && <SegmentedControl
           label="Which figure"
           value={view}
           onChange={(next) => {
@@ -339,11 +456,17 @@ export function GradeSheet() {
             { value: 'soFar', label: 'So far' },
             { value: 'official', label: 'Official' },
           ]}
-        />
+        />}
       </div>
 
       <p className="mb-4 text-xs text-muted">
-        {view === 'soFar' ? (
+        {isOverall ? (
+          <>
+            The <b className="text-ink">final computed grade</b> weighs the three terms against
+            each other. A term with no marks is never treated as a zero — the grade is withheld
+            and the missing term is named instead.
+          </>
+        ) : view === 'soFar' ? (
           <>
             <b className="text-ink">So far</b> counts only what you have marked, so two
             students&rsquo; figures are not comparable with each other. An empty cell means
@@ -371,6 +494,8 @@ export function GradeSheet() {
         <ErrorState onRetry={() => void load()} detail="Grades need migration 0057 applied.">
           {loadError}
         </ErrorState>
+      ) : isOverall ? (
+        <OverallTable rows={overallRows} policies={policies} />
       ) : students.length === 0 ? (
         <EmptyState>This section has no active students.</EmptyState>
       ) : isDesktop ? (

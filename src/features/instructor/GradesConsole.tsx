@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
@@ -9,7 +10,8 @@ import { listGradePolicies } from '@/lib/api'
 import { subjectPolicyError } from '@/lib/grading'
 import { errorText } from '@/lib/errors'
 import { useInstructor } from './InstructorLayout'
-import type { GradePolicy, TermKey } from '@/lib/types'
+import { WeightsSheet } from './WeightsSheet'
+import type { GradePolicy, Subject, TermKey } from '@/lib/types'
 
 const TERMS: TermKey[] = ['prelim', 'midterm', 'finals']
 const TERM_LABEL: Record<TermKey, string> = {
@@ -34,6 +36,7 @@ export function GradesConsole() {
   const [policies, setPolicies] = useState<Record<string, GradePolicy[]>>({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [weightsFor, setWeightsFor] = useState<Subject | null>(null)
 
   const load = useCallback(async () => {
     if (subjects.length === 0) {
@@ -109,6 +112,14 @@ export function GradesConsole() {
                       <p className="truncate text-xs text-muted">{subject.name}</p>
                     </div>
                     {problem && <Chip tone="warn">Check weights</Chip>}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setWeightsFor(subject)}
+                      className="shrink-0"
+                    >
+                      Weights
+                    </Button>
                   </div>
 
                   {problem && <p className="text-xs text-warn">{problem}</p>}
@@ -129,6 +140,21 @@ export function GradesConsole() {
             })}
           </div>
         ))
+      )}
+
+      {weightsFor && (
+        <WeightsSheet
+          open
+          onClose={() => setWeightsFor(null)}
+          subject={weightsFor}
+          policies={policies[weightsFor.id] ?? []}
+          // Every section taking this subject — the real reach of the change,
+          // and what the confirm counts.
+          sectionIds={sections
+            .filter((s) => subjectsForSection(s.id).some((x) => x.id === weightsFor.id))
+            .map((s) => s.id)}
+          onSaved={() => void load()}
+        />
       )}
     </div>
   )

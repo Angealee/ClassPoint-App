@@ -28,7 +28,12 @@ export function isChatRoom(pathname: string): boolean {
  * split as the chat room and its room list.
  */
 export function isGradeGrid(pathname: string): boolean {
-  return /^\/teach\/grades\/[^/]+\/[^/]+\/[^/]+$/.test(pathname)
+  // The four tab values, NOT a wildcard segment. `…/<section>/<subject>/print`
+  // is also three segments, and a wildcard matched it — harmless in practice,
+  // since the print route renders outside `Shell` and never asks about width,
+  // but a predicate that answers true for a URL it does not describe is how
+  // the next reader gets misled.
+  return /^\/teach\/grades\/[^/]+\/[^/]+\/(prelim|midterm|finals|overall)$/.test(pathname)
 }
 
 /**
