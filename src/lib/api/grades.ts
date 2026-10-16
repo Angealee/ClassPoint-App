@@ -389,3 +389,70 @@ export async function getSectionGradeSums(
   })
   return (rows ?? []).map(mapSums)
 }
+
+// ----------------------------------------------------------------------------
+// Import (migration 0058)
+// ----------------------------------------------------------------------------
+
+export interface GradeImportColumn {
+  component: GradeItem['component']
+  name: string
+  maxScore: number
+}
+
+export interface GradeImportMark {
+  component: GradeItem['component']
+  studentId: string
+  score: number
+}
+
+export interface GradeImportResult {
+  itemsCreated: number
+  scoresWritten: number
+  scoresOverwritten: number
+}
+
+/**
+ * Write a whole term from a spreadsheet, in ONE transaction.
+ *
+ * All of it lands or none of it does — an import is four columns and ~160
+ * marks, and a half-written one leaves real columns with some marks in them
+ * and nothing on screen saying which half is missing. The RPC also refuses a
+ * mark for a student outside the section, which aborts the whole run rather
+ * than quietly attaching one mark to a stranger.
+ *
+ * Marks that are NOT sent stay unmarked. Null is never sent as 0.
+ */
+export async function importGradeTerm(
+  sectionId: string,
+  subjectId: string,
+  term: TermKey,
+  columns: GradeImportColumn[],
+  marks: GradeImportMark[],
+): Promise<GradeImportResult> {
+  const data = await rpc<{
+    items_created: number
+    scores_written: number
+    scores_overwritten: number
+  }>('import_grade_term', {
+    p_section_id: sectionId,
+    p_subject_id: subjectId,
+    p_term: term,
+    p_components: columns.map((c) => ({
+      component: c.component,
+      name: c.name,
+      max_score: c.maxScore,
+    })),
+    p_scores: marks.map((m) => ({
+      component: m.component,
+      student_id: m.studentId,
+      score: m.score,
+    })),
+  })
+
+  return {
+    itemsCreated: num(data?.items_created) ?? 0,
+    scoresWritten: num(data?.scores_written) ?? 0,
+    scoresOverwritten: num(data?.scores_overwritten) ?? 0,
+  }
+}

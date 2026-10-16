@@ -24,6 +24,7 @@ import { GradeGrid, type CellEdit } from './GradeGrid'
 import { OverallTable } from './OverallTable'
 import { GradeItemEntry } from './GradeItemEntry'
 import { GradeItemsSheet } from './GradeItemsSheet'
+import { GradeImportSheet } from './GradeImportSheet'
 import { useInstructor } from './InstructorLayout'
 import type {
   GradeItem,
@@ -92,6 +93,7 @@ export function GradeSheet() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [itemsOpen, setItemsOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   const [view, setView] = useState<GradeView>(() => {
     try {
@@ -423,9 +425,14 @@ export function GradeSheet() {
                 Print
               </Button>
             ) : (
-              <Button size="sm" variant="outline" onClick={() => setItemsOpen(true)}>
-                Columns
-              </Button>
+              <>
+                <Button size="sm" variant="outline" onClick={() => setItemsOpen(true)}>
+                  Columns
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+                  Import
+                </Button>
+              </>
             )}
             <Button size="sm" variant="outline" loading={exporting} onClick={() => void onExport()}>
               Export
@@ -553,6 +560,20 @@ export function GradeSheet() {
             )}
           </Card>
         </StickyBar>
+      )}
+
+      {section && subject && (
+        <GradeImportSheet
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          sectionId={sectionId}
+          subjectId={subjectId}
+          sectionName={section.name}
+          subjectCode={subject.code}
+          term={term}
+          students={students}
+          onImported={() => void load()}
+        />
       )}
 
       <GradeItemsSheet

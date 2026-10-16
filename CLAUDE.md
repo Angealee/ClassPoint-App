@@ -191,13 +191,19 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   insert, and the guard early-returns when it sees the flag. `cp_recompute_points` is NOT
   touched. Until 0056 lands, every event scan that awards >0 points fails with that guard
   error and records no check-in; a 0-point event works (no ledger row, no recompute).
+  **0058 is WRITTEN AND NOT YET APPLIED** — the grade importer's transactional
+  write. It MUST go after 0057 (it writes `grade_items` and `grade_scores`, and
+  relies on 0057's section guard to abort a mis-matched import). Until it lands,
+  the Import button opens and every stage works up to the final confirm, which
+  then fails with a readable error and writes nothing — which is also what the
+  whole function is designed to guarantee.
   **0057 is WRITTEN AND NOT YET APPLIED** — grades. It depends on nothing after
   0027 (semesters/subjects/sections) and takes `cp_nightly_backup` from 0052, so
   0052 must not be edited. Until it lands, `src/lib/grading.ts` and its 31 tests
   are fully exercised (they are pure), but every call in `api/grades.ts` 400s —
   so every grades fetch gets its OWN try/catch and `ErrorState` (the 0034
   SectionGrid precedent), and nothing else in the instructor area is affected.
-  **Next number: 0058.**
+  **Next number: 0059.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -2744,6 +2750,66 @@ as 368px of phantom overflow on a page that measured 0 at 1280 and at 375. **Set
 explicit viewport with `resize_window` before trusting any geometry.** Screenshots also
 time out outright while the window is hidden — read the DOM instead, which is the stronger
 check anyway.
+
+Since 0058 (Grades — Phase 5: the importer). Decisions (user, 2026-10-16): **one
+transactional RPC** · **a full-screen sheet from the term tab** · **one term per run** ·
+**overwrite, with the count stated up front**.
+
+**`import_grade_term()` IS ONE TRANSACTION, AND THAT IS WHY IT IS A FUNCTION.** An import
+is four column inserts and ~160 marks; from the client that is five round trips with no
+transaction around them, so a dropped connection leaves two components imported and two
+not — real columns, real marks, no way to tell from the screen which half is missing. The
+`apply_peer_group_plan` (0054) reasoning exactly. 0057's section guard still fires per row,
+so **a mis-matched name pointing at a student in another section aborts the whole import**
+rather than quietly attaching one mark to a stranger. A re-import finds the same column by
+name and overwrites rather than stacking a second one beside it. **It never creates a
+student** — inventing a roster row from a spreadsheet cell is how a typo becomes a person.
+
+**IMPORTED TERMS GET ONE COLUMN PER COMPONENT** (`"Quizzes (imported)"`), holding each
+student's row total. The source sheet records a total per component and never a maximum per
+quiz, so per-item detail cannot be recovered without inventing it — decision 15 from the
+planning round, now enforced by the RPC's shape.
+
+**`src/lib/grade-match.ts` (+16 tests) is the riskiest code in the feature.** Everything
+else fails loudly; a mis-matched name writes a class's marks onto the wrong person with
+nothing looking broken. The idea doing most of the work: **compare a SORTED TOKEN SET, not
+a string** — "Dela Cruz, Juan" and "Juan Dela Cruz" are the same set, which removes the
+whole "Last, First" problem with no special case. Particles are joined (`de la cruz` →
+`delacruz`, the most likely real mismatch in this roster), accents folded, suffixes
+dropped. **An initial is never treated as noise:** dropping it downgrades a match to FUZZY
+and a collision to AMBIGUOUS, because "Juan P." and "Juan R." are two people and that
+letter is the only thing telling them apart. **Nothing is ever auto-resolved** —
+`students.full_name` has no unique constraint and two real people can share one.
+`missingFromSheet` counts only EXACT matches as covered: a fuzzy row may still be rejected,
+so the student stays on the list that exists to catch someone being left ungraded.
+
+**`src/lib/grades-io.ts` (+12 tests) detects the layout, and everything it finds is a
+SUGGESTION.** Ranges come from the merged group headers, totals from the totals row; one
+inserted column shifts all of it, so the importer shows each range beside the real header
+text and the first student's actual cells, and writes nothing until a person confirms.
+⚠ **Detection order is load-bearing and the first attempt had it backwards.** Finding the
+body first and the name column second reads naturally — but the instructor's totals row
+carries **"FULL NAME"** in the name column, which is text beside numbers, the exact shape
+of a student row. It was read as the first student and every range shifted a row with it.
+The name column is now found across the whole sheet and the body starts at the first row
+whose name is an actual name (`isLikelyHeading`, shared with the matcher). A component
+whose cells are all blank yields **null, not 0** — importing zeros would record marks
+nobody gave, which the official grade then counts.
+
+**Three stages, and the middle one cannot be skipped.** Confirm the structure → review the
+names → confirm the counts. **Only EXACT matches are pre-ticked**; ambiguous rows offer
+every candidate and choose none, fuzzy rows sit at Skip, an unmatched row cannot create
+anyone, and students the sheet never mentions get their own warning block — the strongest
+signal the wrong file was loaded. The final `ConfirmDialog` states columns created vs
+reused, marks written, **marks replaced**, rows skipped and students getting nothing.
+
+Verified end to end by probe (removed, residue-checked) against a deliberately awkward
+fixture — a reversed-order exact match, a name differing by one initial, two students
+sharing a name, one student absent from the sheet, and a TOTAL row. Result: 1 exact, 1
+fuzzy, 1 ambiguous, 1 unmatched, 1 heading ignored, "4 students get nothing", and **only
+the exact row pre-selected**. Editing a range in the form updated the detected chips
+correctly. ⚠ **A CSV carries no merges**, so range detection falls back to single columns
+there — which is the suggestion-then-confirm design working, not a bug.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
