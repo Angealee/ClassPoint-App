@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthShell } from './AuthShell'
+import { ClaimDoor } from '@/components/auth/ClaimDoor'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { TicketIcon } from '@/components/ui/icons'
 import { useAuth } from '@/lib/auth'
 import { formatCountdown, useLockout } from '@/lib/useLockout'
 
@@ -36,32 +36,12 @@ export function SignIn() {
 
   return (
     <AuthShell
-      title="Sign in"
-      subtitle="Enter your username and PIN to see your points."
-      footer={
-        <>
-          First time?{' '}
-          <Link to="/claim" className="font-semibold text-accent hover:underline">
-            Claim your account
-          </Link>
-        </>
-      }
+      title="Welcome back"
+      subtitle="Sign in to pick up your points, streak and rank."
+      // The claim stub is the ONLY route to /claim on this screen, and it is
+      // deliberately not repeated in the footer — see ClaimDoor's own note.
+      below={<ClaimDoor />}
     >
-      <Link
-        to="/claim"
-        className="mb-4 flex items-center gap-3 rounded-xl border border-accent-solid/30 bg-accent-solid/5 p-3 text-left transition-colors hover:bg-accent-solid/10"
-      >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-solid/10 text-accent">
-          <TicketIcon className="h-5 w-5" />
-        </span>
-        <span className="min-w-0">
-          <span className="block text-sm font-semibold">First time? Have a token?</span>
-          <span className="block text-xs text-muted">
-            Claim your account to set your username &amp; PIN.
-          </span>
-        </span>
-      </Link>
-
       <form onSubmit={onSubmit} className="space-y-4">
         <Input
           label="Username"

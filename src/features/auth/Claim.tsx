@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { AuthShell } from './AuthShell'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { SectionLabel } from '@/components/ui/SectionLabel'
+import { TicketIcon } from '@/components/ui/icons'
 import { USERNAME_RE, useAuth } from '@/lib/auth'
 import { formatCountdown, useLockout } from '@/lib/useLockout'
 
@@ -61,7 +63,8 @@ export function Claim() {
   return (
     <AuthShell
       title="Claim your account"
-      subtitle="Use your one-time token to set up your login."
+      subtitle="One token, once. Then you pick the username and PIN you keep."
+      icon={<TicketIcon className="h-6 w-6" />}
       footer={
         <>
           Already set up?{' '}
@@ -71,54 +74,77 @@ export function Claim() {
         </>
       }
     >
-      <form onSubmit={onSubmit} className="space-y-4">
-        <Input
-          label="Token"
-          value={token}
-          onChange={(e) => setToken(e.target.value.toUpperCase())}
-          autoCapitalize="characters"
-          autoCorrect="off"
-          spellCheck={false}
-          placeholder="e.g. 9F3A1C7B2D8E406A"
-          disabled={disabled}
-          required
-        />
-        <Input
-          label="Choose a username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          hint="This is how you'll log in. Lowercase, no spaces."
-          placeholder="e.g. juan_dc"
-          required
-        />
-        <Input
-          label="Display name (optional)"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          hint="Shown on the leaderboard. Leave blank to use your full name."
-          placeholder="e.g. Juan D."
-        />
-        <Input
-          label="PIN"
-          type="password"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          autoComplete="new-password"
-          hint="At least 6 characters."
-          required
-        />
-        <Input
-          label="Confirm PIN"
-          type="password"
-          value={pin2}
-          onChange={(e) => setPin2(e.target.value)}
-          autoComplete="new-password"
-          required
-          error={error}
-        />
+      {/* Six stacked fields read as a wall, and they are not one job: the token
+          is something you were HANDED, the rest is something you CHOOSE. The
+          two groups say that, so nobody hunts for which box the token goes in. */}
+      <form onSubmit={onSubmit} className="space-y-6">
+        <section>
+          <SectionLabel>1 · From your instructor</SectionLabel>
+          <Input
+            label="Token"
+            value={token}
+            onChange={(e) => setToken(e.target.value.toUpperCase())}
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            hint="One-time. It stops working the moment this account exists."
+            placeholder="e.g. 9F3A1C7B2D8E406A"
+            disabled={disabled}
+            required
+          />
+        </section>
+
+        <section className="space-y-4 border-t border-line pt-5">
+          <SectionLabel className="mb-0">2 · The login you keep</SectionLabel>
+          <Input
+            label="Choose a username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            hint="This is how you'll log in. Lowercase, no spaces."
+            placeholder="e.g. juan_dc"
+            disabled={disabled}
+            required
+          />
+          <Input
+            label="Display name (optional)"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            hint="Shown on the leaderboard. Leave blank to use your full name."
+            placeholder="e.g. Juan D."
+            disabled={disabled}
+          />
+          <Input
+            label="PIN"
+            type="password"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            autoComplete="new-password"
+            hint="At least 6 characters."
+            disabled={disabled}
+            required
+          />
+          <Input
+            label="Confirm PIN"
+            type="password"
+            value={pin2}
+            onChange={(e) => setPin2(e.target.value)}
+            autoComplete="new-password"
+            disabled={disabled}
+            required
+          />
+        </section>
+
+        {/* The error used to render under "Confirm PIN" whatever it was about,
+            so "Enter the token your instructor gave you." appeared at the far
+            end of the form from the token box. It gets its own block now. */}
+        {error && (
+          <p role="alert" className="rounded-xl bg-danger-solid/10 px-3 py-2 text-sm text-danger">
+            {error}
+          </p>
+        )}
         {lock.locked && (
           <p className="rounded-xl bg-danger-solid/10 px-3 py-2 text-sm text-danger">
             Too many attempts. Try again in {formatCountdown(lock.remainingMs)}.
