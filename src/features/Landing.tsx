@@ -237,7 +237,7 @@ function LandingPage() {
                   <button
                     type="button"
                     onClick={() => navigate('/claim')}
-                    className="rounded-lg px-1 py-1 text-sm text-muted transition-colors hover:text-ink"
+                    className="cp-tap-y rounded-lg px-1 py-1 text-sm text-muted transition-colors hover:text-ink"
                   >
                     First time here?{' '}
                     <span className="font-semibold text-accent">Claim your account</span>
@@ -263,7 +263,7 @@ function LandingPage() {
           <div className="relative flex shrink-0 justify-center pb-6">
             <a
               href="#how"
-              className="flex flex-col items-center gap-1 rounded-lg px-3 py-1 text-2xs font-semibold uppercase tracking-widest text-muted transition-colors hover:text-ink"
+              className="cp-tap-y flex flex-col items-center gap-1 rounded-lg px-3 py-1 text-2xs font-semibold uppercase tracking-widest text-muted transition-colors hover:text-ink"
             >
               How it works
               <ChevronDownIcon className="cp-bob h-4 w-4" />
@@ -397,7 +397,7 @@ s
             transition={spring}
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             aria-label="Back to top"
-            className="fixed bottom-5 right-5 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-card text-muted shadow-lg transition-colors hover:text-ink"
+            className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-5 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-card text-muted shadow-lg transition-colors hover:text-ink"
           >
             <ChevronDownIcon className="h-5 w-5 rotate-180" />
           </motion.button>

@@ -149,7 +149,7 @@ export function StudentReport() {
           display: flex; justify-content: space-between; gap: 8px;
           padding: 12px 16px; max-width: 800px; margin: 0 auto;
         }
-        .report-btn { height: 40px; padding: 0 20px; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; }
+        .report-btn { height: 44px; padding: 0 20px; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; }
         .report-btn-primary { background: #e11d2a; color: #fff; }
         .report-btn-ghost { background: transparent; color: #333; border: 1px solid #ccc; }
         .report-page {
@@ -158,13 +158,22 @@ export function StudentReport() {
         }
         .report-page h1 { font-size: 22px; font-weight: 800; margin: 0; }
         .report-muted { color: #555; }
-        .report-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        /* A phone cannot scroll a plain table, so it squeezes instead — measured on
+           the grade sheet at 375px: 9px of page overflow and 103px rows. The
+           wrapper scrolls on screen and is released for print, where there is no
+           viewport and a scroller would clip the sheet to one screenful. */
+        .report-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+        .report-table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 12px; }
         .report-table th, .report-table td { border: 1px solid #ddd; padding: 5px 8px; text-align: left; }
         .report-table th { background: #f4f4f5; font-weight: 600; }
         .report-week { break-inside: avoid; margin-top: 14px; }
         .report-week h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #666; margin: 0 0 4px; }
         @media print {
           .report-toolbar { display: none !important; }
+          /* Released for paper: there is no viewport to scroll, so a scroller
+             here would print one screenful and silently drop the rest. */
+          .report-scroll { overflow: visible !important; }
+          .report-table { min-width: 0 !important; }
           .report-page { max-width: none; margin: 0; padding: 0; }
           thead { display: table-header-group; }
           @page { size: A4; margin: 14mm; }
@@ -228,7 +237,8 @@ export function StudentReport() {
                 {w.term ? `${termLabel(w.term)} · ` : ''}
                 {weekLabel(w.week)}
               </h3>
-              <table className="report-table">
+              <div className="report-scroll">
+                <table className="report-table">
                 <thead>
                   <tr>
                     <th style={{ width: 90 }}>Date</th>
@@ -253,7 +263,8 @@ export function StudentReport() {
                       </tr>
                     ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           ))
         )}

@@ -58,7 +58,7 @@ export function SegmentedControl<T extends string>({
             aria-checked={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              'rounded-xl font-semibold transition-colors',
+              'cp-tap-y rounded-xl font-semibold transition-colors',
               size === 'sm' ? 'h-8 px-3 text-xs' : 'h-10 text-sm',
               quiet
                 ? active

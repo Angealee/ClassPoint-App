@@ -614,7 +614,7 @@ function RestRow({
                 }
               />
             )}
-            <span className="truncate">
+            <span className="min-w-0 truncate">
               {sectionLabel}
               {sectionLabel ? ' · ' : ''}
               {spend

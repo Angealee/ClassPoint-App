@@ -2,6 +2,7 @@ import { memo, useCallback, useMemo, useRef, useState, type ClipboardEvent, type
 import { Button } from '@/components/ui/Button'
  import { EmptyState } from '@/components/ui/EmptyState'
  import { TableIcon } from '@/components/ui/icons'
+ import { TableScroller } from '@/components/ui/TableScroller'
  import { cn } from '@/lib/cn'
 import {
   cellKey,
@@ -145,7 +146,7 @@ export function GradeGrid({
     // `max-h-[75dvh]` survives as the MOBILE fallback, where the page still
     // scrolls normally, and `min-h-64` means a broken chain can only ever make
     // this short — never zero-height, which would look like a failed render.
-    <div className="-mx-1 min-h-64 max-h-[75dvh] overflow-auto overscroll-contain px-1 pb-2 md:max-h-none md:min-h-0 md:flex-1">
+    <TableScroller fill className="pb-2">
       <table className="w-max border-separate border-spacing-0 text-sm">
         <thead>
           <tr>
@@ -224,7 +225,7 @@ export function GradeGrid({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableScroller>
   )
 }
 

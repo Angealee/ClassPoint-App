@@ -88,7 +88,9 @@ export function PrintChrome({
           padding: 12px 16px; border-bottom: 1px solid #e5e5e5;
         }
         .gp-btn {
-          height: 40px; padding: 0 20px; border-radius: 10px;
+          /* 44px, not 40: these are real buttons pressed with a thumb, and 44
+             is the floor Apple and Google both publish. */
+          height: 44px; padding: 0 20px; border-radius: 10px;
           font-size: 14px; font-weight: 500; cursor: pointer; border: none;
         }
         .gp-btn-primary { background: #e11d2a; color: #fff; }
@@ -99,7 +101,12 @@ export function PrintChrome({
         .gp-muted { color: #555; margin: 2px 0 0; font-size: 13px; }
         .gp-stamp { font-size: 12px; }
         .gp-error { color: #9f1239; font-weight: 600; }
-        .gp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        /* A phone cannot scroll a plain table, so it squeezes instead: measured at
+           375px the sheet overflowed by 9px and every row stood 103px tall. The
+           wrapper scrolls on screen and is released for print, where there is no
+           viewport and a scroller would clip the sheet to one screenful. */
+        .gp-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+        .gp-table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 12px; }
         .gp-table th, .gp-table td {
           border: 1px solid #ddd; padding: 6px 8px; text-align: center;
         }
@@ -116,6 +123,10 @@ export function PrintChrome({
 
         @media print {
           .gp-toolbar { display: none !important; }
+          /* Released for paper: there is no viewport to scroll, so a scroller
+             here would print one screenful and silently drop the rest. */
+          .gp-scroll { overflow: visible !important; }
+          .gp-table { min-width: 0 !important; }
           .gp-page { max-width: none; padding: 0; }
           /* Repeat the header on every page — a second sheet of unlabelled
              numbers is unreadable. */

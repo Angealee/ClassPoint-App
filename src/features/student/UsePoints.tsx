@@ -357,7 +357,7 @@ export function UsePoints() {
                 type="button"
                 onClick={() => setKind(k.value)}
                 className={cn(
-                  'h-9 rounded-lg text-sm font-semibold transition-colors',
+                  'cp-tap-y h-9 rounded-lg text-sm font-semibold transition-colors',
                   kind === k.value
                     ? 'bg-accent-solid text-white'
                     : 'bg-card-2 text-muted hover:text-ink',

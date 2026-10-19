@@ -2850,6 +2850,143 @@ the exact row pre-selected**. Editing a range in the form updated the detected c
 correctly. ⚠ **A CSV carries no merges**, so range detection falls back to single columns
 there — which is the suggestion-then-confirm design working, not a bug.
 
+Mobile responsiveness pass (2026-10-19, no migration). The user asked for the whole
+app, not one screen: **cards, components, text and containers**. Four real defects,
+all of them invisible on screen and only findable by measuring.
+
+**`components/ui/TableScroller.tsx` exists because the print routes shipped tables with
+no scroller at all.** A phone cannot scroll a plain `<table>`, so it SQUEEZES instead:
+measured on the class grade sheet at 375px, 9px of page overflow and rows **103px** tall,
+each name wrapped into a column of single words. The grid already had the right wrapper
+inline, so this is the fourth-copy rule applied one copy early — `GradeGrid`,
+`OverallTable`, `GradesPrint` and `StudentReport` now share it (the last two through
+`.gp-scroll` / `.report-scroll`, since they are namespaced literal-CSS islands and must
+stay token-free). `fill` is the grid variant that takes the viewport height;
+`print="release"` drops the cap, and **both print stylesheets release `overflow` and
+`min-width` inside `@media print`** — on paper there is no viewport to scroll, so a live
+scroller would print one screenful and silently drop the rest of the class. Measured
+after: 0 page overflow, rows 49px.
+
+⚠ **`truncate` DOES NOTHING WITHOUT A WIDTH CONSTRAINT, AND WHICH CONSTRAINT DEPENDS ON
+THE PARENT.** `Stat` carried `truncate` on its label and the label still rendered **422px
+wide, running 153px off the left edge of the screen** — nothing looked broken only
+because `body { overflow-x: clip }` cropped it without a scrollbar. The parent already
+had `min-w-0`, which is why it read as correct. Three shapes, three fixes:
+- **A child of `items-center` (or any shrink-to-fit flex child) → `max-w-full`.** It is
+  sized to its CONTENT and is never asked to shrink, so `min-w-0` has nothing to permit.
+  This was `Stat` (Dashboard strip, profile tiles, StudentRecord) and `RoomRail`’s
+  64px rail buttons.
+- **A compressed child of a flex ROW → `min-w-0`.** `PodiumBoard`’s section-and-level
+  line, where a long section name plus "· Lv 12" escaped the podium card.
+- **A grid item → `min-w-0`.** Grid items default to `min-width: auto` and refuse to
+  shrink below content. `ScaleRow`’s two-column Yes/No buttons.
+A `truncate` on a BLOCK element (`<p>`, `<h2>`) is fine — it fills its parent — which is
+why ~40 such sites are correct and only these four were not. **Grep is not enough here:
+the broken and working cases look identical in source.** Measure with
+`getBoundingClientRect` against `clientWidth`.
+
+**`overflow-wrap: break-word` is now a global backstop on `body`.** The default is
+`normal`, which breaks at spaces only: measured at 375px, a 90-character unbreakable
+token in an ordinary `<p>` inside a `Card` overflowed that card by **444px** and took
+the document 406px past the viewport. Only 14 call sites (lounge posts, chat messages,
+reports) carried `break-words` of their own, so every instructor-typed item name, error
+message and free-text field was unprotected. `break-word`, NOT `anywhere`: it breaks a
+word only when that word would otherwise overflow, so nothing that fits is re-wrapped.
+**It cannot disturb `truncate`** — that is `white-space: nowrap`, and wrapping rules
+never apply to a line that does not wrap (verified: all 14 truncating elements still
+compute `nowrap` + `ellipsis`). The per-site `[overflow-wrap:anywhere]` on chat links
+stays, because a URL must break mid-token. Same discipline as the `overflow-x: clip`
+rule above it: **the backstop, not the fix — a string that needs breaking usually wanted
+`truncate`.** Verified it does not move the grade tables: at 1440 the Overall table is
+1292px in a 1320px scroller with 36px rows (no cell wrapped to two lines); at 375 it is
+536px inside a 351px scroller that absorbs it, page overflow 0.
+
+**Tap targets on the two print toolbars were 40px**, under the 44 Apple and Google both
+publish — and these are the buttons pressed hardest, since the whole point of the route
+is to hit Print. `.gp-btn` and `.report-btn` are 44px now. `Landing`’s back-to-top
+button was at a flat `bottom-5`, which puts it under the home-gesture bar on a notched
+phone; it is `bottom-[max(1.25rem,env(safe-area-inset-bottom))]`.
+
+**Measured clean and deliberately left alone:** `StudentRecord`’s 4-up `Stat` row beside
+a 56px avatar (labels need 49px in a 57px cell — it fits, so collapsing it to 2×2 would
+have been a change with no defect behind it); `UsePoints`’ four `grid-cols-4` kind
+buttons ("Activity" is the longest at ~56px in a ~70px cell); every fixed width in the
+app (all ≤280px); the five-tab bottom bar at 69px each; tablet 768/1024 and landscape
+812×375, where the nav’s own `overflow-y-auto` absorbs the squeeze. **Measuring first is
+what kept this pass to four real fixes** instead of a sweep of plausible-looking edits.
+
+⚠ **ESLint warnings are now 105, not the 47 recorded above** — the grades feature added
+the bulk of them, still dominated by react-hooks v7’s `set-state-in-effect` and
+`purity` opinions, plus unused-disable directives. Still 0 errors, so the gate is green;
+the "tighten to errors once the backlog is read" note now has twice the backlog.
+Tap targets — the 44px pass (2026-10-19, no migration). Came out of the
+responsiveness sweep above: `Button`'s `sm` variant was **36px**, under the floor
+Apple and Google both publish, and three square buttons had never come through
+`IconButton` at all.
+
+**`.cp-tap-44` and `.cp-tap-y` in index.css are the ONE definition of each
+geometry**, and there are two because small controls come in two shapes.
+`.cp-tap-44` is a centred 44x44 box for SQUARE icon controls; `.cp-tap-y` is 44px
+tall across the element's own width, for WIDE ones (a labelled button, a segmented
+tab, a switch) — **height only, because those are already wider than 44px and
+expanding sideways would only reach into a horizontal neighbour**. `IconButton`'s
+inline `before:*` chain was replaced by `.cp-tap-44`, so its 44 call sites and the
+three hand-rolled buttons now share one rule rather than two copies of it.
+Both are absolutely-positioned pseudo-elements, so **nothing moves**: every control's
+VISIBLE height was measured unchanged afterwards (36, 32, 40, 28, 24).
+
+**⚠ THE ADJACENCY RULE DECIDES DATA CORRECTNESS HERE, NOT COMFORT, AND IT IS WHY
+TWO THINGS WERE DELIBERATELY LEFT SMALL.** Two expanded regions overlap when their
+centres are under 44px apart, and in the overlap the LATER element in DOM order
+wins. For `.cp-tap-y` only VERTICAL neighbours can collide. The two that must not
+take it:
+- **`StatusPicker`'s `compact` variant** — five letter squares at `h-8` and
+  `gap-1`, i.e. 36px centres. Expanding them does not cause a mis-tap, it **marks
+  the wrong attendance status**, on the one screen the codebase already exempts for
+  speed. Measured still 32x32, unexpanded, on purpose.
+- **`AwardBar`'s point chips** — same `gap-1` shape, where a wrong tap awards the
+  wrong number of points.
+Everything expanded was checked: the instructor's `actions` row is `gap-2` with
+36px buttons (36 + 8 = 44 centres, exactly touching); `StatusPicker`'s grid is 3-up
+at `gap-2`, measured row 1 ending at y=387 and row 2 starting at y=388 — **touching
+at zero overlap**. A static scan of all 67 `Button size="sm"` sites found two
+candidates in `divide-y` lists and **both were false positives** (the button sits
+after the list with `mt-2`/`mt-3`, not inside it).
+
+**A second bug fell out of the same scan, and it was not a tap target.**
+`CommentsOverlay`'s composer is a hand-rolled `<input>` that never used the `Input`
+primitive, and it was **`text-sm` — 14px, which makes iOS Safari zoom the viewport
+on focus and never zoom back** — on a student-facing surface. A scan of every
+native form control in the app found it was the ONLY one; `Input`/`Textarea`/
+`Select` are all `h-11 text-base`. It is `h-11 text-base` now, and the `h-10`
+override on the Send button beside it was dropped so the row lines up at 44.
+**Any new hand-rolled form control must be `text-base`** — the Era 6.0 Phase 4 rule
+held for four months and then a new component quietly broke it, so the check is
+worth re-running rather than assuming.
+
+**Left alone deliberately, beyond the two adjacency cases:** `Attendance`'s
+penalties checkbox is `h-5` but sits inside a `<label>`, so the whole row is
+already the target — a sweep that "fixes" the checkbox makes it worse, not better;
+`PinnedBadges`' Unpin, `ProfileBanner`'s Remove and `Profile`'s pencil/x stay small
+because they are DESTRUCTIVE overlay affordances on image tiles (the existing
+decision — a 44px region there invites the accidental taps the small size
+prevents); and Landing's version string is a `cursor-default` secret-tap easter
+egg, where a bigger target is the opposite of the intent.
+
+Expanded: `Button sm` (67 sites) - `SegmentedControl` both sizes - `StatusPicker`
+grid + its Reset - `UsePoints`' four kind buttons - `ThemeToggle` - the two
+`role="switch"` toggles (24px and 28px, the smallest real controls in the app) -
+the notification bell, the mobile menu's close and the instructor's requests
+button - Landing's "Claim your account" and "How it works".
+
+Verified by probe at 375x812 (removed, residue-checked) by walking
+`elementFromPoint` outward from each control's centre — **the real hit region, not
+what the CSS claims**: `Button sm` 36 -> 44, segmented 32/40 -> 44, switches 24 ->
+44 and 28 -> 45, icon buttons 36 -> 44x44, `expandHitArea={false}` still 36x36, and
+the compact status squares still 32x32. Then on the live Landing page: the claim
+link 28 -> 45 sitting 4px clear of Sign in, and **`overlaps: []`** across every
+control on the screen. **Not verified on a real authenticated screen.**
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained

@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { displayGrade, termGrade } from '@/lib/grading'
+import { TableScroller } from '@/components/ui/TableScroller'
+ import { displayGrade, termGrade } from '@/lib/grading'
 import { finalGradeFor } from '@/lib/grade-impact'
 import type { GradePolicy, GradeSumsRow, TermKey } from '@/lib/types'
 
@@ -87,7 +88,7 @@ export function OverallTable({ rows, policies }: OverallTableProps) {
         )}
       </p>
 
-      <div className="-mx-1 max-h-[75dvh] overflow-auto overscroll-contain px-1 pb-2">
+      <TableScroller className="pb-2">
         <table className="w-full border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
@@ -149,7 +150,7 @@ export function OverallTable({ rows, policies }: OverallTableProps) {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScroller>
     </div>
   )
 }

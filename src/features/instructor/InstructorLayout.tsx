@@ -108,7 +108,7 @@ function RedemptionInbox({ count }: { count: number }) {
       type="button"
       onClick={() => navigate('/teach/redemptions')}
       aria-label={count > 0 ? `Requests (${count} waiting)` : 'Requests'}
-      className="relative flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
+      className="cp-tap-44 relative flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
     >
       <TicketIcon className="h-5 w-5" />
       {count > 0 && (

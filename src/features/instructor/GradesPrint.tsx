@@ -93,7 +93,8 @@ export function GradesPrint() {
       // reads as "nobody has a grade" rather than "this failed to load".
       loadError={loadError}
     >
-      <table className="gp-table">
+      <div className="gp-scroll">
+        <table className="gp-table">
         <thead>
           <tr>
             <th className="gp-left">Student</th>
@@ -121,7 +122,8 @@ export function GradesPrint() {
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
 
       {lines.length === 0 && !loading && !loadError && (
         <p className="gp-muted">No students in this section.</p>

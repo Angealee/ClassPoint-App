@@ -139,7 +139,7 @@ export function StatusPicker({
             aria-pressed={active}
             onClick={() => onPick(s)}
             className={cn(
-              'h-9 rounded-lg px-2 text-sm font-semibold transition-colors',
+              'cp-tap-y h-9 rounded-lg px-2 text-sm font-semibold transition-colors',
               'disabled:pointer-events-none disabled:opacity-50',
               active ? STATUS_META[s].solid : 'bg-card-2 text-muted hover:text-ink',
               isSuggested && 'ring-2 ring-accent-solid/40',
@@ -154,7 +154,7 @@ export function StatusPicker({
           type="button"
           disabled={disabled}
           onClick={onReset}
-          className="h-9 rounded-lg px-2 text-sm font-medium text-muted transition-colors hover:bg-card-2 hover:text-ink"
+          className="cp-tap-y h-9 rounded-lg px-2 text-sm font-medium text-muted transition-colors hover:bg-card-2 hover:text-ink"
         >
           Reset
         </button>
