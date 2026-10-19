@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { isChatRoom } from '@/lib/routes-shape'
+import { routeWidth } from '@/lib/routes-shape'
 import { motion } from 'framer-motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
 import { Splash } from '@/components/layout/Splash'
@@ -20,6 +20,7 @@ import {
   LogOutIcon,
   QrIcon,
   ShieldIcon,
+  TableIcon,
   TicketIcon,
   TrophyIcon,
   UsersIcon,
@@ -73,9 +74,18 @@ export function useInstructor(): InstructorContextValue {
  * on the Attendance screen, which the live-class view replaces outright, so
  * they were unreachable exactly when a class was running.
  */
+/**
+ * Grades took the fifth tab rather than another round button in `actions`.
+ *
+ * That slot already carries four controls, and a fifth puts ~212px of buttons
+ * in a 375px header — on the thing the instructor opens most often. Entering
+ * marks is weekly core work, unlike Ops or Peer Evaluation, so it earns a tab;
+ * five is the comfortable limit on a phone and this is the fifth.
+ */
 const nav: NavItem[] = [
   { to: '/teach', label: 'Students', Icon: UsersIcon, end: true },
   { to: '/teach/attendance', label: 'Attendance', Icon: QrIcon },
+  { to: '/teach/grades', label: 'Grades', Icon: TableIcon },
   { to: '/teach/history', label: 'History', Icon: ClockIcon },
   { to: '/teach/leaderboard', label: 'Ranks', Icon: TrophyIcon },
 ]
@@ -98,7 +108,7 @@ function RedemptionInbox({ count }: { count: number }) {
       type="button"
       onClick={() => navigate('/teach/redemptions')}
       aria-label={count > 0 ? `Requests (${count} waiting)` : 'Requests'}
-      className="relative flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
+      className="cp-tap-44 relative flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted transition-colors hover:text-ink"
     >
       <TicketIcon className="h-5 w-5" />
       {count > 0 && (
@@ -310,7 +320,7 @@ export function InstructorLayout() {
     >
       <Shell
         nav={nav}
-        wide={isChatRoom(pathname)}
+        width={routeWidth(pathname)}
         badge={
           <span className="ml-1 rounded-lg bg-accent-solid/10 px-2 py-0.5 text-xs font-semibold text-accent">
             Instructor

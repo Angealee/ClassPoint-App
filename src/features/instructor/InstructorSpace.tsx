@@ -56,7 +56,7 @@ function Toggle({
       disabled={busy}
       onClick={() => onChange(!on)}
       className={cn(
-        'relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50',
+        'cp-tap-y relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50',
         on ? 'bg-success-solid' : 'bg-card-2 ring-1 ring-line',
       )}
     >

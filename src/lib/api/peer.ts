@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import { rpc } from './_internal'
+import { num, rpc } from './_internal'
 import type {
   MyPeerResults,
   PeerEvaluationTemplate,
@@ -366,19 +366,6 @@ interface ResultRow {
   same_scale: boolean
   criteria: PeerCriterionResult[] | null
   comments: PeerCommentRow[] | null
-}
-
-/**
- * Postgres `numeric` arrives as a STRING over PostgREST, not a number.
- *
- * It is sent as text to preserve arbitrary precision, and `"81.3" * 1` works in
- * JavaScript while `"81.3".toFixed(1)` does not — so a screen that skips this
- * fails only on the formatting call, not on the arithmetic beside it.
- */
-function num(v: number | string | null): number | null {
-  if (v === null || v === undefined) return null
-  const n = typeof v === 'number' ? v : Number(v)
-  return Number.isFinite(n) ? n : null
 }
 
 function mapCriteria(list: PeerCriterionResult[] | null): PeerCriterionResult[] {

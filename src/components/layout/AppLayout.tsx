@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
-import { isChatRoom } from '@/lib/routes-shape'
+import { routeWidth } from '@/lib/routes-shape'
 import { SidebarAccount } from '@/components/layout/AccountMenu'
 import { MobileMenu } from '@/components/layout/MobileMenu'
 import { StudentDataProvider, useStudentData } from '@/features/student/StudentData'
@@ -71,7 +71,7 @@ function NotificationBell() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
-        className="relative flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card-2 text-muted transition-colors hover:text-ink"
+        className="cp-tap-44 relative flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card-2 text-muted transition-colors hover:text-ink"
       >
         <BellIcon className="h-4.5 w-4.5" />
         {unreadCount > 0 && (
@@ -167,7 +167,7 @@ function StudentShell() {
       <Shell
         nav={nav}
         tabNav={tabNav}
-        wide={isChatRoom(pathname)}
+        width={routeWidth(pathname)}
         actions={<NotificationBell />}
         accountSlot={
           isDesktop ? (

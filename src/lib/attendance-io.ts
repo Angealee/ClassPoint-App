@@ -131,8 +131,12 @@ export async function exportSectionRegister(
  * The subject segment matters: exporting both subjects of one section on the
  * same day used to produce two identically-named files, so the second silently
  * replaced the first in Downloads.
+ *
+ * Shared with `export-grades.ts` rather than copied — this encodes a collision
+ * rule, and this codebase has already merged the same rule back together four
+ * separate times after it was duplicated.
  */
-function fileName(kind: string, sectionName: string, subjectCode?: string | null): string {
+export function fileName(kind: string, sectionName: string, subjectCode?: string | null): string {
   const safe = (v: string) => v.replace(/[^\w-]+/g, '_')
   const parts = [
     'classpoint',

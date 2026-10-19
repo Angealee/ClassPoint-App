@@ -133,7 +133,7 @@ export function MobileMenu({
               type="button"
               onClick={onClose}
               aria-label="Close menu"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card-2 text-muted transition-colors hover:text-ink"
+              className="cp-tap-44 flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card-2 text-muted transition-colors hover:text-ink"
             >
               <XIcon className="h-4.5 w-4.5" />
             </button>

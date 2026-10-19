@@ -176,7 +176,7 @@ export function AttendanceReview({
           aria-checked={apply}
           onClick={toggleApply}
           className={cn(
-            'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+            'cp-tap-y relative h-6 w-11 shrink-0 rounded-full transition-colors',
             apply ? 'bg-accent-solid' : 'bg-line',
           )}
         >

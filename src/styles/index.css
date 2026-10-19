@@ -219,6 +219,27 @@
      * guarantees is that the NEXT one cannot crop a student's screen.
      */
     overflow-x: clip;
+    /*
+     * A long unbreakable string must wrap rather than escape its card.
+     * Measured at 375px: a 90-character token in an ordinary <p> inside a
+     * Card overflowed that card by 444px and took the document scroll width
+     * 406px past the viewport - text running out of the card and under the
+     * screen edge, with the clip above merely hiding where it went. The
+     * default is overflow-wrap: normal, which breaks at spaces only, and just
+     * 14 call sites (lounge posts, chat messages, reports) already carry
+     * break-words of their own.
+     *
+     * break-word, NOT anywhere: it breaks a word only when that word would
+     * otherwise overflow, so nothing that already fits is re-wrapped and no
+     * short word is ever chopped. It also cannot disturb truncate, which is
+     * white-space: nowrap - wrapping rules never apply to a line that does
+     * not wrap. The per-site [overflow-wrap:anywhere] on chat links stays: a
+     * URL has to break mid-token, which is stronger than this backstop.
+     *
+     * Same discipline as the clip above: the backstop, not the fix. A string
+     * that needs breaking is usually one that wanted truncate.
+     */
+    overflow-wrap: break-word;
   }
 
   h1, h2, h3, h4, .font-display {
@@ -235,6 +256,62 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+}
+
+/* ── TOUCH TARGETS ─────────────────────────────────────────────────────────
+ *
+ * Two invisible tap regions. Both keep the control's VISUAL size and grow only
+ * the thumb target, so neither moves a single pixel of layout — making every
+ * small control bigger was considered and rejected when `IconButton` was
+ * built, because it thickens every header and roster row.
+ *
+ * There are two because small controls come in two shapes and one rule serves
+ * neither well:
+ *
+ *   `.cp-tap-44` — a centred 44×44 box, for SQUARE icon-shaped controls.
+ *   `.cp-tap-y`  — 44px tall across the element's own width, for WIDE controls
+ *                  (a labelled button, a segmented tab, a switch). HEIGHT ONLY:
+ *                  these are already wider than 44px, so expanding sideways
+ *                  would reach into a horizontal neighbour and buy nothing.
+ *
+ * ⚠ THE ADJACENCY RULE DECIDES DATA CORRECTNESS HERE, NOT COMFORT.
+ * Two expanded regions overlap when their centres are closer than 44px, and in
+ * the overlap the LATER element in DOM order wins — so a tap near the seam
+ * activates the wrong control. For `.cp-tap-44`, a row of 36px buttons needs at
+ * least `gap-2` (36 + 8 = 44, exactly touching, never overlapping) and 32px
+ * needs `gap-3`. For `.cp-tap-y` only VERTICAL neighbours can collide, so a
+ * stack of 36px controls needs `gap-2`.
+ *
+ * A group tighter than that must NOT take these classes. The live-attendance
+ * status squares and the award bar's point chips sit at `gap-1` and are
+ * deliberately left small: there, an overlapping region does not mis-tap a
+ * button, it marks the wrong student or awards the wrong number of points.
+ */
+.cp-tap-44,
+.cp-tap-y {
+  position: relative;
+}
+
+/* The pseudo-element is a child of the control, so a tap on it is a tap on the
+   control. `disabled:pointer-events-none` at the call sites covers it too. */
+.cp-tap-44::before,
+.cp-tap-y::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  height: 2.75rem;
+}
+
+.cp-tap-44::before {
+  left: 50%;
+  width: 2.75rem;
+  transform: translate(-50%, -50%);
+}
+
+.cp-tap-y::before {
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
 }
 
 /* XP bar shimmer — CSS-driven so it doesn't keep the JS render loop busy. */

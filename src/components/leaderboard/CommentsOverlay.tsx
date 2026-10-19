@@ -415,10 +415,10 @@ export function CommentsOverlay({
                   : 'You’re out of comments for today'
             }
             disabled={!isInstructor && left === 0}
-            className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-card px-3 text-sm outline-none placeholder:text-muted focus:ring-2 focus:ring-ring/40 disabled:opacity-60"
+            className="h-11 min-w-0 flex-1 rounded-xl border border-line bg-card px-3 text-base outline-none placeholder:text-muted focus:ring-2 focus:ring-ring/40 disabled:opacity-60"
           />
           <Button
-            className="h-10 shrink-0"
+            className="shrink-0"
             onClick={() => void send()}
             disabled={!canSend}
             loading={sending}
