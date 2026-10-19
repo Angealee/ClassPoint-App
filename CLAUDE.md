@@ -2987,6 +2987,67 @@ the compact status squares still 32x32. Then on the live Landing page: the claim
 link 28 -> 45 sitting 4px clear of Sign in, and **`overlaps: []`** across every
 control on the screen. **Not verified on a real authenticated screen.**
 
+Auth screens — the aurora pass (2026-10-19, no migration). Decisions (user):
+**aurora + raised card** · **ticket-stub claim door below the form** · **all four auth
+screens**.
+
+**THE SIGN-IN SCREEN HAD THREE DOORS TO `/claim` AND THE FIRST ONE WAS IN THE WAY.**
+Measured at 375x812 before the change: a bordered "First time? Have a token?" card at
+**y=274**, directly under the heading and ABOVE both fields, plus a footer link at
+**y=695** saying the same thing in different words. So a returning student — very nearly
+all of the traffic — read an invitation addressed to somebody else before reaching the
+username box, and a new student was asked the same question twice in one screen.
+`components/auth/ClaimDoor.tsx` is now the ONLY route to `/claim` from sign-in, and it
+sits BELOW the form: it earns attention by being the loudest block on the page rather
+than the highest one. Verified in the browser — `a[href="/claim"]` returns exactly **1**.
+
+**THE TICKET STUB USES A PERFORATION, NOT EDGE NOTCHES, AND THAT IS A DELIBERATE
+DEPARTURE FROM `PodiumBoard`.** The spend pedestal bites its notches out with circles
+painted in the colour of the surface behind it, which works there because that surface
+is flat. Here the backdrop is the aurora, so a `bg-canvas` circle would read as a solid
+dot parked on a gradient. A genuine hole needs `mask-composite`, whose failure mode on
+an unsupporting engine is **the element disappearing entirely** — not a trade worth
+making for the only claim door in the app. A dashed perforation says "ticket" with no
+assumption about what is behind it.
+The ACTION is the second line and carries the weight and the `reward` colour; the
+question is the muted first line. A one-line explanation sat on that second line first
+and wrapped to two, which pushed the stub to **90px** and left the verb in muted body
+copy — it is **70px** now.
+
+**`AuthShell` hosts the aurora on a FULL-WIDTH root, not on the reading column.** The
+blurs are 416px and 480px across and would be cropped to `max-w-md` otherwise. The root
+carries `overflow-hidden`, which is safe **only because nothing in the auth area is
+`sticky`** — the same class would break the Shell header, AwardBar and the roster. The
+aurora is the landing page's own component reused rather than re-invented, so the screen
+a student lands on and the screen they sign in on belong to one world; it is
+`pointer-events-none`, animates only transform/opacity on the compositor, and the global
+reduced-motion block already switches it off with everything else.
+
+**The shell now owns the icon tile and a `below` slot.** `InstructorSignIn` hand-rolled
+that tile in its own body; it is an `icon` prop now, and Claim and ResetPin take one too.
+**Sign in passes NO icon on purpose** — it is the default door, so its heading should be
+the loudest thing on the page and the claim stub the only decorated element. `below`
+renders between the card and the footer, outside the card, because the claim stub is a
+second door and putting it inside the card that holds the form would say it was a field.
+
+⚠ **A real bug fixed on the way through: `Claim` and `ResetPin` rendered EVERY validation
+error under the LAST field.** `error` was passed to the Confirm-PIN input, so
+"Enter the token your instructor gave you." appeared at the opposite end of the form from
+the token box, with a red border on a field that was fine. Both now render it in their
+own `role="alert"` block above the submit button.
+Claim's six stacked fields are split into **"1 · From your instructor"** and
+**"2 · The login you keep"** (ResetPin likewise): the token is something you were HANDED,
+the rest is something you CHOOSE, and six identical boxes in a column said neither.
+
+Verified at 375x812 in BOTH themes (`localStorage['classpoint-theme']`, since the pane's
+`colorScheme` emulation does not drive this app's `.dark` class): zero horizontal
+overflow on all four screens, every input still **16px** (the iOS zoom rule), aurora
+present on all four, sign-in and instructor sign-in fit one screen (812px) while claim
+scrolls at 1105px. Light canvas `#f3f3f6` / card `#ffffff` / action `rgb(214,124,5)`;
+dark canvas `#08080b` / card `#18181f` / action `rgb(255,186,31)`. ESLint stayed at
+**105 warnings, 0 errors** — the new files added none. **Not verified against a real
+sign-in**, only the unauthenticated screens.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
