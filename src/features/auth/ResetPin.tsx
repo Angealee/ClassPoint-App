@@ -1,25 +1,36 @@
-import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { AuthShell } from './AuthShell'
+import { useAuthTransition } from '@/components/auth/AuthTransition'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { SectionLabel } from '@/components/ui/SectionLabel'
-import { KeyIcon } from '@/components/ui/icons'
+import { CheckIcon, KeyIcon } from '@/components/ui/icons'
 import { useAuth } from '@/lib/auth'
 import { formatCountdown, useLockout } from '@/lib/useLockout'
+import { useCapsLock } from '@/lib/useCapsLock'
+import { listVariants, rowVariants } from '@/lib/motion'
 
 export function ResetPin() {
   const { resetPin } = useAuth()
-  const navigate = useNavigate()
   // Client-side speed bump over the server's per-IP limit. Only SERVER
   // rejections count — a local typo caught by validate() below is not an
   // attempt at anything.
   const lock = useLockout('cp_reset_pin', { threshold: 5, baseMs: 60_000 })
+  const transition = useAuthTransition()
+  const { capsOn, capsProps } = useCapsLock()
   const [token, setToken] = useState('')
   const [pin, setPin] = useState('')
   const [pin2, setPin2] = useState('')
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
+
+  const tokenRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    tokenRef.current?.focus()
+  }, [])
 
   function validate(): string | undefined {
     if (!token.trim()) return 'Enter the reset code your instructor gave you.'
@@ -30,7 +41,7 @@ export function ResetPin() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    if (lock.locked) return
+    if (lock.locked || transition.active) return
     const problem = validate()
     if (problem) {
       setError(problem)
@@ -45,11 +56,12 @@ export function ResetPin() {
       setError(error)
     } else {
       lock.reset()
-      navigate('/app', { replace: true })
+      setDone(true)
+      transition.start('/app')
     }
   }
 
-  const disabled = busy || lock.locked
+  const disabled = busy || lock.locked || transition.active
 
   return (
     <AuthShell
@@ -67,10 +79,17 @@ export function ResetPin() {
     >
       {/* Same two-group split as Claim, for the same reason: the code is handed
           to you, the PIN is chosen by you. */}
-      <form onSubmit={onSubmit} className="space-y-6">
-        <section>
+      <motion.form
+        onSubmit={onSubmit}
+        className="space-y-6"
+        variants={listVariants}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.section variants={rowVariants}>
           <SectionLabel>1 · From your instructor</SectionLabel>
           <Input
+            ref={tokenRef}
             label="Reset code"
             value={token}
             onChange={(e) => setToken(e.target.value.toUpperCase())}
@@ -82,51 +101,78 @@ export function ResetPin() {
             disabled={disabled}
             required
           />
-        </section>
+        </motion.section>
 
-        <section className="space-y-4 border-t border-line pt-5">
+        <motion.section variants={rowVariants} className="space-y-4 border-t border-line pt-5">
           <SectionLabel className="mb-0">2 · Your new PIN</SectionLabel>
-          <Input
-            label="New PIN"
-            type="password"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            autoComplete="new-password"
-            hint="At least 6 characters."
-            disabled={disabled}
-            required
-          />
+          <div>
+            <Input
+              label="New PIN"
+              type="password"
+              revealable
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              autoComplete="new-password"
+              hint="At least 6 characters."
+              disabled={disabled}
+              required
+              {...capsProps}
+            />
+            {capsOn && <p className="mt-1.5 text-sm text-warn">Caps Lock is on.</p>}
+          </div>
           <Input
             label="Confirm new PIN"
             type="password"
+            revealable
             value={pin2}
             onChange={(e) => setPin2(e.target.value)}
             autoComplete="new-password"
             disabled={disabled}
             required
+            {...capsProps}
           />
-        </section>
+        </motion.section>
 
         {/* Was rendered under "Confirm new PIN", so a complaint about the RESET
             CODE appeared at the opposite end of the form from the code box. */}
         {error && (
-          <p role="alert" className="rounded-xl bg-danger-solid/10 px-3 py-2 text-sm text-danger">
+          <motion.p
+            variants={rowVariants}
+            role="alert"
+            className="rounded-xl bg-danger-solid/10 px-3 py-2 text-sm text-danger"
+          >
             {error}
-          </p>
+          </motion.p>
         )}
         {lock.locked && (
-          <p className="rounded-xl bg-danger-solid/10 px-3 py-2 text-sm text-danger">
+          <motion.p
+            variants={rowVariants}
+            className="rounded-xl bg-danger-solid/10 px-3 py-2 text-sm text-danger"
+          >
             Too many attempts. Try again in {formatCountdown(lock.remainingMs)}.
-          </p>
+          </motion.p>
         )}
-        <Button type="submit" size="lg" className="w-full" disabled={disabled}>
-          {lock.locked
-            ? `Locked · ${formatCountdown(lock.remainingMs)}`
-            : busy
-              ? 'Resetting…'
-              : 'Reset PIN & sign in'}
-        </Button>
-      </form>
+        <motion.div variants={rowVariants}>
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={disabled}
+            loading={busy}
+            icon={done ? <CheckIcon className="h-5 w-5" /> : undefined}
+          >
+            {done
+              ? 'Done'
+              : lock.locked
+                ? `Locked · ${formatCountdown(lock.remainingMs)}`
+                : busy
+                  ? 'Resetting…'
+                  : 'Reset PIN & sign in'}
+          </Button>
+        </motion.div>
+      </motion.form>
+
+      {transition.overlay}
     </AuthShell>
   )
 }

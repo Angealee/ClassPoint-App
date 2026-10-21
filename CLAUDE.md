@@ -3048,6 +3048,71 @@ dark canvas `#08080b` / card `#18181f` / action `rgb(255,186,31)`. ESLint stayed
 **105 warnings, 0 errors** — the new files added none. **Not verified against a real
 sign-in**, only the unauthenticated screens.
 
+Sign-in transition + auth polish (2026-10-21, no migration). Decisions (user):
+**fade & breathe logo transition, ~2s** · **on every student entry** (sign-in, claim,
+reset — instructor instant) · extras: **show/hide PIN · remember username · staggered
+entrance · caps-lock hint · button spinner→checkmark · auto-focus first empty field**.
+
+**`AuthTransition` + `useAuthTransition` play THEN navigate, they do not navigate then
+animate.** The three student screens already know they are going to `/app` the instant
+the server says yes. A full-screen `bg-canvas` overlay fades in OVER the screen that
+succeeded, and the `navigate('/app', {replace})` fires only when it ends — so the
+dashboard mounts behind an already-opaque screen with no seam, and no second route or
+loader flash. **The navigate is driven by a single `setTimeout(onDone, 2000)`, NOT by
+`onAnimationComplete`** — three sub-animations finish at three different moments and
+`reducedMotion` changes which, so one timer is the only clock that cannot disagree with
+itself. Everything is opacity+scale (compositor), and the global reduced-motion block
+leaves the straight fade the user asked for while the timer still fires on time.
+`onDone` is `useCallback`'d on `dest` so the overlay effect does not re-run every render
+(the `[open, onClose]` Sheet-focus trap). Instructor sign-in deliberately stays instant —
+the instructor is not made to wait 2s on every login.
+
+**`Input` gained `revealable`** — an eye toggle (new `EyeIcon`/`EyeOffIcon`) that flips
+`type` password↔text, `tabIndex={-1}` so it stays off the Tab path (username → PIN →
+submit), `.cp-tap-44` hit region, sitting INSIDE the field (`pr-11` on the input).
+Verified in the browser: password→text→password, `eyeInsideField: true`. Claim and Reset
+carry it on both PIN fields (`pinEyeCount: 2`).
+
+**`src/lib/auth-prefs.ts` stores the USERNAME ONLY** (`cp_last_username_v1`), never the
+PIN — the whole point of a PIN is that the device does not hold it. Written on a
+successful sign-in AND a successful claim (so a new student's first ordinary sign-in on
+that phone remembers them). SignIn prefills it, shows "Not you?" to clear
+(field + storage + refocus), and **auto-focuses the first EMPTY field**: PIN when the
+username is remembered, username otherwise. All of localStorage is try/caught (the
+per-viewer-convenience rule). Verified: prefill, PIN-focus-when-remembered, and the full
+"Not you?" clear cycle.
+
+**`src/lib/useCapsLock.ts` reads `getModifierState` off the field's OWN key events**, not
+a global listener — it is reliable only on a real key event and a phone's on-screen
+keyboard reports nothing, so it is inert exactly where it has nothing to warn about (a
+phone has no caps lock). The hint is `warn`-toned and suppressed while an error already
+shows under the PIN.
+
+**The staggered entrance reuses `motion.ts`'s `listVariants`/`rowVariants`** — the form
+is a `motion.form` and each field group a `rowVariants` child, so fields cascade in under
+the card's own entrance. The button shows a `CheckIcon` + "Signed in" the instant auth
+succeeds, as the hand-off into the overlay.
+
+⚠ **A CONCURRENT-EDIT COLLISION happened mid-task and is the lesson here.** All four auth
+screens were rewritten; while the browser verification ran, the user was hand-editing
+`SignIn.tsx` in their own editor (an older buffer) and saved it — silently reverting that
+one file to a plain version ("Welcome!" copy, no features) while Input/Claim/ResetPin and
+the three new files kept their new versions. Caught because the rendered page showed copy
+("Forgot your PIN? Click here") that was not in the code just written. **SignIn was
+re-applied ONTO the user's copy** (title "Welcome!", subtitle "Log in to your account to
+access your progress.", "Forgot your PIN? Click here" preserved verbatim) rather than
+reverting their words. If an auth `.tsx` ever shows copy that does not match the source,
+suspect the user's editor has it open — read disk before assuming a build is stale.
+
+Verified at 375x812 in both themes (`localStorage['classpoint-theme']`): zero horizontal
+overflow on sign-in and claim, inputs 16px, eye toggles work, auto-focus and
+remember-username confirmed by DOM probe. `npm run verify` green — **0 errors, 105
+warnings (unchanged), 417 tests**. **The 2s success transition itself is NOT verified
+against a real sign-in** (no test student credentials) — it is verified by typecheck,
+build and logic only, like the aurora pass. ⚠ The stagger entrance photographs faded
+because framer-motion's rAF is starved while the pane is not compositing (the documented
+artifact); the DOM measurements are the reliable signal.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
