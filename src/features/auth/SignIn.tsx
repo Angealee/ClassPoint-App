@@ -36,10 +36,8 @@ export function SignIn() {
 
   return (
     <AuthShell
-      title="Welcome back"
-      subtitle="Sign in to pick up your points, streak and rank."
-      // The claim stub is the ONLY route to /claim on this screen, and it is
-      // deliberately not repeated in the footer — see ClaimDoor's own note.
+      title="Welcome!"
+      subtitle="Log in to your account to access your progress."
       below={<ClaimDoor />}
     >
       <form onSubmit={onSubmit} className="space-y-4">
@@ -51,7 +49,7 @@ export function SignIn() {
           autoCorrect="off"
           autoComplete="username"
           spellCheck={false}
-          hint="The username you chose when claiming — not your token."
+          hint="The username you chose when claiming, not your token."
           placeholder="Your username"
           disabled={disabled}
           required
