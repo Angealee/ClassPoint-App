@@ -14,6 +14,7 @@ import {
   BellIcon,
   BoltIcon,
   CheckIcon,
+  MoreIcon,
   StarIcon,
   TicketIcon,
   TrophyIcon,
@@ -29,6 +30,10 @@ import type { ComponentType, SVGProps } from 'react'
 
 const PAGE_SIZE = 30
 const SWIPE_THRESHOLD = 80
+
+// True on devices whose primary pointer is precise (mouse/trackpad). Used to
+// switch between swipe-to-dismiss (touch) and the 3-dot menu (desktop).
+const IS_DESKTOP = window.matchMedia('(pointer: fine)').matches
 
 const TYPE_META: Record<
   string,
@@ -116,21 +121,158 @@ function EmptyIllustration() {
   )
 }
 
+// ── Desktop-only 3-dot row menu ──────────────────────────────────────────────
+
+interface RowMenuProps {
+  isRead: boolean
+  onToggleRead: () => void
+  onDismiss: () => void
+}
+
+function RowMenu({ isRead, onToggleRead, onDismiss }: RowMenuProps) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onPointer(e: PointerEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointer)
+    return () => document.removeEventListener('pointerdown', onPointer)
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        aria-label="More options"
+        onClick={() => setOpen((v) => !v)}
+        className="cp-tap-44 flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-card-2 hover:text-ink"
+      >
+        <MoreIcon className="h-4 w-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-card py-1 shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              onToggleRead()
+              setOpen(false)
+            }}
+            className="flex w-full items-center px-3.5 py-2.5 text-left text-sm text-ink transition-colors hover:bg-card-2"
+          >
+            {isRead ? 'Mark as unread' : 'Mark as read'}
+          </button>
+          <div className="mx-3 my-0.5 h-px bg-line" />
+          <button
+            type="button"
+            onClick={() => {
+              onDismiss()
+              setOpen(false)
+            }}
+            className="flex w-full items-center px-3.5 py-2.5 text-left text-sm text-danger transition-colors hover:bg-card-2"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Notification row ─────────────────────────────────────────────────────────
+
 interface SwipeRowProps {
   n: AppNotification
-  allRead: boolean
+  /** Effective read state, already accounting for allRead + per-item overrides. */
+  isRead: boolean
   onDismiss: (id: string) => void
   onClick: (n: AppNotification) => void
+  onToggleRead: (id: string, read: boolean) => void
   /** Called when a drag gesture starts — lets the parent suppress backdrop clicks. */
   onRowDragStart: () => void
   /** Called when a drag gesture ends (after a brief delay to cover synthetic clicks). */
   onRowDragEnd: () => void
 }
 
-function SwipeRow({ n, allRead, onDismiss, onClick, onRowDragStart, onRowDragEnd }: SwipeRowProps) {
+function SwipeRow({ n, isRead, onDismiss, onClick, onToggleRead, onRowDragStart, onRowDragEnd }: SwipeRowProps) {
   const meta = TYPE_META[n.type] ?? DEFAULT_META
-  const unread = !allRead && !n.readAt
+  const unread = !isRead
 
+  // ── Desktop: plain row + hover 3-dot menu ─────────────────────────────────
+  if (IS_DESKTOP) {
+    return (
+      <div className="group relative flex items-center">
+        {unread && <div className="pointer-events-none absolute inset-0 bg-accent-solid/[0.06]" aria-hidden />}
+        <button
+          type="button"
+          onClick={() => onClick(n)}
+          className="relative flex min-w-0 flex-1 items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-card-2 active:bg-card-2"
+        >
+          <span
+            className={cn(
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+              meta.cls,
+            )}
+          >
+            <meta.Icon className="h-4.5 w-4.5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className={cn('truncate text-sm', unread ? 'font-semibold' : 'font-medium')}>
+                {n.title}
+              </span>
+              <span className="shrink-0 text-xs text-muted">{timeAgo(n.createdAt)}</span>
+            </span>
+            {n.body && (
+              <span className="mt-0.5 block truncate text-xs text-muted">{n.body}</span>
+            )}
+          </span>
+          {unread && (
+            <span
+              className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent-solid"
+              aria-label="Unread"
+            />
+          )}
+        </button>
+        {/* 3-dot menu: hidden until the row is hovered or the button has focus */}
+        <div className="invisible mr-1 shrink-0 group-hover:visible group-focus-within:visible">
+          <RowMenu
+            isRead={isRead}
+            onToggleRead={() => onToggleRead(n.id, !isRead)}
+            onDismiss={() => onDismiss(n.id)}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  // ── Mobile: swipe-to-dismiss ───────────────────────────────────────────────
+  return <SwipeRowMobile
+    n={n}
+    unread={unread}
+    meta={meta}
+    onDismiss={onDismiss}
+    onClick={onClick}
+    onRowDragStart={onRowDragStart}
+    onRowDragEnd={onRowDragEnd}
+  />
+}
+
+interface SwipeRowMobileProps {
+  n: AppNotification
+  unread: boolean
+  meta: { Icon: ComponentType<SVGProps<SVGSVGElement>>; cls: string }
+  onDismiss: (id: string) => void
+  onClick: (n: AppNotification) => void
+  onRowDragStart: () => void
+  onRowDragEnd: () => void
+}
+
+function SwipeRowMobile({ n, unread, meta, onDismiss, onClick, onRowDragStart, onRowDragEnd }: SwipeRowMobileProps) {
   const x = useMotionValue(0)
   // Reveal the dismiss hint as the user drags
   const hintOpacity = useTransform(
@@ -215,7 +357,8 @@ function SwipeRow({ n, allRead, onDismiss, onClick, onRowDragStart, onRowDragEnd
  *
  * Opens as a card that scales up from the center of the screen (not a bottom
  * sheet). Items are grouped by day with sticky headers. Each row is
- * horizontally swipeable to dismiss it from the list.
+ * horizontally swipeable to dismiss it from the list (mobile/touch), or has a
+ * 3-dot menu for mark-as-read / dismiss (desktop/mouse).
  */
 export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { me, markAllRead, unreadCount } = useStudentData()
@@ -230,6 +373,8 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
   const [dismissed, setDismissed] = useState(new Set<string>())
   const [allRead, setAllRead] = useState(false)
   const [openedUnread, setOpenedUnread] = useState(0)
+  // Per-item read overrides: true = read, false = unread. Session-local only.
+  const [readOverrides, setReadOverrides] = useState<Map<string, boolean>>(new Map())
 
   // Always-fresh ref so the open effect can read the current count without
   // adding it to the dependency array (we only want the value at open time).
@@ -250,6 +395,7 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
     setOpenedUnread(latestUnreadRef.current)
     setDismissed(new Set())
     setAllRead(false)
+    setReadOverrides(new Map())
     let cancelled = false
     setLoading(true)
     setError(false)
@@ -312,11 +458,33 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
   function handleMarkAllRead() {
     setAllRead(true)
     setOpenedUnread(0)
+    // Clear any "unread" overrides since everything is now read
+    setReadOverrides((prev) => {
+      if (prev.size === 0) return prev
+      const next = new Map(prev)
+      for (const [id, v] of next) {
+        if (!v) next.delete(id) // remove "unread" overrides
+      }
+      return next
+    })
     void markAllRead()
   }
 
   function handleDismiss(id: string) {
     setDismissed((prev) => new Set([...prev, id]))
+  }
+
+  function handleToggleRead(id: string, read: boolean) {
+    setReadOverrides((prev) => new Map(prev).set(id, read))
+    // If marking as unread, bump the unread badge count
+    if (!read) setOpenedUnread((prev) => prev + 1)
+  }
+
+  /** Compute the effective read state for a notification. */
+  function isEffectivelyRead(n: AppNotification): boolean {
+    if (readOverrides.has(n.id)) return readOverrides.get(n.id)!
+    if (allRead) return true
+    return n.readAt !== null
   }
 
   const visibleItems = items.filter((n) => !dismissed.has(n.id))
@@ -417,9 +585,10 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
                           >
                             <SwipeRow
                               n={n}
-                              allRead={allRead}
+                              isRead={isEffectivelyRead(n)}
                               onDismiss={handleDismiss}
                               onClick={openTarget}
+                              onToggleRead={handleToggleRead}
                               onRowDragStart={() => { draggingRef.current = true }}
                               onRowDragEnd={() => { draggingRef.current = false }}
                             />
