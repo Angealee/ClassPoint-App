@@ -353,7 +353,7 @@ export function CommentsOverlay({
               >
                 <span
                   className={cn(
-                    'flex items-start gap-2 rounded-2xl border px-3 py-2 text-sm shadow-lg backdrop-blur-md',
+                    'flex items-start gap-2 rounded-2xl border px-3 py-2 text-sm shadow-lg',
                     p.studentId === null
                       ? 'border-accent-solid/50 bg-accent-solid/25 text-accent'
                       : 'border-line bg-card/92 text-ink',

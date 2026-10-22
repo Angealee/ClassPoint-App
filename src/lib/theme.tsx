@@ -33,6 +33,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement
     root.classList.toggle('dark', theme === 'dark')
     root.style.colorScheme = theme
+    // Keep the Android status bar with the theme. The pre-paint script in index.html
+    // sets this first; this is what moves it when the user toggles mid-session. A
+    // media-scoped <meta> pair cannot do this, because it follows the OS preference
+    // rather than the in-app override.
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#08080b' : '#f3f3f6')
     window.localStorage.setItem(STORAGE_KEY, theme)
   }, [theme])
 
