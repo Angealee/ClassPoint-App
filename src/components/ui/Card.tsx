@@ -22,6 +22,28 @@ import { cn } from '@/lib/cn'
 
 type CardPad = 'none' | 'tight' | 'default' | 'roomy'
 
+/**
+ * How far off the page a card sits.
+ *
+ * The two themes express this by different means, which is measured rather than
+ * stylistic — see the MATERIAL block in index.css. Light mode carries depth with
+ * a shadow (a white card on a #f3f3f6 canvas has something to cast onto); dark
+ * mode carries it with a lit top edge, because canvas to card is only ΔL* 6.3
+ * and a black shadow on #08080b has nothing to darken. Both facets ship on every
+ * level, so a call site never branches on theme.
+ *
+ * 'flat' is the default and is byte-identical to what Card rendered before this
+ * prop existed, so no existing card moved. Screens opt in as they are reviewed.
+ */
+type CardElevation = 'flat' | 'raised' | 'floating'
+
+const ELEVATIONS: Record<CardElevation, string> = {
+  // The original look: Tailwind's shadow-sm with a theme-aware tint.
+  flat: 'shadow-sm shadow-black/5 dark:shadow-black/30',
+  raised: 'cp-elev-2 cp-lit',
+  floating: 'cp-elev-3 cp-lit',
+}
+
 const PADS: Record<CardPad, string> = {
   none: '',
   tight: 'p-3',
@@ -33,14 +55,28 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   pad?: CardPad
   /** Hover/press affordance for a card that is itself a tap target. */
   interactive?: boolean
+  /**
+   * ⚠ 'raised' and 'floating' add `.cp-lit`, which sets `position: relative`.
+   * That cannot affect a `position: fixed` descendant (only transform, filter,
+   * will-change and contain create a containing block for those, so every Sheet
+   * backdrop is safe) but it DOES become the offset parent for an absolutely
+   * positioned child. Check the card's children before raising it.
+   */
+  elevation?: CardElevation
 }
 
-export function Card({ className, pad = 'default', interactive, ...props }: CardProps) {
+export function Card({
+  className,
+  pad = 'default',
+  interactive,
+  elevation = 'flat',
+  ...props
+}: CardProps) {
   return (
     <div
       className={cn(
-        'theme-transition rounded-2xl border border-line bg-card shadow-sm',
-        'shadow-black/5 dark:shadow-black/30',
+        'theme-transition rounded-2xl border border-line bg-card',
+        ELEVATIONS[elevation],
         PADS[pad],
         interactive &&
           'cursor-pointer transition-[background-color,transform] hover:bg-card-2 active:scale-[0.99]',

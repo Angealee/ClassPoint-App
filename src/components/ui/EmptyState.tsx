@@ -22,6 +22,7 @@ export function EmptyState({
   children,
   description,
   action,
+  compact,
   className,
 }: {
   icon?: ReactNode
@@ -31,14 +32,39 @@ export function EmptyState({
   description?: ReactNode
   /** Usually a <Button>. Rendered below the text. */
   action?: ReactNode
+  /**
+   * Drop the Card and the p-8, for an empty list INSIDE something that is
+   * already a surface: a Sheet body, a picker, a search dropdown.
+   *
+   * This is the variant whose absence left 11 hand-rolled empties in the tree,
+   * every one of them in exactly that position, and no two agreeing on padding
+   * (p-4, py-6, px-4 py-6, p-6, py-8). A full p-8 Card nested inside a Sheet is
+   * a box inside a box, so each call site quietly opted out instead. Mirrors
+   * ErrorState's `inline`, which already existed for the same reason.
+   */
+  compact?: boolean
   className?: string
 }) {
-  return (
-    <Card pad="none" className={cn('flex flex-col items-center gap-2 p-8 text-center', className)}>
+  const body = (
+    <>
       {icon && <span className="text-muted [&>svg]:h-7 [&>svg]:w-7">{icon}</span>}
       <p className="text-sm text-muted">{children}</p>
       {description && <p className="max-w-xs text-xs text-muted">{description}</p>}
       {action && <div className="mt-2">{action}</div>}
+    </>
+  )
+
+  if (compact) {
+    return (
+      <div className={cn('flex flex-col items-center gap-2 px-4 py-6 text-center', className)}>
+        {body}
+      </div>
+    )
+  }
+
+  return (
+    <Card pad="none" className={cn('flex flex-col items-center gap-2 p-8 text-center', className)}>
+      {body}
     </Card>
   )
 }

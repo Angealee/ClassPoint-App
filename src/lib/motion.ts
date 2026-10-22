@@ -20,6 +20,36 @@ export const spring: Transition = {
   mass: 0.9,
 }
 
+/**
+ * FOUR NAMED ROLES, so no component invents its own spring.
+ *
+ * Before this there were six unrelated definitions written inline at six call
+ * sites (260/24, 320/32, 400/30, 500/32, 380/22, 120/20, 600/20), which meant
+ * "how does this app move" had no answer and retuning it meant finding them
+ * all. Each role below is the behaviour, not the component: pick by what the
+ * thing IS doing, and a new component never needs a new number.
+ *
+ * Reduced motion is handled globally by MotionConfig in App.tsx; none of these
+ * need their own guard.
+ */
+
+/** UI state feedback: a toast arriving, a switch flipping, a tick confirming. */
+export const snap: Transition = { type: 'spring', stiffness: 400, damping: 30 }
+
+/** A large surface moving: sheets and side panels. Softer, because the eye has
+ *  to track a big object rather than register a small state change. */
+export const glide: Transition = { type: 'spring', stiffness: 320, damping: 32 }
+
+/** A value coming to rest: XP rails, meters, animated figures. Deliberately the
+ *  slowest of the four, because a number that snaps is a number you cannot read
+ *  on the way. */
+export const settle: Transition = { type: 'spring', stiffness: 120, damping: 20 }
+
+/** Direct manipulation of a small target: the bottom-tab glyph dipping under a
+ *  thumb. Much stiffer than `snap` on purpose. This one is felt rather than
+ *  watched, and any softness at all reads as input lag. */
+export const tap: Transition = { type: 'spring', stiffness: 600, damping: 20 }
+
 /** For things that should ease rather than bounce — bars, widths, opacity. */
 export const ease: Transition = { duration: 0.32, ease: [0.22, 1, 0.36, 1] }
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { glide } from '@/lib/motion'
 
 /** A small pill at the top of the screen while the device is offline. */
 export function OfflineBanner() {
@@ -23,7 +24,7 @@ export function OfflineBanner() {
           initial={{ y: -40, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -40, opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+          transition={glide}
           className="fixed inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-50 mx-auto flex w-fit items-center gap-2 rounded-full border border-line bg-card px-4 py-1.5 shadow-lg"
           role="status"
         >

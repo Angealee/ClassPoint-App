@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { snap } from '@/lib/motion'
 
 /**
  * A brief centered check that confirms a consequential action landed (approve a
@@ -34,7 +35,7 @@ export function SuccessTick({ show, onDone }: { show: boolean; onDone: () => voi
             initial={{ scale: 0.4, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+            transition={snap}
           >
             <motion.svg
               width="48"

@@ -51,6 +51,27 @@
   --color-plate: #14141c;
   --color-plate-2: #1e1e2b;
 
+  /* RADIUS LADDER. These override Tailwind's own values for the SAME utility
+     names, which is the whole trick: all 275 existing rounded-lg/xl/2xl sites
+     pick the new geometry up with no call site edited, and tailwind-merge keeps
+     working because no new class name is introduced.
+
+     Inventing a name here instead (rounded-card, say) would be silently broken:
+     cn() is bare twMerge with no extendTailwindMerge, so it classifies an
+     unknown word after rounded- as a COLOUR and drops the size. See cn.ts.
+
+       lg  10px  inline chips, small controls
+       xl  14px  buttons, inputs, selects, segmented controls
+       2xl 18px  cards, the shared surface
+       3xl 24px  sheets and the hero (unchanged from Tailwind's default)
+
+     rounded-full is not a token (it compiles to an effectively infinite radius)
+     and is therefore untouched by any of this. */
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
+  --radius-3xl: 1.5rem;
+
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
@@ -119,6 +140,46 @@
   --reward-solid: #ffba1f;
   --accent-solid: #e11d2a;
 
+  /* ── MATERIAL: elevation, lit edge, texture ──────────────────────────────
+     The two themes carry depth by DIFFERENT means, and that is measured rather
+     than stylistic. In light mode a card is #ffffff on a #f3f3f6 canvas, so a
+     shadow has something to darken and a white top highlight would be
+     invisible. In dark mode the reverse is true: canvas to card is only
+     ΔL* 6.3 and a black shadow on #08080b has almost nothing to darken, which
+     is exactly why 41 shadow utilities across the whole app never added up to
+     an elevation language.
+
+     So: light leans on --elev-shadow-*, dark leans on --lit. Both tokens exist
+     in both themes so a component never has to branch. */
+  --elev-shadow-1: 0 1px 2px rgb(16 16 24 / 0.06);
+  --elev-shadow-2: 0 2px 4px rgb(16 16 24 / 0.07), 0 8px 16px -4px rgb(16 16 24 / 0.08);
+  --elev-shadow-3: 0 4px 8px rgb(16 16 24 / 0.08), 0 16px 32px -8px rgb(16 16 24 / 0.12);
+
+  /* Transparent in light on purpose: a white hairline on a white card is not a
+     subtle effect, it is no effect, and shipping one would just be a pseudo
+     element painted for nothing on every surface. */
+  --lit: transparent;
+  --lit-wash: transparent;
+
+  --grid-dot: rgb(16 16 24 / 0.07);
+  --grain-opacity: 0.02;
+
+  /* ── Z LADDER ────────────────────────────────────────────────────────────
+     Documented so the next overlay does not pick another number out of the air.
+     These match what the app already does (Shell 20, Sheet 40, Toast 50,
+     SuccessTick 60, AuthTransition 100); only --z-grain is new.
+     The 20 remaining arbitrary z-[...] sites are deliberately NOT swept here:
+     most sit on authenticated screens that cannot be verified in this
+     environment, and a wrong z-index is invisible until it is catastrophic.
+     They are migrated per screen, where each one can actually be looked at. */
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-sheet: 40;
+  --z-toast: 50;
+  --z-burst: 60;
+  --z-transition: 100;
+  --z-grain: 200;
+
   /* ⚠ Never write a Tailwind glob with a star inside a CSS comment here. The
      star-slash sequence closes the comment EARLY and silently swallows the
      declarations that follow it — doing exactly that once gutted this whole
@@ -157,6 +218,23 @@
   --streak: #fb923c;
   --reward: #ffba1f;
   --accent: #f76a72;
+
+  /* Darker and further than the light values: on a near-black canvas a shadow
+     has to work harder to register at all. */
+  --elev-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --elev-shadow-2: 0 2px 6px rgb(0 0 0 / 0.45), 0 10px 20px -6px rgb(0 0 0 / 0.5);
+  --elev-shadow-3: 0 4px 10px rgb(0 0 0 / 0.5), 0 20px 40px -10px rgb(0 0 0 / 0.6);
+
+  /* The lit edge IS dark-mode elevation. A 1px highlight where a real surface
+     would catch light reads as a raised object far more reliably than a shadow
+     that has nothing to darken. */
+  --lit: rgb(255 255 255 / 0.10);
+  --lit-wash: rgb(255 255 255 / 0.045);
+
+  --grid-dot: rgb(255 255 255 / 0.055);
+  /* Higher than light mode: noise is far more visible on white, where the same
+     value reads as dirt rather than texture. */
+  --grain-opacity: 0.035;
 }
 
 @theme inline {
@@ -312,6 +390,108 @@
   left: 0;
   right: 0;
   transform: translateY(-50%);
+}
+
+/* ── MATERIAL SURFACES ──────────────────────────────────────────────────────
+ *
+ * Three utilities, all STATIC PAINT. Nothing here animates, nothing here runs a
+ * filter, and nothing here costs a frame once drawn. That is deliberate: the
+ * app already runs several permanent CSS loops and three permanently mounted
+ * backdrop-filter layers in Shell, and perceived depth is much cheaper to buy
+ * with a correctly placed gradient than with another blurred layer.
+ */
+
+/* Elevation. One class, one shadow.
+ *
+ * ⚠ DO NOT STACK THESE. twMerge does not recognise cp-* names, so it passes
+ * both through and CSS source order decides the winner rather than the author,
+ * which is the same class of bug the plain-join cn() used to cause app-wide.
+ * A component must emit exactly one. */
+.cp-elev-1 { box-shadow: var(--elev-shadow-1); }
+.cp-elev-2 { box-shadow: var(--elev-shadow-2); }
+.cp-elev-3 { box-shadow: var(--elev-shadow-3); }
+
+/* The lit edge: a 1px highlight along the top of a surface, plus a very soft
+ * wash below it, as if the surface were catching light from above.
+ *
+ * border-radius: inherit is what makes this work on a rounded card. The pseudo
+ * element takes the parent's own radius, so the hairline is CLIPPED BY THE
+ * CURVE and stops short of each corner instead of cutting across it. Verified
+ * in the browser: a 16px parent gives a 16px pseudo.
+ *
+ * Deliberately NOT the mask-composite "gradient border" trick, whose failure
+ * mode on an engine that does not support it is the element disappearing
+ * outright. Nothing here can fail worse than rendering no highlight, which is
+ * exactly what light mode does on purpose (--lit is transparent there).
+ *
+ * inset: 0 resolves against the PADDING box, so on a bordered card the
+ * hairline sits just inside the border rather than on top of it.
+ *
+ * ⚠ This sets position: relative. That is harmless for fixed descendants (only
+ * transform, filter, will-change and contain create a containing block for
+ * those, so every Sheet backdrop is unaffected) but it DOES become the offset
+ * parent for absolutely positioned children. Only add it to a checked surface. */
+.cp-lit {
+  position: relative;
+}
+
+.cp-lit::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, var(--lit) 22%, var(--lit) 78%, transparent)
+      top / 100% 1px no-repeat,
+    linear-gradient(180deg, var(--lit-wash), transparent 42%);
+}
+
+/* Dot field, for "stage" surfaces only: the home scoreboard plate, empty
+ * states, the QR card, the auth and landing heroes.
+ *
+ * ⚠ Put this on a DECORATIVE ABSOLUTELY POSITIONED CHILD, never on a container
+ * that holds content. It carries a mask, and a mask applies to the element's
+ * content as well as its background, so on a content box it would fade the
+ * text out along with the dots. Aurora is the pattern to copy.
+ *
+ * Explicitly not used behind scrolling lists, and not on the leaderboard board
+ * area, where it would compete with the flying comment pills and the podium. */
+.cp-grid {
+  background-image: radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0);
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(ellipse at 50% 0%, #000 45%, transparent 100%);
+  mask-image: radial-gradient(ellipse at 50% 0%, #000 45%, transparent 100%);
+}
+
+/* Fine grain over the whole app.
+ *
+ * One tiled 160x160 raster, painted once and composited thereafter, so it costs
+ * nothing per frame. It sits ABOVE everything (--z-grain is the top of the
+ * ladder) so a sheet or a celebration burst wears the same film as the page
+ * underneath; at 2 to 3.5% that reads as material rather than as an overlay.
+ *
+ * Verified: body carries overflow-x: clip, and a fixed pseudo element still
+ * lays out at full viewport size inside it, because body creates no containing
+ * block (no transform, filter, will-change or contain).
+ *
+ * stitchTiles='stitch' is load-bearing. Without it feTurbulence restarts its
+ * noise field at every tile edge and the seams show as a visible 160px grid. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--z-grain);
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+/* Paper has no grain of ours, and the two print routes render their own
+ * namespaced light-only stylesheets. */
+@media print {
+  body::after { display: none; }
 }
 
 /* XP bar shimmer — CSS-driven so it doesn't keep the JS render loop busy. */

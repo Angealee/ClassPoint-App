@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { cn } from '@/lib/cn'
+import { snap } from '@/lib/motion'
 
 type ToastTone = 'success' | 'error' | 'info'
 interface Toast {
@@ -66,7 +67,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               initial={{ opacity: 0, y: -16, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.96 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              transition={snap}
               className={cn(
                 'pointer-events-auto flex items-center gap-2.5 rounded-xl border px-4 py-2.5 text-sm font-medium shadow-lg shadow-black/10',
                 toneStyles[t.tone],

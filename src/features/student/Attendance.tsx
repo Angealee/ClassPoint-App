@@ -6,6 +6,7 @@ import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { Sheet } from '@/components/ui/Sheet'
+import { Spinner } from '@/components/ui/Spinner'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ScanIcon, CheckIcon, WarningIcon } from '@/components/ui/icons'
 import { QrScanner } from '@/components/attendance/QrScanner'
@@ -358,7 +359,7 @@ export function Attendance() {
       <Sheet open={scanOpen} onClose={closeScan} title="Scan attendance">
         {submitting ? (
           <div className="flex flex-col items-center gap-3 py-10 text-sm text-muted">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-accent-solid" />
+            <Spinner className="h-8 w-8" />
             Checking you in…
           </div>
         ) : result ? (
