@@ -135,8 +135,10 @@ function SwipeRow({ n, allRead, onDismiss, onClick }: SwipeRowProps) {
     [0.85, 0.4, 0, 0.4, 0.85],
   )
 
-  function onDragEnd(_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) {
-    if (Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
+  function onDragEnd(e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) {
+    // Only dismiss on touch — on desktop a mouse drag is never intentional
+    const isTouch = e instanceof PointerEvent ? e.pointerType === 'touch' : e instanceof TouchEvent
+    if (isTouch && Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
       onDismiss(n.id)
     }
   }
