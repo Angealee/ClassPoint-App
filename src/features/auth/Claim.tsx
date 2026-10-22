@@ -23,7 +23,6 @@ export function Claim() {
   const { capsOn, capsProps } = useCapsLock()
   const [token, setToken] = useState('')
   const [username, setUsername] = useState('')
-  const [displayName, setDisplayName] = useState('')
   const [pin, setPin] = useState('')
   const [pin2, setPin2] = useState('')
   const [error, setError] = useState<string>()
@@ -58,7 +57,6 @@ export function Claim() {
       token: token.trim(),
       username: username.trim().toLowerCase(),
       pin,
-      displayName: displayName.trim() || undefined,
     })
     setBusy(false)
     if (error) {
@@ -69,7 +67,7 @@ export function Claim() {
       // So their first ordinary sign-in on this phone remembers them.
       rememberUsername(username)
       setDone(true)
-      transition.start('/app')
+      transition.start()
     }
   }
 
@@ -129,14 +127,6 @@ export function Claim() {
             placeholder="e.g. juan_dc"
             disabled={disabled}
             required
-          />
-          <Input
-            label="Display name (optional)"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            hint="Shown on the leaderboard. Leave blank to use your full name."
-            placeholder="e.g. Juan D."
-            disabled={disabled}
           />
           <div>
             <Input
@@ -205,8 +195,6 @@ export function Claim() {
           </Button>
         </motion.div>
       </motion.form>
-
-      {transition.overlay}
     </AuthShell>
   )
 }

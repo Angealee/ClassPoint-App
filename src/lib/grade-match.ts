@@ -57,8 +57,11 @@ export interface MatchReport {
  */
 const PARTICLES = new Set(['de', 'del', 'dela', 'delos', 'delas', 'la', 'las', 'los', 'san', 'santa', 'santo', 'st', 'mc', 'mac'])
 
-/** Generational suffixes carry no identity and are dropped. */
-const SUFFIXES = new Set(['jr', 'sr', 'ii', 'iii', 'iv', 'v'])
+/** Generational suffixes carry no identity and are dropped.
+ * 'v' is deliberately absent: it is a valid Roman-numeral middle initial
+ * ("Vicente", "Violeta") and dropping it would silently mis-match a student
+ * whose middle name starts with V. */
+const SUFFIXES = new Set(['jr', 'sr', 'ii', 'iii', 'iv'])
 
 /**
  * Rows that are plainly not a person.

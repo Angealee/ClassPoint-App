@@ -50,7 +50,7 @@ export function SignIn() {
       lock.reset()
       rememberUsername(username)
       setDone(true)
-      transition.start('/app')
+      transition.start()
     }
   }
 
@@ -159,8 +159,6 @@ export function SignIn() {
           </Button>
         </motion.div>
       </motion.form>
-
-      {transition.overlay}
     </AuthShell>
   )
 }

@@ -82,10 +82,11 @@ export interface MentionQuery {
  * The @mention being typed at the caret, or null.
  *
  * Anchored to an `@` that starts the string or follows whitespace, so an email
- * address never opens the picker. The query may hold ONE space, because half
- * the names in this class are two words and "@Maria S" has to keep matching;
- * past that the query stops matching anybody and the picker closes on its own,
- * which is the right behaviour for a sentence that happens to contain an `@`.
+ * address never opens the picker. The query may hold up to TWO spaces, because
+ * some names in this class are three words ("Juan Dela Cruz") and "@Juan De"
+ * has to keep matching; past that the query stops matching anybody and the
+ * picker closes on its own, which is the right behaviour for a sentence that
+ * happens to contain an `@`.
  */
 export function mentionQuery(beforeCaret: string): MentionQuery | null {
   const at = beforeCaret.lastIndexOf('@')
@@ -95,8 +96,8 @@ export function mentionQuery(beforeCaret: string): MentionQuery | null {
   const query = beforeCaret.slice(at + 1)
   if (query.length > MAX_QUERY) return null
   if (/[@\n]/.test(query)) return null
-  // At most one space — see above.
-  if ((query.match(/ /g) ?? []).length > 1) return null
+  // At most two spaces — see above.
+  if ((query.match(/ /g) ?? []).length > 2) return null
   return { query, start: at }
 }
 

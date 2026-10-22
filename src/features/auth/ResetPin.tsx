@@ -57,7 +57,7 @@ export function ResetPin() {
     } else {
       lock.reset()
       setDone(true)
-      transition.start('/app')
+      transition.start()
     }
   }
 
@@ -171,8 +171,6 @@ export function ResetPin() {
           </Button>
         </motion.div>
       </motion.form>
-
-      {transition.overlay}
     </AuthShell>
   )
 }

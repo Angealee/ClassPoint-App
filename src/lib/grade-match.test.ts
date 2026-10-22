@@ -44,6 +44,12 @@ describe('nameTokens', () => {
     expect(nameTokens('Juan Santos Jr.')).toEqual(nameTokens('Santos, Juan'))
   })
 
+  it('does NOT drop the Roman numeral V — it is a valid middle initial', () => {
+    // 'v' was in SUFFIXES before 0059 and would silently strip the middle
+    // initial of anyone named Vicente, Violeta, etc.
+    expect(nameTokens('Juan V. Santos')).toContain('v')
+  })
+
   it('keeps an initial as its own token', () => {
     expect(nameTokens('Juan P. Dela Cruz')).toContain('p')
   })

@@ -203,7 +203,23 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   are fully exercised (they are pure), but every call in `api/grades.ts` 400s —
   so every grades fetch gets its OWN try/catch and `ErrorState` (the 0034
   SectionGrid precedent), and nothing else in the instructor area is affected.
-  **Next number: 0059.**
+  **Next number: 0060.**
+  **0059 is WRITTEN AND NOT YET APPLIED** — structured student names. It adds
+  `last_name` / `first_name` / `middle_name` / `suffix` columns to `students`,
+  backfills `display_name` for old comma-format names (idempotent: `WHERE last_name
+  IS NULL`), ownership-moves `cp_guard_student_update` 0056→0059 (adds the four new
+  columns + `display_name` to the denylist), drops the exact `create_student(uuid,
+  text)` signature and recreates with structured params, updates `create_students`
+  to parse "Last, First MI" strings into the columns, adds `update_student_name` RPC
+  (instructor-only, writes audit log + re-runs `refresh_leaderboard_snapshot`),
+  widens `audit_log_action_check` with `'edit_name'` (all 15 values re-listed), and
+  calls `SELECT refresh_leaderboard_snapshot()` to update snapshot's `display_name`
+  copies. Until it lands, adding a student uses the new 4-field form but the RPC
+  falls back to constructing `full_name`/`display_name` from the old single-text
+  path — nothing breaks; structured columns stay NULL for all existing students.
+  Client mirror: `src/lib/student-name.ts` (`officialName`/`socialName`/`initialsOf`,
+  pinned by `student-name.test.ts`). **Change one side, change the other, same
+  commit** (the `lounge-answers.ts` rule).
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -3113,10 +3129,34 @@ build and logic only, like the aurora pass. ⚠ The stagger entrance photographs
 because framer-motion's rAF is starved while the pane is not compositing (the documented
 artifact); the DOM measurements are the reliable signal.
 
+⚠ **THE TRANSITION DID NOT SHOW ON A REAL SIGN-IN, AND THE GUARD RACE IS THE LESSON
+(2026-10-21).** The first version rendered the overlay INSIDE the auth screen
+(`{transition.overlay}` in SignIn's JSX) and navigated from the overlay's own timer. On a
+real sign-in it never appeared: `RedirectIfAuthed` (the guard wrapping /signin, /claim,
+/reset) redirects to /app the INSTANT auth resolves, so SignIn — and the overlay it
+rendered — unmounted a tick after the server said yes, long before the 2s timer. The
+guard won the race every time. This was foreseeable from `guards.tsx`, which had already
+been read; a full-screen effect that must outlive a route change cannot be mounted by the
+component the route change unmounts. **The overlay now lives in `AuthTransitionProvider`
+at the APP ROOT** (App.tsx, wrapping `RouterProvider`), triggered through context by
+`start()`. The guard redirects to /app UNDERNEATH; the `fixed inset-0 z-[100]` layer stays
+mounted across the redirect and covers it for the full 2s, then unmounts after its
+fade-out has already gone transparent, revealing /app (mounted behind it the whole time).
+**No navigate lives in the overlay any more** — the guard is the only thing that moves the
+route, so `start()` takes no destination. Verified by a temporary probe route
+(`/__fx`, removed, residue-checked) that called `start()` on mount: the overlay mounts at
+root, `z-index 100`, covers the viewport, `bg` canvas, logo + "ClassPoint" present, and
+opacity sampled `1` steadily across 5 reads (it animates in and holds). ⚠ Its SCREENSHOT
+still captures black — the pane's screenshot grabs a pre-composite frame — so the DOM
+opacity sample, not the screenshot, is the proof here.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
-`greatest(0, SUM(point_events.points))`), `student_secrets`, `point_events` (the
+`greatest(0, SUM(point_events.points))`; structured name columns `last_name` /
+`first_name` / `middle_name` / `suffix` added by 0059 — NULL for all 208 existing
+students until 0059 is applied; `full_name` = official sort key `"Dela Cruz, Juan M."`,
+`display_name` = social `"Juan Dela Cruz"`), `student_secrets`, `point_events` (the
 ledger — awards, penalties, and future spending all flow through it), `instructors`
 (allowlist, checked via `is_instructor()`), `leaderboard_snapshot` + `leaderboard_meta`
 (frozen rank, pg_cron refresh 12:30 + 19:30 Manila), `push_subscriptions`,
