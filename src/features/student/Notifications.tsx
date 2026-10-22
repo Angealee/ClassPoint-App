@@ -142,7 +142,7 @@ function SwipeRow({ n, allRead, onDismiss, onClick }: SwipeRowProps) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative overflow-hidden">
       {/* Dismiss hint shown behind the row as it's dragged */}
       <motion.div
         className="absolute inset-0 flex items-center justify-between bg-danger/10 px-5"
@@ -153,20 +153,22 @@ function SwipeRow({ n, allRead, onDismiss, onClick }: SwipeRowProps) {
         <span className="text-2xs font-semibold text-danger">Dismiss →</span>
       </motion.div>
 
-      {/* Draggable row */}
+      {/* Draggable row — bg-canvas makes it opaque so the hint tint never bleeds
+          through the row; the unread accent sits in its own overlay inside. */}
       <motion.div
         drag="x"
         dragConstraints={{ left: -240, right: 240 }}
         dragElastic={0.12}
         onDragEnd={onDragEnd}
         style={{ x }}
-        className={cn('relative touch-pan-y', unread && 'bg-accent-solid/[0.06]')}
+        className="relative touch-pan-y bg-canvas"
         onClick={(e) => e.stopPropagation()}
       >
+        {unread && <div className="absolute inset-0 bg-accent-solid/[0.06]" aria-hidden />}
         <button
           type="button"
           onClick={() => onClick(n)}
-          className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-card-2 active:bg-card-2"
+          className="relative flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-card-2 active:bg-card-2"
         >
           <span
             className={cn(
