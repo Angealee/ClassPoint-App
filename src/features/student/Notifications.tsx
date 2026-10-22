@@ -14,7 +14,6 @@ import {
   BellIcon,
   BoltIcon,
   CheckIcon,
-  MoreIcon,
   StarIcon,
   TicketIcon,
   TrophyIcon,
@@ -32,7 +31,7 @@ const PAGE_SIZE = 30
 const SWIPE_THRESHOLD = 80
 
 // True on devices whose primary pointer is precise (mouse/trackpad). Used to
-// switch between swipe-to-dismiss (touch) and the 3-dot menu (desktop).
+// switch between swipe-to-dismiss (touch) and right-click context menu (desktop).
 const IS_DESKTOP = window.matchMedia('(pointer: fine)').matches
 
 const TYPE_META: Record<
@@ -121,64 +120,58 @@ function EmptyIllustration() {
   )
 }
 
-// ── Desktop-only 3-dot row menu ──────────────────────────────────────────────
+// ── Desktop right-click context menu ────────────────────────────────────────
+// Rendered directly into the parent portal (fixed z-[60] clears the modal's z-50).
 
-interface RowMenuProps {
+interface NotifContextMenuProps {
+  x: number
+  y: number
   isRead: boolean
   onToggleRead: () => void
   onDismiss: () => void
+  onClose: () => void
 }
 
-function RowMenu({ isRead, onToggleRead, onDismiss }: RowMenuProps) {
-  const [open, setOpen] = useState(false)
+function NotifContextMenu({ x, y, isRead, onToggleRead, onDismiss, onClose }: NotifContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!open) return
     function onPointer(e: PointerEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
+        onClose()
       }
     }
     document.addEventListener('pointerdown', onPointer)
     return () => document.removeEventListener('pointerdown', onPointer)
-  }, [open])
+  }, [onClose])
+
+  // Keep menu inside the viewport
+  const MENU_W = 176
+  const MENU_H = 90
+  const left = x + MENU_W > window.innerWidth ? x - MENU_W : x
+  const top = y + MENU_H > window.innerHeight ? y - MENU_H : y
 
   return (
-    <div ref={ref} className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+    <div
+      ref={ref}
+      style={{ left, top }}
+      className="fixed z-[60] w-44 overflow-hidden rounded-xl border border-line bg-card py-1 shadow-xl"
+    >
       <button
         type="button"
-        aria-label="More options"
-        onClick={() => setOpen((v) => !v)}
-        className="cp-tap-44 flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-card-2 hover:text-ink"
+        onClick={() => { onToggleRead(); onClose() }}
+        className="flex w-full items-center px-3.5 py-2.5 text-left text-sm text-ink transition-colors hover:bg-card-2"
       >
-        <MoreIcon className="h-4 w-4" />
+        {isRead ? 'Mark as unread' : 'Mark as read'}
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-card py-1 shadow-lg">
-          <button
-            type="button"
-            onClick={() => {
-              onToggleRead()
-              setOpen(false)
-            }}
-            className="flex w-full items-center px-3.5 py-2.5 text-left text-sm text-ink transition-colors hover:bg-card-2"
-          >
-            {isRead ? 'Mark as unread' : 'Mark as read'}
-          </button>
-          <div className="mx-3 my-0.5 h-px bg-line" />
-          <button
-            type="button"
-            onClick={() => {
-              onDismiss()
-              setOpen(false)
-            }}
-            className="flex w-full items-center px-3.5 py-2.5 text-left text-sm text-danger transition-colors hover:bg-card-2"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
+      <div className="mx-3 my-0.5 h-px bg-line" />
+      <button
+        type="button"
+        onClick={() => { onDismiss(); onClose() }}
+        className="flex w-full items-center px-3.5 py-2.5 text-left text-sm text-danger transition-colors hover:bg-card-2"
+      >
+        Dismiss
+      </button>
     </div>
   )
 }
@@ -191,21 +184,22 @@ interface SwipeRowProps {
   isRead: boolean
   onDismiss: (id: string) => void
   onClick: (n: AppNotification) => void
-  onToggleRead: (id: string, read: boolean) => void
+  /** Right-click context menu handler (desktop only). */
+  onContextMenu: (e: React.MouseEvent) => void
   /** Called when a drag gesture starts — lets the parent suppress backdrop clicks. */
   onRowDragStart: () => void
   /** Called when a drag gesture ends (after a brief delay to cover synthetic clicks). */
   onRowDragEnd: () => void
 }
 
-function SwipeRow({ n, isRead, onDismiss, onClick, onToggleRead, onRowDragStart, onRowDragEnd }: SwipeRowProps) {
+function SwipeRow({ n, isRead, onDismiss, onClick, onContextMenu, onRowDragStart, onRowDragEnd }: SwipeRowProps) {
   const meta = TYPE_META[n.type] ?? DEFAULT_META
   const unread = !isRead
 
-  // ── Desktop: plain row + hover 3-dot menu ─────────────────────────────────
+  // ── Desktop: clean row, right-click opens context menu ───────────────────
   if (IS_DESKTOP) {
     return (
-      <div className="group relative flex items-center">
+      <div className="relative flex items-center" onContextMenu={onContextMenu}>
         {unread && <div className="pointer-events-none absolute inset-0 bg-accent-solid/[0.06]" aria-hidden />}
         <button
           type="button"
@@ -238,14 +232,6 @@ function SwipeRow({ n, isRead, onDismiss, onClick, onToggleRead, onRowDragStart,
             />
           )}
         </button>
-        {/* 3-dot menu: hidden until the row is hovered or the button has focus */}
-        <div className="invisible mr-1 shrink-0 group-hover:visible group-focus-within:visible">
-          <RowMenu
-            isRead={isRead}
-            onToggleRead={() => onToggleRead(n.id, !isRead)}
-            onDismiss={() => onDismiss(n.id)}
-          />
-        </div>
       </div>
     )
   }
@@ -357,8 +343,8 @@ function SwipeRowMobile({ n, unread, meta, onDismiss, onClick, onRowDragStart, o
  *
  * Opens as a card that scales up from the center of the screen (not a bottom
  * sheet). Items are grouped by day with sticky headers. Each row is
- * horizontally swipeable to dismiss it from the list (mobile/touch), or has a
- * 3-dot menu for mark-as-read / dismiss (desktop/mouse).
+ * horizontally swipeable to dismiss it from the list (mobile/touch), or
+ * right-clickable for a context menu showing mark-as-read / dismiss (desktop).
  */
 export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { me, markAllRead, unreadCount } = useStudentData()
@@ -375,6 +361,13 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
   const [openedUnread, setOpenedUnread] = useState(0)
   // Per-item read overrides: true = read, false = unread. Session-local only.
   const [readOverrides, setReadOverrides] = useState<Map<string, boolean>>(new Map())
+  // Desktop context menu: which notification was right-clicked and where.
+  const [ctxMenu, setCtxMenu] = useState<{
+    id: string
+    x: number
+    y: number
+    isRead: boolean
+  } | null>(null)
 
   // Always-fresh ref so the open effect can read the current count without
   // adding it to the dependency array (we only want the value at open time).
@@ -384,6 +377,11 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
   // Stable callback ref so the Escape handler doesn't re-register on every render.
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+
+  // Ref so the Escape handler can check if the context menu is open without
+  // re-registering the listener on every ctxMenu state change.
+  const ctxMenuRef = useRef(ctxMenu)
+  ctxMenuRef.current = ctxMenu
 
   // True while any row is being dragged (or for 100ms after — long enough to
   // swallow the synthetic click framer-motion fires after a drag ends).
@@ -396,6 +394,7 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
     setDismissed(new Set())
     setAllRead(false)
     setReadOverrides(new Map())
+    setCtxMenu(null)
     let cancelled = false
     setLoading(true)
     setError(false)
@@ -423,11 +422,17 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
     }
   }, [open])
 
-  // Escape key
+  // Escape key: closes the context menu first, then the modal on a second press.
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onCloseRef.current()
+      if (e.key === 'Escape') {
+        if (ctxMenuRef.current) {
+          setCtxMenu(null)
+        } else {
+          onCloseRef.current()
+        }
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -492,130 +497,145 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
   const showUnreadBadge = !loading && !allRead && openedUnread > 0
 
   return createPortal(
-    <AnimatePresence>
-      {open && (
-        // Backdrop doubles as the centering flex container
-        <motion.div
-          key="notifications-overlay"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.16 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-          onClick={() => { if (!draggingRef.current) onClose() }}
-        >
-          {/* Card — scales up from center */}
+    <>
+      <AnimatePresence>
+        {open && (
+          // Backdrop doubles as the centering flex container
           <motion.div
-            role="dialog"
-            aria-modal
-            aria-label="Notifications"
-            initial={{ scale: 0.92, opacity: 0, y: 10 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.94, opacity: 0, y: 6 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-            className="flex h-full max-h-[82dvh] w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-line bg-canvas shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            key="notifications-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+            onClick={() => { if (!draggingRef.current) onClose() }}
           >
-            {/* ── Header ── */}
-            <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-3.5">
-              <h2 className="min-w-0 flex-1 truncate text-base font-semibold">Notifications</h2>
-              {showUnreadBadge && (
-                <span className="shrink-0 rounded-full bg-accent-solid/15 px-2 py-0.5 text-xs font-semibold tabular-nums text-accent">
-                  {openedUnread > 99 ? '99+' : openedUnread}
-                </span>
-              )}
-              {showUnreadBadge && (
+            {/* Card — scales up from center */}
+            <motion.div
+              role="dialog"
+              aria-modal
+              aria-label="Notifications"
+              initial={{ scale: 0.92, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.94, opacity: 0, y: 6 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+              className="flex h-full max-h-[82dvh] w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-line bg-canvas shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* ── Header ── */}
+              <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-3.5">
+                <h2 className="min-w-0 flex-1 truncate text-base font-semibold">Notifications</h2>
+                {showUnreadBadge && (
+                  <span className="shrink-0 rounded-full bg-accent-solid/15 px-2 py-0.5 text-xs font-semibold tabular-nums text-accent">
+                    {openedUnread > 99 ? '99+' : openedUnread}
+                  </span>
+                )}
+                {showUnreadBadge && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllRead}
+                    className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent-solid/10"
+                  >
+                    Mark all read
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={handleMarkAllRead}
-                  className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent-solid/10"
+                  onClick={onClose}
+                  aria-label="Close notifications"
+                  className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-card-2 hover:text-ink"
                 >
-                  Mark all read
+                  <XIcon className="h-4 w-4" />
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close notifications"
-                className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-card-2 hover:text-ink"
-              >
-                <XIcon className="h-4 w-4" />
-              </button>
-            </div>
+              </div>
 
-            {/* ── Body ── */}
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-              {loading ? (
-                <div className="px-4 py-4">
-                  <ListSkeleton rows={6} />
-                </div>
-              ) : error ? (
-                <p className="py-10 text-center text-sm text-danger">
-                  Could not load. Close and try again.
-                </p>
-              ) : visibleItems.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 py-12 text-center">
-                  <EmptyIllustration />
-                  <p className="text-sm text-muted">
-                    Nothing yet — points, level-ups
-                    <br />
-                    and rank moves land here.
+              {/* ── Body ── */}
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                {loading ? (
+                  <div className="px-4 py-4">
+                    <ListSkeleton rows={6} />
+                  </div>
+                ) : error ? (
+                  <p className="py-10 text-center text-sm text-danger">
+                    Could not load. Close and try again.
                   </p>
-                </div>
-              ) : (
-                <>
-                  {groups.map((group) => (
-                    <div key={group.label}>
-                      {/* Sticky day header */}
-                      <div className="sticky top-0 z-10 bg-canvas px-4 pb-1.5 pt-2.5">
-                        <span className="text-2xs font-semibold uppercase tracking-widest text-muted">
-                          {group.label}
-                        </span>
+                ) : visibleItems.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 py-12 text-center">
+                    <EmptyIllustration />
+                    <p className="text-sm text-muted">
+                      Nothing yet — points, level-ups
+                      <br />
+                      and rank moves land here.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {groups.map((group) => (
+                      <div key={group.label}>
+                        {/* Sticky day header */}
+                        <div className="sticky top-0 z-10 bg-canvas px-4 pb-1.5 pt-2.5">
+                          <span className="text-2xs font-semibold uppercase tracking-widest text-muted">
+                            {group.label}
+                          </span>
+                        </div>
+                        {/* Items — AnimatePresence handles swipe-dismissed exits */}
+                        <AnimatePresence initial={false}>
+                          {group.items.map((n) => (
+                            <motion.div
+                              key={n.id}
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.18 }}
+                              className="overflow-hidden border-b border-line/50 last:border-b-0"
+                            >
+                              <SwipeRow
+                                n={n}
+                                isRead={isEffectivelyRead(n)}
+                                onDismiss={handleDismiss}
+                                onClick={openTarget}
+                                onContextMenu={(e) => {
+                                  e.preventDefault()
+                                  setCtxMenu({ id: n.id, x: e.clientX, y: e.clientY, isRead: isEffectivelyRead(n) })
+                                }}
+                                onRowDragStart={() => { draggingRef.current = true }}
+                                onRowDragEnd={() => { draggingRef.current = false }}
+                              />
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
                       </div>
-                      {/* Items — AnimatePresence handles swipe-dismissed exits */}
-                      <AnimatePresence initial={false}>
-                        {group.items.map((n) => (
-                          <motion.div
-                            key={n.id}
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.18 }}
-                            className="overflow-hidden border-b border-line/50 last:border-b-0"
-                          >
-                            <SwipeRow
-                              n={n}
-                              isRead={isEffectivelyRead(n)}
-                              onDismiss={handleDismiss}
-                              onClick={openTarget}
-                              onToggleRead={handleToggleRead}
-                              onRowDragStart={() => { draggingRef.current = true }}
-                              onRowDragEnd={() => { draggingRef.current = false }}
-                            />
-                          </motion.div>
-                        ))}
-                      </AnimatePresence>
-                    </div>
-                  ))}
-                  {hasMore && (
-                    <div className="px-4 py-3">
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => void loadMore()}
-                        disabled={loadingMore}
-                      >
-                        {loadingMore ? 'Loading…' : 'Load older'}
-                      </Button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+                    ))}
+                    {hasMore && (
+                      <div className="px-4 py-3">
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => void loadMore()}
+                          disabled={loadingMore}
+                        >
+                          {loadingMore ? 'Loading…' : 'Load older'}
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
+        )}
+      </AnimatePresence>
+      {open && ctxMenu && (
+        <NotifContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          isRead={ctxMenu.isRead}
+          onToggleRead={() => handleToggleRead(ctxMenu.id, !ctxMenu.isRead)}
+          onDismiss={() => { handleDismiss(ctxMenu.id); setCtxMenu(null) }}
+          onClose={() => setCtxMenu(null)}
+        />
       )}
-    </AnimatePresence>,
+    </>,
     document.body,
   )
 }
