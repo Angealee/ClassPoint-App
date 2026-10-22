@@ -33,28 +33,21 @@ const TAP_WINDOW_MS = 2000
 /** Header height, in px. The hero pads by exactly this to fill one screen. */
 const HEADER_H = 56
 
-/**
- * The three steps, in the order a student actually lives them.
- *
- * These answer "what happens to me", which is a different question from the
- * feature list below ("what do I get"). The page this replaced asked both
- * questions with one set of three cards and so answered neither properly.
- */
 const STEPS = [
   {
     Icon: KeyIcon,
-    title: 'Claim your account',
-    body: 'Your instructor hands you a token. Use it once to pick a username and a PIN.',
+    title: 'Claim mo muna account mo',
+    body: 'If wala ka pang account, contact your instructor to claim a token for account creation.',
   },
   {
     Icon: BoltIcon,
-    title: 'Earn in class',
-    body: 'Recitations and activities are worth 1 to 5 points, awarded live while class is running.',
+    title: 'Grind kang points sa class yah',
+    body: 'Recitations and activities can gain you points, it can beawarded live while class is running.',
   },
   {
     Icon: TrophyIcon,
-    title: 'Climb',
-    body: 'Points are XP. Fill the bar, level up, and watch your rank move on the board.',
+    title: 'Tignan mo sa leaderboard kung gaano ka kalakas',
+    body: 'Points are XP. Fill the bar, level up, and watch your rank move on the rankings.',
   },
 ]
 
@@ -62,23 +55,23 @@ const STEPS = [
 const FEATURES = [
   {
     Icon: ScanIcon,
-    title: 'QR check-in',
-    body: 'Point your camera at the board. Works offline and syncs when you are back.',
+    title: 'Offline QR attendance-in',
+    body: 'Point your camera. Works offline and syncs when you are back.',
   },
   {
     Icon: StarIcon,
     title: 'Badges',
-    body: 'Dozens to unlock. Some are obvious. Some are very much not.',
+    body: 'Be active to unlock certain hidden achievements.',
   },
   {
     Icon: FlameIcon,
     title: 'Streaks',
-    body: 'Turn up, turn up on time, and keep the flame lit.',
+    body: 'Consistency. Turn up on time, and keep the flame lit.',
   },
   {
     Icon: TicketIcon,
-    title: 'Rewards',
-    body: 'Spend points on whatever your instructor has put up for grabs.',
+    title: 'Points',
+    body: 'Gain points then spend points on certain quizzes and activities.',
   },
 ]
 
@@ -93,17 +86,6 @@ export function Landing() {
 function LandingPage() {
   const navigate = useNavigate()
   const { scrollY, progress } = useLandingScroll()
-
-  /**
-   * True once the hero is mostly behind you. Drives three things at once — the
-   * header solidifying, the compact Sign in appearing, and the back-to-top
-   * button — so they change together as one moment rather than at three
-   * different scroll offsets.
-   *
-   * `setScrolled` is called on every scroll frame but React bails out when the
-   * boolean is unchanged, so this re-renders twice per page: once crossing
-   * down, once crossing back.
-   */
   const [scrolled, setScrolled] = useState(false)
   useMotionValueEvent(scrollY, 'change', (y) => {
     setScrolled(y > window.innerHeight * 0.6)
@@ -131,15 +113,6 @@ function LandingPage() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {/* ── HEADER ────────────────────────────────────────────────────────
-          FIXED, not sticky, and that is what lets the hero be exactly one
-          screen: a sticky header occupies flow height, so `min-h-dvh` below it
-          would total a screen PLUS the bar and leave the next section peeking
-          at the bottom. Fixed takes no flow height, and the hero pads by
-          HEADER_H to sit clear of it.
-
-          Transparent over the hero so the aurora runs edge to edge behind the
-          logo, then it fades in its own surface once you have scrolled past. */}
       <header
         className={cn(
           'fixed inset-x-0 top-0 z-30 transition-colors duration-300',
@@ -154,9 +127,7 @@ function LandingPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Sign in follows you down the page, but only once the hero's own
-                CTA has left the screen — two identical buttons visible at the
-                same time would be two decisions where there is one. */}
+
             <AnimatePresence>
               {scrolled && (
                 <motion.div
@@ -182,16 +153,12 @@ function LandingPage() {
         <motion.div
           aria-hidden
           style={{ scaleX: progress }}
-          className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-gradient-to-r from-gold-500 to-gold-300"
+          className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-linear-to-r from-gold-500 to-gold-300"
         />
       </header>
 
       <main className="flex-1">
-        {/* ── HERO — exactly one screen ─────────────────────────────────────
-            `min-h-dvh` with `paddingTop: HEADER_H`: Tailwind's border-box means
-            the padding is INSIDE the 100dvh, so the section is one viewport
-            tall including its clearance, and nothing below it can peek. The
-            content takes `flex-1` and centres; the cue pins to the bottom. */}
+       
         <section
           className="relative flex min-h-dvh flex-col"
           style={{ paddingTop: HEADER_H }}
@@ -207,29 +174,19 @@ function LandingPage() {
                 className="text-center lg:text-left"
               >
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-solid/10 px-3 py-1 text-2xs font-semibold uppercase tracking-widest text-accent">
-                  Built for DCT-CCS
+                  Built by the CEO
                 </span>
 
-                {/* `text-3xl` on a phone, not `text-4xl`: at 36px this headline
-                    wraps to three lines and pushes the scoreboard off the
-                    screen. The scoreboard IS the pitch, so it has to be in the
-                    first view — a landing page that shows nothing but words on
-                    first paint is the page this replaced. */}
                 <h1 className="mt-4 font-display text-3xl font-bold leading-[1.1] sm:text-5xl">
-                  Turn class points into <span className="text-reward">XP</span>.
+                  Class 'points' into <span className="text-reward">XP</span>.
                 </h1>
 
                 <p className="mx-auto mt-3 max-w-md text-muted lg:mx-0">
-                  Recite, join in, show up. Your points become levels, badges, and a place on the
+                  Recite, be active, get points. See your progress on the
                   leaderboard.
                 </p>
 
-                {/* ── ONE action, one quiet alternative ───────────────────────
-                    This used to be three targets of near-equal weight (sign in,
-                    claim, install) stacked in a column, which is three
-                    decisions where there should be one. Install moved to its
-                    own section at the foot of the page: worth doing, but never
-                    the reason somebody opened this URL. */}
+                
                 <div className="mx-auto mt-6 flex max-w-sm flex-col items-center gap-3 lg:mx-0 lg:items-start">
                   <Button size="lg" className="w-full" onClick={() => navigate('/signin')}>
                     Sign in
@@ -256,10 +213,6 @@ function LandingPage() {
             </div>
           </div>
 
-          {/* Scroll cue, pinned to the bottom of the viewport. A real anchor
-              rather than a decorative chevron: it says what is below AND takes
-              you there, which is the difference between an affordance and an
-              ornament. */}
           <div className="relative flex shrink-0 justify-center pb-6">
             <a
               href="#how"
@@ -271,10 +224,6 @@ function LandingPage() {
           </div>
         </section>
 
-        {/* ── HOW IT WORKS ───────────────────────────────────────────────────
-            Numbered, because these are sequential and the feature grid below is
-            not. The number is the visual anchor; the icon supports it.
-            `scroll-mt` clears the FIXED header when the cue jumps here. */}
         <section id="how" className="border-t border-line bg-card-2" style={{ scrollMarginTop: HEADER_H }}>
           <div className="mx-auto max-w-5xl px-5 py-16">
             <Reveal>
@@ -357,7 +306,7 @@ function LandingPage() {
             <BoardPreview className="mt-8" />
           </div>
         </section>
-s
+
         {/*install div*/}
         <section className="border-t border-line">
           <div className="mx-auto max-w-xl px-5 py-16">

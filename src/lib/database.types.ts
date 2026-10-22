@@ -78,6 +78,11 @@ export interface Database {
         section_id: UUID
         full_name: string
         display_name: string
+        /** 0059 — structured name fields. NULL for students created before 0059. */
+        last_name: string | null
+        first_name: string | null
+        middle_name: string | null
+        suffix: string | null
         avatar_url: string | null
         /** Career total. Achievements read this (badges are lifetime). */
         lifetime_points: number

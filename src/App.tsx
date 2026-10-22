@@ -8,6 +8,7 @@ import { UpdatePrompt } from '@/components/pwa/UpdatePrompt'
 import { InstallPrompt } from '@/components/pwa/InstallPrompt'
 import { OfflineBanner } from '@/components/pwa/OfflineBanner'
 import { router } from '@/router'
+import { AuthTransitionProvider } from '@/components/auth/AuthTransition'
 
 export default function App() {
   return (
@@ -21,7 +22,9 @@ export default function App() {
         <ToastProvider>
           <PwaInstallProvider>
             <AuthProvider>
-              <RouterProvider router={router} />
+              <AuthTransitionProvider>
+                <RouterProvider router={router} />
+              </AuthTransitionProvider>
               <OfflineBanner />
               <UpdatePrompt />
               <InstallPrompt />

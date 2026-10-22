@@ -55,6 +55,11 @@ export interface SectionStudent {
   section_id: string
   full_name: string
   display_name: string
+  /** Structured name fields (0059). NULL for students created before 0059. */
+  last_name: string | null
+  first_name: string | null
+  middle_name: string | null
+  suffix: string | null
   avatar_url: string | null
   /** This semester's points — what the roster and Award screen show (0029). */
   semester_points: number

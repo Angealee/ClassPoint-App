@@ -455,3 +455,23 @@ export function TableIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+/** Reveal a hidden PIN. */
+export function EyeIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+/** Hide a revealed PIN — the eye with a slash. */
+export function EyeOffIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M10.6 6.1A9.8 9.8 0 0 1 12 6c6 0 9.5 6 9.5 6a16 16 0 0 1-2.3 2.9M6.2 7.2A16 16 0 0 0 2.5 12S6 18 12 18a9.3 9.3 0 0 0 3.8-.8" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />
+    </svg>
+  )
+}

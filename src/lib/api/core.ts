@@ -26,6 +26,7 @@ import type {
   SectionStudent,
   StudentSelf,
 } from '@/lib/types'
+import type { NameParts } from '@/lib/student-name'
 
 // ── Semesters, terms & subjects (0027) ───────────────────────────────────────
 
@@ -443,13 +444,33 @@ export async function listStudents(sectionId: string): Promise<SectionStudent[]>
 /** Add a student to a section; returns the generated one-time claim token. */
 export async function createStudent(
   sectionId: string,
-  fullName: string,
+  parts: NameParts,
 ): Promise<{ studentId: string; claimToken: string }> {
   const { data, error } = await supabase
-    .rpc('create_student', { p_section_id: sectionId, p_full_name: fullName })
+    .rpc('create_student', {
+      p_section_id: sectionId,
+      p_last_name: parts.lastName,
+      p_first_name: parts.firstName,
+      p_middle_name: parts.middleName ?? null,
+      p_suffix: parts.suffix ?? null,
+    })
     .single<{ student_id: string; claim_token: string }>()
   if (error) throw error
   return { studentId: data.student_id, claimToken: data.claim_token }
+}
+
+/** Update a student's structured name fields (instructor-only). */
+export async function updateStudentName(
+  studentId: string,
+  parts: NameParts,
+): Promise<void> {
+  await rpc('update_student_name', {
+    p_student_id: studentId,
+    p_last_name: parts.lastName,
+    p_first_name: parts.firstName,
+    p_middle_name: parts.middleName ?? null,
+    p_suffix: parts.suffix ?? null,
+  })
 }
 
 /**

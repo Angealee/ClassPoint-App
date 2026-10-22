@@ -203,7 +203,23 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   are fully exercised (they are pure), but every call in `api/grades.ts` 400s —
   so every grades fetch gets its OWN try/catch and `ErrorState` (the 0034
   SectionGrid precedent), and nothing else in the instructor area is affected.
-  **Next number: 0059.**
+  **Next number: 0060.**
+  **0059 is WRITTEN AND NOT YET APPLIED** — structured student names. It adds
+  `last_name` / `first_name` / `middle_name` / `suffix` columns to `students`,
+  backfills `display_name` for old comma-format names (idempotent: `WHERE last_name
+  IS NULL`), ownership-moves `cp_guard_student_update` 0056→0059 (adds the four new
+  columns + `display_name` to the denylist), drops the exact `create_student(uuid,
+  text)` signature and recreates with structured params, updates `create_students`
+  to parse "Last, First MI" strings into the columns, adds `update_student_name` RPC
+  (instructor-only, writes audit log + re-runs `refresh_leaderboard_snapshot`),
+  widens `audit_log_action_check` with `'edit_name'` (all 15 values re-listed), and
+  calls `SELECT refresh_leaderboard_snapshot()` to update snapshot's `display_name`
+  copies. Until it lands, adding a student uses the new 4-field form but the RPC
+  falls back to constructing `full_name`/`display_name` from the old single-text
+  path — nothing breaks; structured columns stay NULL for all existing students.
+  Client mirror: `src/lib/student-name.ts` (`officialName`/`socialName`/`initialsOf`,
+  pinned by `student-name.test.ts`). **Change one side, change the other, same
+  commit** (the `lounge-answers.ts` rule).
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -2987,10 +3003,160 @@ the compact status squares still 32x32. Then on the live Landing page: the claim
 link 28 -> 45 sitting 4px clear of Sign in, and **`overlaps: []`** across every
 control on the screen. **Not verified on a real authenticated screen.**
 
+Auth screens — the aurora pass (2026-10-19, no migration). Decisions (user):
+**aurora + raised card** · **ticket-stub claim door below the form** · **all four auth
+screens**.
+
+**THE SIGN-IN SCREEN HAD THREE DOORS TO `/claim` AND THE FIRST ONE WAS IN THE WAY.**
+Measured at 375x812 before the change: a bordered "First time? Have a token?" card at
+**y=274**, directly under the heading and ABOVE both fields, plus a footer link at
+**y=695** saying the same thing in different words. So a returning student — very nearly
+all of the traffic — read an invitation addressed to somebody else before reaching the
+username box, and a new student was asked the same question twice in one screen.
+`components/auth/ClaimDoor.tsx` is now the ONLY route to `/claim` from sign-in, and it
+sits BELOW the form: it earns attention by being the loudest block on the page rather
+than the highest one. Verified in the browser — `a[href="/claim"]` returns exactly **1**.
+
+**THE TICKET STUB USES A PERFORATION, NOT EDGE NOTCHES, AND THAT IS A DELIBERATE
+DEPARTURE FROM `PodiumBoard`.** The spend pedestal bites its notches out with circles
+painted in the colour of the surface behind it, which works there because that surface
+is flat. Here the backdrop is the aurora, so a `bg-canvas` circle would read as a solid
+dot parked on a gradient. A genuine hole needs `mask-composite`, whose failure mode on
+an unsupporting engine is **the element disappearing entirely** — not a trade worth
+making for the only claim door in the app. A dashed perforation says "ticket" with no
+assumption about what is behind it.
+The ACTION is the second line and carries the weight and the `reward` colour; the
+question is the muted first line. A one-line explanation sat on that second line first
+and wrapped to two, which pushed the stub to **90px** and left the verb in muted body
+copy — it is **70px** now.
+
+**`AuthShell` hosts the aurora on a FULL-WIDTH root, not on the reading column.** The
+blurs are 416px and 480px across and would be cropped to `max-w-md` otherwise. The root
+carries `overflow-hidden`, which is safe **only because nothing in the auth area is
+`sticky`** — the same class would break the Shell header, AwardBar and the roster. The
+aurora is the landing page's own component reused rather than re-invented, so the screen
+a student lands on and the screen they sign in on belong to one world; it is
+`pointer-events-none`, animates only transform/opacity on the compositor, and the global
+reduced-motion block already switches it off with everything else.
+
+**The shell now owns the icon tile and a `below` slot.** `InstructorSignIn` hand-rolled
+that tile in its own body; it is an `icon` prop now, and Claim and ResetPin take one too.
+**Sign in passes NO icon on purpose** — it is the default door, so its heading should be
+the loudest thing on the page and the claim stub the only decorated element. `below`
+renders between the card and the footer, outside the card, because the claim stub is a
+second door and putting it inside the card that holds the form would say it was a field.
+
+⚠ **A real bug fixed on the way through: `Claim` and `ResetPin` rendered EVERY validation
+error under the LAST field.** `error` was passed to the Confirm-PIN input, so
+"Enter the token your instructor gave you." appeared at the opposite end of the form from
+the token box, with a red border on a field that was fine. Both now render it in their
+own `role="alert"` block above the submit button.
+Claim's six stacked fields are split into **"1 · From your instructor"** and
+**"2 · The login you keep"** (ResetPin likewise): the token is something you were HANDED,
+the rest is something you CHOOSE, and six identical boxes in a column said neither.
+
+Verified at 375x812 in BOTH themes (`localStorage['classpoint-theme']`, since the pane's
+`colorScheme` emulation does not drive this app's `.dark` class): zero horizontal
+overflow on all four screens, every input still **16px** (the iOS zoom rule), aurora
+present on all four, sign-in and instructor sign-in fit one screen (812px) while claim
+scrolls at 1105px. Light canvas `#f3f3f6` / card `#ffffff` / action `rgb(214,124,5)`;
+dark canvas `#08080b` / card `#18181f` / action `rgb(255,186,31)`. ESLint stayed at
+**105 warnings, 0 errors** — the new files added none. **Not verified against a real
+sign-in**, only the unauthenticated screens.
+
+Sign-in transition + auth polish (2026-10-21, no migration). Decisions (user):
+**fade & breathe logo transition, ~2s** · **on every student entry** (sign-in, claim,
+reset — instructor instant) · extras: **show/hide PIN · remember username · staggered
+entrance · caps-lock hint · button spinner→checkmark · auto-focus first empty field**.
+
+**`AuthTransition` + `useAuthTransition` play THEN navigate, they do not navigate then
+animate.** The three student screens already know they are going to `/app` the instant
+the server says yes. A full-screen `bg-canvas` overlay fades in OVER the screen that
+succeeded, and the `navigate('/app', {replace})` fires only when it ends — so the
+dashboard mounts behind an already-opaque screen with no seam, and no second route or
+loader flash. **The navigate is driven by a single `setTimeout(onDone, 2000)`, NOT by
+`onAnimationComplete`** — three sub-animations finish at three different moments and
+`reducedMotion` changes which, so one timer is the only clock that cannot disagree with
+itself. Everything is opacity+scale (compositor), and the global reduced-motion block
+leaves the straight fade the user asked for while the timer still fires on time.
+`onDone` is `useCallback`'d on `dest` so the overlay effect does not re-run every render
+(the `[open, onClose]` Sheet-focus trap). Instructor sign-in deliberately stays instant —
+the instructor is not made to wait 2s on every login.
+
+**`Input` gained `revealable`** — an eye toggle (new `EyeIcon`/`EyeOffIcon`) that flips
+`type` password↔text, `tabIndex={-1}` so it stays off the Tab path (username → PIN →
+submit), `.cp-tap-44` hit region, sitting INSIDE the field (`pr-11` on the input).
+Verified in the browser: password→text→password, `eyeInsideField: true`. Claim and Reset
+carry it on both PIN fields (`pinEyeCount: 2`).
+
+**`src/lib/auth-prefs.ts` stores the USERNAME ONLY** (`cp_last_username_v1`), never the
+PIN — the whole point of a PIN is that the device does not hold it. Written on a
+successful sign-in AND a successful claim (so a new student's first ordinary sign-in on
+that phone remembers them). SignIn prefills it, shows "Not you?" to clear
+(field + storage + refocus), and **auto-focuses the first EMPTY field**: PIN when the
+username is remembered, username otherwise. All of localStorage is try/caught (the
+per-viewer-convenience rule). Verified: prefill, PIN-focus-when-remembered, and the full
+"Not you?" clear cycle.
+
+**`src/lib/useCapsLock.ts` reads `getModifierState` off the field's OWN key events**, not
+a global listener — it is reliable only on a real key event and a phone's on-screen
+keyboard reports nothing, so it is inert exactly where it has nothing to warn about (a
+phone has no caps lock). The hint is `warn`-toned and suppressed while an error already
+shows under the PIN.
+
+**The staggered entrance reuses `motion.ts`'s `listVariants`/`rowVariants`** — the form
+is a `motion.form` and each field group a `rowVariants` child, so fields cascade in under
+the card's own entrance. The button shows a `CheckIcon` + "Signed in" the instant auth
+succeeds, as the hand-off into the overlay.
+
+⚠ **A CONCURRENT-EDIT COLLISION happened mid-task and is the lesson here.** All four auth
+screens were rewritten; while the browser verification ran, the user was hand-editing
+`SignIn.tsx` in their own editor (an older buffer) and saved it — silently reverting that
+one file to a plain version ("Welcome!" copy, no features) while Input/Claim/ResetPin and
+the three new files kept their new versions. Caught because the rendered page showed copy
+("Forgot your PIN? Click here") that was not in the code just written. **SignIn was
+re-applied ONTO the user's copy** (title "Welcome!", subtitle "Log in to your account to
+access your progress.", "Forgot your PIN? Click here" preserved verbatim) rather than
+reverting their words. If an auth `.tsx` ever shows copy that does not match the source,
+suspect the user's editor has it open — read disk before assuming a build is stale.
+
+Verified at 375x812 in both themes (`localStorage['classpoint-theme']`): zero horizontal
+overflow on sign-in and claim, inputs 16px, eye toggles work, auto-focus and
+remember-username confirmed by DOM probe. `npm run verify` green — **0 errors, 105
+warnings (unchanged), 417 tests**. **The 2s success transition itself is NOT verified
+against a real sign-in** (no test student credentials) — it is verified by typecheck,
+build and logic only, like the aurora pass. ⚠ The stagger entrance photographs faded
+because framer-motion's rAF is starved while the pane is not compositing (the documented
+artifact); the DOM measurements are the reliable signal.
+
+⚠ **THE TRANSITION DID NOT SHOW ON A REAL SIGN-IN, AND THE GUARD RACE IS THE LESSON
+(2026-10-21).** The first version rendered the overlay INSIDE the auth screen
+(`{transition.overlay}` in SignIn's JSX) and navigated from the overlay's own timer. On a
+real sign-in it never appeared: `RedirectIfAuthed` (the guard wrapping /signin, /claim,
+/reset) redirects to /app the INSTANT auth resolves, so SignIn — and the overlay it
+rendered — unmounted a tick after the server said yes, long before the 2s timer. The
+guard won the race every time. This was foreseeable from `guards.tsx`, which had already
+been read; a full-screen effect that must outlive a route change cannot be mounted by the
+component the route change unmounts. **The overlay now lives in `AuthTransitionProvider`
+at the APP ROOT** (App.tsx, wrapping `RouterProvider`), triggered through context by
+`start()`. The guard redirects to /app UNDERNEATH; the `fixed inset-0 z-[100]` layer stays
+mounted across the redirect and covers it for the full 2s, then unmounts after its
+fade-out has already gone transparent, revealing /app (mounted behind it the whole time).
+**No navigate lives in the overlay any more** — the guard is the only thing that moves the
+route, so `start()` takes no destination. Verified by a temporary probe route
+(`/__fx`, removed, residue-checked) that called `start()` on mount: the overlay mounts at
+root, `z-index 100`, covers the viewport, `bg` canvas, logo + "ClassPoint" present, and
+opacity sampled `1` steadily across 5 reads (it animates in and holds). ⚠ Its SCREENSHOT
+still captures black — the pane's screenshot grabs a pre-composite frame — so the DOM
+opacity sample, not the screenshot, is the proof here.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
-`greatest(0, SUM(point_events.points))`), `student_secrets`, `point_events` (the
+`greatest(0, SUM(point_events.points))`; structured name columns `last_name` /
+`first_name` / `middle_name` / `suffix` added by 0059 — NULL for all 208 existing
+students until 0059 is applied; `full_name` = official sort key `"Dela Cruz, Juan M."`,
+`display_name` = social `"Juan Dela Cruz"`), `student_secrets`, `point_events` (the
 ledger — awards, penalties, and future spending all flow through it), `instructors`
 (allowlist, checked via `is_instructor()`), `leaderboard_snapshot` + `leaderboard_meta`
 (frozen rank, pg_cron refresh 12:30 + 19:30 Manila), `push_subscriptions`,

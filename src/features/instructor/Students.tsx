@@ -17,6 +17,7 @@ import {
   CopyIcon,
   DownloadIcon,
   KeyIcon,
+  PencilIcon,
   PlusIcon,
   SearchIcon,
   TrashIcon,
@@ -41,12 +42,14 @@ import {
   listSessions,
   listStudents,
   resetStudentPin,
+  updateStudentName,
 } from '@/lib/api'
 import { exportAllData } from '@/lib/export-all'
 import { exportRoster, parseRosterNames } from '@/lib/roster-io'
 import { getLevelProgress } from '@/lib/leveling'
 import { cn } from '@/lib/cn'
 import type { Achievement, SectionStudent } from '@/lib/types'
+import { officialName } from '@/lib/student-name'
 
 export function Students() {
   const { sections, setSelectedSectionId } = useInstructor()
@@ -64,9 +67,20 @@ export function Students() {
   const [query, setQuery] = useState('')
 
   const [addOpen, setAddOpen] = useState(false)
-  const [newName, setNewName] = useState('')
+  const [newLastName, setNewLastName] = useState('')
+  const [newFirstName, setNewFirstName] = useState('')
+  const [newMiddleName, setNewMiddleName] = useState('')
+  const [newSuffix, setNewSuffix] = useState('')
   const [creating, setCreating] = useState(false)
   const [created, setCreated] = useState<{ name: string; token: string }>()
+
+  const [editTarget, setEditTarget] = useState<SectionStudent>()
+  const [editLastName, setEditLastName] = useState('')
+  const [editFirstName, setEditFirstName] = useState('')
+  const [editMiddleName, setEditMiddleName] = useState('')
+  const [editSuffix, setEditSuffix] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editConfirmOpen, setEditConfirmOpen] = useState(false)
 
   const [importOpen, setImportOpen] = useState(false)
   const [importNames, setImportNames] = useState<string[]>([])
@@ -256,12 +270,21 @@ export function Students() {
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
-    if (!newName.trim() || !openId) return
+    if (!newLastName.trim() || !newFirstName.trim() || !openId) return
     setCreating(true)
+    const parts = {
+      lastName: newLastName.trim(),
+      firstName: newFirstName.trim(),
+      middleName: newMiddleName.trim() || null,
+      suffix: newSuffix.trim() || null,
+    }
     try {
-      const { claimToken } = await createStudent(openId, newName.trim())
-      setCreated({ name: newName.trim(), token: claimToken })
-      setNewName('')
+      const { claimToken } = await createStudent(openId, parts)
+      setCreated({ name: officialName(parts), token: claimToken })
+      setNewLastName('')
+      setNewFirstName('')
+      setNewMiddleName('')
+      setNewSuffix('')
       await refresh()
     } catch {
       toast('Could not add the student.', 'error')
@@ -356,6 +379,35 @@ export function Students() {
       toast('Could not archive the student.', 'error')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  function openEditName(s: SectionStudent) {
+    setEditLastName(s.last_name ?? '')
+    setEditFirstName(s.first_name ?? '')
+    setEditMiddleName(s.middle_name ?? '')
+    setEditSuffix(s.suffix ?? '')
+    setEditTarget(s)
+  }
+
+  async function onSaveEditName() {
+    if (!editTarget || !editLastName.trim() || !editFirstName.trim()) return
+    setEditSaving(true)
+    try {
+      await updateStudentName(editTarget.id, {
+        lastName: editLastName.trim(),
+        firstName: editFirstName.trim(),
+        middleName: editMiddleName.trim() || null,
+        suffix: editSuffix.trim() || null,
+      })
+      toast(`Name updated.`, 'success')
+      setEditTarget(undefined)
+      setEditConfirmOpen(false)
+      await refresh()
+    } catch {
+      toast('Could not update the name.', 'error')
+    } finally {
+      setEditSaving(false)
     }
   }
 
@@ -587,6 +639,12 @@ export function Students() {
                   />
                 )}
                                 <IconButton
+                  label={`Edit ${s.full_name}'s name`}
+                  onClick={() => openEditName(s)}
+                  title="Edit name"
+                  icon={<PencilIcon className="h-4.5 w-4.5" />}
+                />
+                <IconButton
                   label={`Archive ${s.full_name}`}
                   variant="danger"
                   onClick={() => setDeleteTarget(s)}
@@ -677,20 +735,126 @@ export function Students() {
         ) : (
           <form onSubmit={onCreate} className="space-y-4">
             <Input
-              label="Full name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Last name, First name M.I."
-              hint="e.g. Dela Cruz, Juan A."
+              label="Last name"
+              value={newLastName}
+              onChange={(e) => setNewLastName(e.target.value)}
+              placeholder="e.g. Dela Cruz"
               autoFocus
               required
             />
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="First name"
+                value={newFirstName}
+                onChange={(e) => setNewFirstName(e.target.value)}
+                placeholder="e.g. Juan"
+                required
+              />
+              <Input
+                label="Middle name"
+                value={newMiddleName}
+                onChange={(e) => setNewMiddleName(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+            <Input
+              label="Suffix"
+              value={newSuffix}
+              onChange={(e) => setNewSuffix(e.target.value)}
+              placeholder="Jr., III, etc. (optional)"
+            />
+            {newLastName.trim() && newFirstName.trim() && (
+              <p className="rounded-lg bg-card-2 px-3 py-2 text-sm text-muted">
+                Official name:{' '}
+                <span className="font-semibold text-ink">
+                  {officialName({
+                    lastName: newLastName.trim(),
+                    firstName: newFirstName.trim(),
+                    middleName: newMiddleName.trim() || null,
+                    suffix: newSuffix.trim() || null,
+                  })}
+                </span>
+              </p>
+            )}
             <Button type="submit" size="lg" className="w-full" disabled={creating}>
               {creating ? 'Adding…' : 'Add & generate token'}
             </Button>
           </form>
         )}
       </Sheet>
+
+      {/* Edit name */}
+      <Sheet
+        open={!!editTarget}
+        onClose={() => setEditTarget(undefined)}
+        title={`Edit name — ${editTarget?.full_name ?? ''}`}
+      >
+        <div className="space-y-4">
+          <Input
+            label="Last name"
+            value={editLastName}
+            onChange={(e) => setEditLastName(e.target.value)}
+            autoFocus
+            required
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="First name"
+              value={editFirstName}
+              onChange={(e) => setEditFirstName(e.target.value)}
+              required
+            />
+            <Input
+              label="Middle name"
+              value={editMiddleName}
+              onChange={(e) => setEditMiddleName(e.target.value)}
+              placeholder="optional"
+            />
+          </div>
+          <Input
+            label="Suffix"
+            value={editSuffix}
+            onChange={(e) => setEditSuffix(e.target.value)}
+            placeholder="Jr., III, etc. (optional)"
+          />
+          {editLastName.trim() && editFirstName.trim() && (
+            <p className="rounded-lg bg-card-2 px-3 py-2 text-sm text-muted">
+              Official name:{' '}
+              <span className="font-semibold text-ink">
+                {officialName({
+                  lastName: editLastName.trim(),
+                  firstName: editFirstName.trim(),
+                  middleName: editMiddleName.trim() || null,
+                  suffix: editSuffix.trim() || null,
+                })}
+              </span>
+            </p>
+          )}
+          <Button
+            size="lg"
+            className="w-full"
+            disabled={!editLastName.trim() || !editFirstName.trim() || editSaving}
+            onClick={() => setEditConfirmOpen(true)}
+          >
+            Save name
+          </Button>
+        </div>
+      </Sheet>
+
+      <ConfirmDialog
+        open={editConfirmOpen}
+        title="Save this name?"
+        message={
+          <>
+            This updates <span className="font-semibold text-ink">{editTarget?.full_name}</span>'s
+            name everywhere in the app — leaderboard, attendance, records and all history.
+          </>
+        }
+        confirmLabel="Save"
+        busy={editSaving}
+        onConfirm={() => void onSaveEditName()}
+        onClose={() => setEditConfirmOpen(false)}
+      />
 
       {/* Import from Excel/CSV */}
       <Sheet
