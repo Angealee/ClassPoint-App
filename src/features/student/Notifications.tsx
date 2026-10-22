@@ -121,9 +121,13 @@ interface SwipeRowProps {
   allRead: boolean
   onDismiss: (id: string) => void
   onClick: (n: AppNotification) => void
+  /** Called when a drag gesture starts — lets the parent suppress backdrop clicks. */
+  onRowDragStart: () => void
+  /** Called when a drag gesture ends (after a brief delay to cover synthetic clicks). */
+  onRowDragEnd: () => void
 }
 
-function SwipeRow({ n, allRead, onDismiss, onClick }: SwipeRowProps) {
+function SwipeRow({ n, allRead, onDismiss, onClick, onRowDragStart, onRowDragEnd }: SwipeRowProps) {
   const meta = TYPE_META[n.type] ?? DEFAULT_META
   const unread = !allRead && !n.readAt
 
@@ -135,12 +139,14 @@ function SwipeRow({ n, allRead, onDismiss, onClick }: SwipeRowProps) {
     [0.85, 0.4, 0, 0.4, 0.85],
   )
 
-  function onDragEnd(e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) {
+  function handleDragEnd(e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) {
     // Only dismiss on touch — on desktop a mouse drag is never intentional
     const isTouch = e instanceof PointerEvent ? e.pointerType === 'touch' : e instanceof TouchEvent
     if (isTouch && Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
       onDismiss(n.id)
     }
+    // Keep dragging flag alive long enough to swallow the synthetic post-drag click
+    setTimeout(onRowDragEnd, 100)
   }
 
   return (
@@ -161,7 +167,8 @@ function SwipeRow({ n, allRead, onDismiss, onClick }: SwipeRowProps) {
         drag="x"
         dragConstraints={{ left: -240, right: 240 }}
         dragElastic={0.12}
-        onDragEnd={onDragEnd}
+        onDragStart={onRowDragStart}
+        onDragEnd={handleDragEnd}
         style={{ x }}
         className="relative touch-pan-y bg-canvas"
         onClick={(e) => e.stopPropagation()}
@@ -232,6 +239,11 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
   // Stable callback ref so the Escape handler doesn't re-register on every render.
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+
+  // True while any row is being dragged (or for 100ms after — long enough to
+  // swallow the synthetic click framer-motion fires after a drag ends).
+  // Prevents the backdrop onClick from closing the modal mid-swipe.
+  const draggingRef = useRef(false)
 
   useEffect(() => {
     if (!open || !studentId) return
@@ -322,7 +334,7 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
           exit={{ opacity: 0 }}
           transition={{ duration: 0.16 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-          onClick={onClose}
+          onClick={() => { if (!draggingRef.current) onClose() }}
         >
           {/* Card — scales up from center */}
           <motion.div
@@ -408,6 +420,8 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
                               allRead={allRead}
                               onDismiss={handleDismiss}
                               onClick={openTarget}
+                              onRowDragStart={() => { draggingRef.current = true }}
+                              onRowDragEnd={() => { draggingRef.current = false }}
                             />
                           </motion.div>
                         ))}
