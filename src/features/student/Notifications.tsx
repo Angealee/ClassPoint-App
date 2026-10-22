@@ -161,6 +161,7 @@ function SwipeRow({ n, allRead, onDismiss, onClick }: SwipeRowProps) {
         onDragEnd={onDragEnd}
         style={{ x }}
         className={cn('relative touch-pan-y', unread && 'bg-accent-solid/[0.06]')}
+        onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
