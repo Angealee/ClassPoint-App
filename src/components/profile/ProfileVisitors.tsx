@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Avatar } from '@/components/ui/Avatar'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { getProfileViews } from '@/lib/api'
 import { VisitorsSheet } from './VisitorsSheet'
 import type { ProfileViews, ProfileVisitorRow } from '@/lib/types'
@@ -46,7 +47,7 @@ export function ProfileVisitors({
         Profile views
       </p>
       {state === 'loading' || !views ? (
-        <div className="h-[4.25rem] animate-pulse rounded-xl bg-card-2" />
+        <Skeleton className="h-[4.25rem] rounded-xl" />
       ) : views.total === 0 ? (
         <p className="rounded-xl bg-card-2 px-4 py-3 text-sm text-muted">
           No profile views yet. Only you can see this.

@@ -332,7 +332,7 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
           />
           <div className="max-h-72 divide-y divide-line overflow-y-auto rounded-xl border border-line">
             {filtered.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-muted">Nobody by that name.</p>
+              <EmptyState compact>Nobody by that name.</EmptyState>
             ) : (
               filtered.map((p) => (
                 <button

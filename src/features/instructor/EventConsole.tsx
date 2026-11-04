@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { Input } from '@/components/ui/Input'
@@ -296,7 +297,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
     <div className="space-y-5">
       <PageHeader title={event.name} subtitle="Live event check-in" fallback="/teach/attendance" />
 
-      <Card pad="roomy" className="relative flex flex-col items-center gap-3">
+      <Card pad="roomy" elevation="raised" className="relative flex flex-col items-center gap-3">
         <IconButton
           label="Present QR fullscreen"
           variant="outline"
@@ -309,7 +310,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
           {payload ? (
             <QrCode value={payload} size={232} />
           ) : (
-            <div className="h-[232px] w-[232px] animate-pulse rounded-xl bg-card-2" />
+            <Skeleton className="h-[232px] w-[232px] rounded-xl" />
           )}
         </div>
         <div className="w-full max-w-[248px]">
@@ -397,10 +398,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
               {payload ? (
                 <QrCode value={payload} size={bigSize} />
               ) : (
-                <div
-                  className="animate-pulse rounded-xl bg-card-2"
-                  style={{ height: bigSize, width: bigSize }}
-                />
+                <Skeleton className="rounded-xl" style={{ height: bigSize, width: bigSize }} />
               )}
             </div>
             <div className="text-center">
@@ -655,7 +653,7 @@ function ManualAddSheet({
           {loadingRoster ? (
             <p className="p-6 text-center text-sm text-muted">Loading…</p>
           ) : visible.length === 0 ? (
-            <p className="p-6 text-center text-sm text-muted">No students match.</p>
+            <EmptyState compact>No students match.</EmptyState>
           ) : (
             visible.map((p) => (
               <button

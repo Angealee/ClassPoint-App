@@ -3,6 +3,7 @@ import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Rows } from '@/components/ui/Card'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { AchievementCard } from '@/components/achievements/AchievementCard'
@@ -203,7 +204,7 @@ export function Achievements() {
       )}
 
       {achievementsLoading ? (
-        <Card pad="none" className="h-64 animate-pulse bg-card-2" />
+        <Skeleton className="h-64 rounded-2xl" />
       ) : achievementsError ? (
         /* Without this the failed load left an empty catalog, which hid the
            filters above and then said "try a different filter" — with no

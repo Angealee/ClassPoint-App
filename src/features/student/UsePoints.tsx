@@ -3,6 +3,7 @@ import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { settle } from '@/lib/motion'
 import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -204,7 +205,7 @@ export function UsePoints() {
       />
 
       {/* Balance + the spent gauge */}
-      <Card className="p-5">
+      <Card elevation="raised" className="p-5">
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="text-xs text-muted">Available to spend</p>
@@ -244,7 +245,7 @@ export function UsePoints() {
               className="h-full rounded-full bg-gradient-to-r from-gold-600 via-gold-500 to-gold-300"
               initial={{ width: 0 }}
               animate={{ width: `${gaugePct}%` }}
-              transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+              transition={settle}
             />
           </div>
           <p className="mt-1.5 text-xs text-muted">

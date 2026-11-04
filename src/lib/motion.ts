@@ -21,13 +21,19 @@ export const spring: Transition = {
 }
 
 /**
- * FOUR NAMED ROLES, so no component invents its own spring.
+ * FIVE NAMED ROLES, so no component invents its own spring.
  *
  * Before this there were six unrelated definitions written inline at six call
  * sites (260/24, 320/32, 400/30, 500/32, 380/22, 120/20, 600/20), which meant
  * "how does this app move" had no answer and retuning it meant finding them
  * all. Each role below is the behaviour, not the component: pick by what the
  * thing IS doing, and a new component never needs a new number.
+ *
+ * Four inline springs deliberately survive this, all of them ART rather than
+ * interface: the podium entrance and the achievement burst stage themselves
+ * with a per-element computed delay, and HomeHero pops its points figure much
+ * harder than any role here. Naming those would mean either five more roles or
+ * flattening animations that are meant to differ.
  *
  * Reduced motion is handled globally by MotionConfig in App.tsx; none of these
  * need their own guard.
@@ -44,6 +50,16 @@ export const glide: Transition = { type: 'spring', stiffness: 320, damping: 32 }
  *  slowest of the four, because a number that snaps is a number you cannot read
  *  on the way. */
 export const settle: Transition = { type: 'spring', stiffness: 120, damping: 20 }
+
+/**
+ * A celebratory overshoot: the tick that confirms a scan, a success pop.
+ *
+ * Much less damped than the four roles above, which is the whole point — this
+ * is the only place in the vocabulary where a visible bounce is the message
+ * rather than a side effect. It was written inline three times (twice in one
+ * file) before it had a name.
+ */
+export const pop: Transition = { type: 'spring', stiffness: 300, damping: 18 }
 
 /** Direct manipulation of a small target: the bottom-tab glyph dipping under a
  *  thumb. Much stiffer than `snap` on purpose. This one is felt rather than

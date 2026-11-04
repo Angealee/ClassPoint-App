@@ -71,7 +71,7 @@ export function EventCard({
   const over = body.length > MAX_POST_LENGTH
 
   return (
-    <Card pad="roomy" className="border-reward-solid/35 bg-reward-solid/5">
+    <Card pad="roomy" elevation="raised" className="border-reward-solid/35 bg-reward-solid/5">
       <div className="flex flex-wrap items-center gap-2">
         <Chip tone="reward" size="sm">
           Random Event

@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { settle } from '@/lib/motion'
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
 import { FlameIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
@@ -113,7 +114,7 @@ export function HomeHero({
               className="h-full rounded-full bg-gradient-to-r from-gold-500 via-gold-400 to-gold-300"
               initial={{ width: 0 }}
               animate={{ width: `${Math.max(0, Math.min(100, progress.progressPct))}%` }}
-              transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+              transition={settle}
             />
           </div>
           <div className="mt-2 flex items-center justify-between text-2xs tabular-nums">

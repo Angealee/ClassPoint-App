@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BadgeArt } from './BadgeArt'
 import { Sheet } from '@/components/ui/Sheet'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { PlusIcon, XIcon } from '@/components/ui/icons'
 import type { AchievementState } from '@/lib/types'
 
@@ -61,9 +62,7 @@ export function PinnedBadges({ achievements, pinnedCodes, editable, onChange, bu
         <Sheet open={picking} onClose={() => setPicking(false)} title="Pin a badge">
           <div className="space-y-2">
             {unlockedUnpinned.length === 0 ? (
-              <p className="p-4 text-center text-sm text-muted">
-                Unlock more achievements to feature them here.
-              </p>
+              <EmptyState compact>Unlock more achievements to feature them here.</EmptyState>
             ) : (
               unlockedUnpinned.map((a) => (
                 <button

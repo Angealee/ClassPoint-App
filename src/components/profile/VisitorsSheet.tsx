@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Sheet } from '@/components/ui/Sheet'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
@@ -78,7 +79,7 @@ export function VisitorsSheet({
       {loading ? (
         <ListSkeleton rows={5} />
       ) : rows.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted">Nobody yet — go climb the leaderboard.</p>
+        <EmptyState compact>Nobody yet — go climb the leaderboard.</EmptyState>
       ) : (
         <div className="space-y-3">
           <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">

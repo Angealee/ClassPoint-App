@@ -3,6 +3,8 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { ScreenTitle } from '@/components/ui/ScreenTitle'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Sheet } from '@/components/ui/Sheet'
@@ -152,10 +154,10 @@ export function Profile() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-display text-2xl font-bold">Profile</h1>
+      <ScreenTitle title="Profile" />
 
       {loading ? (
-        <Card pad="none" className="h-44 animate-pulse bg-card-2" />
+        <Skeleton className="h-44 rounded-2xl" />
       ) : !me ? (
         <EmptyState>We couldn't find your student record.</EmptyState>
       ) : (

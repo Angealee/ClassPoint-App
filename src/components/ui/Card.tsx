@@ -34,6 +34,14 @@ type CardPad = 'none' | 'tight' | 'default' | 'roomy'
  *
  * 'flat' is the default and is byte-identical to what Card rendered before this
  * prop existed, so no existing card moved. Screens opt in as they are reviewed.
+ *
+ * ⚠ NEVER raise a --color-plate surface (the home scoreboard, YourRankCard).
+ * The plate is declared in the FIXED @theme block precisely so it does NOT flip
+ * with the theme, while --lit DOES: it is transparent in light mode. A lit edge
+ * on a permanently dark plate would therefore vanish for every light-mode
+ * student, which is the one place the effect is most load-bearing. Those
+ * surfaces carry their own fixed `ring-1 ring-white/10` instead, and that is
+ * the correct treatment, not an oversight. Pinned in material.test.ts.
  */
 type CardElevation = 'flat' | 'raised' | 'floating'
 

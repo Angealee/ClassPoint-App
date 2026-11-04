@@ -2,11 +2,13 @@ import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { pop } from '@/lib/motion'
 import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { Sheet } from '@/components/ui/Sheet'
 import { Spinner } from '@/components/ui/Spinner'
+import { ScreenTitle } from '@/components/ui/ScreenTitle'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ScanIcon, CheckIcon, WarningIcon } from '@/components/ui/icons'
 import { QrScanner } from '@/components/attendance/QrScanner'
@@ -205,10 +207,7 @@ export function Attendance() {
     // re-check ("did my check-in actually land?").
     <PullToRefresh onRefresh={load}>
     <div className="space-y-5">
-      <div>
-        <h1 className="font-display text-xl font-bold">Attendance</h1>
-        <p className="text-sm text-muted">Scan your instructor’s QR to check in.</p>
-      </div>
+      <ScreenTitle title="Attendance" subtitle="Scan your instructor’s QR to check in." />
 
       {/* Read-only, because their semester is over (0035). */}
       <SemesterEndedBanner />
@@ -245,7 +244,7 @@ export function Attendance() {
           figure. It's still here (it's the number that matters for a grade) but
           as a calm footer line: the counts are what you act on. */}
       {history.length > 0 && (
-        <Card className="p-0">
+        <Card elevation="raised" className="p-0">
           <div className="grid grid-cols-3 divide-x divide-line">
             {(['present', 'late', 'absent'] as const).map((k) => (
               <div key={k} className="flex flex-col items-center justify-center py-4">
@@ -369,7 +368,7 @@ export function Attendance() {
             <motion.div
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+              transition={pop}
               className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-success-solid/12 text-success"
             >
               <CheckIcon className="h-10 w-10" />
@@ -427,7 +426,7 @@ function ResultView({ result, onDone }: { result: ScanResult; onDone: () => void
       <motion.div
         initial={{ scale: 0.5, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+        transition={pop}
         className={cn('mx-auto flex h-20 w-20 items-center justify-center rounded-full', meta.chip)}
       >
         <CheckIcon className="h-10 w-10" />

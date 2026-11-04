@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { tap } from '@/lib/motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
 import { routeWidth } from '@/lib/routes-shape'
 import { SidebarAccount } from '@/components/layout/AccountMenu'
@@ -80,7 +81,7 @@ function NotificationBell() {
             key={unreadCount}
             initial={{ scale: 0.5 }}
             animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 600, damping: 18 }}
+            transition={tap}
             className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-solid px-1 text-2xs font-bold tabular-nums text-white ring-2 ring-canvas"
           >
             {unreadCount > 9 ? '9+' : unreadCount}

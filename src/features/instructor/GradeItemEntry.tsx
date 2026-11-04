@@ -1,5 +1,6 @@
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import { Rows } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
 import { Meter } from '@/components/ui/Meter'
 import { cn } from '@/lib/cn'
@@ -59,9 +60,7 @@ export function GradeItemEntry({ students, items, scores, failed, onCommit }: Gr
 
   if (!item) {
     return (
-      <p className="py-6 text-center text-sm text-muted">
-        No score columns yet. Add one to start entering marks.
-      </p>
+      <EmptyState compact>No score columns yet. Add one to start entering marks.</EmptyState>
     )
   }
 

@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion'
+import { spring } from '@/lib/motion'
 import { useNavigate } from 'react-router-dom'
 import { Card, Rows } from '@/components/ui/Card'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { Avatar } from '@/components/ui/Avatar'
@@ -36,7 +38,7 @@ const container = {
 }
 const item = {
   hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 260, damping: 24 } },
+  show: { opacity: 1, y: 0, transition: spring },
 }
 
 export function Dashboard() {
@@ -342,15 +344,21 @@ function LiveBadge({ live }: { live: boolean }) {
   )
 }
 
+/**
+ * Mirrors the real stack above: greeting, hero, milestone line, two teaser
+ * cards, feed. Built from the Skeleton primitive rather than a bare
+ * `animate-pulse` wrapper so it sweeps like every other loading state in the
+ * app instead of blinking on its own schedule.
+ */
 function DashboardSkeleton() {
   return (
-    <div className="animate-pulse space-y-5">
-      <div className="h-11 w-full rounded-lg bg-card-2" />
-      <div className="h-56 rounded-2xl bg-card-2" />
-      <div className="h-4 w-48 rounded-lg bg-card-2" />
-      <div className="h-20 rounded-2xl bg-card-2" />
-      <div className="h-20 rounded-2xl bg-card-2" />
-      <div className="h-64 rounded-2xl bg-card-2" />
+    <div className="space-y-5">
+      <Skeleton className="h-11 w-full" />
+      <Skeleton className="h-56 rounded-2xl" />
+      <Skeleton className="h-4 w-48" />
+      <Skeleton className="h-20 rounded-2xl" />
+      <Skeleton className="h-20 rounded-2xl" />
+      <Skeleton className="h-64 rounded-2xl" />
     </div>
   )
 }

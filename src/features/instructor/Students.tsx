@@ -999,7 +999,7 @@ export function Students() {
       >
         <div className="space-y-2">
           {recognitions.length === 0 ? (
-            <p className="p-4 text-center text-sm text-muted">No recognitions available.</p>
+            <EmptyState compact>No recognitions available.</EmptyState>
           ) : (
             recognitions.map((a) => (
               <button

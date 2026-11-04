@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Card, Rows } from '@/components/ui/Card'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Avatar } from '@/components/ui/Avatar'
@@ -475,7 +476,7 @@ export function AttendanceSession({
       </div>
 
       {/* Rotating QR — or a closed state once the check-in window ends */}
-      <Card className="relative flex flex-col items-center gap-3 p-6">
+      <Card elevation="raised" className="relative flex flex-col items-center gap-3 p-6">
         {closed ? (
           <div className="flex flex-col items-center gap-2 py-4 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-solid/10 text-accent">
@@ -501,7 +502,7 @@ export function AttendanceSession({
               {payload ? (
                 <QrCode value={payload} size={232} />
               ) : (
-                <div className="h-[232px] w-[232px] animate-pulse rounded-xl bg-card-2" />
+                <Skeleton className="h-[232px] w-[232px] rounded-xl" />
               )}
             </div>
             <div className="w-full max-w-[248px]">
@@ -768,10 +769,7 @@ export function AttendanceSession({
               {payload ? (
                 <QrCode value={payload} size={bigSize} />
               ) : (
-                <div
-                  className="animate-pulse rounded-xl bg-card-2"
-                  style={{ height: bigSize, width: bigSize }}
-                />
+                <Skeleton className="rounded-xl" style={{ height: bigSize, width: bigSize }} />
               )}
             </div>
             <p className="text-center text-sm text-muted">

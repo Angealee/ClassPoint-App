@@ -1,6 +1,7 @@
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Select } from '@/components/ui/Select'
+import { ScreenTitle } from '@/components/ui/ScreenTitle'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotChip } from '@/components/ui/SnapshotStamp'
 import { ShareIcon, TrophyIcon } from '@/components/ui/icons'
@@ -70,21 +71,23 @@ export function InstructorLeaderboard() {
   return (
     <div className="space-y-4">
       <div>
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="font-display text-xl font-bold leading-tight">Leaderboard</h1>
-          <Select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            wrapperClassName="max-w-36 shrink-0"
-          >
-            <option value="all">All sections</option>
-            {sections.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </Select>
-        </div>
+        <ScreenTitle
+          title="Leaderboard"
+          actions={
+            <Select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              wrapperClassName="max-w-36 shrink-0"
+            >
+              <option value="all">All sections</option>
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </Select>
+          }
+        />
         <div className="mt-2 flex items-center gap-1.5">
           <span className="inline-flex items-center gap-1 rounded-full bg-card-2 px-2.5 py-1 text-xs font-semibold text-muted">
             <TrophyIcon className="h-3.5 w-3.5" />

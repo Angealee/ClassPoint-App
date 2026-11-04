@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { glide, settle, snap, spring, tap } from './motion'
+import { glide, pop, settle, snap, spring, tap } from './motion'
 
 /**
  * Guards the material layer: radius, elevation, the lit edge, texture, motion.
@@ -40,6 +40,11 @@ const CSS = readFileSync(join(process.cwd(), 'src/styles/index.css'), 'utf8')
  * fails on a correct file. Caught by this suite on its first run.
  */
 const CSS_CODE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+
+/** Same idea for a .tsx source: a guard must not fire on prose about itself. */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+}
 
 /** The declaration block for a selector, e.g. `:root` or `.dark`. */
 function block(selector: string): string {
@@ -118,6 +123,72 @@ describe('elevation and the lit edge', () => {
   })
 })
 
+describe('the plate rule', () => {
+  /**
+   * --color-plate is declared in the FIXED @theme block so it never flips with
+   * the theme: it is the one surface in the app that is always dark, which is
+   * what makes the scoreboard read as an object rather than another card.
+   *
+   * --lit does flip, and is transparent in light mode. So a lit edge on a plate
+   * surface renders for dark-mode students and silently disappears for
+   * light-mode ones. Those surfaces carry a fixed `ring-1 ring-white/10`
+   * instead, and that is correct rather than an oversight.
+   *
+   * This is an easy mistake to make while raising cards screen by screen, and
+   * it is invisible in whichever theme the author happens to be using.
+   */
+  const FILES = ['src/features/student/HomeHero.tsx', 'src/features/student/Leaderboard.tsx']
+
+  it('never puts a lit edge on a plate surface', () => {
+    for (const f of FILES) {
+      const src = readFileSync(join(process.cwd(), f), 'utf8')
+      const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+      for (const m of code.matchAll(/className=\{?(?:cn\()?([\s\S]{0,400}?)\}/g)) {
+        const chunk = m[1]
+        if (/\bto-plate\b|\bfrom-plate\b|\bbg-plate\b/.test(chunk)) {
+          expect(chunk, `${f}: a plate surface must not take cp-lit`).not.toMatch(/\bcp-lit\b/)
+        }
+      }
+    }
+  })
+
+  it('leaves the plate its own fixed highlight', () => {
+    const src = readFileSync(join(process.cwd(), FILES[1]), 'utf8')
+    expect(src).toMatch(/ring-1 ring-white\/10/)
+  })
+})
+
+describe('repeated rows stay flat', () => {
+  /**
+   * Elevation only means something while it is rare, and these are the surfaces
+   * most likely to be "improved" by someone applying it uniformly.
+   *
+   * MessageRow is the strongest case. It deliberately has NO bubble: a run of
+   * messages is drawn with a 2px identity rule rather than a fill, precisely so
+   * three consecutive messages do not render as three grey slabs. A lit edge or
+   * a shadow per row rebuilds the bubble by another name, and the chat was
+   * already reverted once for exactly that.
+   *
+   * PostCard, PeerCard and PeerResultCard are list items for the same reason.
+   */
+  const ROWS = [
+    'src/components/space/MessageRow.tsx',
+    'src/components/space/PostCard.tsx',
+    'src/components/peer/PeerCard.tsx',
+    'src/components/peer/PeerResultCard.tsx',
+  ]
+
+  it('never elevates a repeated row', () => {
+    for (const f of ROWS) {
+      const code = stripComments(readFileSync(join(process.cwd(), f), 'utf8'))
+      expect(code, `${f}: a repeated row must stay flat`).not.toMatch(
+        /elevation=\{?['"](raised|floating)/,
+      )
+      expect(code, `${f}: a repeated row must not take a lit edge`).not.toMatch(/\bcp-lit\b/)
+    }
+  })
+})
+
 describe('texture', () => {
   it('tiles the grain seamlessly', () => {
     // Without stitchTiles the noise field restarts at every tile edge and the
@@ -150,17 +221,28 @@ describe('texture', () => {
 })
 
 describe('motion vocabulary', () => {
-  it('names four distinct roles', () => {
-    const values = [snap, glide, settle, tap].map((t) => `${t.stiffness}/${t.damping}`)
-    expect(new Set(values).size).toBe(4)
+  it('names five distinct roles', () => {
+    const values = [snap, glide, settle, tap, pop].map((t) => `${t.stiffness}/${t.damping}`)
+    expect(new Set(values).size).toBe(5)
   })
 
-  it('orders them by how much the eye has to track', () => {
+  it('orders the four interface roles by how much the eye has to track', () => {
     // A value settling must be gentler than a sheet gliding, which must be
     // gentler than a control snapping, which must be gentler than a direct tap.
+    // `pop` is deliberately absent: it varies on BOUNCE, not on stiffness, so
+    // it has no place on this axis.
     expect(settle.stiffness).toBeLessThan(glide.stiffness!)
     expect(glide.stiffness).toBeLessThan(snap.stiffness!)
     expect(snap.stiffness).toBeLessThan(tap.stiffness!)
+  })
+
+  it('keeps pop the only role that visibly overshoots', () => {
+    // The bounce IS the message for pop, and a side effect everywhere else.
+    // If another role ever drops to this damping, two things that should read
+    // differently start reading the same.
+    for (const t of [snap, glide, settle, tap]) {
+      expect(pop.damping!).toBeLessThan(t.damping!)
+    }
   })
 
   it('keeps the house spring distinct from the named roles', () => {

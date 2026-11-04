@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { ScreenTitle } from '@/components/ui/ScreenTitle'
 import { Chip } from '@/components/ui/Chip'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
@@ -162,13 +163,13 @@ export function GradesConsole() {
 
 function Header({ semesterName }: { semesterName?: string }) {
   return (
-    <div>
-      <h1 className="font-display text-xl font-bold">Grades</h1>
-      <p className="text-sm text-muted">
-        {semesterName
+    <ScreenTitle
+      title="Grades"
+      subtitle={
+        semesterName
           ? `Prelim, Midterm and Finals for ${semesterName}. Points never feed a grade.`
-          : 'Prelim, Midterm and Finals.'}
-      </p>
-    </div>
+          : 'Prelim, Midterm and Finals.'
+      }
+    />
   )
 }

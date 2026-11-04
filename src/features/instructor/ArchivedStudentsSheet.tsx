@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Sheet } from '@/components/ui/Sheet'
 import { Button } from '@/components/ui/Button'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Avatar } from '@/components/ui/Avatar'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ListSkeleton } from '@/components/ui/Skeleton'
@@ -90,7 +91,7 @@ export function ArchivedStudentsSheet({
         {loading ? (
           <ListSkeleton rows={3} />
         ) : rows.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted">No archived students.</p>
+          <EmptyState compact>No archived students.</EmptyState>
         ) : (
           <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
             {rows.map((s) => (
