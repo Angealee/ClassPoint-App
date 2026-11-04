@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion'
+import { tap } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
 /**
@@ -48,7 +49,7 @@ export function WButton({
         key={String(given)}
         initial={reduce ? false : { scale: 0.6 }}
         animate={{ scale: 1 }}
-        transition={{ type: 'spring', stiffness: 600, damping: 16 }}
+        transition={tap}
         className="font-display text-sm font-bold leading-none"
       >
         W

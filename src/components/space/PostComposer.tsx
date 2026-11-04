@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Sheet } from '@/components/ui/Sheet'
 import { Input } from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -193,7 +194,7 @@ export function PostComposer({
           />
           <div className="max-h-72 divide-y divide-line overflow-y-auto rounded-xl border border-line">
             {filtered.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-muted">Nobody by that name.</p>
+              <EmptyState compact>Nobody by that name.</EmptyState>
             ) : (
               filtered.map((c) => (
                 <button

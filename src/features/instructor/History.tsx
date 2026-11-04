@@ -1,4 +1,5 @@
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { ScreenTitle } from '@/components/ui/ScreenTitle'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AwardHistory } from './AwardHistory'
@@ -30,14 +31,14 @@ export function History() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="font-display text-xl font-bold">History</h1>
-        <p className="text-sm text-muted">
-          {tab === 'points'
+      <ScreenTitle
+        title="History"
+        subtitle={
+          tab === 'points'
             ? 'Every award and penalty, newest first — undo any mistake.'
-            : 'Every session, and who’s actually showing up.'}
-        </p>
-      </div>
+            : 'Every session, and who’s actually showing up.'
+        }
+      />
 
       <SegmentedControl
         label="History view"

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import { pop } from '@/lib/motion'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
@@ -163,7 +164,7 @@ function ResultView({ result, onDone }: { result: EventScanResult; onDone: () =>
       <motion.span
         initial={{ scale: 0.5, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 320, damping: 18 }}
+        transition={pop}
         className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success-solid/15 text-success"
       >
         <CheckIcon className="h-9 w-9" />

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import { glide } from '@/lib/motion'
 import { NavLink } from 'react-router-dom'
 import type { NavItem } from '@/components/layout/Shell'
 import { IdentityBlock, SettingsRow, SignOutRow, type AccountActions } from './AccountMenu'
@@ -122,7 +123,7 @@ export function MobileMenu({
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 24 }}
-          transition={{ type: 'spring', stiffness: 360, damping: 34 }}
+          transition={glide}
           className="fixed inset-0 z-50 flex flex-col bg-canvas outline-none"
         >
           {/* Unlike the app's sticky header, this is `fixed inset-0` and starts at

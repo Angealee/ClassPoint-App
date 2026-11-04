@@ -67,7 +67,7 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="font-display text-2xl font-bold">Sections</h1>
+        <h1 className="font-display text-xl font-bold">Sections</h1>
         <div className="flex items-center gap-2">
           <InstallButton />
           <Button variant="outline" onClick={() => setManageOpen(true)}>

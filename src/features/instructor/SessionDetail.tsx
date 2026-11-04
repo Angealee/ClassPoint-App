@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/Input'
 import { Sheet } from '@/components/ui/Sheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Avatar } from '@/components/ui/Avatar'
-import { ListSkeleton } from '@/components/ui/Skeleton'
+import { ListSkeleton, Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { StatusChip, STATUS_META } from '@/components/attendance/StatusChip'
 import {
@@ -254,7 +254,7 @@ export function SessionDetail() {
     return (
       <div className="space-y-4">
         <PageHeader title="Class details" fallback="/teach/attendance" />
-        <Card pad="none" className="h-24 animate-pulse bg-card-2" />
+        <Skeleton className="h-24 rounded-2xl" />
         <ListSkeleton rows={6} />
       </div>
     )

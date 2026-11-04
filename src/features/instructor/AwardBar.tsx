@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/Toast'
 import { awardPoints } from '@/lib/api'
 import { errorText } from '@/lib/errors'
 import { cn } from '@/lib/cn'
+import { snap } from '@/lib/motion'
 import type { PointCategory } from '@/lib/types'
 
 const POINTS = [1, 2, 3, 4, 5]
@@ -124,7 +125,7 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
             initial={{ y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+            transition={snap}
             className={cn(
               'fixed inset-x-0 z-30 mx-auto w-full max-w-2xl px-4',
               // Clears the fixed mobile tab bar; on desktop the nav is a sidebar.

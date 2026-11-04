@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useDragControls, type PanInfo } from 'framer-motion'
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { glide } from '@/lib/motion'
 
 interface SheetProps {
   open: boolean
@@ -168,7 +169,7 @@ export function Sheet({ open, onClose, title, children, variant = 'sheet' }: She
             initial={screen ? { x: '100%' } : { y: '100%', opacity: 0.6 }}
             animate={screen ? { x: 0 } : { y: 0, opacity: 1 }}
             exit={screen ? { x: '100%' } : { y: '100%', opacity: 0.6 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+            transition={glide}
             drag={screen ? false : 'y'}
             dragListener={false}
             dragControls={dragControls}

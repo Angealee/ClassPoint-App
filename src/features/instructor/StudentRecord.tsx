@@ -9,7 +9,7 @@ import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { ListSkeleton } from '@/components/ui/Skeleton'
+import { ListSkeleton, Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { StatusChip } from '@/components/attendance/StatusChip'
 import { StudentEventHistory } from '@/components/attendance/StudentEventHistory'
@@ -208,7 +208,7 @@ export function StudentRecord() {
     return (
       <div className="space-y-4">
         <PageHeader title="Student record" fallback="/teach" />
-        <Card pad="none" className="h-28 animate-pulse bg-card-2" />
+        <Skeleton className="h-28 rounded-2xl" />
         <ListSkeleton rows={6} />
       </div>
     )

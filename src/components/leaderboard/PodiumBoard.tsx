@@ -553,7 +553,7 @@ function RestRow({
   const value = spend ? entry.spent_points : entry.points
   return (
     <motion.div
-      layout
+      layout={!reduced}
       initial={reduced ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index * 0.03, 0.3) }}

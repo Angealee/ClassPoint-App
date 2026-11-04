@@ -8,6 +8,7 @@ import {
   useTransform,
   type PanInfo,
 } from 'framer-motion'
+import { snap } from '@/lib/motion'
 import { Button } from '@/components/ui/Button'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import {
@@ -518,7 +519,7 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
               initial={{ scale: 0.92, opacity: 0, y: 10 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.94, opacity: 0, y: 6 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+              transition={snap}
               className="flex h-full max-h-[82dvh] w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-line bg-canvas shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >

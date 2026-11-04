@@ -1,6 +1,15 @@
 import { cn } from '@/lib/cn'
 
-/** Branded ring spinner for full-page / route transitions. */
+/**
+ * Branded ring spinner for full-page and route transitions.
+ *
+ * Button has its own private ButtonSpinner and that is deliberate, not drift.
+ * This one is `role="status"` with brand colours, which is right when it is the
+ * only thing on screen; inside a button it would announce a second time over
+ * the button's own `aria-busy`, and brand-on-brand would be invisible on a
+ * primary button. ButtonSpinner is `aria-hidden` and `border-current`, so it
+ * inherits whatever colour its label has. Merging them loses one or the other.
+ */
 export function Spinner({ className }: { className?: string }) {
   return (
     <span

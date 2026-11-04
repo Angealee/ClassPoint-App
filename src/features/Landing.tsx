@@ -91,10 +91,8 @@ function LandingPage() {
     setScrolled(y > window.innerHeight * 0.6)
   })
 
-  /** The aurora lags the page, which is what reads as depth. */
   const auroraY = useTransform(scrollY, [0, 900], [0, 180])
 
-  // Secret tap counter for revealing the instructor sign-in inside the PWA.
   const taps = useRef(0)
   const firstTapAt = useRef(0)
 
@@ -298,8 +296,7 @@ function LandingPage() {
             <Reveal className="text-center">
               <h2 className="font-display text-2xl font-bold sm:text-3xl">Everyone can see it</h2>
               <p className="mx-auto mt-3 max-w-md text-muted">
-                The board settles twice a day. Every section, one ranking, and your row is the one
-                you will keep checking.
+                Leaderboard settle per day. Will you be able to raeh the top?
               </p>
             </Reveal>
 
@@ -315,8 +312,7 @@ function LandingPage() {
                 <Logo className="mx-auto h-12 w-12" />
                 <h2 className="mt-4 font-display text-xl font-bold">Put it on your home screen</h2>
                 <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
-                  Opens like a real app, checks you in without a signal, and can nudge you when
-                  points land.
+                  Opens the app, checks you in without a signal/offline.
                 </p>
                 <InstallButton className="mx-auto mt-5 w-full max-w-xs" />
               </div>

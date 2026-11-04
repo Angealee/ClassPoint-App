@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/Button'
 import { AnimatePresence, motion } from 'framer-motion'
+import { glide } from '@/lib/motion'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
 /** How often an open app asks the server whether a new build exists. */
@@ -44,7 +45,7 @@ export function UpdatePrompt() {
           initial={{ y: 80, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 80, opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+          transition={glide}
           className="fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 mx-auto w-full max-w-md px-4 md:bottom-6"
         >
           <div className="flex items-center gap-3 rounded-2xl border border-line bg-card p-3 pl-4 shadow-xl">

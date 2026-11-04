@@ -6,6 +6,7 @@ import { Logo } from '@/components/ui/Logo'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { RouteFallback } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { tap } from '@/lib/motion'
 
 /**
  * The routed screen, with a subtle enter-only fade+rise on each navigation.
@@ -127,7 +128,7 @@ function NavBody({
           className="relative"
           // Springy squish on tap — skipped for reduced-motion.
           whileTap={reduce ? undefined : { scale: 0.82 }}
-          transition={{ type: 'spring', stiffness: 600, damping: 20 }}
+          transition={tap}
         >
           {glyph}
         </motion.span>

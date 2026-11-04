@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/cn'
+import { snap } from '@/lib/motion'
 
 /** Sun/moon theme switch with a sliding knob. */
 export function ThemeToggle({ className }: { className?: string }) {
@@ -21,7 +22,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     >
       <motion.span
         layout
-        transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+        transition={snap}
         className={cn(
           'flex h-7 w-7 items-center justify-center rounded-full text-sm shadow-sm',
           isDark ? 'ml-auto bg-accent-solid text-white' : 'mr-auto bg-gold-400 text-brand-950',
