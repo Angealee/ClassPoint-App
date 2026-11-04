@@ -66,6 +66,51 @@ export const DRAFT_EVENTS: ChangelogEntry = {
   ],
 }
 
+/**
+ * DRAFT — Era 7.0, the material layer. NOT in CHANGELOG yet, so it is invisible
+ * to users (LATEST_VERSION reads CHANGELOG[0]). Move it into the array with a
+ * bumped version once the instructor says to announce it. Version/date are
+ * placeholders until then.
+ *
+ * Deliberately SHORT, and student-facing only. Most of Era 7.0 was a token and
+ * primitive layer plus instructor screens, none of which belongs in a student's
+ * "What's new" — that is the 4.0.0 lesson, which was cut from 19 sections and 72
+ * bullets to 6 and 19 before it shipped. Three sections, seven bullets.
+ *
+ * The flash fix leads because it is the only item here a student would have
+ * NOTICED as a problem; the rest is polish they feel rather than read about.
+ */
+export const DRAFT_7_0_0: ChangelogEntry = {
+  version: '5.0.0',
+  date: '2026-11-04',
+  title: 'Easier on the eyes',
+  sections: [
+    {
+      heading: 'No more white flash when you open the app',
+      major: true,
+      items: [
+        'Opening ClassPoint in dark mode used to blind you with a white screen for a moment first. It does not any more — it opens dark, from the very first frame.',
+        'Your phone’s status bar now matches whichever theme you are in, instead of always sitting there in red.',
+      ],
+    },
+    {
+      heading: 'A warmer, deeper look',
+      items: [
+        'Corners are a touch softer across the whole app, and there is a very fine grain over everything so the big dark areas feel like a surface instead of a void.',
+        'The things that matter on a screen now sit slightly above it — your points balance, your attendance summary, the live QR card — so your eye lands on them first.',
+      ],
+    },
+    {
+      heading: 'Smoother on the way in',
+      items: [
+        'Loading placeholders now shimmer the same way everywhere, instead of three screens blinking on their own schedule.',
+        'Sheets, toasts, switches and tapped buttons all move on one shared set of timings, so the app feels like one thing rather than a pile of screens.',
+        'Nothing new runs in the background while you are reading. All of this is paint, not animation.',
+      ],
+    },
+  ],
+}
+
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {

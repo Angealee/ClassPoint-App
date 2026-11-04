@@ -2931,7 +2931,7 @@ app (all ≤280px); the five-tab bottom bar at 69px each; tablet 768/1024 and la
 812×375, where the nav’s own `overflow-y-auto` absorbs the squeeze. **Measuring first is
 what kept this pass to four real fixes** instead of a sweep of plausible-looking edits.
 
-⚠ **ESLint warnings are now 105, not the 47 recorded above** — the grades feature added
+⚠ **ESLint warnings are now 105, not the 47 recorded above** (and 107 since Era 7.0) — the grades feature added
 the bulk of them, still dominated by react-hooks v7’s `set-state-in-effect` and
 `purity` opinions, plus unused-disable directives. Still 0 errors, so the gate is green;
 the "tighten to errors once the backlog is read" note now has twice the backlog.
@@ -3149,6 +3149,178 @@ root, `z-index 100`, covers the viewport, `bg` canvas, logo + "ClassPoint" prese
 opacity sampled `1` steadily across 5 reads (it animates in and holds). ⚠ Its SCREENSHOT
 still captures black — the pane's screenshot grabs a pre-composite frame — so the DOM
 opacity sample, not the screenshot, is the proof here.
+
+Era 7.0 — the material layer (2026-10-22 to 2026-11-04). Decisions (user): **lit edges
++ an elevation ladder** · **fine grain globally, a dot grid as a scoped surface
+treatment** · **responsive motion on one spring system, no new always-running
+animation** · **defects, then foundation, then screens**.
+
+**The diagnosis, because it explains every choice below.** Era 6.0 left the COLOUR layer
+mature (role tokens picked by measured ΔE and contrast, pinned by `tone.test.ts`) and
+everything else unsystematised. Measured across ~30,000 lines: **41 shadow utilities**
+(so no elevation language at all), 7 untokenised radii, 7 untokenised control heights,
+**25 inline spring definitions**, 20 arbitrary `z-[...]`, and three of the most-visited
+student screens hand-rolling `animate-pulse` while 45 other sites used the `Skeleton`
+primitive. The app read flat because it WAS flat, not because the colours were wrong.
+
+**Phase 1 fixed four verified defects.** The headline one: `.dark` was applied in a
+`useEffect` in `theme.tsx`, so it only landed after a 515KB bundle had parsed and
+mounted — **every dark-mode user got a white flash on every cold launch of the installed
+PWA**, because `:root` resolves to light (`--canvas #f3f3f6`) until the class arrives.
+Fixed with a blocking inline script in `index.html` placed BEFORE the only render-blocking
+stylesheet, which is a spec guarantee rather than a timing race: no paint happens until
+that stylesheet loads, and the script has already run. It mirrors `getInitialTheme()`
+exactly and the effect then writes the same value, so the two cannot disagree. The
+`try/catch` is load-bearing — `localStorage` throws in some private-browsing modes and an
+uncaught throw in a head script stops the page dead. `theme-color` is now resolved by that
+same script and kept in sync by the effect; a media-scoped `<meta>` pair was rejected
+because it follows the OS preference and would disagree with an in-app override.
+Also: `PodiumBoard.tsx`'s `RestRow` had a bare `layout` prop while `initial` one line below
+WAS reduced-motion gated (~205 FLIP participants on the instructor board, in the subtree
+`CommentsOverlay` re-renders on every realtime comment); three dead keyframes removed
+including `cp-podium-glow`, the only animation in the app touching `box-shadow`; and the
+per-pill `backdrop-blur-md` dropped from every flying comment, which composited over
+Shell's three permanent blur layers for no visible gain at `bg-card/92`.
+⚠ **A plan claim that was WRONG and is worth not repeating:** the 888KB `levelup.mp3` is
+NOT precached. The manifest is 132 js, 4 png, 3 svg, 2 ico, 2 html, 1 css, zero audio. It
+is still a real cost, just differently — `sound.ts`'s unlock primes all four clips with
+`preload='auto'` on the FIRST TAP ANYWHERE. Re-encoding it changes how the app sounds, so
+it is the instructor's call and is still open.
+
+**THE RADIUS LADDER WORKS BY OVERRIDING TAILWIND'S OWN `--radius-*` VALUES, AND THAT IS
+THE CONSTRAINT THAT KEEPS THE WHOLE ERA SAFE.** `lg` 8→10px, `xl` 12→14px, `2xl` 16→18px,
+`3xl` unchanged. All 275 existing `rounded-*` sites moved with **zero files edited**.
+Inventing a name instead (`rounded-card`) is silently broken: `cn.ts` is bare twMerge with
+no `extendTailwindMerge`, so it classifies an unknown word after `rounded-` as a COLOUR and
+drops the size. Nothing errors; corners just quietly go square. **Do not add custom
+`rounded-*` or `text-*` names — retune the `@theme` value.** `rounded-full` is not a token
+and is untouched.
+
+**Light and dark carry depth by DIFFERENT means, and that is measured rather than
+stylistic.** In light a card is `#ffffff` on `#f3f3f6`, so a shadow has something to darken
+and a white top highlight would be invisible. In dark the reverse: canvas→card is ΔL* 6.3
+and a black shadow on `#08080b` has almost nothing to darken. So light leans on
+`--elev-shadow-*` and dark leans on `--lit`, and **both tokens exist in both themes so no
+component ever branches on theme**. `--lit` is `transparent` in light on purpose: shipping
+a white hairline on a white card is not a subtle effect, it is a pseudo-element painted for
+nothing on every surface.
+
+**`.cp-lit` uses `border-radius: inherit`, NOT the mask-composite gradient-border trick.**
+Verified in the browser: a 16px parent gives a 16px pseudo, so the hairline is clipped by
+the curve and stops short of each corner instead of cutting across it. mask-composite was
+rejected because its failure mode on an unsupporting engine is the element disappearing
+outright (the same reason `ClaimDoor` uses a dashed perforation). `inset: 0` resolves
+against the PADDING box, so on a bordered card the hairline sits just inside the border.
+⚠ `.cp-lit` sets `position: relative`. Harmless for `fixed` descendants (only transform,
+filter, will-change and contain create a containing block for those, so every Sheet
+backdrop is safe) but it DOES become the offset parent for absolutely positioned children.
+⚠ **DO NOT STACK `.cp-elev-*`.** twMerge does not recognise `cp-*` names, so it passes both
+through and CSS source order picks the winner rather than the author — the same class of
+bug the plain-join `cn()` caused app-wide. `Card` emits exactly one.
+
+⚠ **NEVER RAISE A `--color-plate` SURFACE** (the home scoreboard, `YourRankCard`). The
+plate is declared in the FIXED `@theme` block precisely so it does NOT flip, while `--lit`
+does and is transparent in light. A lit edge on a permanently dark plate renders for
+dark-mode students and **silently vanishes for light-mode ones**, which is invisible in
+whichever theme the author happens to be using. Those surfaces carry their own fixed
+`ring-1 ring-white/10`, and that is correct rather than an oversight. Pinned in
+`material.test.ts`.
+
+**Grain is global atmosphere; the dot grid is a scoped SURFACE treatment.** Grain is a
+fixed `body::after`, one tiled 160×160 raster painted once and composited thereafter, at
+`0.02` light / `0.035` dark, `pointer-events: none`, at the top of the z ladder so a sheet
+or a burst wears the same film, and switched off in `@media print`. Verified it survives
+`body { overflow-x: clip }`: a fixed pseudo still lays out at full viewport size because
+body creates no containing block. `stitchTiles='stitch'` is load-bearing — without it
+feTurbulence restarts its noise field at every tile edge and the seams read as a visible
+160px grid. ⚠ **`.cp-grid` goes on a DECORATIVE ABSOLUTELY POSITIONED CHILD, never a
+content box**: it carries a mask, and a mask applies to content as well as background, so
+on a container it would fade the text out with the dots. Aurora is the pattern to copy. It
+is deliberately NOT used behind scrolling lists or on the leaderboard board area, where it
+would compete with the flying pills and the podium.
+
+**FIVE NAMED SPRINGS, and the count in the plan was wrong.** The plan said six competing
+definitions; the real number was **25**. Now 4. `snap` 400/30 (UI state feedback) ·
+`glide` 320/32 (large surfaces) · `settle` 120/20 (values coming to rest) · `tap` 600/20
+(direct manipulation of a small target, stiffer on purpose because it is felt rather than
+watched) · `pop` 300/18 (a celebratory overshoot — the ONLY role where a visible bounce is
+the message, and it was written out three times, twice in one file, before it had a name).
+`spring` 260/24/0.9 remains the house general. The four survivors all carry per-element
+computed delays or are declared art (PodiumBoard ×2, `AchievementUnlockBurst`,
+`HomeHero`'s 500/18 points pop) and are deliberate.
+
+**`ScreenTitle` is the counterpart to `PageHeader`, and the trap it exists to prevent is
+one I nearly walked into myself.** `PageHeader` always renders a back button, correct for
+every screen it serves because all of them are pushed onto the stack (hence its required
+`fallback`). Home, Ranks, Attend, Profile, Grades, History and Student Space are nav
+DESTINATIONS with nothing to go back to — which is exactly why all seven hand-rolled an
+`<h1>`. **That reads like drift and is correct**, so the obvious cleanup ships a back
+button onto seven root screens. Adopted on 7 of them. Its alignment is DERIVED, not a prop:
+`items-start` with a subtitle so actions line up with the title, `items-center` without,
+where a 24px title beside a 44px control reads as misaligned. It also settled three
+`text-2xl` outliers — Profile, Sections and Student Space — **all three of which turned out
+to be root screens**.
+**`SectionGrid`, `StudentSpace` and both Leaderboards keep bespoke headers.** They differ
+in LAYOUT (a wrapping two-button row, a status chip that qualifies the title by sitting
+beside it, a truncating title with a caption chip), not in style, and this codebase has
+already reverted two UI changes for collapsing exactly that distinction.
+
+**Elevation is opted into, never swept.** `Card`'s `elevation` defaults to `flat`, which is
+byte-identical to what it rendered before the prop existed, so no existing card moved. Five
+subject surfaces rise: the UsePoints balance, the Attendance summary, both QR cards and the
+Lounge `EventCard`. Elevation only means anything while it stays rare.
+
+**`material.test.ts` (17 tests) pins all of it**, in the spirit of `tone.test.ts`: pure
+source parsing, no mocking. It guards the radius trick, the both-themes rule, the absence
+of mask-composite, grain never reaching paper, the plate rule, the repeated-row rule
+(`MessageRow`, `PostCard`, `PeerCard`, `PeerResultCard` can never take elevation or a lit
+edge — `MessageRow` has no bubble BY DESIGN, and a lit edge per row rebuilds it by another
+name), and that `pop` stays the only role that visibly overshoots. Every guard was verified
+to FAIL on an injected violation.
+⚠ **A guard must not fire on prose about itself.** The mask-composite check failed on its
+first run against the comment explaining why mask-composite was avoided. Hence
+`stripComments()` / `CSS_CODE` — any new source-text guard in this file must use them.
+
+**Deliberately left, each for a reason a sweep must not "fix":** the 20 arbitrary `z-[...]`
+(the ladder is defined and documented, but most sit on authenticated screens that cannot be
+verified in this environment, and a wrong z-index is invisible until it is catastrophic —
+they migrate per screen); `Students.tsx`'s structure; `GradeGrid`, which is untouched and
+**provably unaffected by the radius retune because it contains no `rounded-*` classes at
+all** (its load-bearing `w-22 min-w-22 max-w-22`, `size={4}` and `h-8` are intact);
+`AttendanceSession`'s one remaining `animate-pulse`, which is a live-status dot rather than
+a skeleton; `QrScanner`'s bordered empty and `EventConsole`'s two "Loading…" lines, which
+are loading states rather than empty states and would be a box inside a box as a compact
+`EmptyState`; and `Ops.tsx`'s `ErrorLine`, which the audit called a fourth error treatment
+and which already delegates to `<ErrorState inline>` — it is a thin alias, not drift.
+
+**The Dashboard banners stay OUTSIDE the stagger, and the plan was wrong to want them in.**
+Each returns `null` when inactive, and an empty `motion.div` is still a `space-y-5` child,
+so three inactive banners would add ~60px of phantom gap on an ordinary day. Two of them
+already own entrance animations timed to the EVENT rather than to page load, which is right
+for a banner that appears mid-session.
+
+**Build:** `vite.config.ts` had no `build` key at all. Three vendor chunks now split
+`react`/`react-dom`/`react-router-dom`, `framer-motion` and `@supabase/supabase-js` out of
+the eager entry (515,707 → 33,470 bytes). The split is for CACHE LIFETIME, not first-load
+size: all three are imported eagerly, so what it buys is that an ordinary deploy no longer
+invalidates ~300KB of unchanged dependency bytes. react and react-dom MUST stay in one
+chunk — separating a library from its renderer is the classic initialisation-order crash.
+The whole material layer costs **+1.15KB of CSS** (117.50 → 118.65KB).
+
+⚠ **A fourth Browser-pane artifact, beside the three already recorded:
+`requestAnimationFrame` is STARVED while the pane is hidden, so a measurement script that
+awaits a frame simply never resolves and times out at 45s.** `getComputedStyle` forces a
+style recalc synchronously and needs no frame — measure with it instead of waiting on rAF.
+
+**Verified: 0 errors, 107 warnings (unchanged throughout), 449 tests.** ⚠ The warning and
+test baselines recorded earlier in this file were STALE (105 / 417) before this era began;
+my own edits added zero warnings, confirmed by stashing them and re-linting. Landing and
+all four auth screens measured at 375px in BOTH themes: zero overflow, zero escaping
+elements beyond the aurora's own contained blobs, inputs still 16px. **Nothing in the
+student, instructor, space or peer areas has been seen rendered on an authenticated
+screen** — those are verified by typecheck, tests, build and temporary probe routes
+(each removed and residue-checked) only. A guided pass on a real device is still the
+agreed next step.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 
