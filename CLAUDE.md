@@ -3322,6 +3322,52 @@ screen** — those are verified by typecheck, tests, build and temporary probe r
 (each removed and residue-checked) only. A guided pass on a real device is still the
 agreed next step.
 
+Pre-ship QA sweep (2026-11-04). A full responsiveness and overlap audit, run
+because "ship-ready" is a claim that has to be measured rather than asserted.
+
+**Method.** A detector injected into the running app that reports four things:
+page overflow, content wider than its own box with nothing clipping it (the
+"crammed chip/frame" case), text that is not the topmost element at its own
+coordinates (the covered-text case), and expanded tap regions that collide.
+Run over the six real unauthenticated routes, plus a stress probe mounting the
+components that carry the risk — `ScreenTitle`, `PageHeader`, `HomeHero`,
+`Stat` 3-up and 4-up, `Chip` rows, `PersonRow`, `PointEventRow`,
+`SegmentedControl`, all three `ScaleRow` shapes, `Meter`, `XpBar`, `BadgeArt`,
+all three `Card` elevations, `Input`/`Select`, both `EmptyState` variants, both
+`ErrorState` variants, and tight `Button`/`IconButton` rows — with **worst-case
+data**: a 53-character name, a 36-character section name, four-digit points,
+Level 99. Measured at **320, 360, 390, 414, 768 and 1440**, in both themes.
+
+**Result: zero defects.** Zero page overflow, zero escaping elements, zero
+crammed boxes, zero covered text, zero tap collisions, at every width, in both
+themes. All form controls 16px (the iOS zoom rule). 320px is the tightest case
+the audit covers and nothing broke there, which matters because every earlier
+phase measured at 375.
+
+⚠ **A FIFTH BROWSER-PANE ARTIFACT, and the one most likely to waste somebody's
+afternoon: `document.elementFromPoint()` RETURNS A STALE NODE while the pane is
+not compositing.** Measured: at the point (54, 242) it returned an element whose
+own bounding box is 249–306, which does not contain that y at all, while
+`document.elementsFromPoint()` at the same instant correctly put the real
+element at index 0. The singular API appears to read a cached hit-test tree that
+the non-compositing pane never refreshes.
+
+This produced two confident false positives on `HomeHero` ("Level" and "Points"
+reported as covered) that look exactly like the real paint-order bug this file
+already documents for the profile name. **Use `elementsFromPoint` and check for
+index 0; never trust `elementFromPoint` here.** Note that the tap-target pass
+recorded earlier in this file used `elementFromPoint` — its conclusions were
+confirmed by other means, but a re-run should use the plural API.
+
+Two further measurement traps found the same way, both instrument rather than
+app: neutralising transforms globally to defeat a frozen spring also kills
+`.cp-tap-44::before`'s own centring `translate(-50%,-50%)`, which inflates its
+deliberate 4px spill to 26px and invents a dozen "crammed" findings — neutralise
+only framer-motion's INLINE transforms instead. And a 44px hit region on a 32 or
+36px control legitimately spills 4–6px past its parent's scroll width, so a
+cramming check needs a tolerance above that or every icon button is a false
+positive.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
