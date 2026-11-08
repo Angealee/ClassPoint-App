@@ -128,7 +128,7 @@ export const DRAFT_7_0_0: ChangelogEntry = {
  * the `@layer` fix: that is instructor work and plumbing, and a student reading
  * their "What's new" does not care which cascade layer a rule sits in.
  *
- * Four sections, eleven bullets.
+ * Five sections, thirteen bullets.
  */
 export const DRAFT_8_0_0: ChangelogEntry = {
   version: '6.0.0',
@@ -145,6 +145,15 @@ export const DRAFT_8_0_0: ChangelogEntry = {
       ],
     },
     {
+      heading: 'Your grades, and what your points can buy',
+      major: true,
+      items: [
+        'A new Grades screen shows every mark you have, part by part, with a “so far” figure for each term. It fills in as your instructor enters marks.',
+        'Your instructor can offer a quiz or activity for a points boost: spend a few points to add marks to a mark you already have. You see exactly what you would gain before you send the request, and nothing is spent until it is approved.',
+        'It is a real trade. Spending points lowers your XP, level and rank like any other spend, and the screen says so before you commit.',
+      ],
+    },
+    {
       heading: 'Comments float up the side now',
       items: [
         'Classmates’ comments used to fly across the middle of the leaderboard, over the podium and everything else. They drift up one side instead, so you can read the board and the banter at the same time.',
@@ -156,6 +165,13 @@ export const DRAFT_8_0_0: ChangelogEntry = {
       items: [
         'The top three used to change width depending on how long the names were, so the podium reshaped itself every time the board settled. The three stands are fixed now, and roomier.',
         'Picking a section is a proper full-width control rather than a squeezed box that cut every section name in half.',
+      ],
+    },
+    {
+      heading: 'A quick tour when you start',
+      items: [
+        'New here? A short, animated walkthrough shows the four things that matter: earning points, recording attendance, the leaderboard and spending what you earn.',
+        'It plays your first three times opening the app, so nothing slips past you. From the second time you can skip it.',
       ],
     },
     {

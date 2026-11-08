@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from 'react'
+import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Rows } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
@@ -38,6 +38,12 @@ export function GradeItemEntry({ students, items, scores, failed, onCommit }: Gr
   // always current because every commit writes through to it.
   const [values, setValues] = useState<Map<string, number | null>>(new Map())
   const [badCell, setBadCell] = useState<{ studentId: string; reason: string } | null>(null)
+
+  // The roster's inputs, by row. Enter walks to the next one through this map
+  // rather than `document.getElementById('entry-N')`: that was a convention in a
+  // global namespace (any other element with the same id would have taken the
+  // walk) and a lookup that has to search the whole document on every Enter.
+  const inputs = useRef(new Map<number, HTMLInputElement>())
 
   const current = useMemo(() => {
     if (!item) return new Map<string, number | null>()
@@ -88,8 +94,8 @@ export function GradeItemEntry({ students, items, scores, failed, onCommit }: Gr
     e.preventDefault()
     e.currentTarget.blur()
     // Walk down the roster, the way the grid's Enter does.
-    const next = document.getElementById(`entry-${index + 1}`)
-    if (next instanceof HTMLInputElement) {
+    const next = inputs.current.get(index + 1)
+    if (next) {
       next.focus()
       next.select()
     }
@@ -136,7 +142,10 @@ export function GradeItemEntry({ students, items, scores, failed, onCommit }: Gr
             <div key={student.id} className="flex items-center gap-3 p-3">
               <span className="min-w-0 flex-1 truncate text-sm">{student.fullName}</span>
               <input
-                id={`entry-${index}`}
+                ref={(el) => {
+                  if (el) inputs.current.set(index, el)
+                  else inputs.current.delete(index)
+                }}
                 type="text"
                 inputMode="decimal"
                 defaultValue={formatScoreInput(value)}

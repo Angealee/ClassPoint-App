@@ -13,7 +13,9 @@ import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { TicketIcon } from '@/components/ui/icons'
-import { decideRedemption, listRedemptions, listTopSpenders } from '@/lib/api'
+import { decideRedemption, listRedemptions, listTopSpenders, reverseGradeBoost } from '@/lib/api'
+import { boostGain, formatMarks } from '@/lib/grade-boost'
+import { COMPONENT_LABEL } from '@/lib/grading'
 import { timeAgo } from '@/lib/time'
 import { supabase, uniqueChannel } from '@/lib/supabase'
 import { cn } from '@/lib/cn'
@@ -37,6 +39,8 @@ const STATUS_META: Record<RedemptionStatus, { label: string; cls: string }> = {
   approved: { label: 'Approved', cls: TONE.success.chip },
   rejected: { label: 'Declined', cls: TONE.danger.chip },
   cancelled: { label: 'Cancelled', cls: TONE.neutral.chip },
+  // 0062 — an approved grade boost that was later undone.
+  reversed: { label: 'Reversed', cls: TONE.neutral.chip },
 }
 
 function errorText(e: unknown, fallback: string): string {
@@ -59,6 +63,8 @@ export function Redemptions() {
   const [busy, setBusy] = useState(false)
   const [tick, setTick] = useState(false)
   const [tab, setTab] = useState<RequestsTab>('points')
+  // An approved grade boost the instructor is about to undo (0062).
+  const [reversing, setReversing] = useState<RedemptionRequest | null>(null)
 
   const sectionName = useCallback(
     (id: string) => sections.find((s) => s.id === id)?.name ?? '',
@@ -114,6 +120,26 @@ export function Redemptions() {
       await load()
     } catch (e) {
       toast(errorText(e, 'Could not save that decision.'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onReverse() {
+    if (!reversing?.gradeItemId) return
+    setBusy(true)
+    try {
+      const result = await reverseGradeBoost(reversing.gradeItemId, reversing.studentId)
+      toast(
+        result.markRestored
+          ? `Boost reversed — ${result.pointsRefunded} points returned.`
+          : `${result.pointsRefunded} points returned. The mark had been edited since, so it was left as typed.`,
+        'success',
+      )
+      setReversing(null)
+      await load()
+    } catch (e) {
+      toast(errorText(e, 'Could not reverse that boost.'), 'error')
     } finally {
       setBusy(false)
     }
@@ -186,10 +212,14 @@ export function Redemptions() {
                       </span>
                     </div>
 
-                    <p className="mt-3 rounded-lg bg-card-2 px-3 py-2 text-sm">
-                      <span className="font-semibold">{KIND_LABEL[r.kind]}</span>
-                      {r.note ? <span className="text-muted"> · {r.note}</span> : null}
-                    </p>
+                    {r.grade ? (
+                      <BoostDetail r={r} />
+                    ) : (
+                      <p className="mt-3 rounded-lg bg-card-2 px-3 py-2 text-sm">
+                        <span className="font-semibold">{KIND_LABEL[r.kind]}</span>
+                        {r.note ? <span className="text-muted"> · {r.note}</span> : null}
+                      </p>
+                    )}
 
                     {r.points > r.semesterPoints && (
                       <p className="mt-2 text-xs font-semibold text-accent">
@@ -262,10 +292,19 @@ export function Redemptions() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">{r.studentName}</p>
                       <p className="truncate text-xs text-muted">
-                        {r.points} pts · {KIND_LABEL[r.kind]}
+                        {r.points} pts ·{' '}
+                        {r.grade ? `Boost · ${r.grade.itemName}` : KIND_LABEL[r.kind]}
                         {r.decidedAt ? ` · ${timeAgo(r.decidedAt)}` : ''}
                       </p>
                     </div>
+                    {/* The one place a boost can be undone. Only an APPROVED one
+                        has anything to undo: pending is declined instead, and a
+                        reversed one is already back. */}
+                    {r.status === 'approved' && r.gradeItemId && (
+                      <Button size="sm" variant="outline" onClick={() => setReversing(r)}>
+                        Reverse
+                      </Button>
+                    )}
                     <span
                       className={cn(
                         'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
@@ -288,12 +327,42 @@ export function Redemptions() {
         title={decision?.approve ? `Approve ${decision.req.points} points?` : 'Decline this request?'}
         message={
           decision?.approve ? (
-            <>
-              <span className="font-semibold text-ink">{decision.req.studentName}</span> spends{' '}
-              <span className="font-semibold text-ink">{decision.req.points} points</span> on their{' '}
-              {KIND_LABEL[decision.req.kind].toLowerCase()}. Their total drops to{' '}
-              {Math.max(0, decision.req.semesterPoints - decision.req.points)}.
-            </>
+            decision.req.grade ? (
+              <>
+                <span className="font-semibold text-ink">{decision.req.studentName}</span> spends{' '}
+                <span className="font-semibold text-ink">{decision.req.points} points</span> to
+                raise <span className="font-semibold text-ink">{decision.req.grade.itemName}</span>
+                {decision.req.grade.currentScore !== null && (
+                  <>
+                    {' '}
+                    from{' '}
+                    <span className="font-semibold text-ink">
+                      {formatMarks(decision.req.grade.currentScore)}
+                    </span>{' '}
+                    to{' '}
+                    <span className="font-semibold text-ink">
+                      {formatMarks(
+                        decision.req.grade.currentScore +
+                          boostGain(
+                            decision.req.grade.currentScore,
+                            decision.req.grade.maxScore,
+                            decision.req.grade.bonus,
+                          ),
+                      )}
+                    </span>
+                  </>
+                )}
+                . Their total drops to{' '}
+                {Math.max(0, decision.req.semesterPoints - decision.req.points)}.
+              </>
+            ) : (
+              <>
+                <span className="font-semibold text-ink">{decision.req.studentName}</span> spends{' '}
+                <span className="font-semibold text-ink">{decision.req.points} points</span> on
+                their {KIND_LABEL[decision.req.kind].toLowerCase()}. Their total drops to{' '}
+                {Math.max(0, decision.req.semesterPoints - decision.req.points)}.
+              </>
+            )
           ) : (
             <>
               <span className="font-semibold text-ink">{decision?.req.studentName}</span> keeps
@@ -303,7 +372,9 @@ export function Redemptions() {
         }
         detail={
           decision?.approve
-            ? 'This deducts the points for real — their level and rank drop with it.'
+            ? decision.req.grade
+              ? 'This deducts the points AND rewrites their mark — their level and rank drop with it. You can reverse it afterwards from Recent decisions.'
+              : 'This deducts the points for real — their level and rank drop with it.'
             : undefined
         }
         confirmLabel={decision?.approve ? 'Approve & deduct' : 'Decline'}
@@ -320,7 +391,75 @@ export function Redemptions() {
         />
       </ConfirmDialog>
 
+      <ConfirmDialog
+        open={!!reversing}
+        title="Reverse this boost?"
+        message={
+          reversing ? (
+            <>
+              <span className="font-semibold text-ink">{reversing.studentName}</span> gets{' '}
+              <span className="font-semibold text-ink">{reversing.points} points</span> back, and
+              {reversing.grade ? <> {reversing.grade.itemName}</> : ' the column'} goes back to the
+              mark it had before — unless you have edited it since, in which case your edit stays.
+            </>
+          ) : null
+        }
+        detail="They are told, and can ask for a boost on this column again."
+        confirmLabel="Reverse boost"
+        busy={busy}
+        onConfirm={onReverse}
+        onClose={() => setReversing(null)}
+      />
+
       <SuccessTick show={tick} onDone={() => setTick(false)} />
+    </div>
+  )
+}
+
+/**
+ * What approving a grade boost will do, stated as the mark it changes.
+ *
+ * The student's mark is read FRESH when the inbox loads (see
+ * `attachGradeContext`), not remembered from the request: it can be entered,
+ * retyped or cleared between asking and deciding, and an approve screen is only
+ * honest if it shows what approval will do today. The server re-checks all of
+ * this itself — these two warnings exist so the instructor hears about a doomed
+ * approval before pressing the button rather than after.
+ */
+function BoostDetail({ r }: { r: RedemptionRequest }) {
+  const g = r.grade
+  if (!g) return null
+
+  const gain = g.currentScore === null ? 0 : boostGain(g.currentScore, g.maxScore, g.bonus)
+
+  return (
+    <div className="mt-3 space-y-1.5 rounded-lg bg-card-2 px-3 py-2 text-sm">
+      <p>
+        <span className="font-semibold">Grade boost</span>
+        <span className="text-muted">
+          {' '}
+          · {g.itemName} · {COMPONENT_LABEL[g.component]}
+        </span>
+      </p>
+      {g.currentScore === null ? (
+        <p className="text-xs font-semibold text-warn">
+          Their mark has been cleared — approving will fail until it is back.
+        </p>
+      ) : gain <= 0 ? (
+        <p className="text-xs font-semibold text-warn">
+          They already have full marks ({formatMarks(g.currentScore)} / {formatMarks(g.maxScore)}) —
+          approving will fail. Decline it.
+        </p>
+      ) : (
+        <p className="text-xs tabular-nums text-muted">
+          Mark{' '}
+          <span className="font-semibold text-ink">
+            {formatMarks(g.currentScore)} → {formatMarks(g.currentScore + gain)}
+          </span>{' '}
+          out of {formatMarks(g.maxScore)} (+{formatMarks(gain)}
+          {gain < g.bonus ? `, capped from +${formatMarks(g.bonus)}` : ''})
+        </p>
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { tap } from '@/lib/motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
 import { routeWidth } from '@/lib/routes-shape'
@@ -12,12 +12,13 @@ import { AchievementUnlockBurst } from '@/components/achievements/AchievementUnl
 import { WhatsNew } from '@/features/WhatsNew'
 import { AwayRecap } from '@/features/student/AwayRecap'
 import { NotificationsSheet } from '@/features/student/Notifications'
-import { Onboarding } from '@/features/student/Onboarding'
+import { Tour } from '@/features/student/Tour'
 import { ArchivedScreen } from '@/features/student/ArchivedScreen'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useAuth } from '@/lib/auth'
 import { useIsDesktop } from '@/lib/useIsDesktop'
-import { LATEST_VERSION, setSeenVersion } from '@/lib/changelog'
+import { LATEST_VERSION, getSeenVersion, setSeenVersion } from '@/lib/changelog'
+import { beginTour, endTour, type TourSession } from '@/lib/tour'
 import { spaceChip } from '@/lib/space-gate'
 import { Chip } from '@/components/ui/Chip'
 import {
@@ -27,24 +28,37 @@ import {
   SaturnIcon,
   ClipboardIcon,
   ScanIcon,
+  TableIcon,
   TrophyIcon,
   UserIcon,
 } from '@/components/ui/icons'
 
-const ONBOARDED_KEY = 'cp_onboarded'
+/**
+ * The previous intro's "done" flag. It is READ and never written any more: a
+ * student who already got that intro has used the app for a semester, so
+ * `beginTour` counts them as having had the tour rather than showing a
+ * beginner's walkthrough to someone who has been recited at for months.
+ */
+const LEGACY_ONBOARDED_KEY = 'cp_onboarded'
 
 /**
- * The six destinations, in sidebar order.
+ * The seven destinations, in sidebar order.
  *
  * Student Space sits second — directly under Home — because it is the feature
- * being launched and burying it under a menu is how a beta goes unused. Profile
- * is last: it is checked far less often than the three it follows.
+ * being launched and burying it under a menu is how a beta goes unused. Grades
+ * follows Attend: both answer "how am I doing in this class". Profile is last:
+ * it is checked far less often than the ones it follows.
+ *
+ * Grades is deliberately NOT a bottom tab (decision 18): the bar is full, and
+ * the menu mirrors this list, so it is two taps away on a phone without
+ * displacing anything a student opens every day.
  */
 const SIDEBAR_NAV = [
   { to: '/app', label: 'Home', Icon: HomeIcon, end: true },
   { to: '/app/space', label: 'Student Space', Icon: SaturnIcon },
   { to: '/app/leaderboard', label: 'Ranks', Icon: TrophyIcon },
   { to: '/app/attendance', label: 'Attend', Icon: ScanIcon },
+  { to: '/app/grades', label: 'Grades', Icon: TableIcon },
   { to: '/app/peer', label: 'Peer eval', Icon: ClipboardIcon },
   { to: '/app/profile', label: 'Profile', Icon: UserIcon },
 ] as const
@@ -53,8 +67,8 @@ const SIDEBAR_NAV = [
  * The mobile bottom bar carries three of those plus the menu.
  *
  * Five tabs is the comfortable limit on a phone and the bar is already full, so
- * Student Space, Peer eval and Profile live in the menu overlay — which mirrors
- * the full sidebar, so nothing is more than two taps away.
+ * Student Space, Grades, Peer eval and Profile live in the menu overlay — which
+ * mirrors the full sidebar, so nothing is more than two taps away.
  */
 const TAB_ROUTES = ['/app', '/app/leaderboard', '/app/attendance'] as const
 
@@ -241,31 +255,81 @@ function AwayRecapOverlay() {
 }
 
 /**
- * First-run intro for new students, otherwise the "What's new" sheet. They're
- * mutually exclusive so a brand-new student never gets both at once — finishing
- * onboarding also marks the changelog seen.
+ * Count this open and decide whether the tour plays. Safe to call twice in one
+ * session — see `beginTour` — which is what lets a lazy `useState`
+ * initialiser run it: React runs those twice under StrictMode.
+ *
+ * Reaching `localStorage` can itself throw (some private-browsing modes), so
+ * the globals are touched inside the try. Failing closed means NO tour.
  */
-function IntroOrWhatsNew() {
-  const [onboarding, setOnboarding] = useState(() => {
-    try {
-      return localStorage.getItem(ONBOARDED_KEY) !== '1'
-    } catch {
-      return false
-    }
-  })
+function startTour(studentId: string): TourSession {
+  try {
+    const legacy = localStorage.getItem(LEGACY_ONBOARDED_KEY) === '1'
+    return beginTour(localStorage, sessionStorage, studentId, legacy)
+  } catch {
+    return { show: false, opens: 0, skippable: false }
+  }
+}
 
-  function finishOnboarding() {
+/**
+ * The tour, the "What's new" sheet and the away-recap, in that order of
+ * precedence — one layer deciding which of three full-attention things the
+ * student sees, so they never stack.
+ *
+ * ── WHY THE AWAY-RECAP MOVED IN HERE ───────────────────────────────────────
+ * It used to be a sibling that mounted whenever it had events. Both it and
+ * "What's new" are Sheets, and Sheet's focus trap is document-level: left
+ * mounted behind the tour it would drag focus back into itself the moment
+ * anything inside the tour was tabbed to. So they wait their turn, and the
+ * recap — whose events are held in StudentData until cleared — simply appears
+ * when the tour is done.
+ *
+ * ── THE TOUR TAKES A TURN IN THE OVERLAY CHAIN ─────────────────────────────
+ * A level-up and a badge unlock already serialise because two full-screen
+ * overlays once drew on top of each other. The tour waits for both to clear
+ * rather than racing them. `open` stays true meanwhile, so the recap and
+ * "What's new" keep waiting too.
+ *
+ * ── NOTHING UNTIL WE KNOW WHO THIS IS ──────────────────────────────────────
+ * The play count is per student (a shared phone must not hand one student's
+ * plays to the next), so there is nothing to decide before `me` has loaded.
+ * The shell is showing its own skeleton in the meantime.
+ */
+function IntroLayer() {
+  const { me } = useStudentData()
+  if (!me) return null
+  return <IntroLayerFor studentId={me.id} />
+}
+
+function IntroLayerFor({ studentId }: { studentId: string }) {
+  const { levelUp, unlockedAchievement } = useStudentData()
+  const [session] = useState(() => startTour(studentId))
+  const [open, setOpen] = useState(session.show)
+
+  function finish() {
     try {
-      localStorage.setItem(ONBOARDED_KEY, '1')
-      setSeenVersion(LATEST_VERSION)
+      endTour(sessionStorage, studentId)
     } catch {
-      /* storage unavailable */
+      /* a blocked store costs a replay on remount, never the screen */
     }
-    setOnboarding(false)
+    // Only for a student who has never seen a release note: finishing the tour
+    // must not ALSO throw "What's new" at them, but on opens 2 and 3 a seen
+    // version already exists and a genuinely newer entry should still appear.
+    if (getSeenVersion() === null) setSeenVersion(LATEST_VERSION)
+    setOpen(false)
   }
 
-  if (onboarding) return <Onboarding open onDone={finishOnboarding} />
-  return <WhatsNew />
+  const visible = open && levelUp === null && unlockedAchievement === null
+
+  return (
+    <>
+      <AnimatePresence>
+        {visible && <Tour skippable={session.skippable} onDone={finish} />}
+      </AnimatePresence>
+      {!open && <WhatsNew />}
+      {!open && <AwayRecapOverlay />}
+    </>
+  )
 }
 
 /**
@@ -302,8 +366,7 @@ function StudentOrArchived() {
       <StudentShell />
       <LevelUpOverlay />
       <AchievementUnlockOverlay />
-      <IntroOrWhatsNew />
-      <AwayRecapOverlay />
+      <IntroLayer />
     </>
   )
 }

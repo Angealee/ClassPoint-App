@@ -89,10 +89,16 @@ with expected (migration, kind, name) as (
     ('0060', 'column',   'semesters.farewell_message'),
     ('0060', 'function', 'archive_semester_students'),
     ('0060', 'function', 'restore_student_into'),
-    -- 0061 · Grade boosts (this era)
-    ('0061', 'column',   'grade_items.points_cost'),
-    ('0061', 'table',    'grade_boosts'),
-    ('0061', 'function', 'get_my_grades')
+    -- 0061 adds no new object — see BLOCK 6.
+    -- 0062 · Student grades + grade boosts (this era)
+    ('0062', 'column',   'grade_items.points_cost'),
+    ('0062', 'column',   'point_redemptions.grade_item_id'),
+    ('0062', 'table',    'grade_boosts'),
+    ('0062', 'function', 'get_my_grades'),
+    ('0062', 'function', 'request_grade_boost'),
+    ('0062', 'function', 'reverse_grade_boost'),
+    ('0062', 'function', 'set_student_grades_enabled'),
+    ('0062', 'function', 'save_subject_policy')
 )
 select
   e.migration,
@@ -164,8 +170,12 @@ with expected (migration, kind, name) as (
     ('0060', 'column', 'semesters.farewell_message'),
     ('0060', 'function', 'archive_semester_students'),
     ('0060', 'function', 'restore_student_into'),
-    ('0061', 'column', 'grade_items.points_cost'), ('0061', 'table', 'grade_boosts'),
-    ('0061', 'function', 'get_my_grades')
+    ('0062', 'column', 'grade_items.points_cost'),
+    ('0062', 'column', 'point_redemptions.grade_item_id'),
+    ('0062', 'table', 'grade_boosts'), ('0062', 'function', 'get_my_grades'),
+    ('0062', 'function', 'request_grade_boost'), ('0062', 'function', 'reverse_grade_boost'),
+    ('0062', 'function', 'set_student_grades_enabled'),
+    ('0062', 'function', 'save_subject_policy')
 ),
 probe as (
   select
@@ -283,4 +293,53 @@ select
      where n.nspname = 'public'
        and p.proname = 'cp_guard_student_update'
        and pg_get_functiondef(p.oid) like '%cp.event_award%'
-  ) as present;
+  ) as present
+union all
+--   0061 adds a WHERE clause to set_active_semester's bulk recompute. Until it
+--   is applied, activating a semester fails with "UPDATE requires a WHERE
+--   clause" — pg_safeupdate refuses the unqualified UPDATE for the API roles.
+--
+--   ⚠ You cannot test this by CALLING the function here: the SQL editor runs as
+--     `postgres`, which the guard exempts, so it succeeds either way. Probing
+--     the body is the only honest check from SQL.
+select
+  '0061',
+  exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'set_active_semester'
+       and pg_get_functiondef(p.oid) like '%set semester_points = v.pts%'
+  )
+union all
+--   0062 takes decide_point_redemption from 0029. The new OBJECTS above prove the
+--   file was pasted, but a partial paste could leave the OLD decide function in
+--   place, and then approving a boost request would deduct the points and never
+--   touch the mark. The grade branch writes an audit row — that is the tell.
+select
+  '0062 · decide_point_redemption has the grade branch',
+  exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'decide_point_redemption'
+       and pg_get_functiondef(p.oid) like '%grade_boost%'
+  )
+union all
+--   …and the ledger must accept a POSITIVE redeem row (the refund of a reversed
+--   boost). Until the CHECK is widened, reversing a boost fails at the refund.
+--
+--   ⚠ Postgres stores `between -500 and 50` as `points >= '-500' AND points <=
+--     50`, so matching the words "between" or "-500 and 50" finds nothing. The
+--     redeem branch's upper bound is the only `<= 50` in the constraint (the
+--     other branch tops out at 100), which makes it the honest tell.
+select
+  '0062 · point_events accepts a refund',
+  exists (
+    select 1
+      from pg_constraint
+     where conname = 'point_events_points_check'
+       and pg_get_constraintdef(oid) like '%points <= 50)%'
+  );

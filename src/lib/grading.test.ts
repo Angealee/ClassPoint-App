@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  completionByTerm,
   componentScore,
   defaultPolicy,
   displayGrade,
@@ -13,7 +14,7 @@ import {
   termGrade,
   type GradeItemLike,
 } from './grading'
-import type { GradeComponent, GradePolicy, TermSums } from './types'
+import type { GradeComponent, GradePolicy, TermKey, TermSums } from './types'
 
 /**
  * Pins the grade computation against the instructor's real spreadsheet.
@@ -309,5 +310,63 @@ describe('displayGrade', () => {
   it('always shows two decimals', () => {
     expect(displayGrade(91.5)).toBe('91.50')
     expect(displayGrade(100)).toBe('100.00')
+  })
+})
+
+describe('completionByTerm (Era 8.0)', () => {
+  /** One student's worth of sums, with only the quiz component populated. */
+  const row = (term: TermKey, marked: number, max: number) => ({
+    term,
+    sums: {
+      ...emptySums(),
+      quiz: { sumScore: 0, sumMax: max, sumMaxMarked: marked },
+    } as TermSums,
+  })
+
+  it('divides marked by the FULL maximum, not by what is marked', () => {
+    // ⚠ The load-bearing case. Dividing by sumMaxMarked gives 100% always,
+    // which reads as "nothing left to do" and is the one wrong answer that
+    // looks completely plausible on screen.
+    const out = completionByTerm([row('prelim', 10, 40), row('prelim', 10, 40)])
+    expect(out.prelim).toBe(25)
+  })
+
+  it('reports a term with no columns as null, not as 0%', () => {
+    // An instructor has not fallen behind on a term they have not set up, and
+    // 0% sends them looking for marks that cannot exist yet.
+    const out = completionByTerm([row('prelim', 10, 40)])
+    expect(out.midterm).toBeNull()
+    expect(out.finals).toBeNull()
+  })
+
+  it('is 0 for a term that is fully set up and entirely unmarked', () => {
+    // The real distinction: columns exist, nothing typed. That IS zero.
+    const out = completionByTerm([row('finals', 0, 50)])
+    expect(out.finals).toBe(0)
+  })
+
+  it('is 100 once every cell is marked', () => {
+    const out = completionByTerm([row('midterm', 30, 30), row('midterm', 30, 30)])
+    expect(out.midterm).toBe(100)
+  })
+
+  it('sums across components, not just the first one', () => {
+    const mixed = {
+      term: 'prelim' as TermKey,
+      sums: {
+        performance_task: { sumScore: 0, sumMax: 100, sumMaxMarked: 0 },
+        quiz: { sumScore: 0, sumMax: 100, sumMaxMarked: 100 },
+        recitation: { sumScore: 0, sumMax: 0, sumMaxMarked: 0 },
+        exam: { sumScore: 0, sumMax: 0, sumMaxMarked: 0 },
+      } as TermSums,
+    }
+    // 100 of 200 — a reading that only looked at the first component would say
+    // 0, and one that stopped at the second would say 100.
+    expect(completionByTerm([mixed]).prelim).toBe(50)
+  })
+
+  it('answers every term for an empty roster', () => {
+    const out = completionByTerm([])
+    expect(out).toEqual({ prelim: null, midterm: null, finals: null })
   })
 })

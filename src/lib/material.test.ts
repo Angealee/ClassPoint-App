@@ -432,6 +432,64 @@ describe('the rising comment column (Era 8.0)', () => {
   })
 })
 
+describe('the first-run tour (Era 8.0)', () => {
+  /**
+   * The tour is the first thing a student sees, on whatever phone they own, and
+   * its demos loop. The rule that keeps them cheap is that they only animate
+   * what the compositor can do without layout: opacity and transform.
+   *
+   * ⚠ Animating `width`, `height`, `top`, `left` or a margin forces layout every
+   *   frame. It looks identical on a developer's laptop and drops frames on a
+   *   low-end Android — which is where the tour is most likely to be the
+   *   student's first impression of the app. Nothing else would notice: the
+   *   code compiles, the demo plays, only the frame rate suffers.
+   */
+  const DEMOS = 'src/components/tour/TourDemos.tsx'
+  const ALLOWED = new Set(['opacity', 'x', 'y', 'scale', 'scaleX', 'scaleY', 'rotate'])
+
+  /** Every key inside every `initial={{…}}` / `animate={{…}}` / `exit={{…}}`. */
+  function animatedKeys(src: string): string[] {
+    const keys: string[] = []
+    for (const m of src.matchAll(/\b(?:initial|animate|exit)=\{\{([^}]*)\}\}/g)) {
+      for (const k of m[1].matchAll(/(\w+)\s*:/g)) keys.push(k[1])
+    }
+    return keys
+  }
+
+  it('animates only opacity and transform', () => {
+    const code = stripComments(readFileSync(join(process.cwd(), DEMOS), 'utf8'))
+    const keys = animatedKeys(code)
+    expect(keys.length, 'the matcher found nothing, so it would pass vacuously').toBeGreaterThan(10)
+    const layout = keys.filter((k) => !ALLOWED.has(k))
+    expect(layout, 'a demo animates a layout property').toEqual([])
+  })
+
+  it('has a matcher that actually sees a layout property', () => {
+    // The regression test for the guard itself: a guard that finds no keys
+    // passes on any input, which is the vacuous-pass hole this file keeps
+    // recording. Both forms must be caught.
+    expect(animatedKeys('animate={{ width: [0, 1], opacity: 1 }}')).toEqual(['width', 'opacity'])
+    expect(animatedKeys('initial={{ top: 4 }} exit={{ x: 2 }}')).toEqual(['top', 'x'])
+  })
+
+  it('draws no random shapes and carries no raw palette', () => {
+    // Math.random() would give a different QR on every render and trips the
+    // react-hooks purity rule; a hex would not follow the theme.
+    const code = stripComments(readFileSync(join(process.cwd(), DEMOS), 'utf8'))
+    expect(code).not.toMatch(/Math\.random/)
+    expect(code).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+  })
+
+  it('never takes a lit edge on the tour surfaces', () => {
+    // Stage is a fixed-height card on the canvas; a lit edge there would be a
+    // second elevation language in a screen that is deliberately flat.
+    for (const f of [DEMOS, 'src/features/student/Tour.tsx']) {
+      const code = stripComments(readFileSync(join(process.cwd(), f), 'utf8'))
+      expect(code, `${f} must stay flat`).not.toMatch(/\bcp-lit\b|\bcp-elev-/)
+    }
+  })
+})
+
 describe('the silent board (0060)', () => {
   /**
    * The empty leaderboard is ART, and the two rules it has to keep are both

@@ -22,7 +22,16 @@ import {
   parsePastedColumn,
   parseScoreInput,
 } from '@/lib/grade-entry'
-import type { GradeComponent, GradeItem, GradePolicy, GradeView, RosterPerson } from '@/lib/types'
+import { formatMarks } from '@/lib/grade-boost'
+import { TONE } from '@/lib/tone'
+import type {
+  GradeBoost,
+  GradeComponent,
+  GradeItem,
+  GradePolicy,
+  GradeView,
+  RosterPerson,
+} from '@/lib/types'
 
 /**
  * The spreadsheet: students down, score columns across.
@@ -58,6 +67,13 @@ interface GradeGridProps {
   view: GradeView
   /** Cells whose last write failed — kept on screen, flagged, never discarded. */
   failed: Set<string>
+  /**
+   * cellKey → the receipt, for every mark a student's points changed (0062).
+   * Drawn as a dot in the cell's corner. It is decoration over the cell — the
+   * mark itself is the ordinary score, so nothing about typing changes — and an
+   * empty map (the usual case, and the case before the migration) draws nothing.
+   */
+  boosts: Map<string, GradeBoost>
   onCommit: (edit: CellEdit, previous: number | null) => void
   /** A column pasted from Excel, applied in one go by the parent. */
   onPasteColumn: (itemId: string, startIndex: number, values: string[]) => void
@@ -72,6 +88,7 @@ export function GradeGrid({
   policy,
   view,
   failed,
+  boosts,
   onCommit,
   onPasteColumn,
   onAddColumn,
@@ -106,6 +123,41 @@ export function GradeGrid({
     students.forEach((s, i) => m.set(s.id, i))
     return m
   }, [students])
+
+  /**
+   * The component band's cells: one per component that HAS columns, spanning
+   * them.
+   *
+   * Built from `items` rather than from GRADE_COMPONENTS so a component with
+   * no columns yet contributes no cell — an empty "Recitation" band over zero
+   * columns would be a header for nothing. `items` arrives already ordered by
+   * component then position (`orderedItems`), which is what makes a contiguous
+   * span correct; if that ordering ever changes, this has to become a group-by
+   * rather than a run-length pass.
+   */
+  const bands = useMemo(() => {
+    const out: Array<{ component: GradeComponent; span: number }> = []
+    for (const item of items) {
+      const last = out[out.length - 1]
+      if (last && last.component === item.component) last.span += 1
+      else out.push({ component: item.component, span: 1 })
+    }
+    return out
+  }, [items])
+
+  /**
+   * Which COLUMN has focus, for the crosshair.
+   *
+   * ⚠ The hot path is free, and that is why this is affordable. Walking a
+   *   column with Enter fires `onFocus` 40 times with the SAME item id, and
+   *   React bails out of a `setState` to an identical value — so typing down a
+   *   column causes ZERO extra renders. Only moving ACROSS columns (Tab)
+   *   re-renders the rows, once.
+   *
+   *   The row half needs no state at all: `:focus-within` on the `<tr>` does
+   *   it in CSS.
+   */
+  const [focusedItemId, setFocusedItemId] = useState<string | null>(null)
 
   if (items.length === 0) {
     return (
@@ -149,10 +201,65 @@ export function GradeGrid({
     <TableScroller fill className="pb-2">
       <table className="w-max border-separate border-spacing-0 text-sm">
         <thead>
+          {/* ── THE COMPONENT BAND ───────────────────────────────────────────
+              Which component a column belongs to used to live only in the
+              cell's `title` attribute — invisible on a touch screen and
+              invisible while typing. It is the first thing you need: a quiz
+              and a performance task weigh differently, and a column named
+              "Activity 3" does not say which it is.
+
+              This mirrors the instructor's own spreadsheet, which carries
+              merged group headers over the same columns.
+
+              ⚠ TWO STICKY ROWS NEED TWO OFFSETS. The band is `top-0` and the
+                header below it is `top-6` — 24px, which is exactly `h-6` on
+                the band's cells. Both numbers reference the same step on
+                purpose: a measured magic number here drifts the moment the
+                band's padding changes, and the symptom is a header row that
+                overlaps the band by a few pixels while scrolling. */}
           <tr>
             <th
               scope="col"
-              className="sticky left-0 top-0 z-30 border-b border-line bg-card px-3 py-2 text-left font-semibold"
+              colSpan={2}
+              className="sticky left-0 top-0 z-40 h-6 border-b border-line bg-card px-3 text-left text-2xs font-semibold uppercase tracking-wider text-muted"
+            >
+              {/* The gutter + the name column. Deliberately blank: a label
+                  here would be a second screen title. */}
+            </th>
+            {bands.map((band) => (
+              <th
+                key={band.component}
+                scope="colgroup"
+                colSpan={band.span}
+                className="sticky top-0 z-30 h-6 border-b border-l border-line bg-card px-2 text-center text-2xs font-semibold uppercase tracking-wider text-muted"
+                title={COMPONENT_LABEL[band.component]}
+              >
+                <span className="block truncate">{COMPONENT_LABEL[band.component]}</span>
+              </th>
+            ))}
+            {/* Where typing ends and arithmetic begins — the same `border-l-2`
+                the header below uses, so the seam is one line down the grid. */}
+            <th
+              scope="colgroup"
+              colSpan={GRADE_COMPONENTS.length + 2}
+              className="sticky top-0 z-30 h-6 border-b border-l-2 border-line border-l-line bg-card-2 px-2 text-center text-2xs font-semibold uppercase tracking-wider text-muted"
+            >
+              Computed
+            </th>
+          </tr>
+
+          <tr>
+            {/* Row numbers, like a spreadsheet's. Frozen with the name, because
+                a gutter that scrolls away is worse than none. */}
+            <th
+              scope="col"
+              className="sticky left-0 top-6 z-30 w-8 min-w-8 border-b border-line bg-card px-0 py-2 text-center text-2xs font-semibold text-muted"
+            >
+              #
+            </th>
+            <th
+              scope="col"
+              className="sticky left-8 top-6 z-30 border-b border-line bg-card px-3 py-2 text-left font-semibold"
             >
               Student
             </th>
@@ -167,7 +274,7 @@ export function GradeGrid({
                 // ~180px, so a few long names shoved the term grade off screen.
                 // The cap plus `truncate` keeps every column the same width,
                 // and the full name stays in the title.
-                className="sticky top-0 z-20 w-22 min-w-22 max-w-22 border-b border-line bg-card px-2 py-1.5 text-center font-semibold"
+                className="sticky top-6 z-20 w-22 min-w-22 max-w-22 border-b border-line bg-card px-2 py-1.5 text-center font-semibold"
                 title={`${item.name} · ${COMPONENT_LABEL[item.component]} · out of ${item.maxScore}`}
               >
                 <span className="block truncate">{item.name}</span>
@@ -179,7 +286,7 @@ export function GradeGrid({
                 key={c}
                 scope="col"
                 className={cn(
-                  'sticky top-0 z-20 min-w-20 border-b border-line bg-card-2 px-2 py-1.5 text-center text-2xs font-semibold text-muted',
+                  'sticky top-6 z-20 min-w-20 border-b border-line bg-card-2 px-2 py-1.5 text-center text-2xs font-semibold text-muted',
                   // Where typing ends and arithmetic begins. Without it the two
                   // halves blend and a derived column invites a click.
                   i === 0 && 'border-l-2 border-l-line',
@@ -190,7 +297,7 @@ export function GradeGrid({
             ))}
             <th
               scope="col"
-              className="sticky top-0 z-20 min-w-20 border-b border-line bg-card-2 px-2 py-1.5 text-center text-2xs font-semibold text-muted"
+              className="sticky top-6 z-20 min-w-20 border-b border-line bg-card-2 px-2 py-1.5 text-center text-2xs font-semibold text-muted"
             >
               Class standing
             </th>
@@ -199,7 +306,7 @@ export function GradeGrid({
                 point of the screen and was the one column you could not see. */}
             <th
               scope="col"
-              className="sticky right-0 top-0 z-30 min-w-20 border-b border-l-2 border-line border-l-line bg-card-2 px-2 py-1.5 text-center font-semibold"
+              className="sticky right-0 top-6 z-30 min-w-20 border-b border-l-2 border-line border-l-line bg-card-2 px-2 py-1.5 text-center font-semibold"
             >
               Term grade
             </th>
@@ -216,11 +323,14 @@ export function GradeGrid({
               policy={policy}
               view={view}
               failed={failed}
+              boosts={boosts}
               onCommit={onCommit}
               onPasteColumn={onPasteColumn}
               registerInput={registerInput}
               moveFocus={moveFocus}
               indexById={indexById}
+              focusedItemId={focusedItemId}
+              onFocusColumn={setFocusedItemId}
             />
           ))}
         </tbody>
@@ -237,11 +347,15 @@ interface GradeRowProps {
   policy: GradePolicy
   view: GradeView
   failed: Set<string>
+  boosts: Map<string, GradeBoost>
   onCommit: (edit: CellEdit, previous: number | null) => void
   onPasteColumn: (itemId: string, startIndex: number, values: string[]) => void
   registerInput: (key: string, el: HTMLInputElement | null) => void
   moveFocus: (itemId: string, studentIndex: number, delta: number) => void
   indexById: Map<string, number>
+  /** The column with focus, for the crosshair. Null when nothing has it. */
+  focusedItemId: string | null
+  onFocusColumn: (itemId: string) => void
 }
 
 /**
@@ -258,10 +372,13 @@ const GradeRow = memo(function GradeRow({
   policy,
   view,
   failed,
+  boosts,
   onCommit,
   onPasteColumn,
   registerInput,
   moveFocus,
+  focusedItemId,
+  onFocusColumn,
 }: GradeRowProps) {
   // The row's committed values. Seeded once from the parent's map; anything
   // that changes them from outside remounts the grid (see the file header).
@@ -347,11 +464,36 @@ const GradeRow = memo(function GradeRow({
     onPasteColumn(item.id, rowIndex, parsePastedColumn(text))
   }
 
+  // Zebra, applied PER CELL rather than on the <tr>.
+  //
+  // ⚠ A stripe on the row is invisible in the frozen columns: the name and the
+  //   term grade set their own opaque background (they have to, or the marks
+  //   scroll underneath them), and that background paints over the row's. So
+  //   the stripe would appear only between the frozen edges and read as a
+  //   rendering fault rather than as banding.
+  const zebra = rowIndex % 2 === 1
+
   return (
-    <tr className="group">
+    // `focus-within` is the row half of the crosshair, and it costs nothing:
+    // no state, no re-render, pure CSS.
+    <tr className="group focus-within:[&>*]:bg-accent-solid/5">
       <th
         scope="row"
-        className="sticky left-0 z-10 max-w-52 truncate border-b border-line bg-card px-3 py-0 text-left font-normal group-hover:bg-card-2"
+        className={cn(
+          'sticky left-0 z-10 w-8 min-w-8 border-b border-line px-0 py-0 text-center text-2xs font-normal tabular-nums text-muted',
+          zebra ? 'bg-card-2' : 'bg-card',
+          'group-hover:bg-card-2',
+        )}
+      >
+        {rowIndex + 1}
+      </th>
+      <th
+        scope="row"
+        className={cn(
+          'sticky left-8 z-10 max-w-52 truncate border-b border-line px-3 py-0 text-left font-normal',
+          zebra ? 'bg-card-2' : 'bg-card',
+          'group-hover:bg-card-2',
+        )}
       >
         {student.fullName}
       </th>
@@ -361,8 +503,30 @@ const GradeRow = memo(function GradeRow({
         const value = values.get(item.id) ?? null
         const over = isOverMax(value, item.maxScore)
         const isBad = badCell?.itemId === item.id
+        const boost = boosts.get(key)
+        // The receipt remembers what the boost WROTE. A cell that no longer
+        // holds it has been retyped since, and saying "boosted +3" over a mark
+        // that no longer includes the boost would be a small lie in the one
+        // place the instructor looks to find out.
+        const boostNote = boost
+          ? value === boost.scoreAfter
+            ? `Boosted +${formatMarks(boost.marksGranted)} for ${boost.pointsSpent} points (was ${formatMarks(boost.scoreBefore)}). Reverse it from Requests.`
+            : `A boost of +${formatMarks(boost.marksGranted)} was applied, but this mark has been edited since. Reverse it from Requests.`
+          : undefined
         return (
-          <td key={item.id} className="border-b border-line p-0">
+          <td
+            key={item.id}
+            className={cn(
+              // `relative` anchors the boost dot; the cell is otherwise a plain
+              // pass-through for the input.
+              'relative border-b border-line p-0',
+              zebra && 'bg-card-2/40',
+              // The column half of the crosshair. A tint on the CELL rather
+              // than the input, so it reads as a column rather than as a row
+              // of highlighted boxes.
+              focusedItemId === item.id && 'bg-accent-solid/5',
+            )}
+          >
             <input
               ref={(el) => registerInput(key, el)}
               // NOT type="number": its spinners hijack the mouse wheel over a
@@ -380,10 +544,21 @@ const GradeRow = memo(function GradeRow({
               // is ~88px and you can read nine.
               size={4}
               defaultValue={formatScoreInput(value)}
-              aria-label={`${item.name} for ${student.fullName}`}
+              aria-label={`${item.name} for ${student.fullName}${boost ? ', boosted with points' : ''}`}
               aria-invalid={isBad || undefined}
-              title={isBad ? badCell.reason : over ? `Above the maximum of ${item.maxScore}` : undefined}
-              onFocus={(e) => e.currentTarget.select()}
+              title={
+                isBad
+                  ? badCell.reason
+                  : over
+                    ? `Above the maximum of ${item.maxScore}`
+                    : boostNote
+              }
+              onFocus={(e) => {
+                e.currentTarget.select()
+                // Same id while walking DOWN a column, so React bails out of
+                // the setState and the hot path renders nothing extra.
+                onFocusColumn(item.id)
+              }}
               onBlur={(e) => commit(item, e.currentTarget)}
               onKeyDown={(e) => onKeyDown(e, item)}
               onPaste={(e) => onPaste(e, item)}
@@ -397,6 +572,21 @@ const GradeRow = memo(function GradeRow({
                 !isBad && failed.has(key) && 'bg-danger-solid/10',
               )}
             />
+            {boost && (
+              // A dot, not a chip: the cell is 88px with the input filling it,
+              // and anything with width would sit on top of the mark. It is
+              // pointer-events-none so it can never intercept a click meant for
+              // the cell, and it hollows out when the mark has been retyped.
+              <span
+                aria-hidden
+                className={cn(
+                  'pointer-events-none absolute right-1 top-1 h-1.5 w-1.5 rounded-full',
+                  value === boost.scoreAfter
+                    ? TONE.reward.dot
+                    : 'border border-reward bg-transparent',
+                )}
+              />
+            )}
           </td>
         )
       })}
@@ -405,7 +595,8 @@ const GradeRow = memo(function GradeRow({
         <td
           key={c}
           className={cn(
-            'border-b border-line bg-card-2/50 px-2 py-0 text-center text-xs tabular-nums text-muted',
+            'border-b border-line px-2 py-0 text-center text-xs tabular-nums text-muted',
+            zebra ? 'bg-card-2/80' : 'bg-card-2/50',
             i === 0 && 'border-l-2 border-l-line',
           )}
         >
@@ -417,10 +608,20 @@ const GradeRow = memo(function GradeRow({
           {figures.unmarked[c] ? <span className="text-muted/50">—</span> : displayGrade(figures.comps[c])}
         </td>
       ))}
-      <td className="border-b border-line bg-card-2/50 px-2 py-0 text-center text-xs tabular-nums text-muted">
+      <td
+        className={cn(
+          'border-b border-line px-2 py-0 text-center text-xs tabular-nums text-muted',
+          zebra ? 'bg-card-2/80' : 'bg-card-2/50',
+        )}
+      >
         {figures.csUnmarked ? <span className="text-muted/50">—</span> : displayGrade(figures.cs)}
       </td>
-      <td className="sticky right-0 z-10 border-b border-l-2 border-line border-l-line bg-card-2 px-2 py-0 text-center font-display font-bold tabular-nums group-hover:bg-card">
+      <td
+        className={cn(
+          'sticky right-0 z-10 border-b border-l-2 border-line border-l-line px-2 py-0 text-center font-display font-bold tabular-nums group-hover:bg-card',
+          zebra ? 'bg-card' : 'bg-card-2',
+        )}
+      >
         {displayGrade(figures.term)}
       </td>
     </tr>

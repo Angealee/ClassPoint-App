@@ -72,6 +72,7 @@ const MUST_BE_LINKED = [
   '/app/achievements',
   '/app/attendance/stats',
   '/app/settings',
+  '/app/grades',
   '/app/peer',
   '/app/spenders',
   // 0055 — the global event scan screen; linked from the "Event is starting"

@@ -6,9 +6,8 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Input } from '@/components/ui/Input'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { Sheet } from '@/components/ui/Sheet'
 import { useToast } from '@/components/ui/Toast'
-import { getSectionGradeSums, saveGradePolicy } from '@/lib/api'
+import { getSectionGradeSums, saveGradePolicies } from '@/lib/api'
 import { computeImpact, type GradeImpact } from '@/lib/grade-impact'
 import { DEFAULT_WEIGHTS, displayGrade, policyError, sumsToOne } from '@/lib/grading'
 import { errorText } from '@/lib/errors'
@@ -81,9 +80,9 @@ function fromDraft(base: GradePolicy, d: Draft): GradePolicy {
   }
 }
 
-interface WeightsSheetProps {
-  open: boolean
-  onClose: () => void
+interface WeightsPanelProps {
+  /** Close the hosting surface — called after a successful save. */
+  onDone: () => void
   subject: Subject
   policies: GradePolicy[]
   /** Every section taking this subject — what the change actually reaches. */
@@ -91,14 +90,13 @@ interface WeightsSheetProps {
   onSaved: () => void
 }
 
-export function WeightsSheet({
-  open,
-  onClose,
+export function WeightsPanel({
+  onDone,
   subject,
   policies,
   sectionIds,
   onSaved,
-}: WeightsSheetProps) {
+}: WeightsPanelProps) {
   const { toast } = useToast()
   const [term, setTerm] = useState<TermKey>('prelim')
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
@@ -106,14 +104,15 @@ export function WeightsSheet({
   const [busy, setBusy] = useState(false)
   const [impact, setImpact] = useState<GradeImpact | null>(null)
 
+  // Mount IS open now (the host renders this panel only while its tab is
+  // active), so there is nothing to gate on.
   useEffect(() => {
-    if (!open) return
     const next: Record<string, Draft> = {}
     for (const p of policies) next[p.term] = toDraft(p)
     setDrafts(next)
     setAdvanced(false)
     setImpact(null)
-  }, [open, policies])
+  }, [policies])
 
   const draft = drafts[term]
   const policy = policies.find((p) => p.term === term)
@@ -206,10 +205,12 @@ export function WeightsSheet({
   async function save() {
     setBusy(true)
     try {
-      for (const p of next) await saveGradePolicy(p)
+      // One transaction for all three terms: a failure partway used to leave
+      // the shares off 100%, which made every grade for the subject vanish.
+      await saveGradePolicies(subject.id, next)
       setImpact(null)
       onSaved()
-      onClose()
+      onDone()
       toast('Weights saved.', 'success')
     } catch (e) {
       toast(errorText(e, 'Could not save the weights.'), 'error')
@@ -220,136 +221,134 @@ export function WeightsSheet({
 
   return (
     <>
-      <Sheet open={open} onClose={onClose} title={`${subject.code} weights`}>
-        <div className="space-y-5">
-          <p className="text-xs text-muted">
-            These apply to <b className="text-ink">every section</b> taking {subject.code} —{' '}
-            {sectionIds.length} right now. Points never feed any of this.
-          </p>
+      <div className="space-y-5">
+        <p className="text-xs text-muted">
+          These apply to <b className="text-ink">every section</b> taking {subject.code} —{' '}
+          {sectionIds.length} right now. Points never feed any of this.
+        </p>
 
-          <SegmentedControl
-            label="Term"
-            value={term}
-            onChange={setTerm}
-            options={TERMS.map((t) => ({ value: t, label: TERM_LABEL[t] }))}
-          />
+        <SegmentedControl
+          label="Term"
+          value={term}
+          onChange={setTerm}
+          options={TERMS.map((t) => ({ value: t, label: TERM_LABEL[t] }))}
+        />
 
-          {!draft || !policy ? (
-            <Card pad="tight" className="text-sm text-warn">
-              {TERM_LABEL[term]} has no weights row. Re-run migration 0057 — it seeds all three.
-            </Card>
-          ) : (
-            <>
-              <Card pad="tight" className="space-y-3">
-                <SectionLabel
-                  action={
-                    <Chip tone={Math.abs(csTotal - 100) < 0.01 ? 'success' : 'danger'}>
-                      {Number.isFinite(csTotal) ? `${Math.round(csTotal * 100) / 100}%` : '—'}
-                    </Chip>
-                  }
-                >
-                  Class standing is made of
-                </SectionLabel>
-                <PercentField
-                  label="Performance Tasks"
-                  value={draft.pt}
-                  onChange={(v) => patch({ pt: v })}
-                />
-                <PercentField label="Quizzes" value={draft.quiz} onChange={(v) => patch({ quiz: v })} />
-                <PercentField
-                  label="Recitation"
-                  value={draft.recit}
-                  onChange={(v) => patch({ recit: v })}
-                />
-                {Math.abs(csTotal - 100) >= 0.01 && (
-                  <p className="text-xs text-danger">These three must add up to 100%.</p>
-                )}
-              </Card>
-
-              <Card pad="tight" className="space-y-3">
-                <SectionLabel>The term grade is</SectionLabel>
-                <PercentField
-                  label="Class standing"
-                  value={draft.cs}
-                  onChange={(v) => setPair('cs', v)}
-                />
-                <PercentField label="Exam" value={draft.exam} onChange={(v) => setPair('exam', v)} />
-                <p className="text-2xs text-muted">
-                  These two balance each other, so they always add up to 100%.
-                </p>
-              </Card>
-            </>
-          )}
-
-          <Card pad="tight" className="space-y-3">
-            <SectionLabel
-              action={
-                <Chip tone={Math.abs(finalTotal - 100) < 0.01 ? 'success' : 'danger'}>
-                  {Number.isFinite(finalTotal) ? `${Math.round(finalTotal * 100) / 100}%` : '—'}
-                </Chip>
-              }
-            >
-              The final grade is
-            </SectionLabel>
-            {TERMS.map((t) =>
-              drafts[t] ? (
-                <PercentField
-                  key={t}
-                  label={TERM_LABEL[t]}
-                  value={drafts[t].final}
-                  onChange={(v) => setDrafts((d) => ({ ...d, [t]: { ...d[t], final: v } }))}
-                />
-              ) : null,
-            )}
-            {Math.abs(finalTotal - 100) >= 0.01 && (
-              <p className="text-xs text-danger">
-                The three terms must add up to 100%, or no final grade can be worked out at all.
-              </p>
-            )}
+        {!draft || !policy ? (
+          <Card pad="tight" className="text-sm text-warn">
+            {TERM_LABEL[term]} has no weights row. Re-run migration 0057 — it seeds all three.
           </Card>
+        ) : (
+          <>
+            <Card pad="tight" className="space-y-3">
+              <SectionLabel
+                action={
+                  <Chip tone={Math.abs(csTotal - 100) < 0.01 ? 'success' : 'danger'}>
+                    {Number.isFinite(csTotal) ? `${Math.round(csTotal * 100) / 100}%` : '—'}
+                  </Chip>
+                }
+              >
+                Class standing is made of
+              </SectionLabel>
+              <PercentField
+                label="Performance Tasks"
+                value={draft.pt}
+                onChange={(v) => patch({ pt: v })}
+              />
+              <PercentField label="Quizzes" value={draft.quiz} onChange={(v) => patch({ quiz: v })} />
+              <PercentField
+                label="Recitation"
+                value={draft.recit}
+                onChange={(v) => patch({ recit: v })}
+              />
+              {Math.abs(csTotal - 100) >= 0.01 && (
+                <p className="text-xs text-danger">These three must add up to 100%.</p>
+              )}
+            </Card>
 
-          <div>
-            <button
-              type="button"
-              onClick={() => setAdvanced((a) => !a)}
-              className="text-xs text-muted underline-offset-2 hover:underline"
-            >
-              {advanced ? 'Hide' : 'Show'} transmutation
-            </button>
-            {advanced && draft && (
-              <Card pad="tight" className="mt-2 space-y-3">
-                <p className="text-xs text-muted">
-                  Every component is transmuted as{' '}
-                  <b className="text-ink">(raw ÷ total × span + base) × 100</b>. A base of 60% is
-                  what makes {displayGrade(60)} the lowest possible grade. Changing these moves{' '}
-                  <b className="text-ink">every grade this subject has ever produced</b>.
-                </p>
-                <PercentField label="Base" value={draft.base} onChange={(v) => patch({ base: v })} />
-                <PercentField label="Span" value={draft.span} onChange={(v) => patch({ span: v })} />
-                <p className="text-2xs text-muted">
-                  DCT&rsquo;s standard is {pct(DEFAULT_WEIGHTS.transmuteBase)}% base and{' '}
-                  {pct(DEFAULT_WEIGHTS.transmuteSpan)}% span.
-                </p>
-              </Card>
-            )}
-          </div>
+            <Card pad="tight" className="space-y-3">
+              <SectionLabel>The term grade is</SectionLabel>
+              <PercentField
+                label="Class standing"
+                value={draft.cs}
+                onChange={(v) => setPair('cs', v)}
+              />
+              <PercentField label="Exam" value={draft.exam} onChange={(v) => setPair('exam', v)} />
+              <p className="text-2xs text-muted">
+                These two balance each other, so they always add up to 100%.
+              </p>
+            </Card>
+          </>
+        )}
 
-          {problem && (
-            <Card pad="tight" className="border-danger bg-danger-solid/10 text-sm text-danger">
-              {problem}
+        <Card pad="tight" className="space-y-3">
+          <SectionLabel
+            action={
+              <Chip tone={Math.abs(finalTotal - 100) < 0.01 ? 'success' : 'danger'}>
+                {Number.isFinite(finalTotal) ? `${Math.round(finalTotal * 100) / 100}%` : '—'}
+              </Chip>
+            }
+          >
+            The final grade is
+          </SectionLabel>
+          {TERMS.map((t) =>
+            drafts[t] ? (
+              <PercentField
+                key={t}
+                label={TERM_LABEL[t]}
+                value={drafts[t].final}
+                onChange={(v) => setDrafts((d) => ({ ...d, [t]: { ...d[t], final: v } }))}
+              />
+            ) : null,
+          )}
+          {Math.abs(finalTotal - 100) >= 0.01 && (
+            <p className="text-xs text-danger">
+              The three terms must add up to 100%, or no final grade can be worked out at all.
+            </p>
+          )}
+        </Card>
+
+        <div>
+          <button
+            type="button"
+            onClick={() => setAdvanced((a) => !a)}
+            className="text-xs text-muted underline-offset-2 hover:underline"
+          >
+            {advanced ? 'Hide' : 'Show'} transmutation
+          </button>
+          {advanced && draft && (
+            <Card pad="tight" className="mt-2 space-y-3">
+              <p className="text-xs text-muted">
+                Every component is transmuted as{' '}
+                <b className="text-ink">(raw ÷ total × span + base) × 100</b>. A base of 60% is
+                what makes {displayGrade(60)} the lowest possible grade. Changing these moves{' '}
+                <b className="text-ink">every grade this subject has ever produced</b>.
+              </p>
+              <PercentField label="Base" value={draft.base} onChange={(v) => patch({ base: v })} />
+              <PercentField label="Span" value={draft.span} onChange={(v) => patch({ span: v })} />
+              <p className="text-2xs text-muted">
+                DCT&rsquo;s standard is {pct(DEFAULT_WEIGHTS.transmuteBase)}% base and{' '}
+                {pct(DEFAULT_WEIGHTS.transmuteSpan)}% span.
+              </p>
             </Card>
           )}
-
-          <Button
-            className="w-full"
-            loading={busy}
-            disabled={!dirty || problem !== null}
-            onClick={() => void preview()}
-          >
-            {dirty ? 'Review the change' : 'No changes'}
-          </Button>
         </div>
-      </Sheet>
+
+        {problem && (
+          <Card pad="tight" className="border-danger bg-danger-solid/10 text-sm text-danger">
+            {problem}
+          </Card>
+        )}
+
+        <Button
+          className="w-full"
+          loading={busy}
+          disabled={!dirty || problem !== null}
+          onClick={() => void preview()}
+        >
+          {dirty ? 'Review the change' : 'No changes'}
+        </Button>
+      </div>
 
       <ConfirmDialog
         open={impact !== null}

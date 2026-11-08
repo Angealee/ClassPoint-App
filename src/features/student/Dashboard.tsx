@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { Avatar } from '@/components/ui/Avatar'
-import { BoltIcon, CheckIcon, TicketIcon } from '@/components/ui/icons'
+import { BoltIcon, CheckIcon, TableIcon, TicketIcon } from '@/components/ui/icons'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { Meter } from '@/components/ui/Meter'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
@@ -14,7 +14,10 @@ import { PointEventRow } from '@/components/points/PointEventRow'
 import { snapshotLabel } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import { rateTone, tally } from '@/lib/attendance'
-import type { AchievementState, MyAttendanceEntry } from '@/lib/types'
+import { displayGrade } from '@/lib/grading'
+import { TERM_TITLE, boostableCount, latestSoFar, type TermSummary } from '@/lib/student-grades'
+import { TONE } from '@/lib/tone'
+import type { AchievementState, MyAttendanceEntry, MyGradeSubject, MyGrades } from '@/lib/types'
 import { useStudentData } from './StudentData'
 import { HomeHero, NextMilestone } from './HomeHero'
 import { LiveClassBanner } from './LiveClassBanner'
@@ -58,6 +61,8 @@ export function Dashboard() {
     hasUnseenAchievements,
     achievementProgress,
     attendance,
+    grades,
+    semesterEnded,
   } = useStudentData()
 
   if (loading) return <DashboardSkeleton />
@@ -128,6 +133,15 @@ export function Dashboard() {
             onOpen={() => navigate('/app/attendance/stats')}
           />
         </motion.div>
+
+        {/* Renders nothing while the instructor has grades switched off, while
+            nothing is marked, or if the fetch failed — so an ordinary day
+            before grades open costs no space and shows no error. */}
+        <GradesCard
+          grades={grades}
+          boostEnabled={!semesterEnded}
+          onOpen={() => navigate('/app/grades')}
+        />
 
         {/* The only home-screen entry point to /app/points. */}
         <motion.div variants={item}>
@@ -223,6 +237,92 @@ function AttendanceCard({
         <Meter value={t.rate} tone={rateTone(t.rate)} size="sm" label="Attendance rate" className="mt-3" />
       </Card>
     </button>
+  )
+}
+
+/** Subjects shown on the card; the rest are one tap away on the Grades screen. */
+const GRADES_CARD_ROWS = 2
+
+/**
+ * Home-screen glance at grades: the LATEST "so far" figure per subject.
+ *
+ * It is a figure, not a link row — the instructor's call (2026-11-09), so a
+ * student sees where they stand without opening anything. The word "so far" is
+ * on every line for the reason the Grades screen spells out in full: it is the
+ * same number the instructor's sheet shows under its So-far toggle, and it moves
+ * as marks come in.
+ *
+ * Reads `grades` off StudentData and fires no query of its own. Renders NOTHING
+ * (not an error, not a placeholder) when grades are off, loading, failed or
+ * empty — the Grades screen is where those states get explained.
+ */
+function GradesCard({
+  grades,
+  boostEnabled,
+  onOpen,
+}: {
+  grades: MyGrades | null
+  boostEnabled: boolean
+  onOpen: () => void
+}) {
+  if (!grades?.enabled) return null
+
+  const rows: Array<{ subject: MyGradeSubject; latest: TermSummary }> = []
+  for (const subject of grades.subjects) {
+    const latest = latestSoFar(subject)
+    if (latest) rows.push({ subject, latest })
+  }
+
+  if (rows.length === 0) return null
+
+  const boostable = boostEnabled ? boostableCount(grades.subjects) : 0
+
+  return (
+    <motion.div variants={item}>
+      <button type="button" onClick={onOpen} className="block w-full text-left">
+        <Card interactive>
+          <div className="flex items-center gap-3">
+            <span
+              className={cn(
+                'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl',
+                TONE.info.chip,
+              )}
+            >
+              <TableIcon className="h-5.5 w-5.5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-sm font-bold">Grades</p>
+              <p className="text-xs text-muted">
+                {boostable > 0
+                  ? `${boostable} column${boostable === 1 ? '' : 's'} you can boost with points`
+                  : 'Based on what’s marked so far'}
+              </p>
+            </div>
+            <span className="shrink-0 text-lg text-muted">›</span>
+          </div>
+
+          <div className="mt-3 divide-y divide-line border-t border-line">
+            {rows.slice(0, GRADES_CARD_ROWS).map(({ subject, latest }) => (
+              <div key={subject.subjectId} className="flex items-center gap-3 py-2 first:pt-3">
+                <p className="min-w-0 flex-1 truncate text-sm">
+                  <span className="font-medium">{subject.code}</span>
+                  <span className="text-muted"> · {TERM_TITLE[latest.term]} so far</span>
+                </p>
+                <span className="shrink-0 font-display text-lg font-bold tabular-nums">
+                  {displayGrade(latest.soFar)}
+                </span>
+              </div>
+            ))}
+          </div>
+          {rows.length > GRADES_CARD_ROWS && (
+            <p className="pt-1 text-xs text-muted">
+              + {rows.length - GRADES_CARD_ROWS} more subject
+              {rows.length - GRADES_CARD_ROWS === 1 ? '' : 's'}
+            </p>
+          )}
+        </Card>
+      </button>
+    </motion.div>
   )
 }
 

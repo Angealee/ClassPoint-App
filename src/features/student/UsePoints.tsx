@@ -53,6 +53,8 @@ const STATUS_META: Record<RedemptionStatus, { label: string; cls: string }> = {
   approved: { label: 'Approved', cls: TONE.success.chip },
   rejected: { label: 'Declined', cls: TONE.danger.chip },
   cancelled: { label: 'Cancelled', cls: TONE.neutral.chip },
+  // 0062 — an approved grade boost the instructor undid. The points came back.
+  reversed: { label: 'Reversed', cls: TONE.neutral.chip },
 }
 
 function errorText(e: unknown, fallback: string): string {

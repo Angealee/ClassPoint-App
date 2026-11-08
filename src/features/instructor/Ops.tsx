@@ -6,13 +6,16 @@ import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
-import { CalendarIcon, SaturnIcon } from '@/components/ui/icons'
+import { CalendarIcon, SaturnIcon, TableIcon } from '@/components/ui/icons'
+import { Toggle } from '@/components/ui/Toggle'
 import {
   forceLeaderboardRefresh,
   getBackupHealth,
   getSectionHeadcounts,
+  getStudentGradesEnabled,
   listAuditLog,
   listAuthEvents,
+  setStudentGradesEnabled,
 } from '@/lib/api'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { AttendanceWorkbook } from './AttendanceWorkbook'
@@ -59,6 +62,7 @@ export function Ops() {
 
       <SemestersCard />
       <SpaceCard />
+      <StudentGradesCard />
 
       {/* Acting-on-students first, inspection below — the order you'd want on
           a Monday morning. */}
@@ -447,6 +451,103 @@ function SpaceCard() {
       </span>
       <span className="shrink-0 text-lg text-muted">›</span>
     </button>
+  )
+}
+
+/**
+ * Whether students can see their own grades at all (0062).
+ *
+ * It lives here, beside the Student Space entry, because it is the same kind of
+ * lever: a master switch you reach for when you are about to open something to
+ * the whole class. It ships OFF — pasting the migration exposes nothing — so the
+ * first time this matters is the day you have checked the marks and are ready.
+ *
+ * Turning it ON goes through a confirm, because it is outward-facing and not
+ * quietly reversible: a student who has seen a mark has seen it. Turning it OFF
+ * does not, because the cost of hesitating there is worse than the cost of a
+ * mis-tap (fix the marks, and the screen is already hidden).
+ */
+function StudentGradesCard() {
+  const { toast } = useToast()
+  const [on, setOn] = useState<boolean | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+
+  // No synchronous setState before the request: the failure flag clears when an
+  // answer ARRIVES, which keeps this effect off the fetch-on-mount warning list.
+  const load = useCallback(() => {
+    getStudentGradesEnabled()
+      .then((value) => {
+        setOn(value)
+        setFailed(false)
+      })
+      .catch(() => setFailed(true))
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function apply(next: boolean) {
+    setBusy(true)
+    try {
+      setOn(await setStudentGradesEnabled(next))
+      setConfirming(false)
+      toast(
+        next ? 'Students can now see their grades.' : 'Student grades are hidden again.',
+        'success',
+      )
+    } catch (e) {
+      toast(errorText(e, 'Could not change that.'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-3 rounded-2xl border border-line bg-card p-4">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-solid/10 text-accent">
+          <TableIcon className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">Student grades</span>
+          <span className="block text-sm text-muted">
+            {failed
+              ? 'Couldn’t read the setting. This needs migration 0062 applied.'
+              : on
+                ? 'Students can see their marks and spend points on flagged columns.'
+                : 'Hidden. Students are told grades aren’t open yet.'}
+          </span>
+          {failed && (
+            <button type="button" onClick={load} className="mt-1 text-xs font-semibold text-accent">
+              Try again
+            </button>
+          )}
+        </span>
+        {on !== null && (
+          <Toggle
+            on={on}
+            busy={busy}
+            label="Students can see their grades"
+            onChange={(next) => (next ? setConfirming(true) : void apply(false))}
+          />
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={confirming}
+        variant="default"
+        title="Open grades to students?"
+        message="Every student will see their own marks and a “so far” figure for each subject, and can ask to spend points on any column you have flagged."
+        detail="Check the marks first. A student who has seen a mark has seen it."
+        confirmLabel="Open grades"
+        busy={busy}
+        onConfirm={() => apply(true)}
+        onClose={() => setConfirming(false)}
+      />
+    </>
   )
 }
 

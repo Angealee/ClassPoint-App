@@ -71,10 +71,12 @@ and the leaderboard **reset each semester**; achievements and the all-time total
   KEEPS the queued proof"), `changelog` (version compare + the draft stays out of the
   live array). No React/Supabase mocking — that's why these five came first.
 - **ESLint** runs for the first time (`eslint.config.js`, flat config). Deliberately all
-  WARNINGS for now: 47 remain, dominated by react-hooks v7's `set-state-in-effect` and
-  `purity` performance opinions (the purity hits are all `Math.random()` in decorative
+  WARNINGS for now, dominated by react-hooks v7's `set-state-in-effect` and `purity`
+  performance opinions (the purity hits are all `Math.random()` in decorative
   confetti). It already earned its place by catching a real ordering smell in
-  `Students.tsx`. Tighten to errors once the backlog is read.
+  `Students.tsx`. **The count is 109 and `lint:eslint` is CAPPED at it
+  (`--max-warnings 109`)** so `verify` fails if it grows — see the Era 8.0 Phase 6 note
+  under 0062. (Earlier figures in this file — 47, 105, 107 — were true when written.)
 - **Env validation:** missing `VITE_SUPABASE_*` now THROWS in production
   (`lib/supabase.ts`) instead of falling through to placeholder credentials — a typo'd
   Vercel env used to boot fine and fail every request with an opaque network error.
@@ -129,6 +131,27 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   `$` escapes. **$$ IN A GENERATED MIGRATION IS THE THING TO CHECK FIRST** when a pasted
   file errors on a dollar sign: `grep -n '^as $*$' file | awk -F: '{print $2}' | sort | uniq -c`
   should show only `as $$`, in equal number to `$$;`.
+- ⚠ **AN UNQUALIFIED `UPDATE` OR `DELETE` INSIDE A RUNTIME-CALLABLE FUNCTION IS A
+  BUG, EVEN THOUGH THE MIGRATION PASTES CLEANLY.** Supabase runs **pg_safeupdate**
+  for the API roles (`authenticated`, `anon`), which refuses a statement with no
+  WHERE clause: `UPDATE requires a WHERE clause`. The SQL editor runs as
+  `postgres`, which is **exempt** — so the two paths disagree:
+    * a top-level one-time backfill in a migration always works (0029's and
+      0048's unqualified backfills are fine and 0029's has already run);
+    * the same statement inside a `security definer` function called through
+      PostgREST **always fails**, because SECURITY DEFINER changes the privilege,
+      not the session settings the guard reads.
+  This is how 0035's `set_active_semester` shipped broken for months: it pasted,
+  the ACID TEST in its own footer passed (run in the editor, as `postgres`), and
+  it only failed the first time the instructor actually pressed Activate. **0061
+  fixes it; it was the only runtime-reachable case in the project.**
+  **Audit the right way:** strip parenthesised subqueries BEFORE testing for a
+  `where`, or a correlated subquery's own `where` masks the outer statement's
+  missing one — that false negative is exactly why a naive grep never found this.
+  When a statement genuinely must touch every row, say so with a real predicate
+  rather than a tautology: compute the new value in a `from (…) v` subquery once
+  and join on `where v.id = s.id`. That satisfies the guard, keeps ONE copy of the
+  expression, and still updates every row exactly once.
 - **Migration before client, always.** A migration adding a column the client selects
   must land in the database BEFORE the build that selects it, or every read 400s.
   **ALL migrations 0001–0041 are APPLIED as of 2026-09-02** (confirmed by the user; 0041 was pasted twice to prove idempotency). **0042, 0043, 0044 and 0045 are WRITTEN AND NOT YET APPLIED** — until they are, every Student Space screen past the hub shows its error state. Paste them IN ORDER, and order matters: 0043 and 0044 each widen `audit_log_action_check`, and 0045 widens `point_events_category_check`.
@@ -203,7 +226,21 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   are fully exercised (they are pure), but every call in `api/grades.ts` 400s —
   so every grades fetch gets its OWN try/catch and `ErrorState` (the 0034
   SectionGrid precedent), and nothing else in the instructor area is affected.
-  **Next number: 0061.**
+  **0061 is WRITTEN AND NOT YET APPLIED** — the `set_active_semester` WHERE-clause
+  fix. See the pg_safeupdate bullet above; activating a semester fails with
+  "UPDATE requires a WHERE clause" until this is pasted, and nothing is switched.
+  It depends on nothing after 0035 and can be pasted on its own, ahead of 0042–0060.
+  **0062 is WRITTEN AND NOT YET APPLIED** — student grades and grade boosts. It MUST
+  go after 0057 and 0058 (it writes `grade_items` / `grade_scores`), and it takes
+  `decide_point_redemption` from 0029 and `cp_nightly_backup` from 0057. Run
+  `applied_state.sql` BLOCK 2 first: it re-lists `audit_log_action_check`. Until it
+  lands, the client degrades rather than breaks — `listGradeItems` and the
+  instructor inbox fall back to column lists without the new fields, the grid's
+  corner dots and the Home card render nothing, and `/app/grades` shows its error
+  state; boost requests and the Ops switch fail with a readable message.
+  0062 also carries `save_subject_policy` (the atomic weights save) — until it lands the
+  weights editor works as before, at the old non-atomic risk.
+  **Next number: 0063.**
   ⚠ **EVERY "WRITTEN AND NOT YET APPLIED" CLAIM IN THE BLOCK ABOVE IS NOW
   UNVERIFIED PROSE — ASK THE DATABASE INSTEAD.** It was written file by file
   over months, nobody could check it without reading every migration and
@@ -2607,8 +2644,8 @@ opened most often. Entering marks is weekly core work, unlike Ops or Peer Evalua
 landing (section × subject cards, three term links each);
 `/teach/grades/:sectionId/:subjectId/:term` is the sheet. `Shell` only ever sees
 `pathname`, so a `?section=` scope would make the width undecidable and strand the grid in
-the 672px reading column. **`routes-shape.ts` gained `isGradeGrid` + `isWideRoute`, and
-BOTH layouts now call `isWideRoute`** — `isChatRoom` was deliberately not widened (its name
+the 672px reading column. **`routes-shape.ts` gained `isGradeGrid`, and
+BOTH layouts now call `routeWidth`** — `isChatRoom` was deliberately not widened (its name
 would lie, and its own test asserts the room LIST is false). Touching only
 `InstructorLayout` would reintroduce exactly the divergence that file exists to prevent.
 
@@ -2712,7 +2749,7 @@ hard-delete-student.
 
 **The Overall view is the FOURTH TAB on the grade sheet, riding the same `:term` segment**
 (`/teach/grades/:section/:subject/overall`). One route serves all four views, so each stays
-a real deep link and `isWideRoute` can still decide the width from `pathname` alone. It
+a real deep link and `routeWidth` can still decide the width from `pathname` alone. It
 reads the aggregate RPC, never raw cells — three terms of a section is ~2,400 score rows,
 past the 1000-row cap. **It is where the app finally refuses to lie:** a student with 100
 in Prelim and Finals and no Midterm reads **"No Midterm"**, not the 70.00 the spreadsheet
@@ -3709,6 +3746,471 @@ by pausing the animation at a negative `animation-delay` — `getComputedStyle`
 forces a synchronous recalc and needs no frame. **Not verified on a real
 authenticated screen**; the leaderboard, attendance and scanner screens all need a
 login.
+
+
+Since 0061 (`set_active_semester` — "UPDATE requires a WHERE clause", 2026-11-08).
+Reported by the instructor: activating a newly created semester from
+/teach/semesters failed outright and switched nothing. See the pg_safeupdate
+bullet in the Migration workflow section for the rule; the short version is that
+0035's bulk `semester_points` recompute was **deliberately unqualified** (every
+student row, archived included — it says so in its own comment) and Supabase
+refuses an unqualified UPDATE for the API roles.
+
+**IT PASTED, IT PASSED ITS OWN ACID TEST, AND IT COULD NEVER RUN.** The SQL
+editor is `postgres`, which pg_safeupdate exempts — so the migration applied
+cleanly months ago, 0029's identically-shaped top-level backfill ran fine, and
+0035's footer ACID TEST (run in the editor) proved the round-trip worked. The
+only path that fails is the one the app uses. **A migration that pastes cleanly
+can still contain a statement no API role can execute**, and nothing in the
+project's verification habits would have caught it: the fix is to audit for the
+shape, which 0061's header records doing across 0001–0060.
+
+The replacement computes the balance once in a `from (…) v` subquery and joins
+on `where v.id = s.id`. That satisfies the guard with a REAL predicate rather
+than a tautology like `where s.id is not null`, keeps ONE copy of the balance
+expression (a `where semester_points is distinct from <expr>` would have needed
+two), and still updates every student row exactly once. The body was EXTRACTED
+from 0035 programmatically and then diffed, so the WHERE clause and its comment
+are provably the only differences. 0035 is not edited.
+
+Era 8.0 Phase 3 — the grade admin rebuild (2026-11-08, no migration). Decisions
+(user): **one screen, scope in a toolbar** · **grouped header band** · **row
+numbers, striping, crosshair**.
+
+**`GradesConsole` IS DELETED, AND THE CARD WALL WAS THE CONFUSION.** It was one
+card per section × subject, each carrying three term links and a small Weights
+button — a dozen cards and thirty links for two subjects, where every entry led
+to the SAME screen with different parameters. A menu whose every row goes to one
+place makes choosing a scope feel like navigating, when the scope is two
+dropdowns. `/teach/grades` is now a **resolver** (`GradesEntry`): it redirects to
+your last scope, or the first section × subject pairing that exists.
+
+**The scope stays in the PATH, and that is not negotiable.** `Shell` only ever
+sees `pathname`, which is what lets `routeWidth` give the grid the full window; a
+sheet rendered at `/teach/grades` with its scope in state would be stuck in the
+672px reading column. So the resolver redirects rather than rendering.
+`src/lib/grade-scope.ts` remembers it (`cp_grade_scope_v1`), **validated on read**
+— a half-written entry would otherwise put `undefined` into a URL — and
+`GradesEntry` additionally checks the saved pairing still EXISTS, because a
+section can be deleted and a subject unassigned between visits and a stale
+pairing lands on a sheet that can only show its error state. One place decides
+whether a scope is still real.
+
+**`ScreenTitle`, not `PageHeader`, and this is the trap Era 7.0 documented.** The
+sheet is a nav DESTINATION now — `/teach/grades` resolves straight to it — so
+there is nothing to go back to, and `PageHeader` always renders a back button.
+Shipping one here would send the instructor to a redirect that bounces them
+straight back to the screen they just left.
+
+**Changing section can orphan the subject, and `goTo` is the one place that
+knows.** Sections do not all take the same subjects, so picking a new section
+with the current subject unassigned would navigate to a pairing whose sheet can
+only error. `goTo` falls to that section's first subject instead. It is also the
+only writer of the remembered scope, plus an effect that records the scope you
+ARRIVED at — without that, a deep link followed by a tab-bar visit to Grades
+would send you back to the last scope you picked by hand rather than the one you
+were just looking at.
+
+**`subjectPolicyError` moved to a chip on the Subject picker.** That warning was
+the console's one genuinely useful signal: a subject needs all three policy rows
+and each has to add up, and when it does not EVERY figure on EVERY sheet for that
+subject is withheld. It is distinct from `policyError`, which is about the one
+term on screen — a missing Finals row withholds every final grade while the
+Prelim sheet in front of you looks perfectly fine.
+
+**Weights and Columns merged into `GradeSetupSheet`.** With the landing gone,
+weights needed a home, and a toolbar already carrying Import / Export / Print did
+not need two more buttons. ⚠ **The two tabs have DIFFERENT SCOPES and each says
+so on screen** — that ambiguity is exactly why the weights editor was kept off
+the grade sheet when it was built (a sheet is scoped to one section; weights reach
+every section taking the subject). Putting them side by side concentrates the
+hazard rather than removing it, so each panel states its own reach in its first
+line, the header names the scope of the tab you are on, and the weights confirm
+still counts the real sections. **Do not delete those sentences to tidy the
+layout.** One panel is mounted at a time (conditional render, not `hidden`):
+both seed their drafts on mount, and switching tabs discarding a half-typed draft
+is correct, because the two tabs write to different tables.
+**The merge was done by EXTRACTING each body with a script, not retyping it** —
+`WeightsSheet`/`GradeItemsSheet` became `WeightsPanel`/`ColumnsPanel` by removing
+only their `<Sheet>` wrapper, because 770 lines carrying the impact preview, the
+auto-balancing pair, the max-change warning and the archive confirm is where a
+transcription error lands in code that moves every grade in a section.
+
+**`completionByTerm` in `grading.ts` (+6 tests) answers "what is left".** ⚠ The
+denominator is `sumMax`, NOT `sumMaxMarked`, and inverting it gives a figure that
+is **always 100%** — the worst possible failure for a progress read, because it
+says "nothing left to do" and looks entirely plausible. Verified to fail on the
+inverted denominator. A term with no columns reads **null → "—", never 0%**: the
+instructor has not fallen behind on a term they have not set up, and 0% invites
+them to go hunting for marks that cannot exist. All three terms sit on one line
+under the tabs rather than inside them — a four-tab strip is ~85px per tab at
+375px and "Prelim 18%" does not fit without shrinking the text past readable.
+Its fetch is **separate from `load`**, scope-wide rather than term-wide, in its
+own try/catch (the 0034 SectionGrid precedent) and deliberately NOT keyed on
+`dirty`: re-fetching per keystroke would be a query per typed mark.
+
+**The grid gained a component band, a row gutter, zebra and a crosshair.** None
+of it touches the uncontrolled-input architecture, the row-local state, `size={4}`,
+the `w-22` header cap, `h-8`, the frozen term grade or the Enter/↑↓ walk.
+- ⚠ **TWO STICKY HEADER ROWS NEED TWO OFFSETS.** The band is `top-0` and the
+  header below is `top-6` — 24px, which is exactly `h-6` on the band's cells.
+  Both reference the same step on purpose; a measured magic number drifts the
+  moment the band's padding changes, and the symptom is a header row overlapping
+  the band by a few pixels *while scrolling*. Measured under a 600px vertical
+  scroll: band at offset 0, header at 24, band height 24 — they abut exactly.
+- The band is built from `items` by a run-length pass, so a component with no
+  columns contributes no cell. That is only correct because `orderedItems` sorts
+  by component then position; **if that ordering changes this must become a
+  group-by.**
+- ⚠ **ZEBRA IS PER-CELL, NOT ON THE `<tr>`.** The frozen name and term-grade
+  cells set their own opaque background (they must, or marks scroll underneath),
+  and that paints over a row stripe — so the banding would appear only between
+  the frozen edges and read as a rendering fault. Verified: all four cell kinds
+  alternate, and every frozen one stays fully opaque.
+- The crosshair's ROW half is `focus-within:[&>*]` — no state, no re-render. The
+  COLUMN half is one `focusedItemId` in `GradeGrid`, and **the hot path is free**:
+  walking down a column fires `onFocus` 40 times with the SAME id and React bails
+  out of an identical `setState`, so typing down a column renders nothing extra.
+  Only moving ACROSS columns re-renders, once. Verified: focusing a cell tints all
+  30 rows of that column and none of its neighbour, the tint follows a move across
+  and stays put on a walk down.
+- **`onAddColumn` was a dead prop** — declared and used by the grid's empty state,
+  never passed, so "Add a column" could not render and the only way to create the
+  first column was a header button named "Columns". It is wired to the Set up
+  sheet now.
+
+⚠ **A SIXTH BROWSER-PANE ARTIFACT: `element.focus()` DOES NOT RELIABLY FIRE A
+FOCUS EVENT while the pane does not hold window focus.** It cost a confident
+false negative here — the crosshair measured as completely broken (0 of 30 cells
+tinted) while the code was correct, which looks exactly like the memoisation
+problem the plan had warned about. The DOM showed the input WAS
+`document.activeElement` and React's `onFocus` prop was present, yet the handler
+had not run. Dispatching `focusin` explicitly, or calling the handler off
+`__reactProps$…`, both work — the same distinction the `MouseEvent` needing
+`view: window` note already records. **Verify a focus-driven behaviour by invoking
+the handler, not by calling `.focus()` and measuring.**
+A second instrument trap in the same pass: forcing a container to `width: 1920px`
+inside a 1425px viewport reports 480px of page overflow that belongs to the probe,
+not the app. Resize the viewport instead of the container, or read the scroller.
+
+**Verified: 0 errors, 109 warnings, 473 tests** (from 0/110/467 — one warning
+FEWER, since deleting `GradesConsole` took one with it). Measured by probe at
+1440×900 (removed, residue-checked): both header rows pin and abut at 24px under
+a 600px vertical and 285px horizontal scroll, the gutter and name freeze 32px
+apart, the term grade holds the right edge, every item column is exactly 88px
+even with "Performance Task 1" and a 52-character student name, and page overflow
+is 0 at 1024 / 1280 / 1440. **Not verified on a real authenticated screen** — the
+toolbar, the resolver and the Set up sheet all need an instructor login, and the
+completion figures need 0057 applied.
+
+
+Era 8.0 Phase 5 — the first-run tour (2026-11-08, NO migration). Decisions (user):
+**four cards: points, attendance, leaderboard, spending** · **mini live demos** ·
+**plain and friendly copy** · **plays on each of the first three opens, replaying
+from the start every time** · **NO Skip on open 1; Skip on opens 2 and 3**.
+
+**`Onboarding.tsx` IS DELETED.** It was a three-step bottom `Sheet` of paragraphs
+gated once, ever, on `cp_onboarded`. The brief was that students skip wordy
+instructions, so each card is now a title, ONE line and a miniature animated
+demo of the real thing: an XP bar filling and a level badge popping, a QR with a
+sweeping scan line resolving to "Attendance recorded", a podium rising under a
+crown, and a balance dropping while the rank drops with it.
+
+**THE RULES LIVE IN `lib/tour.ts`, PURE, WITH THE STORES INJECTED, AND PINNED BY
+13 TESTS.** Every failure here is silent: a tour that never shows looks like one
+nobody needed and one that nags forever looks like a feature. The rules: plays on
+opens 1–3 from card 1 each time (finishing open 1 does NOT end open 2); skippable
+only from open 2; never after open 3.
+- **An "open" is a SESSION, not a mount.** `AppLayout` remounts after a
+  sign-out/in and StrictMode mounts everything twice in dev; counting mounts would
+  spend all three plays in one sitting. The count increments at most once per
+  `sessionStorage` session (cleared when the installed PWA's webview closes, which
+  is what "opening the app" means on a phone), and a session flag records
+  `'open'` / `'done'` so a remount BEFORE dismissal still shows it and one AFTER
+  does not. That idempotence is what lets a lazy `useState` initialiser call
+  `beginTour` — React runs initialisers twice under StrictMode — and it avoids the
+  `set-state-in-effect` warning a "count in an effect" version would have added.
+- **Every key carries the student id** (a shared phone must not hand one student's
+  plays to the next).
+- **Fail safe is DON'T SHOW.** Storage that throws, a count that cannot be
+  written, or an unreadable value all mean no tour — the opposite default shows it
+  on EVERY open forever for anyone whose browser blocks storage.
+- ⚠ **A REAL BUG THE TESTS CAUGHT: `Number('')` is `0`.** The first parser
+  accepted `Number.isInteger(n) && n >= 0`, so an EMPTY stored value read as a
+  valid fresh start — the one corruption the guard exists to refuse. It is
+  `/^\d+$/` now. Each guard was verified to fail on an injected break (counting
+  every call, skippable on open 1, failing open on a storage error).
+- **Existing students never see it.** The old `cp_onboarded` flag is READ and
+  never written: a student who got the previous intro has used the app for a
+  semester, so their count is set to the maximum. ⚠ This means the current class
+  does NOT get the tour — it is for students who arrive with the next semester.
+  If the instructor wants it shown to everyone once, that is a one-line change in
+  `startTour`, and it is the instructor's call.
+
+**`IntroLayer` REPLACES `IntroOrWhatsNew` AND TAKES THE AWAY-RECAP IN WITH IT.**
+One layer deciding which of three full-attention things the student sees, so they
+never stack. The recap and "What's new" are both Sheets, and **Sheet's focus trap
+is document-level** — left mounted behind the tour it would drag focus back into
+itself the moment anything inside the tour was tabbed to. So they wait their turn;
+the recap's events are held in StudentData until cleared, so it simply appears
+once the tour is done. The tour also waits for a level-up or badge burst to clear
+(two full-screen overlays have already drawn on top of each other once here), and
+`open` stays true meanwhile so the others keep waiting too. Nothing renders until
+`me` has loaded — the count is per student. Finishing marks the changelog seen
+**only if no version has ever been seen**: on open 1 a new student must not get the
+tour AND "What's new", but on opens 2–3 a genuinely newer entry should still show.
+Archived students never reach it — `AppLayout` renders `ArchivedScreen` instead.
+
+**The deck (`Tour.tsx`, z-[60])** sits above Sheet (40) and the bursts (50), below
+the farewell (90) and the auth transition (100). Swipeable (`drag="x"` makes
+framer set `touch-action: pan-y`, so a vertical scroll stays the browser's), with
+Back/Next, dots, arrow keys, and a **500ms tap guard** — it arrives on its own once
+data has loaded, not in response to a tap, so a finger mid-tap on the dashboard
+behind it would otherwise land on Next and skip card 1 before it drew. It traps Tab
+itself. ⚠ **The trap's first draft counted the invisible Back button** (`invisible`
+on card 1 so Next does not jump) as the first focusable, so Shift+Tab from Next
+compared against a node focus could never be on and escaped to the page behind;
+hidden controls are filtered now. Escape is a skip, so it obeys the same rule as
+the Skip button: on open 1 it does nothing.
+`Button` does not forward a ref, so the primary button is focused through a
+`data-tour-primary` attribute rather than changing a shared primitive for one call
+site.
+
+**The demos animate only opacity and transform, and a source-level test pins it.**
+`TourDemos.tsx` loops on low-end Android in the first thirty seconds a student ever
+spends in the app; animating `width`, `top` or `height` forces layout every frame
+and looks identical on a laptop. So the XP bar is `scaleX`, the scan line is `y` in
+pixels (hence every Stage has a FIXED pixel height), and the podium is `scaleY`.
+The guard parses every `initial`/`animate`/`exit` object for its keys, asserts at
+least ten were found (otherwise it passes vacuously), and has its own regression
+test for the matcher. **Loops are keyframes with `times`, not `delay`** — `delay`
+applies to the first iteration only, so a stagger built on it drifts out of step
+from the second cycle; the stagger is baked into each element's `times`. The QR is
+a deterministic pattern, not `Math.random()`, which would change every render.
+
+⚠ **A SEVENTH BROWSER-PANE ARTIFACT, AND THE MOST MISLEADING YET: framer's
+`AnimatePresence` EXIT NEVER COMPLETES, so the tour looked unable to navigate.**
+The step counter advanced and `onDone` fired but the card title never changed, then
+changed intermittently — a believable "backward navigation is broken" report that
+was nothing of the sort. Framer runs opacity through the Web Animations API, and a
+non-rendering page's document timeline does not advance, so `animation.finished`
+never resolves and `mode="wait"` never mounts the next card. It is the same family
+as the CSS-keyframe and rAF notes above, with a new symptom. **To verify
+navigation logic here:** add a temporary
+`<script>window.requestAnimationFrame=cb=>setTimeout(()=>cb(performance.now()),16)</script>`
+to `<head>` (framer captures `requestAnimationFrame` at module load, so it must run
+before anything imports framer) AND set `MotionGlobalConfig.skipAnimations = true`
+from framer-motion — together they apply end states through the frame loop without
+needing the timeline. With both, all 8 forward and backward transitions settled at
+x=24–296 inside a 320px viewport. Remove both afterwards (`index.html` was restored
+from a backup and diffed empty). Without the polyfill, `skipAnimations` alone
+leaves a new card stuck at its `enter` pose (`opacity: 0; translateX(48px)`).
+**The motion itself — springs, the demo loops — is NOT visually verified**; only
+the logic, the final poses and the geometry are.
+
+**Verified: 0 errors, 109 warnings (the tour added none), 490 tests** (from
+0/109/473). At 320×640 — the tightest case: every card's stage is 272×208 and
+inside the viewport, "Scan to record attendance" wraps to two lines and still
+clears the footer, the footer stays in the viewport, zero page overflow, nothing
+escapes any stage, and the `+5` pill was lifted 12px after the arithmetic showed it
+touching the level badge at the instant it became fully visible. Open 1 has no
+Skip and Escape is ignored; opens 2–3 have Skip and Escape both dismiss, once each;
+a tap 60ms after mounting is ignored and one after 700ms advances; Tab wraps among
+visible controls only. **Not verified on a real student login** — the layer's
+wiring (`IntroLayer`, the session count, the WhatsNew/recap ordering) needs one, and
+the copy is a DRAFT for the instructor to read before it ships.
+
+Since 0062 (Student grades + grade boosts — Era 8.0 Phase 4). Decisions (user,
+2026-11-09): **a student asks only AFTER their mark is entered, never when it is
+already full** · **the bonus is CAPPED at the column's max and the real gain is
+shown first** · **once per column** · **REVERSIBLE** · **student grades start
+HIDDEN behind a switch** · **the student "so far" figure is the SAME number the
+instructor's So-far toggle shows** · **the Home card shows the latest figure**.
+
+**A BOOST RAISES THE ORDINARY `grade_scores.score`, SO NOTHING DOWNSTREAM MOVES.**
+`grading.ts`, `get_section_grade_sums`, both exports and both print routes are
+untouched, and 0057's rule ("`grading.ts` is the only definition; no SQL mirror")
+holds — **extended to boosts: if you are about to put a weighting expression in
+0062, stop.** The receipt (`grade_boosts`, PK `(item_id, student_id)`) only draws
+the indicator and lets the instructor undo one. The instructor flags a column with
+`grade_items.points_cost` (1–50) and `points_bonus`, both-or-neither (a CHECK). The
+request is a `point_redemptions` row with `grade_item_id` and **`grade_bonus`, a
+SNAPSHOT of the bonus at request time** — the student confirmed "5 points for +10",
+so editing the column to +2 afterwards must not change what a pending request does.
+
+**`request_grade_boost` re-checks everything, and `src/lib/grade-boost.ts` is its
+preview** (`boostState` — every branch names the exception the SQL raises; change
+one side, change the other, same commit, the `lounge-answers.ts` rule). The student
+comes from `auth.uid()` and cannot be passed in. **Why "after the mark is in":**
+approve-before-marking writes the bonus as the mark, and entering the real mark
+afterwards silently wipes it. `decide_point_redemption` (0029 → 0062, body diffed
+programmatically, every difference marked "0062") re-reads the column, the section
+and the mark at APPROVAL time — marks and columns change between asking and
+deciding — and refuses a cleared mark, a retired column, a moved student, or a mark
+already at the max, each with a sentence ending "Decline this request."
+
+**A REFUND IS A POSITIVE `redeem` ROW, AND THAT IS WHY NOTHING ELSE MOVED.** The
+spend board (0038) sums `-points` over `category = 'redeem'`, so a refund nets out of
+"spent" with NO change to `refresh_leaderboard_snapshot`; `cp_notify_point_event`
+already skips `redeem`, so no second generic push; `listRecentAwards` already
+excludes `redeem`, so the instructor cannot delete a refund and desync it. The cost
+is one loosened CHECK: **`point_events_points_check` now allows +1..+50 for
+`redeem`** (the constraint stores it as `points <= 50`, not "between" — a probe that
+greps for the word finds nothing). `types.ts` and `PointEventRow` document it: **test
+the SIGN, not the category, to tell a spend from a refund** — the row now reads
+"spent" or "refund" instead of "redeem". A dedicated `refund` category was weighed and
+rejected: it needed ownership moves of `refresh_leaderboard_snapshot` AND
+`cp_notify_point_event` for a cleaner word. Known quirk: a refund that restores a lost
+level triggers the ordinary level-up celebration, because `considerLevelUp` follows the
+current level, up or down (read from the code, not observed).
+
+**`reverse_grade_boost` puts the mark back ONLY if it is still what the boost wrote.**
+`grade_boosts.score_after` is stored for exactly this. A cell the instructor has
+retyped since is left alone — the points still return, the receipt goes, the column is
+freed, and the result's `markRestored: false` is toasted — because guessing which of
+two numbers they meant would be inventing a grade. The grid mirrors it: the corner
+dot **hollows out** and its tooltip says "edited since" when `value !== scoreAfter`
+(an import overwrites marks too, so this is reachable). Reversal is refused when the
+original charge belongs to a PAST semester — the refund would be stamped into the
+active one — and its lock order is `decide`'s (redemption, then student). It adds
+status **`reversed`** to `point_redemptions` (not `cancelled`, which means a student
+withdrew a PENDING request); the CHECK widening finds the old constraint BY
+DEFINITION, because it was declared inline in 0019 and a name guess that misses
+leaves the narrow rule rejecting `reversed` until the first reversal.
+
+**Student grades are OFF until the instructor turns them on** — `app_flags.student_grades`,
+seeded `false` with `ON CONFLICT DO NOTHING` (a re-paste must never flip a flag already
+turned on), toggled from **Ops → Student grades** through `set_student_grades_enabled`
+(audited as `'grade_visibility'`; `'grade_boost'` is the other widening of
+`audit_log_action_check`, 18 values in all). **Opening goes through a confirm; hiding
+does not** — a mis-tap on the way off costs less than hesitating. `get_my_grades`
+returns `{ enabled: false }` rather than raising when hidden or archived, so the screen
+can say "not open yet" instead of showing a failure.
+
+**`get_my_grades()` is the ONLY door** (0057: "a student view gets its own aggregating
+RPC"). It returns the caller's OWN marks and the weights, never an official figure and
+never another student's row; jsonb numbers are real JSON numbers, so the PostgREST
+numeric-as-string trap does not apply here. `src/lib/student-grades.ts` derives
+everything from `grading.ts`, and **`student-grades.test.ts` reads the student-facing
+source as TEXT and fails if any of it reaches for `'official'` or `finalGrade`** —
+verified to bite by injecting each into `StudentGrades.tsx` and `Dashboard.tsx`. The
+guard strips comments (these files document what they forbid) and has a matcher
+self-test.
+
+**"So far" for a student is the instructor's So-far figure, by the instructor's choice**
+(offered: average only what is marked; withhold until every part has a mark). The cost
+is known and stated on screen: a term with only quizzes marked reads LOW — measured
+64.50 for a single 15/20 quiz — because each unmarked component takes the 60 minimum.
+The caption says so ("Parts your instructor hasn't marked yet count at the 60
+minimum"), and per-component rows show "—" for an unmarked part rather than a bare 60.
+**If that proves confusing, the alternative is a third view in `grading.ts` with
+hand-checked tests, not a client-side tweak.**
+
+`StudentData` owns the grades slice (`grades`, `gradesLoading`, `gradesError`,
+`reloadGrades`) — loaded off the critical path like achievements and attendance, and
+re-read on a `point_redemptions` event for the student (the durable channel). **A
+student has NO select on `grade_scores`, so a typed mark is invisible to realtime** —
+marks refresh on open, on a return after two minutes away and on pull-to-refresh. The
+Home card (`GradesCard`) and `/app/grades` fire no grade query of their own, and the
+card renders NOTHING (no error, no placeholder) when grades are off, loading, failed or
+empty. `StudentGrades` also reads `listMyRedemptions`, not for grades but because "can I
+afford this / do I already have three waiting" is answered by requests that are not
+boosts. **Grades is the seventh `SIDEBAR_NAV` entry (`TableIcon`) and NOT a bottom tab**
+— the bar is full and the menu mirrors the sidebar; `/app/grades` is in
+`routes.test.ts`'s `MUST_BE_LINKED`.
+
+**Instructor side.** The Columns panel gets "Let students spend points on this column"
+(a live sentence that is the same one the student will be shown; `boostTermsError` is
+the client mirror of `grade_items_boost_range_check`, and the boost fields are sent
+only when CHANGED so a rename still works before 0062). The grid draws a **dot, not a
+chip** — the cell is 88px with the input filling it, so anything with width would sit
+on the mark; it is `pointer-events-none`, and the receipts load in their own
+state/try/catch (the `allSums` precedent), deliberately NOT in `load`, because they
+change on approve/reverse and reloading the grid would remount every uncontrolled
+input. The Requests inbox shows the column and the mark AS IT STANDS NOW (read fresh by
+`attachGradeContext`, which swallows its own failure — a missing preview must not take
+the inbox down, and the server re-checks anyway) with the capped gain, warns before a
+doomed approval, and puts **Reverse** on an approved boost in Recent decisions.
+`listGradeItems` and `listRedemptions` try the new columns first and FALL BACK on
+`42703`, so pasting the client before the migration costs the boost fields and not the
+screen. `components/ui/Toggle.tsx` was extracted from `InstructorSpace` when Ops needed
+a second one.
+
+**Backup:** both existing mirrors are widened in the migration (`alter table if exists
+backup.… add column`) instead of left to the drift handler, which would PARK
+`grade_items` and DROP `point_redemptions`. It works because both tables gain their
+columns at the END, in the same order, and `select current_date, s.*` is positional.
+`grade_boosts` joins the 365-day `kept` list.
+
+`clearGradeScores` was fixed in passing: a pasted column of forty blanks fired forty
+sequential DELETEs inside one flush; it is now one delete per column per chunk of 150.
+
+**QOL batch (Era 8.0 Phase 6, same session; decisions 2026-11-09).**
+- **Saving weights is atomic** — `save_subject_policy(subject, jsonb)` in 0062 §7b. The
+  weights screen used to write three rows in a client loop; a failure after the first
+  left the three term shares off 100%, which `finalGrade` reports as EVERY grade for the
+  subject disappearing. The RPC writes all rows or none and **refuses a set whose
+  `final_weight`s do not sum to exactly 1** — the cross-row rule 0057 could not make a
+  CHECK. That is a guard on WRITES, not a weighting expression (0057's "no SQL mirror"
+  stands): the columns are `numeric(5,4)` so the sum is exact decimal arithmetic with no
+  float tolerance to disagree with `sumsToOne`, and the client keeps its own check so Save
+  can explain itself. `saveGradePolicies` falls back to the old sequential saves ONLY on
+  PostgREST's "no such function" (`PGRST202`/`42883`), so the editor still works before
+  0062 is pasted; a real failure (the sum refusal, a CHECK) is never retried around.
+  ⚠ In a `raise exception` format string a literal percent sign must be written `%%`, or
+  it is read as a placeholder and the message itself raises "too few parameters".
+- **Columns can be reordered** — Move up / Move down inside the edit row, not icon
+  buttons in the list row: four small controls on one line would break the tap-target
+  adjacency rule (`sm` needs `gap-3`), and two labelled buttons say what they do. A move
+  renumbers the WHOLE component group 0..n-1 and writes only the rows whose number
+  changed, because `position` was written once at creation and is not guaranteed unique
+  (a restored column keeps its old number, and swapping two equal numbers does nothing).
+- **The mobile entry screen walks the roster through a ref map**, not
+  `document.getElementById('entry-N')` — a convention in a global namespace.
+  (Showing the term figure in its footer, from the original plan, was NOT done.)
+- **`levelup.mp3` (888KB) is no longer fetched on the first tap.** The unlock used to
+  prime every clip with a muted `play()`, which downloaded it for every student whether
+  or not they ever levelled up (it is not precached). A `LAZY` clip is now unlocked with
+  a 44-byte silent WAV and its real file attached on first play. ⚠ **It must be the SAME
+  element**: iOS Safari only plays an element that was started inside a user gesture, so
+  creating it at level-up time would silently block the sound on the very phones most
+  students have; changing `src` on an already-unlocked element keeps it unlocked. The
+  cost, accepted by the instructor in preference to re-encoding the clip (which would
+  change how it sounds), is that the FIRST level-up on a slow connection plays a moment
+  late. Measured in the dev server: after a first tap only the three small clips load
+  (19 + 3 + 27KB); `levelup.mp3` (867KB) appears only when `playSound('levelup')` runs.
+  Not verified on iOS.
+- **ESLint is CAPPED, not tightened:** `lint:eslint` is `eslint src --max-warnings 109`,
+  so `npm run verify` fails if the count GROWS. Chosen over turning ~100 sites into
+  errors because the warnings are overwhelmingly the fetch-on-mount pattern every screen
+  uses, "fixing" each changes when an effect runs, and most cannot be exercised without a
+  login. **Lower the number as the backlog is paid down; raising it should be a decision,
+  not a reflex.** Verified: passes at 109, exits 1 at 108. A new fetch-on-mount effect can
+  stay clean by clearing its flag when the answer ARRIVES rather than calling a setter
+  before the request (`StudentGradesCard` in Ops does this).
+
+**SQL syntax is now checkable without a database.** `libpg-query` (npm, installed into a
+scratch directory, NOT the project) parses a migration's top-level statements AND each
+`$$` function body as PL/pgSQL. 0060, 0061 and 0062 all parse clean, and the checker was
+verified to fail on a deliberately broken body and a broken top-level statement — so
+"clean" means something. **It checks syntax only**: a wrong column name or a type
+mismatch still fails at runtime, which is why the verify block, not the parse, is the
+test. It would have caught the `$$` → `$` slip that shipped in 0041.
+
+**Verified: 0 errors, 109 warnings (unchanged), 530 tests** (from 0/109/490). Probe
+route (removed, residue-checked) at 375×812 with fixture data: the Grades screen with
+every boost state side by side (boostable, capped, boosted, waiting, unmarked, no
+terms offered) plus its hidden and error states — the empty and loading states were
+not rendered — zero page overflow, the capped-gain confirm reads "17 becomes 20 out of 20 … you'd gain 3", the
+Home card renders both subjects and nothing escapes. ⚠ A Dashboard screenshot comes
+back BLACK while the pane is not compositing — framer's stagger leaves every item at
+opacity 0; inject `*{opacity:1!important;transform:none!important}` to see it, and
+read the DOM for numbers. **Not verified on a real login:** the instructor side (Ops
+switch, Columns terms, the corner dot, the inbox, Reverse) and the whole write path —
+`request_grade_boost`, `decide_point_redemption`'s grade branch and
+`reverse_grade_boost` are typechecked and diffed, never run. 0062's verify block is the
+test: **do a full request → approve → reverse on a scratch student before opening
+grades to the class.**
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

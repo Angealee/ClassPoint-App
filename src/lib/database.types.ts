@@ -249,12 +249,16 @@ export interface Database {
         points: number
         kind: 'quiz' | 'activity' | 'exam' | 'other'
         note: string | null
-        status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+        status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'reversed'
         requested_at: Timestamp
         decided_at: Timestamp | null
         decided_by: UUID | null
         decision_note: string | null
         point_event_id: UUID | null
+        /** 0062 — set when the request is a grade boost. */
+        grade_item_id: UUID | null
+        /** 0062 — the bonus the student agreed to, snapshotted at request time. */
+        grade_bonus: number | null
       }>
 
       absence_excuses: Row<{
@@ -694,6 +698,25 @@ export interface Database {
         /** Retired: leaves the denominator, keeps its scores. */
         archived_at: Timestamp | null
         created_at: Timestamp
+        /** 0062 — "spend this many points…" */
+        points_cost: number | null
+        /** 0062 — "…to add this many marks". Both set or both null. */
+        points_bonus: number | null
+      }>
+
+      /**
+       * 0062 — the receipt for a boost. Instructor-select only; writes go
+       * through the definer functions.
+       */
+      grade_boosts: Row<{
+        item_id: UUID
+        student_id: UUID
+        redemption_id: UUID
+        score_before: number
+        score_after: number
+        marks_granted: number
+        points_spent: number
+        applied_at: Timestamp
       }>
 
       /**

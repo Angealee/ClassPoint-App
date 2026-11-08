@@ -326,3 +326,42 @@ export function displayGrade(value: number | null): string {
 export function cellKey(itemId: string, studentId: string): string {
   return `${itemId}:${studentId}`
 }
+
+/**
+ * How much of each term has actually been marked, 0–100, or null for a term
+ * with no score columns at all.
+ *
+ * ⚠ THE DENOMINATOR IS `sumMax`, NOT `sumMaxMarked`, and getting that backwards
+ *   gives a figure that is ALWAYS 100% — which is the worst possible failure for
+ *   a progress read, because it says "nothing left to do" and looks plausible.
+ *   `sumMaxMarked` is the total this student HAS a score for; `sumMax` is every
+ *   non-archived column. Their ratio is the fraction entered.
+ *
+ * null rather than 0 for an empty term: the instructor has not fallen behind on
+ * a term they have not set up, and 0% invites them to go looking for marks that
+ * cannot exist yet. It is the same blank-versus-zero distinction the whole
+ * feature rests on, one level up.
+ *
+ * Takes the AGGREGATE rows, never raw cells — three terms of a section is
+ * ~2,400 score rows, past PostgREST's silent 1000-row cap (the 0031 lesson).
+ */
+export function completionByTerm(
+  rows: ReadonlyArray<{ term: TermKey; sums: TermSums }>,
+): Record<TermKey, number | null> {
+  const marked: Record<string, number> = {}
+  const total: Record<string, number> = {}
+
+  for (const row of rows) {
+    for (const c of GRADE_COMPONENTS) {
+      marked[row.term] = (marked[row.term] ?? 0) + row.sums[c].sumMaxMarked
+      total[row.term] = (total[row.term] ?? 0) + row.sums[c].sumMax
+    }
+  }
+
+  const out = {} as Record<TermKey, number | null>
+  for (const t of ['prelim', 'midterm', 'finals'] as TermKey[]) {
+    const max = total[t] ?? 0
+    out[t] = max <= 0 ? null : Math.round(((marked[t] ?? 0) / max) * 100)
+  }
+  return out
+}

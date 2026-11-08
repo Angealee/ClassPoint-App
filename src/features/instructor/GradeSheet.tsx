@@ -3,13 +3,16 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
-import { PageHeader } from '@/components/ui/PageHeader'
+import { ScreenTitle } from '@/components/ui/ScreenTitle'
+import { Select } from '@/components/ui/Select'
+import { Chip } from '@/components/ui/Chip'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { StickyBar } from '@/components/ui/StickyBar'
 import { useToast } from '@/components/ui/Toast'
 import {
   clearGradeScores,
+  listGradeBoosts,
   listGradeItems,
   listGradePolicies,
   listGradeScores,
@@ -17,16 +20,26 @@ import {
   getSectionGradeSums,
   saveGradeScores,
 } from '@/lib/api'
-import { cellKey, defaultPolicy, orderedItems, policyError } from '@/lib/grading'
+import {
+  cellKey,
+  completionByTerm,
+  defaultPolicy,
+  orderedItems,
+  policyError,
+  subjectPolicyError,
+} from '@/lib/grading'
+import { cn } from '@/lib/cn'
 import { errorText } from '@/lib/errors'
+import { writeGradeScope } from '@/lib/grade-scope'
 import { useIsDesktop } from '@/lib/useIsDesktop'
 import { GradeGrid, type CellEdit } from './GradeGrid'
 import { OverallTable } from './OverallTable'
 import { GradeItemEntry } from './GradeItemEntry'
-import { GradeItemsSheet } from './GradeItemsSheet'
+import { GradeSetupSheet } from './GradeSetupSheet'
 import { GradeImportSheet } from './GradeImportSheet'
 import { useInstructor } from './InstructorLayout'
 import type {
+  GradeBoost,
   GradeItem,
   GradePolicy,
   GradeSumsRow,
@@ -51,7 +64,7 @@ const VIEW_KEY = 'cp_grade_view_v1'
  * The fourth tab is not a term.
  *
  * `overall` rides the same `:term` segment so one route serves all four views —
- * which keeps every one of them a real deep link, and keeps `isWideRoute` able
+ * which keeps every one of them a real deep link, and keeps `routeWidth` able
  * to decide the width from `pathname` alone.
  */
 type SheetTab = TermKey | 'overall'
@@ -74,7 +87,7 @@ function isTab(value: string | undefined): value is SheetTab {
 export function GradeSheet() {
   const { sectionId = '', subjectId = '', term: termParam } = useParams()
   const navigate = useNavigate()
-  const { sections, subjects } = useInstructor()
+  const { sections, subjects, subjectsForSection, semester } = useInstructor()
   const { toast } = useToast()
   const isDesktop = useIsDesktop()
 
@@ -95,6 +108,30 @@ export function GradeSheet() {
   const [exporting, setExporting] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [noteOpen, setNoteOpen] = useState(false)
+  /**
+   * The aggregate for ALL THREE terms, for the "how much is entered" read.
+   *
+   * Its own state and its own fetch, in its own try/catch — the 0034
+   * SectionGrid precedent. Before 0057 is applied the call throws, and the
+   * progress line simply does not render rather than taking the sheet with it.
+   * It is also deliberately NOT `overallRows`: that one is term-filtered to
+   * nothing only on the Overall tab, while this is needed on every tab.
+   */
+  const [allSums, setAllSums] = useState<GradeSumsRow[]>([])
+
+  /**
+   * Receipts for boosted marks (0062), keyed like the scores.
+   *
+   * Its own state and its own fetch, in its own try/catch — the same precedent
+   * as `allSums`. Before 0062 the table does not exist, and that must cost the
+   * corner dots and nothing else.
+   *
+   * Deliberately NOT part of `load`: they decorate cells and change when a
+   * request is approved or reversed, not when a mark is typed, so reloading the
+   * grid (and remounting every uncontrolled input) for them would be the wrong
+   * trade.
+   */
+  const [boosts, setBoosts] = useState<Map<string, GradeBoost>>(() => new Map())
 
   const [view, setView] = useState<GradeView>(() => {
     try {
@@ -178,6 +215,41 @@ export function GradeSheet() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Progress across all three terms. Separate from `load` on purpose: it is
+  // scope-wide rather than term-wide, so it does not need re-fetching when you
+  // switch tabs, and its failure must cost one line rather than the screen.
+  useEffect(() => {
+    if (!sectionId || !subjectId) return
+    let cancelled = false
+    getSectionGradeSums(sectionId, subjectId)
+      .then((rows) => !cancelled && setAllSums(rows))
+      .catch(() => !cancelled && setAllSums([]))
+    return () => {
+      cancelled = true
+    }
+    // `dirty` is deliberately absent: re-fetching on every keystroke would be
+    // a query per typed mark. The figure refreshes when the scope changes or
+    // the screen reloads, and the status bar already says what is unsaved.
+  }, [sectionId, subjectId])
+
+  // Receipts for the live columns on screen. Re-read whenever the column list
+  // is (a scope change, a reload after Set up) — never on a keystroke.
+  useEffect(() => {
+    const ids = items.filter((i) => i.archivedAt === null).map((i) => i.id)
+    let cancelled = false
+    listGradeBoosts(ids)
+      .then((rows) => {
+        if (cancelled) return
+        setBoosts(new Map(rows.map((b) => [cellKey(b.itemId, b.studentId), b])))
+      })
+      .catch(() => {
+        if (!cancelled) setBoosts(new Map())
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [items])
 
   // ── Flushing ──────────────────────────────────────────────────────────────
   const flush = useCallback(async () => {
@@ -398,12 +470,62 @@ export function GradeSheet() {
 
   const policyProblem = policy === null ? null : policyError(policy)
 
-  const title = section && subject ? `${subject.code} · ${section.name}` : 'Grades'
+  /**
+   * Whether this SUBJECT can produce a grade at all — all three policy rows
+   * present and each adding up. Distinct from `policyProblem`, which is about
+   * the one term on screen: a missing Finals row withholds every final grade
+   * while the Prelim sheet in front of you looks perfectly fine.
+   */
+  const subjectProblem = useMemo(
+    () => (policies.length > 0 ? subjectPolicyError(policies) : null),
+    [policies],
+  )
+
+  /** The subjects actually assigned to the section on screen. */
+  const subjectChoices = useMemo(
+    () => subjectsForSection(sectionId),
+    [subjectsForSection, sectionId],
+  )
+
+  const completion = useMemo(() => completionByTerm(allSums), [allSums])
+
+  /**
+   * Move the scope. One function, because every control that changes scope has
+   * to do the same two things — navigate, and remember — and a second copy is
+   * how one of them starts forgetting.
+   *
+   * ⚠ Changing SECTION can orphan the subject: sections do not all take the
+   *   same subjects. If the current subject is not assigned to the new section
+   *   we fall to that section's first, rather than navigating to a pairing
+   *   whose sheet can only render its error state.
+   */
+  const goTo = useCallback(
+    (nextSection: string, nextSubject: string, nextTab: SheetTab) => {
+      const allowed = subjectsForSection(nextSection)
+      const subjectOk = allowed.some((s) => s.id === nextSubject)
+      const resolvedSubject = subjectOk ? nextSubject : (allowed[0]?.id ?? nextSubject)
+      writeGradeScope({ sectionId: nextSection, subjectId: resolvedSubject, term: nextTab })
+      navigate(`/teach/grades/${nextSection}/${resolvedSubject}/${nextTab}`)
+    },
+    [subjectsForSection, navigate],
+  )
+
+  /**
+   * Remember the scope you ARRIVED at too, not only the ones you pick.
+   *
+   * Without this, a deep link followed by a tab-bar visit to Grades would send
+   * you back to whatever you last chose by hand rather than what you were just
+   * looking at.
+   */
+  useEffect(() => {
+    if (!sectionId || !subjectId) return
+    writeGradeScope({ sectionId, subjectId, term: tab })
+  }, [sectionId, subjectId, tab])
 
   if (!sectionId || !subjectId) {
     return (
       <div className="mx-auto w-full max-w-2xl">
-        <PageHeader title="Grades" fallback="/teach/grades" />
+        <ScreenTitle title="Grades" />
         <EmptyState>That grade sheet does not exist.</EmptyState>
       </div>
     )
@@ -411,10 +533,14 @@ export function GradeSheet() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col md:min-h-0">
-      <PageHeader
-        title={title}
-        subtitle={section && subject ? subject.name : undefined}
-        fallback="/teach/grades"
+      {/* ⚠ `ScreenTitle`, NOT `PageHeader` — this is a nav DESTINATION now.
+          `/teach/grades` resolves straight here (GradesEntry), so there is no
+          landing to go back TO, and `PageHeader` always renders a back button.
+          Shipping one here would send the instructor to a redirect that bounces
+          them back to the screen they just left. */}
+      <ScreenTitle
+        title="Grades"
+        subtitle={semester ? semester.name : undefined}
         actions={
           <div className="flex items-center gap-2">
             {isOverall ? (
@@ -428,7 +554,7 @@ export function GradeSheet() {
             ) : (
               <>
                 <Button size="sm" variant="outline" onClick={() => setItemsOpen(true)}>
-                  Columns
+                  Set up
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
                   Import
@@ -442,11 +568,62 @@ export function GradeSheet() {
         }
       />
 
+      {/* ── THE SCOPE, AS TWO PICKERS RATHER THAN A SCREEN OF CARDS ──────────
+          This is what replaced `GradesConsole`. Changing either one NAVIGATES,
+          because the scope has to stay in the path — `Shell` reads `pathname`
+          to decide this route gets the full window, and a scope in state would
+          strand the grid in the 672px reading column.
+
+          Full width and stacked on a phone: a section name is the longest
+          string on the screen and the whole job of the control is to name it.
+          (The leaderboard's capped picker is the counter-example — 136px of
+          box for "BSIT 2A — Platform Technologies Section".) */}
+      <div className="mb-3 grid gap-2 sm:grid-cols-2">
+        <Select
+          label="Section"
+          value={sectionId}
+          onChange={(e) => goTo(e.target.value, subjectId, tab)}
+        >
+          {sections.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </Select>
+
+        <div>
+          <Select
+            label="Subject"
+            value={subjectId}
+            onChange={(e) => goTo(sectionId, e.target.value, tab)}
+          >
+            {subjectChoices.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.code} · {s.name}
+              </option>
+            ))}
+          </Select>
+          {/* GradesConsole's one genuinely useful signal, moved to where the
+              subject actually is. A subject needs all three policy rows and
+              each has to add up; when it does not, EVERY figure on EVERY sheet
+              for that subject is withheld, and finding that out three taps in
+              is what made the old landing feel necessary. */}
+          {subjectProblem && (
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs text-warn">
+              <Chip tone="warn" size="sm">
+                Check weights
+              </Chip>
+              <span className="min-w-0">{subjectProblem}</span>
+            </p>
+          )}
+        </div>
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <SegmentedControl
           label="Term"
           value={tab}
-          onChange={(next) => navigate(`/teach/grades/${sectionId}/${subjectId}/${next}`)}
+          onChange={(next) => goTo(sectionId, subjectId, next)}
           options={TABS.map((t) => ({ value: t, label: TAB_LABEL[t] }))}
         />
         {/* QUIET, not accent. Two filled strips side by side read as one
@@ -481,6 +658,34 @@ export function GradeSheet() {
           {noteOpen ? 'Hide' : 'What do these mean?'}
         </button>
       </div>
+
+      {/* ── HOW MUCH IS ENTERED ───────────────────────────────────────────────
+          "What is left to do" is the question the old landing never answered,
+          and the reason it felt like a menu you had to guess your way through.
+
+          All three terms on one line rather than a percentage inside each tab:
+          the four-tab strip is ~85px per tab at 375px, and "Prelim 18%" does
+          not fit there without shrinking the text below the point of being
+          readable. One line says more and costs the same height.
+
+          A term with no columns reads "—", never 0% — the instructor has not
+          fallen behind on a term they have not set up yet. */}
+      {allSums.length > 0 && (
+        <p className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+          <span className="font-semibold">Entered</span>
+          {TERMS.map((t) => {
+            const pct = completion[t]
+            return (
+              <span key={t} className={cn(t === term && !isOverall && 'text-ink')}>
+                {TERM_LABEL[t]}{' '}
+                <span className="font-semibold tabular-nums">
+                  {pct === null ? '—' : `${pct}%`}
+                </span>
+              </span>
+            )
+          })}
+        </p>
+      )}
 
       {/* Collapsed by default: it is a two-line explanation you need once, on a
           screen that wants every row it can get. */}
@@ -536,8 +741,15 @@ export function GradeSheet() {
           policy={effectivePolicy}
           view={view}
           failed={failed}
+          boosts={boosts}
           onCommit={onCommit}
           onPasteColumn={onPasteColumn}
+          // ⚠ This prop existed and was never passed, so the desktop empty
+          //   state's "Add a column" button could not render — the only way to
+          //   create the first column was a header button named "Columns",
+          //   which is not where someone looking at an empty grid looks. It
+          //   has somewhere to go now.
+          onAddColumn={() => setItemsOpen(true)}
         />
       ) : (
         <GradeItemEntry
@@ -596,16 +808,28 @@ export function GradeSheet() {
         />
       )}
 
-      <GradeItemsSheet
-        open={itemsOpen}
-        onClose={() => setItemsOpen(false)}
-        sectionId={sectionId}
-        subjectId={subjectId}
-        term={term}
-        items={items}
-        markedCounts={markedCounts}
-        onChanged={() => void load()}
-      />
+      {/* Columns AND weights, behind one button. `subject` is required for the
+          weights half (it names the scope and the confirm counts its
+          sections), so the sheet only mounts once the subject has resolved. */}
+      {subject && (
+        <GradeSetupSheet
+          open={itemsOpen}
+          onClose={() => setItemsOpen(false)}
+          subject={subject}
+          policies={policies}
+          // Every section taking this subject — the real reach of a weight
+          // change, and what the confirm counts.
+          sectionIds={sections
+            .filter((s) => subjectsForSection(s.id).some((x) => x.id === subject.id))
+            .map((s) => s.id)}
+          onPoliciesSaved={() => void load()}
+          sectionId={sectionId}
+          term={term}
+          items={items}
+          markedCounts={markedCounts}
+          onItemsChanged={() => void load()}
+        />
+      )}
     </div>
   )
 }
