@@ -847,12 +847,47 @@ export async function listRecentEvents(limit = 20): Promise<EventSession[]> {
 
 /**
  * Everyone who checked in to an event (newest first) — the instructor's live
- * monitor list and the read-only review of a finished event. Instructor-only by
- * RLS (event_attendance is instructor-or-own). Bounded by the active semester's
- * roster, so it stays well under PostgREST's 1000-row cap.
+ * monitor list and the read-only review of a finished event.
+ *
+ * Goes through `get_event_attendees` (0057), a SECURITY DEFINER RPC that reads
+ * the SAME rows get_event_stats counts, under the same RLS bypass — so the list
+ * can never show fewer than the number (the 2026-09-21 "2 checked in, 1 shows"
+ * bug, where a definer count disagreed with an RLS'd embed select). `limit` caps
+ * it for the live monitor/feed; the review omits it for the full roster.
+ *
+ * Falls back to the pre-0057 embed select if the RPC isn't in the database yet,
+ * so the list keeps working during the paste window (it just carries the old
+ * discrepancy until 0057 lands).
  */
-export async function getEventAttendees(eventId: string): Promise<EventAttendee[]> {
-  type Row = {
+export async function getEventAttendees(eventId: string, limit?: number): Promise<EventAttendee[]> {
+  const { data, error } = await supabase.rpc('get_event_attendees', {
+    p_event_id: eventId,
+    p_limit: limit ?? null,
+  })
+  if (!error) {
+    type Row = {
+      student_id: string
+      display_name: string | null
+      avatar_url: string | null
+      section_name: string | null
+      scanned_at: string
+      manual: boolean
+      points: number
+    }
+    return ((data ?? []) as Row[]).map((r) => ({
+      studentId: r.student_id,
+      displayName: r.display_name ?? 'Student',
+      avatarUrl: r.avatar_url ?? null,
+      sectionName: r.section_name ?? null,
+      scannedAt: r.scanned_at,
+      manual: r.manual,
+      points: Number(r.points) || 0,
+    }))
+  }
+  // RPC missing (pre-0057) → the old embed select. Any other error rethrows.
+  const code = (error as { code?: string }).code ?? ''
+  if (!code.startsWith('PGRST2') && code !== '42883') throw error
+  type EmbedRow = {
     student_id: string
     scanned_at: string
     manual: boolean
@@ -860,17 +895,17 @@ export async function getEventAttendees(eventId: string): Promise<EventAttendee[
     sections: { name: string } | { name: string }[] | null
     point_events: { points: number } | { points: number }[] | null
   }
-  const { data, error } = await supabase
+  let query = supabase
     .from('event_attendance')
     .select(
       'student_id, scanned_at, manual, students(display_name, avatar_url), sections(name), point_events(points)',
     )
     .eq('event_id', eventId)
     .order('scanned_at', { ascending: false })
-  if (error) throw error
-  // Cast through `unknown`: the hand-written schema types embeds as
-  // SelectQueryError (Relationships: []), the same reason getMyEventHistory casts.
-  return ((data ?? []) as unknown as Row[]).map((r) => ({
+  if (limit) query = query.limit(limit)
+  const embed = await query
+  if (embed.error) throw embed.error
+  return ((embed.data ?? []) as unknown as EmbedRow[]).map((r) => ({
     studentId: r.student_id,
     displayName: oneEmbed<{ display_name: string }>(r.students)?.display_name ?? 'Student',
     avatarUrl: oneEmbed<{ avatar_url: string | null }>(r.students)?.avatar_url ?? null,

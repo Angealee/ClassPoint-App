@@ -56,7 +56,7 @@ begin
   -- 0056: a student's own event check-in (scan_event_attendance /
   -- mark_event_attendance) raises this transaction-local flag right before the
   -- point_events insert, so cp_recompute_points may write lifetime/semester
-  -- points here. The flag is LOCAL and set only inside those definer RPCs.
+  -- points here. The flag is LOCAL and set only inside those definer RPCs. 
   if current_setting('cp.event_award', true) = 'on' then
     return NEW;
   end if;

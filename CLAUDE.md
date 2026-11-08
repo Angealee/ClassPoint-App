@@ -191,7 +191,15 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   insert, and the guard early-returns when it sees the flag. `cp_recompute_points` is NOT
   touched. Until 0056 lands, every event scan that awards >0 points fails with that guard
   error and records no check-in; a 0-point event works (no ledger row, no recompute).
-  **Next number: 0057.**
+  **0057 is WRITTEN AND NOT YET APPLIED** — `get_event_attendees()`, a definer RPC for
+  the checked-in list. The live monitor showed "2 checked in" but listed only 1: the
+  count came from `get_event_stats` (definer, bypasses RLS) while the list was a direct
+  embed select through the caller's RLS, and the two read paths disagreed. 0057 reads the
+  list the same way the count is read, so it can never show fewer than the number. The
+  client (`getEventAttendees`) calls the RPC and FALLS BACK to the old embed if 0057 isn't
+  applied yet, so the list keeps working during the paste window (it just carries the old
+  discrepancy until 0057 lands). Independent of 0056; paste in either order.
+  **Next number: 0058.**
 
 Since 0033 (Student presence — Phase F): **`class_sessions` joined the realtime
 publication** (guarded 0004 pattern). Safe because the table is already
@@ -2483,6 +2491,24 @@ the term groups and `tally`, so an event never touches a show-up rate/streak), a
 `event_attendance`). **`PageHeader` gained an optional `onBack`** for a header that switches an
 in-component view (the review ↔ setup toggle is state, not a route); `fallback` is ignored when
 `onBack` is set and stays required so no existing caller changed.
+
+Fullscreen check-in wall + the count/list fix (2026-09-21, migration 0057). Decisions (user):
+**a Twitch-style live feed on the right of the fullscreen QR** · **newest at the bottom,
+auto-scrolling** · **avatar + name + section rows** · **~2s poll while presenting** ·
+**desktop only**. `PresentFeed` is `hidden md:flex`, a 22–26rem right column; on a phone the
+present overlay stays a single centred column. The QR is sized to the LEFT STAGE via a
+`ResizeObserver` (not the window), so it shrinks to make room for the panel and never overlaps
+it. The feed renders `attendees` REVERSED (the fetch is newest-first) and pins `scrollTop` to
+`scrollHeight` on every change — a projector always wants the latest. The stats poll drops to
+**2s while `presenting`, 4s otherwise** (one instructor's event, so the faster poll is cheap).
+**`attendees` is lifted to `EventMonitor`** and fetched on `[event.id, stats?.total]` (capped
+at `MONITOR_CAP` 100, newest-first), so the inline "Checked in" list and the fullscreen feed
+share ONE fetch that only re-runs when the count changes — an event never loses a check-in, so
+a count-gated refetch can't miss one. `AttendeeList` was split into `AttendeeListView`
+(presentational, takes `count` because the monitor's `people` is a capped slice while the
+header number must be the accurate `stats.total`) and a self-fetching `AttendeeList` wrapper
+(the review's one-time full fetch). **The count/list mismatch was a definer-vs-RLS split**
+(see 0057): `getEventAttendees` now reads through the definer RPC with an embed fallback.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

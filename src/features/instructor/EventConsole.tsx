@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
@@ -213,6 +213,10 @@ function clock(ms: number): string {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+/** Cap on the live monitor/feed roster fetch — recent N is all that's shown; the
+ *  count comes from get_event_stats, so this never has to be the full roster. */
+const MONITOR_CAP = 100
+
 /** Live monitor: rotating QR + polled total/per-section counts + manual add + End. */
 function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => void }) {
   const { toast } = useToast()
@@ -220,22 +224,30 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
   const [rotateIn, setRotateIn] = useState(QR_STEP_SECONDS)
   const [nowMs, setNowMs] = useState(Date.now())
   const [stats, setStats] = useState<EventStats | null>(null)
+  const [attendees, setAttendees] = useState<EventAttendee[]>([])
+  const [attLoaded, setAttLoaded] = useState(false)
   const [ending, setEnding] = useState(false)
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
-  // Fullscreen "present" QR — same as the class session, so a whole hall can scan.
+  // Fullscreen "present" QR + live check-in wall — same as the class session, so
+  // a whole hall can scan.
   const [presenting, setPresenting] = useState(false)
   const [bigSize, setBigSize] = useState(320)
+  const stageRef = useRef<HTMLDivElement>(null)
   const startedMs = new Date(event.startedAt).getTime()
 
-  // Size the fullscreen QR to the smaller viewport edge.
+  // Size the fullscreen QR to the LEFT STAGE (a ResizeObserver, so the QR shrinks
+  // to make room for the feed panel on desktop and never overlaps it).
   useEffect(() => {
     if (!presenting) return
+    const el = stageRef.current
+    if (!el) return
     const calc = () =>
-      setBigSize(Math.max(220, Math.min(560, Math.min(window.innerWidth, window.innerHeight) - 96)))
+      setBigSize(Math.max(220, Math.min(560, Math.min(el.clientWidth, el.clientHeight) - 96)))
     calc()
-    window.addEventListener('resize', calc)
-    return () => window.removeEventListener('resize', calc)
+    const ro = new ResizeObserver(calc)
+    ro.observe(el)
+    return () => ro.disconnect()
   }, [presenting])
 
   // Rotating QR — same pattern as the class session, against the event secret.
@@ -264,6 +276,8 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
   }, [event.id, event.qrSecret])
 
   // Poll the count — event_attendance isn't in realtime on purpose (scale).
+  // Faster (2s) while presenting so a name appears within a couple seconds on the
+  // projector; the ordinary monitor stays at 4s.
   const refreshStats = useCallback(() => {
     void getEventStats(event.id)
       .then(setStats)
@@ -271,9 +285,26 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
   }, [event.id])
   useEffect(() => {
     refreshStats()
-    const id = window.setInterval(refreshStats, 4000)
+    const id = window.setInterval(refreshStats, presenting ? 2000 : 4000)
     return () => window.clearInterval(id)
-  }, [refreshStats])
+  }, [refreshStats, presenting])
+
+  // The names, refetched only when the polled total CHANGES — so the inline list
+  // and the fullscreen feed both stay live without a roster query every poll. An
+  // event never loses a check-in, so a count-gated refetch can't miss one.
+  useEffect(() => {
+    let cancelled = false
+    getEventAttendees(event.id, MONITOR_CAP)
+      .then((rows) => {
+        if (cancelled) return
+        setAttendees(rows)
+        setAttLoaded(true)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [event.id, stats?.total])
 
   async function onEnd() {
     setConfirmEnd(false)
@@ -358,9 +389,9 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
         </div>
       )}
 
-      {/* Who checked in — refetched only when the polled count changes, so the
-          list stays live without a full roster query every 4 seconds. */}
-      <AttendeeList eventId={event.id} version={stats?.total ?? 0} />
+      {/* Who checked in — the header count is the accurate total; `attendees` is a
+          recent slice (capped), so pass `count` from stats. */}
+      <AttendeeListView people={attendees} loaded={attLoaded} count={stats?.total} />
 
       <div className="grid grid-cols-2 gap-3">
         <Button variant="outline" onClick={() => setAddOpen(true)}>
@@ -371,47 +402,63 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
         </Button>
       </div>
 
-      {/* Fullscreen "present" QR — for a projector / shared screen at a big event. */}
+      {/* Fullscreen "present" mode — QR on the left, a live check-in wall on the
+          right (desktop only). */}
       <AnimatePresence>
         {presenting && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-canvas p-6"
+            className="fixed inset-0 z-50 flex bg-canvas"
           >
+            {/* Close sits top-LEFT so it never overlaps the feed panel. */}
             <IconButton
               label="Exit fullscreen"
               variant="outline"
               size="lg"
               round
               onClick={() => setPresenting(false)}
-              className="absolute right-4 top-4"
+              className="absolute left-4 top-4 z-10"
               icon={<XIcon className="h-6 w-6" />}
             />
-            <div className="text-center">
-              <p className="font-display text-2xl font-bold">{event.name}</p>
-              <p className="text-sm text-muted">Scan to check in</p>
+
+            {/* Left stage — QR + count. Sized by the ResizeObserver above. */}
+            <div
+              ref={stageRef}
+              className="flex flex-1 flex-col items-center justify-center gap-6 p-6"
+            >
+              <div className="text-center">
+                <p className="font-display text-2xl font-bold">{event.name}</p>
+                <p className="text-sm text-muted">Scan to check in</p>
+              </div>
+              <div className="rounded-3xl bg-white p-5 shadow-lg">
+                {payload ? (
+                  <QrCode value={payload} size={bigSize} />
+                ) : (
+                  <div
+                    className="animate-pulse rounded-xl bg-card-2"
+                    style={{ height: bigSize, width: bigSize }}
+                  />
+                )}
+              </div>
+              <div className="text-center">
+                <p className="font-display text-4xl font-bold tabular-nums text-reward">
+                  {stats?.total ?? 0}
+                </p>
+                <p className="text-sm text-muted">
+                  checked in · code refreshes in <span className="tabular-nums">{rotateIn}s</span>
+                  {event.pointsPerScan > 0 ? ` · +${event.pointsPerScan} pts each` : ''}
+                </p>
+              </div>
             </div>
-            <div className="rounded-3xl bg-white p-5 shadow-lg">
-              {payload ? (
-                <QrCode value={payload} size={bigSize} />
-              ) : (
-                <div
-                  className="animate-pulse rounded-xl bg-card-2"
-                  style={{ height: bigSize, width: bigSize }}
-                />
-              )}
-            </div>
-            <div className="text-center">
-              <p className="font-display text-4xl font-bold tabular-nums text-reward">
-                {stats?.total ?? 0}
-              </p>
-              <p className="text-sm text-muted">
-                checked in · code refreshes in <span className="tabular-nums">{rotateIn}s</span>
-                {event.pointsPerScan > 0 ? ` · +${event.pointsPerScan} pts each` : ''}
-              </p>
-            </div>
+
+            {/* Live check-in wall — desktop only (a 22–26rem column on the right). */}
+            <PresentFeed
+              people={attendees}
+              total={stats?.total ?? 0}
+              loaded={attLoaded}
+            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -436,39 +483,104 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
   )
 }
 
+/**
+ * The live check-in wall in fullscreen present mode — a Twitch-style feed on the
+ * right edge, DESKTOP ONLY (`hidden md:flex`). Newest at the BOTTOM, auto-scrolls
+ * as people scan. `people` is newest-first (the fetch order), so it renders
+ * reversed. Renders nothing on a phone, where the present overlay stays a single
+ * centred column.
+ */
+function PresentFeed({
+  people,
+  total,
+  loaded,
+}: {
+  people: EventAttendee[]
+  total: number
+  loaded: boolean
+}) {
+  const feedRef = useRef<HTMLDivElement>(null)
+  // oldest → newest, so the newest sits at the bottom like a chat log.
+  const ordered = useMemo(() => [...people].reverse(), [people])
+
+  // Stick to the bottom as new check-ins arrive (it's a projector — always latest).
+  useEffect(() => {
+    const el = feedRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [ordered])
+
+  return (
+    <aside className="hidden w-[22rem] shrink-0 flex-col border-l border-line bg-card/30 md:flex lg:w-[26rem]">
+      <div className="flex items-center gap-2 border-b border-line px-5 py-4">
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-reward-solid/70" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-reward-solid" />
+        </span>
+        <p className="font-display text-lg font-bold">
+          Checked in <span className="tabular-nums text-reward">{total}</span>
+        </p>
+      </div>
+
+      <div ref={feedRef} className="flex-1 space-y-1.5 overflow-y-auto p-4">
+        {loaded && ordered.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted">
+            <BoltIcon className="h-8 w-8 text-reward/60" />
+            <p className="text-sm">Waiting for the first check-in…</p>
+          </div>
+        ) : (
+          <AnimatePresence initial={false}>
+            {ordered.map((p) => (
+              <motion.div
+                key={p.studentId}
+                layout
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                className="flex items-center gap-3 rounded-xl bg-card px-3 py-2.5"
+              >
+                <Avatar name={p.displayName} url={p.avatarUrl} className="h-10 w-10" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{p.displayName}</p>
+                  {p.sectionName && (
+                    <p className="truncate text-xs text-muted">{p.sectionName}</p>
+                  )}
+                </div>
+                {p.points > 0 && (
+                  <span className="shrink-0 text-sm font-bold text-reward">+{p.points}</span>
+                )}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        )}
+      </div>
+    </aside>
+  )
+}
+
 const clockTime = (iso: string) =>
   new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 
 /**
- * The list of checked-in students. `version` bumps (the polled total) trigger a
- * refetch — so the live monitor updates as people scan, without querying the
- * whole roster on every 4-second poll. In review mode `version` never changes,
- * so it fetches exactly once.
+ * The list of checked-in students (presentational). `count` is the accurate
+ * total (the monitor passes stats.total, since its `people` is a capped recent
+ * slice); it defaults to the list length for the review's full fetch.
  */
-function AttendeeList({ eventId, version }: { eventId: string; version: number }) {
-  const [people, setPeople] = useState<EventAttendee[]>([])
-  const [loaded, setLoaded] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    getEventAttendees(eventId)
-      .then((rows) => {
-        if (cancelled) return
-        setPeople(rows)
-        setLoaded(true)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [eventId, version])
-
+function AttendeeListView({
+  people,
+  loaded,
+  count,
+}: {
+  people: EventAttendee[]
+  loaded: boolean
+  count?: number
+}) {
   if (loaded && people.length === 0) return null
+  const n = count ?? people.length
 
   return (
     <div>
       <p className="mb-2 px-1 text-sm font-semibold text-muted">
-        Checked in{people.length > 0 ? ` · ${people.length}` : ''}
+        Checked in{n > 0 ? ` · ${n}` : ''}
       </p>
       <Card pad="none" className="divide-y divide-line">
         {!loaded ? (
@@ -498,6 +610,28 @@ function AttendeeList({ eventId, version }: { eventId: string; version: number }
       </Card>
     </div>
   )
+}
+
+/** Self-fetching wrapper — used by the read-only review (one-time full fetch). */
+function AttendeeList({ eventId }: { eventId: string }) {
+  const [people, setPeople] = useState<EventAttendee[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    getEventAttendees(eventId)
+      .then((rows) => {
+        if (cancelled) return
+        setPeople(rows)
+        setLoaded(true)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [eventId])
+
+  return <AttendeeListView people={people} loaded={loaded} />
 }
 
 /**
@@ -563,7 +697,7 @@ function EventReview({ event, onBack }: { event: EventSession; onBack: () => voi
         </div>
       )}
 
-      <AttendeeList eventId={event.id} version={0} />
+      <AttendeeList eventId={event.id} />
 
       {stats?.total === 0 && <EmptyState>Nobody checked in to this event.</EmptyState>}
     </div>
