@@ -220,7 +220,7 @@ function AttendanceCard({
           </div>
           <span className="shrink-0 font-display text-xl font-bold tabular-nums">{t.rate}%</span>
         </div>
-        <Meter value={t.rate} tone={rateTone(t.rate)} size="sm" label="Show-up rate" className="mt-3" />
+        <Meter value={t.rate} tone={rateTone(t.rate)} size="sm" label="Attendance rate" className="mt-3" />
       </Card>
     </button>
   )

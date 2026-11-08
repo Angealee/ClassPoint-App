@@ -4,6 +4,8 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Sheet } from '@/components/ui/Sheet'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { LogOutIcon } from '@/components/ui/icons'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { useToast } from '@/components/ui/Toast'
@@ -43,6 +45,8 @@ export function Settings() {
 
   const [whatsNewOpen, setWhatsNewOpen] = useState(false)
 
+  const [signOutOpen, setSignOutOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const [pinOpen, setPinOpen] = useState(false)
   const [currentPin, setCurrentPin] = useState('')
   const [newPin, setNewPin] = useState('')
@@ -98,9 +102,22 @@ export function Settings() {
     toast(nextMuted ? 'Vibration off.' : 'Vibration on.', 'info')
   }
 
+  /**
+   * ⚠ Behind a ConfirmDialog since 2026-11-08, and it was an inconsistency
+   *   rather than a preference: the menu's Sign out has always confirmed
+   *   ("You'll need your username and PIN to get back in."), and this one —
+   *   sitting under seven other controls that all take effect instantly — did
+   *   not. Two paths to the same action, one of them a single tap, on a screen
+   *   students visit to toggle sounds.
+   */
   async function onSignOut() {
-    await signOut()
-    navigate('/', { replace: true })
+    setSigningOut(true)
+    try {
+      await signOut()
+      navigate('/', { replace: true })
+    } finally {
+      setSigningOut(false)
+    }
   }
 
   function openPin() {
@@ -251,16 +268,33 @@ export function Settings() {
         </div>
       </div>
 
-      {/* Alone at the bottom, below everything it could be mistaken for. */}
-      <Button variant="ghost" className="w-full text-muted" onClick={onSignOut}>
-        Sign out
+      {/* Alone at the bottom, below everything it could be mistaken for.
+          `text-danger`, matching the menu's row: a muted Sign out under a
+          column of ink-coloured controls reads as disabled, not as careful. */}
+      <Button
+        variant="ghost"
+        className="w-full text-danger"
+        onClick={() => setSignOutOpen(true)}
+      >
+        <LogOutIcon className="h-4.5 w-4.5" /> Sign out
       </Button>
+
+      <ConfirmDialog
+        open={signOutOpen}
+        title="Sign out?"
+        message="You'll need your username and PIN to get back in."
+        confirmLabel="Sign out"
+        busy={signingOut}
+        onConfirm={() => void onSignOut()}
+        onClose={() => setSignOutOpen(false)}
+      />
 
       <Sheet open={pinOpen} onClose={() => setPinOpen(false)} title="Change PIN">
         <form onSubmit={onChangePin} className="space-y-4">
           <Input
             label="Current PIN"
             type="password"
+            revealable
             inputMode="numeric"
             autoComplete="current-password"
             value={currentPin}
@@ -270,6 +304,7 @@ export function Settings() {
           <Input
             label="New PIN"
             type="password"
+            revealable
             inputMode="numeric"
             autoComplete="new-password"
             value={newPin}
@@ -279,6 +314,7 @@ export function Settings() {
           <Input
             label="Confirm new PIN"
             type="password"
+            revealable
             inputMode="numeric"
             autoComplete="new-password"
             value={confirmPin}

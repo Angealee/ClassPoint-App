@@ -287,6 +287,8 @@ export interface Database {
         name: string
         starts_on: string
         is_active: boolean
+        /** 0060 — read by an archived student on their way out. Max 400 chars. */
+        farewell_message: string | null
         created_at: Timestamp
       }>
 

@@ -67,8 +67,8 @@ export function LiveClassBanner({ onScan }: { onScan?: () => void }) {
           {checkedIn
             ? neutral
               ? `Marked ${liveStatus}. Nothing to scan.`
-              : `Checked in ${liveStatus === 'late' ? 'late' : 'on time'} · started ${timeAgo(liveSession.startedAt)}`
-            : `Started ${timeAgo(liveSession.startedAt)} · scan the QR to check in`}
+              : `Recorded ${liveStatus === 'late' ? 'late' : 'on time'} · started ${timeAgo(liveSession.startedAt)}`
+            : `Started ${timeAgo(liveSession.startedAt)} · scan the QR to record attendance`}
         </p>
       </div>
 

@@ -365,9 +365,32 @@
  * deliberately left small: there, an overlapping region does not mis-tap a
  * button, it marks the wrong student or awards the wrong number of points.
  */
-.cp-tap-44,
-.cp-tap-y {
-  position: relative;
+/* ⚠ `@layer components`, AND IT HAS TO BE — this rule was UNLAYERED and that
+   was a real, shipped bug.
+
+   Per the CSS cascade, UNLAYERED styles beat every layered style regardless of
+   specificity or source order. `@import 'tailwindcss'` puts `.absolute` in the
+   `utilities` layer, so an unlayered `position: relative` here silently won
+   against it: any element carrying BOTH `cp-tap-*` and `absolute` was pinned
+   to `position: relative` and fell back into the document flow.
+   Exactly one call site did that — `Input`'s password reveal control — and it
+   therefore rendered BELOW the field, left-aligned, pushing the field's
+   wrapper from 44px to 76px, on all four auth screens. (Measured: the button
+   sat at x=8 with `position: relative` where it should have been at x≈303.)
+   It is also why the Era 7.0 verification missed it: the check was
+   `button.right <= field.right`, which passes vacuously for a button sitting
+   at the LEFT of the field.
+
+   In `components` the rule still gives every ordinary icon button its
+   positioning context, while a `utilities` class — which is what a call site
+   reaches for when it needs something else — now wins, as it always should
+   have. The pseudo-elements below stay unlayered: nothing competes for
+   `::before` on these, and layering them would be change for its own sake. */
+@layer components {
+  .cp-tap-44,
+  .cp-tap-y {
+    position: relative;
+  }
 }
 
 /* The pseudo-element is a child of the control, so a tap on it is a tap on the
@@ -549,28 +572,69 @@ body::after {
   animation: cp-route-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Flying leaderboard comments (danmaku). A pure transform animation so it runs
-   on the compositor — a JS-driven equivalent would jank on low-end phones with
-   several pills in flight. `--cp-fly-dur` is set per pill from its length, so
-   longer comments travel slower and stay readable. Reduced-motion users get a
-   static list instead (see CommentsOverlay), never this.
+/* Floating leaderboard comments — a RISING COLUMN (the instructor's call,
+   2026-11-08; this replaced `cp-fly`, which flew them right-to-left across up
+   to five horizontal lanes).
 
-   The pill is parked at `left: 100%` (just past the deck's right edge) and
-   travels the deck's width PLUS its own, so it enters and exits fully
-   off-screen. `cqw` measures the DECK, which is what keeps this correct
-   whatever the deck happens to be: it was a centred content column above the
-   podium, and is now a full-screen overlay in front of the whole board. Either
-   way the pill travels exactly the deck's width plus its own.
-   Requires `container-type: inline-size` on the deck. */
-@keyframes cp-fly {
-  from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(calc(-100cqw - 100%), 0, 0); }
+   Why the direction changed: a pill crossing the board horizontally passes over
+   the podium, the picker and the rank rows, and at five lanes the whole board
+   was behind moving text. A single column up one side covers one narrow strip,
+   leaves the board readable, and lets a comment be two or three lines wide
+   without colliding with anything.
+
+   A pure transform + opacity animation, so it runs on the compositor — a
+   JS-driven equivalent would jank on a low-end phone with six pills in flight.
+   `--cp-rise-dur` is set per pill from its measured height, so a three-line
+   comment is on screen proportionally longer. Reduced-motion users get a static
+   list instead (see CommentsOverlay), never this.
+
+   ⚠ `cqh` REQUIRES `container-type: size`, NOT `inline-size`, AND THE FAILURE
+     IS NOT THE ONE YOU WOULD GUESS. `inline-size` establishes a query
+     container on the INLINE axis only, so `cqh` skips the track entirely and
+     falls back to the SMALL VIEWPORT. Measured in this app: a 206px track with
+     a 38px pill travels -244px correctly, and -849px under `inline-size` —
+     i.e. the full 812px viewport plus the pill.
+
+     The pill does not sit still (the obvious guess, and what this comment
+     claimed before it was measured). It flies roughly four times too far in
+     the duration `flightDurationMs` computed from the TRACK's height, so every
+     pill moves four times too fast and the lane-hold arithmetic — which
+     assumes SPEED_PX_PER_SEC — stops preventing overlap. The symptom is a
+     stream that looks merely "fast" while the one guarantee lib/danmaku exists
+     to provide is silently void.
+
+     `size` needs a definite height, which the track has because it is
+     positioned against both edges of a `fixed inset-0` deck.
+
+   The pill is parked at `top: 100%` (just below the track's bottom edge) and
+   travels the track's height PLUS its own, so it enters and leaves fully
+   outside. The track is inset from the header and the tab bar, so a comment
+   never crosses the app's own chrome — which is what the old TOP_INSET /
+   BOTTOM_INSET lane positions bought, now expressed as the track's geometry
+   instead of as arithmetic per lane. */
+@keyframes cp-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  /* Fade in over the first slice, hold, then fade out before the top edge, so
+     a pill dissolves rather than being clipped by the track's boundary. */
+  12% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, calc(-100cqh - 100%), 0);
+  }
 }
 
-.cp-fly {
-  left: 100%;
-  animation: cp-fly var(--cp-fly-dur, 9s) linear forwards;
-  will-change: transform;
+.cp-rise {
+  top: 100%;
+  animation: cp-rise var(--cp-rise-dur, 14s) linear forwards;
+  will-change: transform, opacity;
 }
 
 /* Flame flicker for the streak markers (FlameIcon).
@@ -595,6 +659,27 @@ body::after {
   animation: cp-flicker 1.7s ease-in-out infinite;
   will-change: transform;
 }
+
+/* The empty leaderboard's three stands, breathing (SilentBoard).
+
+   A CSS keyframe rather than framer-motion for the reason the flame already
+   documents: it is decorative, and the reduced-motion block below switches it
+   off with everything else — so there is no second rule to remember and no
+   useReducedMotion guard in the component.
+
+   OPACITY ONLY. Three <rect>s inside one <svg> are cheap to re-composite, but
+   animating a transform on an SVG child means a layout-relative origin and the
+   stands would drift off their shared floor. The stagger is what makes it read
+   as "waiting" rather than as a loading state. */
+@keyframes cp-silent {
+  0%,
+  100% { opacity: 0.55; }
+  50%  { opacity: 1; }
+}
+
+.cp-silent-1 { animation: cp-silent 4.4s ease-in-out infinite; }
+.cp-silent-2 { animation: cp-silent 4.4s ease-in-out 0.5s infinite; }
+.cp-silent-3 { animation: cp-silent 4.4s ease-in-out 1s infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   *,

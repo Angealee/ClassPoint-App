@@ -1,5 +1,4 @@
 import { RankDeltaValue, rankDelta } from '@/components/leaderboard/RankSignals'
-import { EmptyState } from '@/components/ui/EmptyState'
 import { BoardSwitcher } from '@/components/leaderboard/BoardSwitcher'
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Select } from '@/components/ui/Select'
@@ -9,6 +8,7 @@ import { SnapshotChip } from '@/components/ui/SnapshotStamp'
 import { ShareIcon } from '@/components/ui/icons'
 import { IconButton } from '@/components/ui/IconButton'
 import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
+import { SilentBoard } from '@/components/leaderboard/SilentBoard'
 import { CommentsOverlay } from '@/components/leaderboard/CommentsOverlay'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { getLevelProgress } from '@/lib/leveling'
@@ -51,6 +51,20 @@ export function Leaderboard() {
   )
 
   const top = ranked.slice(0, TOP_N)
+  /**
+   * Nobody has scored yet — show the board, but show nothing ON it (0060).
+   *
+   * `leaderboard_snapshot` has no `semester_id`; it ranks EVERY non-archived
+   * student by `semester_points` (0038), and `set_active_semester` resets that
+   * column for everyone. So the first morning of a new semester the board is
+   * forty students tied at zero, alphabetical, wearing place numbers — which
+   * reads as a real ranking and is not one.
+   *
+   * A CLIENT-side rule on purpose: the alternative is teaching the snapshot or
+   * the RPC about emptiness, which would be a second definition of "is this
+   * board live" to keep in sync with this one.
+   */
+  const silent = top.length === 0 || top.every((e) => e.points === 0)
   const meIdx = me ? ranked.findIndex((e) => e.student_id === me.id) : -1
   const meEntry = meIdx >= 0 ? ranked[meIdx] : null
 
@@ -136,10 +150,13 @@ export function Leaderboard() {
   return (
     <PullToRefresh onRefresh={refresh}>
       <div className="space-y-4">
-      {/* Header, tightened. The scope chip that used to sit on the second row
-          ("Top 10" / the section name) said the same thing as the picker beside
-          it, so it is gone and Share moved up to join them. That reclaims a row
-          — which matters more now comments fly in front of the board. */}
+      {/* Header: title + settle caption + Share on row one, the scope picker
+          full width on row two, the board switcher on row three.
+          The scope CHIP is still gone — it said the same thing as the picker
+          below it. What changed in 2026-11-08 is that the picker stopped
+          sharing row one: squeezing a section name into 136px beside two other
+          controls is what "do not squish it for space" was about, and a row is
+          cheaper than an unreadable control. */}
       <div className="space-y-2.5">
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
@@ -150,38 +167,6 @@ export function Leaderboard() {
               <SnapshotChip capturedAt={capturedAt} />
             </div>
           </div>
-          <Select
-            value={view}
-            onChange={(e) => {
-              // "Past semesters" is an ACTION, not a view — open the sheet and
-              // leave `view` alone, so the controlled select snaps back to the
-              // board you were actually looking at.
-              if (e.target.value === PAST) {
-                setPastOpen(true)
-                return
-              }
-              setView(e.target.value)
-            }}
-            aria-label="Choose leaderboard"
-            wrapperClassName="max-w-34 shrink-0"
-            className="h-9! text-sm!"
-          >
-            <option value={GLOBAL}>Global</option>
-            {sections.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-                {s.id === me?.section_id ? ' (mine)' : ''}
-              </option>
-            ))}
-            {/* Past boards (0035) lives here now. I argued the opposite when it
-                was built — that folding a second axis into this picker makes
-                both harder to read — and that was right while it was the only
-                other control. With a switcher needing the row, an archive is
-                the thing that should cost the least. */}
-            <optgroup label="Archive">
-              <option value={PAST}>Past semesters…</option>
-            </optgroup>
-          </Select>
           {top.length > 0 && (
             <IconButton
               label="Share the board"
@@ -194,35 +179,87 @@ export function Leaderboard() {
             />
           )}
         </div>
+
+        {/* ⚠ THE PICKER GETS ITS OWN FULL-WIDTH ROW (2026-11-08).
+            It used to sit in the title row at `wrapperClassName="max-w-34"` —
+            a hard 136px cap, inside which the chevron's own `pr-10` leaves
+            about 96px for a section name, so anything past "BSIT 2A" was
+            truncated. `h-9! text-sm!` was shrinking it further against the
+            app's own 44px control height, and the `!` suffixes only existed to
+            beat the old plain-join `cn()`.
+            All three of those are gone: full width, the primitive's real
+            height, and a section name you can read. "Do not squish it for
+            space." */}
+        <Select
+          value={view}
+          onChange={(e) => {
+            // "Past semesters" is an ACTION, not a view — open the sheet and
+            // leave `view` alone, so the controlled select snaps back to the
+            // board you were actually looking at.
+            if (e.target.value === PAST) {
+              setPastOpen(true)
+              return
+            }
+            setView(e.target.value)
+          }}
+          aria-label="Choose leaderboard"
+        >
+          <option value={GLOBAL}>Global</option>
+          {sections.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+              {s.id === me?.section_id ? ' (mine)' : ''}
+            </option>
+          ))}
+          {/* Past boards (0035) lives here now. I argued the opposite when it
+              was built — that folding a second axis into this picker makes
+              both harder to read — and that was right while it was the only
+              other control. With a switcher needing the row, an archive is
+              the thing that should cost the least. */}
+          <optgroup label="Archive">
+            <option value={PAST}>Past semesters…</option>
+          </optgroup>
+        </Select>
         {/* Which of the two boards this is (0038). */}
         <BoardSwitcher value="points" />
       </div>
 
       {loading ? (
         <ListSkeleton rows={8} />
-      ) : top.length === 0 ? (
-        <EmptyState>{isGlobal
-            ? 'No rankings yet — the board settles at 12:30 PM and 7:30 PM.'
-            : `No ranked students in ${sectionName(view)} yet.`}</EmptyState>
       ) : (
+        /* CommentsOverlay wraps the silent board too, deliberately: the
+           composer is the useful half, and day one of a semester is exactly
+           when a class has something to say to each other. */
         <CommentsOverlay studentId={me?.id} onOpenProfile={openCommenter}>
-          <PodiumBoard
-            entries={top}
-            meId={me?.id}
-            sectionName={sectionName}
-            showSection={isGlobal}
-            // Global view only: rows are renumbered by section position in a
-            // filtered view, and previous_rank/rank_since describe the whole
-            // board — mixing them would put a movement arrow on a row that
-            // didn't move on screen.
-            rankSignals={isGlobal}
-            onSelect={(entry) => setSelected(entry)}
-          />
+          {silent ? (
+            <SilentBoard
+              detail={
+                isGlobal
+                  ? 'The first points of the semester wake it up. It settles at 12:30 PM and 7:30 PM.'
+                  : `Nobody in ${sectionName(view)} has points yet.`
+              }
+            />
+          ) : (
+            <PodiumBoard
+              entries={top}
+              meId={me?.id}
+              sectionName={sectionName}
+              showSection={isGlobal}
+              // Global view only: rows are renumbered by section position in a
+              // filtered view, and previous_rank/rank_since describe the whole
+              // board — mixing them would put a movement arrow on a row that
+              // didn't move on screen.
+              rankSignals={isGlobal}
+              onSelect={(entry) => setSelected(entry)}
+            />
+          )}
         </CommentsOverlay>
       )}
 
-      {/* Your standing — pinned at the bottom so the board leads, not your row. */}
-      {!loading && meEntry && (
+      {/* Your standing — pinned at the bottom so the board leads, not your row.
+          Hidden while the board is silent: "#1" out of a field of zeroes is a
+          number, not a standing. */}
+      {!loading && !silent && meEntry && (
         <YourRankCard
           entry={meEntry}
           position={myPos}

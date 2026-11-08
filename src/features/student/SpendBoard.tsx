@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
-import { EmptyState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { SnapshotChip } from '@/components/ui/SnapshotStamp'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { BoardSwitcher } from '@/components/leaderboard/BoardSwitcher'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
+import { SilentBoard } from '@/components/leaderboard/SilentBoard'
 import type { LeaderboardEntry } from '@/lib/types'
 import { useStudentData } from './StudentData'
 import { StudentProfilePreview } from './StudentProfilePreview'
@@ -71,26 +71,30 @@ export function SpendBoard() {
           title="Leaderboard"
           fallback="/app/leaderboard"
           subtitle={<SnapshotChip capturedAt={capturedAt} />}
-          actions={
-            sections.length > 0 ? (
-              <Select
-                value={view}
-                onChange={(e) => setView(e.target.value)}
-                aria-label="Choose spend board"
-                wrapperClassName="max-w-34 shrink-0"
-            className="h-9! text-sm!"
-              >
-                <option value={GLOBAL}>Global</option>
-                {sections.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                    {s.id === me?.section_id ? ' (mine)' : ''}
-                  </option>
-                ))}
-              </Select>
-            ) : undefined
-          }
         />
+
+        {/* ⚠ OUT OF THE HEADER'S `actions` SLOT AND ONTO ITS OWN ROW, the same
+            change the points board took and for the same reason — the two
+            boards share a switcher, so a picker that is readable on one and
+            clipped on the other is worse than either. It was
+            `wrapperClassName="max-w-34 shrink-0"` + `className="h-9! text-sm!"`,
+            i.e. a 136px box whose chevron eats 40px of it, which is about
+            enough for "Global". Full width, standard height, readable names. */}
+        {sections.length > 0 && (
+          <Select
+            value={view}
+            onChange={(e) => setView(e.target.value)}
+            aria-label="Choose spend board"
+          >
+            <option value={GLOBAL}>Global</option>
+            {sections.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+                {s.id === me?.section_id ? ' (mine)' : ''}
+              </option>
+            ))}
+          </Select>
+        )}
 
         <BoardSwitcher value="spent" />
 
@@ -104,11 +108,19 @@ export function SpendBoard() {
         {loading ? (
           <ListSkeleton rows={6} />
         ) : top.length === 0 ? (
-          <EmptyState>
-            {isGlobal
-              ? 'Nobody has spent any points yet. Be the first one on this board.'
-              : `Nobody in ${sectionName(view)} has spent any points yet.`}
-          </EmptyState>
+          /* The same art as the points board, so day one of a semester feels
+             like one app rather than two different empty states. The
+             actionable line stays — it is the thing worth saying here, and a
+             bare heading would have thrown it away.
+             Note `ranked` already filters to spenders, so this branch means
+             "nobody has spent", never "everybody is on zero". */
+          <SilentBoard
+            detail={
+              isGlobal
+                ? 'Nobody has spent any points yet. Be the first one on this board.'
+                : `Nobody in ${sectionName(view)} has spent any points yet.`
+            }
+          />
         ) : (
           <PodiumBoard
             entries={top}

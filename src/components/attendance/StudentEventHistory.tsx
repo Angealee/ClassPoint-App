@@ -14,7 +14,7 @@ import type { EventHistoryEntry } from '@/lib/types'
  */
 export function StudentEventHistory({
   studentId,
-  title = 'Event check-ins',
+  title = 'Event attendance',
 }: {
   studentId?: string
   title?: string

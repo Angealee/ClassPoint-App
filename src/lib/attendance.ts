@@ -68,7 +68,22 @@ export function tally(items: readonly MyAttendanceEntry[]): AttendanceTally {
   }
 }
 
-/** Show-up rate as a whole percentage. 0 when no class counted yet. */
+/**
+ * The attendance rate as a whole percentage. 0 when no class counted yet.
+ *
+ * ⚠ The UI calls this the ATTENDANCE RATE (renamed 2026-11-08, the
+ *   instructor's call: "show-up rate" read as slang on a screen students use
+ *   to check whether they are failing). The function names here were left
+ *   alone deliberately — renaming `rateOf` / `rateTone` / `showedUp` means
+ *   touching five call sites and the comment that pins this file to
+ *   `get_section_attendance_stats` (0031), for no user-visible gain. So the
+ *   prose in this file still says "show-up"; the screens do not.
+ *
+ * ⚠ A caller showing this to a student must check `counted` first: a term with
+ *   nothing counted yet gets 0 here, which reads as "you attended none of
+ *   them" rather than "no classes yet". The Attendance summary card renders a
+ *   dash in that case.
+ */
 export function rateOf(items: readonly MyAttendanceEntry[]): number {
   const counted = items.filter((h) => counts(h.status)).length
   if (counted === 0) return 0

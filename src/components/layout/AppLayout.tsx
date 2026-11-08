@@ -13,6 +13,7 @@ import { WhatsNew } from '@/features/WhatsNew'
 import { AwayRecap } from '@/features/student/AwayRecap'
 import { NotificationsSheet } from '@/features/student/Notifications'
 import { Onboarding } from '@/features/student/Onboarding'
+import { ArchivedScreen } from '@/features/student/ArchivedScreen'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useAuth } from '@/lib/auth'
 import { useIsDesktop } from '@/lib/useIsDesktop'
@@ -267,15 +268,51 @@ function IntroOrWhatsNew() {
   return <WhatsNew />
 }
 
-/** Student shell — responsive sidebar (desktop) / bottom tabs (mobile). */
-export function AppLayout() {
+/**
+ * Everything inside the provider, chosen by whether this student is archived.
+ *
+ * ── WHY THE GATE IS HERE AND NOT IN `RequireRole` ───────────────────────────
+ * `RequireRole` runs before any student data exists — role comes from the email
+ * domain alone — so gating there would need its own fetch and would flash the
+ * wrong shell first. Here, `me.archived_at` is already on the row the app
+ * fetches anyway, so the decision is made before the first screen paints.
+ *
+ * ⚠ EVERY OVERLAY IS SUPPRESSED for an archived student, not just hidden
+ *   behind the archived screen. A level-up burst, a badge unlock, the "What's
+ *   new" sheet or an away-recap on top of a farewell message would be absurd —
+ *   and three of the four exist to pull someone back into an app they can no
+ *   longer use.
+ *
+ * ⚠ `archived_at` is NOT `semesterEnded`. That one is derived from section
+ *   membership, and the two genuinely disagree: a student can be archived while
+ *   still sitting in an active-semester section, and can be in a past-semester
+ *   section without being archived. Both flags stay; this one wins.
+ *
+ * While `me` is still null the normal shell renders its own skeleton, which is
+ * correct: we do not yet know which of the two this is, and guessing archived
+ * would flash a farewell at everybody.
+ */
+function StudentOrArchived() {
+  const { me } = useStudentData()
+
+  if (me?.archived_at) return <ArchivedScreen />
+
   return (
-    <StudentDataProvider>
+    <>
       <StudentShell />
       <LevelUpOverlay />
       <AchievementUnlockOverlay />
       <IntroOrWhatsNew />
       <AwayRecapOverlay />
+    </>
+  )
+}
+
+/** Student shell — responsive sidebar (desktop) / bottom tabs (mobile). */
+export function AppLayout() {
+  return (
+    <StudentDataProvider>
+      <StudentOrArchived />
     </StudentDataProvider>
   )
 }

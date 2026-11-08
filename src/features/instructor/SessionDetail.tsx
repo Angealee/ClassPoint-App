@@ -429,7 +429,7 @@ export function SessionDetail() {
         {syncedLateCount > 0 && (
           <span className="text-info">
             {' '}
-            {syncedLateCount} synced from an offline check-in.
+            {syncedLateCount} synced from an offline scan.
           </span>
         )}
       </p>
@@ -585,7 +585,7 @@ export function SessionDetail() {
             <span className="font-semibold text-ink">
               {session.topic || sessionDate(session.startedAt)}
             </span>{' '}
-            and all its check-ins will be permanently deleted. This can’t be undone.
+            and all its records will be permanently deleted. This can’t be undone.
           </>
         }
         detail={

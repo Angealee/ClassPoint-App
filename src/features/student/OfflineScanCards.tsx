@@ -41,7 +41,7 @@ export function OfflineScanCards({
               <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-gold-400/40 border-t-gold-500" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-warn">
-                  Check-in waiting to sync
+                  Waiting to sync
                 </p>
                 <p className="text-xs text-muted">
                   Scanned {day(e.capturedAt)}, {time(e.capturedAt)} · syncs automatically when
@@ -65,7 +65,7 @@ export function OfflineScanCards({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-success">
-                  {already ? `Already recorded — ${status}` : `Checked in — ${status}`}
+                  {already ? `Already recorded — ${status}` : `Recorded — ${status}`}
                 </p>
                 <p className="truncate text-xs text-muted">
                   {e.topic || 'Class'} · scanned {time(e.capturedAt)}
@@ -94,7 +94,7 @@ export function OfflineScanCards({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-danger">
-                  Couldn't record this check-in
+                  Couldn't record this scan
                 </p>
                 <p className="text-xs text-muted">
                   {(e.outcome && FAIL_REASON[e.outcome]) ?? 'Something went wrong.'}

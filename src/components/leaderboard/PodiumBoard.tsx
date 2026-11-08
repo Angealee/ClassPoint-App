@@ -177,8 +177,23 @@ export function PodiumBoard({
   const rest = entries.slice(3)
   const climber = biggestClimber(entries)
 
-  // Visually raise #1 in the centre: [#2, #1, #3]. Fewer than three → natural order.
-  const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3
+  /**
+   * THREE FIXED SLOTS: #2 left, #1 centre, #3 right. A missing place is a hole.
+   *
+   * This replaces `top3.length >= 3 ? [#2, #1, #3] : top3`, which fell back to
+   * natural order — so a board with only two ranked students put #1 on the LEFT
+   * and #2 beside it, i.e. the podium read backwards in exactly the situation
+   * (the first week of a semester) where it is most likely to happen.
+   *
+   * Fixed slots are also what let the row be a 3-column grid: every card is one
+   * third whether or not it exists, so the champion stays centred and the two
+   * cards present do not stretch to fill the row.
+   */
+  const podiumSlots: Array<{ entry: LeaderboardEntry; place: Place } | null> = [
+    top3[1] ?? null,
+    top3[0] ?? null,
+    top3[2] ?? null,
+  ]
 
   return (
     <div className="space-y-3">
@@ -210,20 +225,56 @@ export function PodiumBoard({
             than ambient motion. */}
         {showConfetti && <ConfettiBurst />}
 
-        <div className="relative flex items-end justify-center gap-1.5 px-0.5 pt-12 sm:gap-3 sm:px-1">
-          {podiumOrder.map(({ entry, place }) => (
-            <PodiumCard
-              key={entry.student_id}
-              entry={entry}
-              place={place}
-              isMe={meId === entry.student_id}
-              sectionLabel={label(entry.section_id)}
-              reduced={reduced}
-              rankSignals={rankSignals}
-              metric={metric}
-              onClick={pick?.(entry)}
-            />
-          ))}
+        {/* ⚠ A GRID, NOT A FLEX ROW, AND THAT IS THE WHOLE FIX.
+            (The instructor's report, 2026-11-08: "the rank 1 2 3 design width
+            is changing based on the name, it looks awkward and weird. It SHOULD
+            not move.")
+
+            The cards used to be `flex-1` items with `max-w-[12rem]` on the
+            champion and `max-w-[10rem]` on the other two. `flex: 1 1 0%` looks
+            like it should give three equal columns — but a flex item's
+            `min-width` defaults to `auto`, so each card's min-content size
+            becomes its floor, and the children that do NOT truncate contribute
+            to it: the points figure, the "Lv 12" meta line, the pedestal, the
+            signals row. So the three cards resized as names got longer and as
+            a score gained a digit, and the podium visibly shifted between two
+            refreshes of the same board.
+
+            `grid-cols-3` with `min-w-0` on every cell makes each card exactly
+            one third of the row, whatever is in it. `min-w-0` is the half that
+            actually matters: a grid item ALSO defaults to `min-width: auto` and
+            refuses to shrink below its content — the documented trap that made
+            `truncate` silently do nothing in `Stat` and `ScaleRow`. With it,
+            every `truncate` inside the card finally has a width to truncate
+            against.
+
+            The champion is still raised, by HEIGHT alone — the taller pedestal
+            (PEDESTAL_H) and the larger avatar. Width was never carrying that
+            distinction, it was only making the row unstable.
+
+            Gaps and padding went up (gap-1.5 → gap-2.5, px-2 → px-3 inside the
+            card) on the same instruction: "do not squish it for space". That
+            costs vertical space, which is the trade that was asked for. */}
+        <div className="relative grid grid-cols-3 items-end gap-2.5 px-0.5 pt-12 sm:gap-3 sm:px-1">
+          {podiumSlots.map((slot, i) =>
+            slot ? (
+              <PodiumCard
+                key={slot.entry.student_id}
+                entry={slot.entry}
+                place={slot.place}
+                isMe={meId === slot.entry.student_id}
+                sectionLabel={label(slot.entry.section_id)}
+                reduced={reduced}
+                rankSignals={rankSignals}
+                metric={metric}
+                onClick={pick?.(slot.entry)}
+              />
+            ) : (
+              // An empty slot holds its third of the row open, so two cards
+              // stay card-sized and the champion stays centred.
+              <div key={`empty-${i}`} aria-hidden />
+            ),
+          )}
         </div>
 
         {/* Shared stage floor — grounds the three stands so they read as one
@@ -370,8 +421,15 @@ function PodiumCard({
         }
       }}
       className={cn(
-        'relative flex flex-1 flex-col',
-        champ ? 'max-w-[12rem]' : 'max-w-[10rem]',
+        // `min-w-0`, and no `flex-1` and no `max-w`: the parent is a
+        // `grid-cols-3`, so the column already IS exactly one third. `flex-1`
+        // here did nothing useful in a grid, and the two different `max-w`
+        // caps are what made the champion a different WIDTH from its
+        // neighbours — the instability being fixed. `min-w-0` is required:
+        // a grid item defaults to `min-width: auto` and would otherwise refuse
+        // to shrink below its content, which is what silently defeats every
+        // `truncate` inside this card.
+        'relative flex min-w-0 flex-col',
         activate &&
           'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
       )}
@@ -394,9 +452,12 @@ function PodiumCard({
 
       <Card pad="none"
         className={cn(
-          'relative flex flex-col items-center gap-1.5 overflow-hidden border px-2 text-center sm:gap-2 sm:px-3',
+          // px-3 at phone width, up from px-2: the name had ~100px to live in
+          // and truncated on most real names. "Do not squish it for space" —
+          // so the card is roomier and the podium is taller.
+          'relative flex flex-col items-center gap-2 overflow-hidden border px-3 text-center sm:gap-2.5 sm:px-3.5',
           tier.border,
-          champ ? 'pb-3 pt-7 sm:pb-4 sm:pt-8' : 'pb-3 pt-5 sm:pb-3.5 sm:pt-6',
+          champ ? 'pb-3.5 pt-8 sm:pb-4 sm:pt-8' : 'pb-3.5 pt-6 sm:pb-3.5 sm:pt-6',
           // The champion's card carries a steady gold edge instead of a
           // breathing glow — still clearly the winner, no longer pulsing.
           champ && 'ring-1 ring-gold-400/40',

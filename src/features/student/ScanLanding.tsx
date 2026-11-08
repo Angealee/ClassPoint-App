@@ -89,9 +89,9 @@ export function ScanLanding() {
   if (!loading && user && role === 'instructor') {
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
-        <h1 className="font-display text-lg font-bold">That's the student check-in link</h1>
+        <h1 className="font-display text-lg font-bold">That's the student attendance link</h1>
         <p className="max-w-xs text-sm text-muted">
-          Students scan this to check in. You're signed in as the instructor.
+          Students scan this to record their attendance. You're signed in as the instructor.
         </p>
         <Button className="mt-2" onClick={() => navigate('/teach/attendance', { replace: true })}>
           Go to Attendance

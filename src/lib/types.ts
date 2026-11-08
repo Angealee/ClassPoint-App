@@ -38,6 +38,14 @@ export interface Semester {
   /** 'YYYY-MM-DD' — a Monday; anchors week 1. */
   startsOn: string
   isActive: boolean
+  /**
+   * What a student archived out of this semester reads on their way out (0060).
+   *
+   * Per SEMESTER rather than one global message, so next year's batch gets its
+   * own and this year's keeps the words written for them. Null = show the
+   * semester name and their recap, nothing else.
+   */
+  farewellMessage: string | null
   terms: SemesterTerm[]
 }
 
@@ -187,6 +195,21 @@ export interface StudentSelf {
   semester_points: number
   /** Career total across every semester. Achievements stay pinned to this. */
   all_time_points: number
+  /**
+   * Set when the instructor archived this student (0023 column, selected here
+   * for the first time by 0060).
+   *
+   * ⚠ This ONE column is the whole client-side gate for the archived
+   *   experience, which is why it is on the row the app already fetches rather
+   *   than behind an RPC: no extra round trip, and the decision is made before
+   *   the first screen paints.
+   *
+   * ⚠ It is NOT the same question as `semesterEnded` on StudentData, which is
+   *   derived from section membership. A student can be archived while still
+   *   sitting in an active-semester section, and can be in a past-semester
+   *   section without being archived. Both flags exist; this one wins.
+   */
+  archived_at: string | null
 }
 
 /** A point event as shown on another student's public profile preview. */
@@ -450,6 +473,16 @@ export interface ArchivedStudent {
   avatarUrl: string | null
   lifetimePoints: number
   archivedAt: string
+  /**
+   * Where they were when they were archived (0060).
+   *
+   * Null only if the section was deleted out from under them. Carried so a
+   * CROSS-SEMESTER archive list is legible — thirty names with no context is
+   * not a list anyone can act on — and so a restore can say what it is moving
+   * them away from.
+   */
+  sectionName: string | null
+  semesterName: string | null
 }
 
 /** The result a student sees after scanning. */
@@ -835,6 +868,19 @@ export interface RolloverCheck {
   severity: 'block' | 'warn'
   count: number
   detail: string
+}
+
+/**
+ * One student who would be archived by closing a semester (0060).
+ *
+ * `fullName`, not `displayName`: this list is read to check nobody is being
+ * archived by mistake, and the official "Dela Cruz, Juan M." is what the
+ * instructor matches against their own records.
+ */
+export interface SemesterCloseRow {
+  studentId: string
+  fullName: string
+  sectionName: string
 }
 
 /**

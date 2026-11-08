@@ -49,7 +49,7 @@ export const DRAFT_EVENTS: ChangelogEntry = {
   title: 'Big events, one scan',
   sections: [
     {
-      heading: 'Check in to a school-wide event',
+      heading: 'School-wide event attendance',
       major: true,
       items: [
         'When a big event kicks off, a gold banner lights up your home screen — tap it, scan the QR, and you are in from wherever you are sitting.',
@@ -111,6 +111,64 @@ export const DRAFT_7_0_0: ChangelogEntry = {
   ],
 }
 
+
+/**
+ * DRAFT — Era 8.0: closing a semester, and the revision batch. NOT in CHANGELOG
+ * yet, so it is invisible to users (LATEST_VERSION reads CHANGELOG[0]). Move it
+ * into the array with a bumped version once the instructor says to announce it.
+ * Version/date are placeholders until then.
+ *
+ * ⚠ Keep ADDING to this entry's sections as Era 8.0 phases land, rather than
+ *   starting a new draft per phase. Phases 3–6 (the grade admin rebuild, the
+ *   student grade screen, the tour) belong here too.
+ *
+ * Student-facing only, and short — the 4.0.0 lesson, which was cut from 19
+ * sections and 72 bullets to 6 and 19 before it shipped. Nothing here about the
+ * close-a-semester panel, the farewell editor, the restore-into-a-section flow or
+ * the `@layer` fix: that is instructor work and plumbing, and a student reading
+ * their "What's new" does not care which cascade layer a rule sits in.
+ *
+ * Four sections, eleven bullets.
+ */
+export const DRAFT_8_0_0: ChangelogEntry = {
+  version: '6.0.0',
+  date: '2026-11-08',
+  title: 'A clean slate',
+  sections: [
+    {
+      heading: 'A new semester starts properly',
+      major: true,
+      items: [
+        'When a semester ends, the leaderboard goes quiet instead of showing everyone sitting on zero — and it wakes up the moment the first points of the new one are awarded.',
+        'If your semester is over, signing in now shows you a note from your instructor and how you finished — your rank, your points, your badges, your attendance — instead of an app full of buttons that no longer do anything.',
+        'Your record is kept either way. Take a class with the same instructor again and your badges and all-time points come back with you.',
+      ],
+    },
+    {
+      heading: 'Comments float up the side now',
+      items: [
+        'Classmates’ comments used to fly across the middle of the leaderboard, over the podium and everything else. They drift up one side instead, so you can read the board and the banter at the same time.',
+        'Longer comments get the room to be read, and there is a counter so you can see how much of your 120 characters is left before you run out.',
+      ],
+    },
+    {
+      heading: 'The board stops wobbling',
+      items: [
+        'The top three used to change width depending on how long the names were, so the podium reshaped itself every time the board settled. The three stands are fixed now, and roomier.',
+        'Picking a section is a proper full-width control rather than a squeezed box that cut every section name in half.',
+      ],
+    },
+    {
+      heading: 'Attendance and scanning',
+      items: [
+        'Your attendance summary has a Prelim / Midterm / Finals switch, so you can see how one term actually went instead of only the whole semester.',
+        'The camera is in the middle of the screen when you scan, not tucked down by the button you just tapped.',
+        'Tap Show on any PIN box to check what you typed — a wrong character is the usual reason a sign-in fails, and there was no way to see it.',
+        'The app says “attendance recorded” now rather than “checked in”. You are in a class, not a hotel.',
+      ],
+    },
+  ],
+}
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {

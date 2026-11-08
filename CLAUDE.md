@@ -203,7 +203,22 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   are fully exercised (they are pure), but every call in `api/grades.ts` 400s —
   so every grades fetch gets its OWN try/catch and `ErrorState` (the 0034
   SectionGrid precedent), and nothing else in the instructor area is affected.
-  **Next number: 0060.**
+  **Next number: 0061.**
+  ⚠ **EVERY "WRITTEN AND NOT YET APPLIED" CLAIM IN THE BLOCK ABOVE IS NOW
+  UNVERIFIED PROSE — ASK THE DATABASE INSTEAD.** It was written file by file
+  over months, nobody could check it without reading every migration and
+  guessing, and a stale warning is worse than none because the next reader
+  cannot tell which half is still true. **`supabase/queries/applied_state.sql`
+  is the answer**: BLOCK 1 reports, per migration, whether its tables,
+  functions and columns exist; BLOCK 1b collapses that to one line each; and
+  BLOCK 6 covers the files that add no new object (0056 only changes a function
+  body, so nothing else can see it). Run it and replace the prose above with
+  the result. Two things it will NOT tell you, and both have bitten: a
+  `PARTIAL` row can mean a **rename inside an already-pasted file** rather than
+  a missing paste (the 0047 lesson), and **BLOCK 2 must be run before writing
+  any migration that widens `audit_log_action_check`** — copy the live
+  definition rather than the list in any comment, which is how that constraint
+  has already been silently narrowed twice.
   **0059 is WRITTEN AND NOT YET APPLIED** — structured student names. It adds
   `last_name` / `first_name` / `middle_name` / `suffix` columns to `students`,
   backfills `display_name` for old comma-format names (idempotent: `WHERE last_name
@@ -3368,6 +3383,333 @@ only framer-motion's INLINE transforms instead. And a 44px hit region on a 32 or
 cramming check needs a tolerance above that or every icon button is a false
 positive.
 
+
+Since 0060 (Closing a semester — Era 8.0 Phase 1). Decisions (user, 2026-11-08):
+**archive the whole semester in one action** · **archived students get a farewell
+message, then a recap and the live board, and nothing else** · **the message is per
+SEMESTER, edited on the Semesters screen, and plays on every sign-in** · **an empty
+board shows a graphic and "the board is still silent", never a list of zeroes**.
+
+**NOTHING IN THE APP COULD END A SEMESTER, AND THE GAP WAS INVISIBLE.** 0035 shipped
+promote / archive / activate, but the only bulk archive reachable from the UI is
+`SemesterRollover`'s step 3, which archives the UNTICKED students of the ONE section
+currently chosen in its `From` dropdown — so closing a semester meant repeating a
+confirm dialog once per section and hoping none was missed. `archive_semester_students`
+takes a semester, writes one audit row per student and refreshes the leaderboard
+snapshot **once** (archiving 208 students through the single-student RPC would rebuild
+it 208 times — the reason `archive_students` exists at all). Idempotent: a second run
+finds nobody un-archived, returns 0 and does not touch the snapshot.
+
+**AN ARCHIVED STUDENT USED TO GET THE WHOLE APP, WORKING.** `resolveRole` decides
+student-ness from the email domain alone, `RequireRole` passes, `getMyStudent` returns
+their row because `students_select` is `using (true)`, and `StudentData.load()`
+succeeds — so they saw a normal dashboard with a Scan button and every action failed
+with a raw Postgres exception string. The only visible difference was that they had
+vanished from the leaderboard. **`students.archived_at` is now SELECTED by
+`getMyStudent` and is the whole client-side gate**: one column on a row the app already
+fetches, so the decision is made before the first screen paints and no RPC is needed.
+`AppLayout` renders `ArchivedScreen` instead of `StudentShell` and **suppresses all four
+overlays** — a level-up burst, a badge unlock, "What's new" or an away-recap on top of a
+farewell is absurd, and three of the four exist to pull someone back into an app they
+can no longer use.
+
+⚠ **`archived_at` IS NOT `semesterEnded`, and they genuinely disagree.** That flag is
+derived from section membership, so a student can be archived while still sitting in an
+active-semester section, and can be in a past-semester section without being archived.
+Both stay; `archived_at` wins.
+
+**THE ARCHIVED SCREEN ADDS NO READ PATH, AND THAT IS THE POINT.** Every figure comes
+from a grant that already existed: `sections` and `semesters` are
+`select … to authenticated` (0003, 0027), which is how a student reads the name and
+message of a semester they are no longer in; `get_semester_leaderboard` is granted to
+`authenticated` and deliberately INCLUDES archived students (0035); points, badges and
+attendance are already on StudentData. So 0060 adds **one column and zero RPCs** on the
+student side. ⚠ **`me.semester_points` is NOT their final score** — it is relative to
+the ACTIVE semester and `set_active_semester` bulk-recomputes it for every student,
+archived ones included, so the recap reads points AND rank from
+`get_semester_leaderboard` for the semester they finished. The cached column would show
+every returning student a proud 0. Attendance is scoped by the semester's own stored
+term dates rather than through `term.ts`, because that calendar is configured for
+whichever semester is active and pointing it at a past one would leave it wrong for
+everything mounted afterwards.
+
+**`restore_student_into` is the half 0023 was missing.** `restore_student` only clears
+`archived_at`, which leaves the student in the section they had when they left — a
+section belonging to a FINISHED semester — and `scan_attendance`'s active-semester guard
+(0035) then refuses them with "That class belongs to a semester that has ended." So they
+looked restored and could not attend a class, and **nothing failed at restore time**; the
+failure surfaced later, to the student. The new RPC sets both columns in one transaction
+with one audit row carrying both sections. It does NOT require the target section to be
+in the active semester: the rollover wizard commits sections for a semester that is not
+active yet, which is the normal order of work.
+**`listArchivedStudents`' `sectionId` became OPTIONAL for the same reason** — after a
+close, every archived student is in a section of a finished semester, a section that is
+not in the instructor's current list at all, so the per-section drawer could not reach
+one of them. `ArchivedStudentsSheet` is now ONE component with two mounts: per-section
+off the roster (one-tap restore, because the destination is the screen you are on) and
+cross-semester from `SemesterClosePanel` ("Restore into…", with a section picker).
+⚠ The placement form **replaces the list in place** rather than opening a second
+overlay: Sheet is portalled and focus-trapped, so a Sheet inside a Sheet stacks two
+competing traps — which is exactly why `AppLayout` closes the mobile menu before opening
+the sign-out dialog.
+
+**Ownership move `request_point_redemption` 0029 → 0060**, body verbatim plus exactly one
+line: an archived guard. It was **the only student-callable write in the app with no
+archived check** — every other one already refuses — so an archived student holding
+leftover `semester_points` could still file spend requests, which landed in the
+instructor's inbox looking exactly like a live student's. Wording is word-for-word the
+one the five existing guards use.
+
+**`SemesterClosePanel` has its own semester picker, and that is not redundant.** The
+obvious shape is "close the semester this screen is about", i.e. the active one — but the
+instructor may activate the new semester FIRST and only then think to archive the old
+batch, and at that moment the semester they want is no longer
+`useInstructor().semester`, so an active-scoped panel could not reach it at all. It
+defaults to the active semester. Closing is behind the typed-name `ConfirmDialog`
+challenge, and the preview (`get_semester_close_preview`) states the real count with the
+names behind a disclosure: a count the instructor cannot check is a count they learn to
+tap past, and this one is 200 people wide. The farewell editor's **Preview mounts the
+real `ArchivedFarewell`**, not a mock-up, so there is one definition of what the student
+sees.
+
+**The silent board.** `leaderboard_snapshot` has no `semester_id`; it ranks EVERY
+non-archived student by `semester_points` (0038), and `set_active_semester` resets that
+column for everyone — so the first morning of a new semester the board is forty students
+tied at zero, alphabetical, wearing place numbers, which reads as a real ranking and is
+not one. `SilentBoard` replaces the podium whenever `top.every(e => e.points === 0)`, and
+`YourRankCard` is hidden with it ("#1" out of a field of zeroes is a number, not a
+standing). The rule is **client-side on purpose**: teaching the snapshot or an RPC about
+emptiness would be a second definition of "is this board live". `CommentsOverlay` still
+wraps it — the composer is the useful half, and day one of a semester is exactly when a
+class has something to say. `SpendBoard` uses it too, keeping its own actionable line in
+`detail`, so the two boards feel like one app on day one.
+
+⚠ **`SilentBoard`'S OUTLINE IS `--muted`, NOT `--line`, AND THAT WAS MEASURED.** The
+first version stroked everything with `--line`, the right token for a border between two
+surfaces and completely wrong for the only thing carrying a shape: on a white card in
+LIGHT mode `--line` (#e7e7ec) is **1.23:1** — the whole podium was invisible, and
+invisible in exactly one theme, so it looked fine to anyone working in dark mode.
+`--muted` is 4.83:1 there. Measured after the fix, each translucent stroke **blended over
+the card before computing** (reading an `rgb(… / α)` value straight into a contrast
+formula gives nonsense): stand outline **3.00 light / 4.43 dark**, seat ring 2.32 / 3.30,
+floor 2.14 / 2.98. Only the stands are held to 3:1 — the rest is secondary and everything
+the graphic means is also in the heading beside it. The FILLS stay `--card-2` (1.04:1 in
+light) deliberately: that is the app's documented theme split, where the surface step does
+the work in dark and the stroke does it in light. Its animation is a **CSS keyframe**
+(`cp-silent`, opacity only — a transform on an SVG child has a layout-relative origin and
+the stands would drift off their shared floor), so the global reduced-motion block covers
+it with no `useReducedMotion` guard.
+
+**`ArchivedFarewell` follows `AuthTransition`'s single-timer pattern**, for the reason
+that component records: three sub-animations finish at three moments and
+`reducedMotion="user"` changes which, so one `setTimeout` is the only clock that cannot
+disagree with itself. Duration is **reading time, clamped** (3.6–9s) rather than fixed —
+4s yanks a four-line send-off away mid-sentence and 9s on an empty message is a student
+staring at a logo. `onDone` lives in a ref so the timer effect depends on nothing that
+changes (an inline-arrow callback is a new identity every render — the Sheet focus-trap
+bug that cost 21 sheets their keystrokes). **`TAP_GUARD_MS` 700 is load-bearing**: this
+screen appears immediately after the student taps "Sign in", and without it the tap
+already in flight would dismiss the farewell before it drew a frame — the same lesson
+`LevelUpBurst` records. z-[90]: above Sheet (40) and the bursts (50), below
+`AuthTransitionOverlay` (100), which is still fading out over the top of it.
+
+⚠ **`material.test.ts`' PLATE GUARD WAS MISSING HALF ITS CALL SITES, and it was only
+found by injecting a violation and watching the test pass.** The matcher was
+`className=\{?(?:cn\()?…\}` — a BRACE expression. HomeHero and Leaderboard both wrap
+their plate in `cn(...)`, so it worked there and looked complete; a plain string
+`className="… to-plate … cp-lit"` has no braces and was invisible to it, which is exactly
+how `ArchivedScreen`'s plate card is written. It now matches both forms, and a test
+asserts the matcher itself finds each. **Same shape as the `border-t-brand-500` hole
+`tone.test.ts` records: a source-text guard that enumerates one syntax silently exempts
+the others.** Every new guard in that file was verified to fail on an injected violation
+(framer-motion in SilentBoard, a hardcoded hex, a transform in the keyframe, `cp-lit` on
+a plate in both syntaxes).
+
+**Verified: 0 errors, 110 warnings, 454 tests** (from 0/107/449 — the three new warnings
+are all `react-hooks/set-state-in-effect` firing on the house fetch-on-mount pattern that
+every screen in this app uses, left for the ESLint pass rather than deviating in three
+files). Built CSS 118.65 → 120KB. Measured by probe at 375×812 in BOTH themes (removed,
+residue-checked): zero page overflow, zero escaping elements, the farewell mounts at
+z-index 90 covering 375×812 with opacity rising to 1 and holding, a tap at 250ms is
+IGNORED while one past the guard closes it, and it completes on its own between 3s and
+7.2s for a 123-character message. **Not verified on a real archived account** — that
+needs the instructor to close a semester, which is the one thing this phase exists to
+make safe.
+
+
+Era 8.0 Phase 2 — the minor revision batch (2026-11-08, NO migration). Eight items
+the instructor listed, every one of which turned out to have a measured defect
+behind it rather than a preference.
+
+**⚠ THE PASSWORD REVEAL CONTROL HAS BEEN LAID OUT WRONG SINCE IT SHIPPED, AND THE
+CAUSE IS A CSS CASCADE RULE WORTH KNOWING.** `.cp-tap-44` / `.cp-tap-y` set
+`position: relative` so their 44px `::before` has something to position against —
+and that rule was **UNLAYERED**. Per the cascade, unlayered styles beat every
+LAYERED style regardless of specificity or source order, and
+`@import 'tailwindcss'` puts `.absolute` in the `utilities` layer. So any element
+carrying both `cp-tap-*` and `absolute` was silently pinned to `relative` and fell
+back into the document flow. **Exactly one call site in the app does that** — the
+reveal button inside `Input` — so on all four auth screens it rendered BELOW the
+field, left-aligned, stretching the field's wrapper from 44px to **76px**.
+Measured at 375px: the button sat at **x=8** with `position: relative` where it
+belongs at x≈303. The rule now lives in `@layer components`, so a utility wins as
+it always should have; the `::before` rules stay unlayered because nothing
+competes for `::before` on these. Pinned by two tests in `material.test.ts`.
+⚠ It is also why the Era 7.0 auth verification missed it: the check was
+`button.right <= field.right`, which passes **vacuously** for a button sitting at
+the LEFT of the field. My own first check this phase was the same shape and passed
+the same way. A geometry assertion has to pin the side it cares about.
+
+**The reveal control is now a labelled Show / Hide, not an eye** (the instructor's
+call). The eye is the convention and the one piece of chrome here where the
+convention is not self-explanatory — which of two eye glyphs means "currently
+hidden" versus "tap to hide" genuinely has to be learned. A word does not. It also
+carried the geometry fix: a text button needs `pr-17` instead of `pr-11`, which
+moves the control clear of the typed text. Measured after: text ends at x=291, the
+button starts at x=303 — **12px of clearance where there was a 6px overlap**, and
+a 44px-tall hit region (`.cp-tap-y`, height only; expanding sideways is the defect
+being fixed). "Show" and "Hide" are both four characters, so the control is 48px
+wide in both states and nothing shifts; `min-w-12` holds that floor for a future
+translation. `EyeIcon` / `EyeOffIcon` were deleted — nothing else used them.
+`revealable` was also added to the three Change-PIN fields in Settings, which had
+none.
+
+**⚠ `.cp-rise` REPLACED `.cp-fly`, AND THE `container-type` TRAP IS NOT WHAT I
+FIRST WROTE DOWN.** Comments now rise up a single narrow column instead of flying
+right-to-left across five lanes: at five lanes the whole board sat behind moving
+text, and one column covers a single strip and lets a comment be three lines tall
+without threatening anything. The keyframe travels `-100cqh - 100%`, which
+requires **`container-type: size`** on the track. I documented the failure mode as
+"`cqh` resolves against nothing, so every pill sits still" — **that is wrong, and
+measuring it in the browser is what caught it.** `inline-size` establishes a query
+container on the INLINE axis only, so `cqh` skips the track and falls back to the
+small VIEWPORT: a 206px track moved a 38px pill **−244px correctly and −849px**
+under `inline-size`. The pill does not stop; it goes about four times too far in
+the duration `flightDurationMs` derived from the track's height, so every pill
+moves four times too fast and the no-overlap guarantee silently stops holding
+while the screen merely looks "a bit fast". Both comments now say that, and
+`material.test.ts` pins the container type and the keyframe.
+
+`danmaku.ts` is **reused, not rewritten** — not a line of its arithmetic changed,
+because the guarantee is about a distance and a size and never cared which axis
+they were measured on. Its parameters are now `travelPx` / `pillPx` rather than
+`deckWidth` / `pillWidth` to say so. ⚠ The caller must pass the size **on the axis
+of travel**: `offsetHeight`, not `offsetWidth`. Passing the width while the pill
+rises holds the column for the wrong duration and lets a tall comment be
+overtaken, and nothing else in the system would notice. `laneCount` was deleted
+(it derived a lane count from the viewport height, which means nothing for one
+column) and `danmaku.test.ts` grew a `the rising column` block running the same
+disjointness proof with real vertical numbers — one-line 40px and three-line 78px
+pills on a 632px track, plus a 195px landscape track where the guarantee must not
+depend on the track being long. Both halves verified to fail on an injected break.
+The assign interval is also **gated on something being parked** now; it used to
+run five times a second for the life of the screen.
+
+**The 120-character limit was already 120** — in `types.ts`, in the table CHECK and
+in the RPC. What was missing was any way to SEE it: the field simply stopped
+accepting characters. There is now a counter that appears once you start typing and
+turns `warn` over the last 20. No migration.
+
+**⚠ THE PODIUM'S WIDTH USED TO DEPEND ON THE NAMES IN IT** (the instructor's
+report: "the rank 1 2 3 design width is changing based on the name, it looks
+awkward and weird. It SHOULD not move."). The cards were `flex-1` items with
+`max-w-[12rem]` on the champion and `max-w-[10rem]` on the others. `flex: 1 1 0%`
+looks like three equal columns, but a flex item's `min-width` defaults to `auto`,
+so each card's min-content size became its floor — and the children that do NOT
+truncate contribute to it: the points figure, the "Lv 12" line, the pedestal, the
+signals row. So the row visibly reshaped between two refreshes of the same board.
+It is a **`grid grid-cols-3`** with `min-w-0` on every cell now, so each card is
+exactly one third whatever is in it; `min-w-0` is the half that matters, because a
+grid item ALSO defaults to `min-width: auto` and is the documented reason
+`truncate` silently did nothing in `Stat` and `ScaleRow`. The champion is raised by
+**height alone** — taller pedestal, larger avatar — which is all width was ever
+contributing. Measured at 320 / 360 / 375 / 390 / 414 / 768: all three cards equal,
+and **byte-identical between a 3-character-name fixture and a 53-character-name,
+four-digit-score fixture**, with zero overflow.
+**`podiumOrder` became `podiumSlots`, three fixed slots with holes.** The old
+`top3.length >= 3 ? [#2, #1, #3] : top3` fell back to natural order, so a board
+with two ranked students put **#1 on the LEFT** — i.e. the podium read backwards in
+exactly the first week of a semester, when that is most likely. #2 left, #1 centre,
+#3 right, always; an empty slot holds its third of the row open.
+
+**Both leaderboard pickers moved out of their header row.** They were
+`wrapperClassName="max-w-34 shrink-0"` + `className="h-9! text-sm!"` — a hard 136px
+box whose chevron eats 40px, leaving about enough for "Global", on a screen whose
+whole job is naming a section. Full width on their own row now, at the primitive's
+real height, on BOTH boards (they share a switcher, so one readable and one clipped
+is worse than either). The `!` suffixes only ever existed to beat the old
+plain-join `cn()`.
+
+**The attendance summary card is scoped by term.** A quiet `SegmentedControl` of
+Prelim / Midterm / Finals / Overall (Overall default), and **the whole card
+follows it** — counts and rate alike, because three lifetime counts above a
+per-term percentage is two scopes stacked in one box. `termRanges()` finally has a
+real caller; until now it was exercised only by its own test. The picker renders
+only when there is **more than one term with classes in it**: offering Midterm and
+Finals tabs in week two gives a student two ways to be told "nothing yet".
+⚠ A term with nothing counted shows a **dash, not 0%** — `rateOf` answers 0 there,
+which on a student's screen reads as "you attended none of them". `lib/attendance`
+now says so where `rateOf` is defined, and `term.test.ts` grew a block pinning the
+boundary days (prelim ends 07-26, midterm starts 07-27) and the **partition**
+property: filtering by term must never put one class in two terms, or the per-term
+rates stop reconciling with Overall. Both verified to fail on an injected
+off-by-one and an injected overlap.
+"Show-up rate" is **"attendance rate"** in every UI string. The function names
+(`rateOf` / `rateTone` / `showedUp`) were deliberately left alone — renaming them
+touches five call sites and the comment pinning this file to
+`get_section_attendance_stats` (0031) for no user-visible gain — so the prose in
+`lib/attendance.ts` still says "show-up" and now explains why.
+
+**`components/attendance/ScanStage.tsx` centres the camera.** The scanner was
+already `mx-auto`, so the complaint was the FRAMING: Attendance opened it in a
+bottom `Sheet`, which rises from the bottom edge, so the viewfinder sat low on the
+screen directly above the button just tapped. The sheet is `variant="screen"` now
+and the stage centres the camera in the viewport with the caption under it and the
+way out at the bottom. ⚠ `h-full` **and** `min-h-[60dvh]` together, both
+load-bearing: `h-full` resolves against the screen Sheet's definite height, and
+computes to auto — harmlessly ignored — inside EventScan's card, where the `min-h`
+takes over. One class set, no `fill` prop, no second layout. Both call sites use
+it; they had already duplicated the same `space-y-3` + caption stack with captions
+differing only in wording, so this is the fourth-copy rule applied at copy two.
+
+**"Checked in" is gone from the UI: 48 strings across 15 files**, student and
+instructor. Applied by a script that **fails loudly on any string it cannot find**
+— a sed sweep that silently matches nothing is how a vocabulary change ends up
+half-applied, which is worse than not doing it, because the app then says both
+things. It caught one genuine miss (the bulk-mark confirm's "Everyone who hasn't
+checked in yet", twice) and one apostrophe mismatch. **Deliberately NOT renamed:**
+the `Checked In` achievement title (students may already hold it), the
+`'Checked in'` column in `attendance-io.ts` / `export-all.ts` and the printed
+Attendance Record header (files already filed keep their shape), the notification
+titles inside applied migration 0024, every code comment, and **every shipped
+`CHANGELOG` entry** — rewriting an announcement that already went out is
+falsifying history. The one changelog line that DID change is in `DRAFT_EVENTS`,
+which has not shipped, so it will go out in the new vocabulary.
+
+**Sign out is red at rest in the student menu**, which REVERSES the decision
+recorded in `AccountMenu.tsx` ("rests muted … so a menu never looks alarming").
+Under five ink-coloured nav rows and an ink Settings row, muted read as DISABLED —
+the same failure the comment on `SettingsRow` already describes for muted text in
+that menu. The comment now carries the new reason rather than being deleted, so it
+is not reverted by the next reader. Settings' own Sign out matched it and **gained
+the ConfirmDialog it never had**: two paths to the same action, one of them a
+single tap, on a screen students open to toggle sounds.
+
+**Verified: 0 errors, 110 warnings (Phase 2 added NONE), 467 tests** (from
+0/110/454). Measured by probe at 375×812 and re-measured at 320/360/375/390/414/768
+(removed, residue-checked): podium widths content-independent at every width, zero
+page overflow, the reveal control absolute and 12px clear of the text with a stable
+48px width across both states and `tabIndex -1`, the toggle flipping
+password↔text with `aria-pressed` and an `aria-label` containing its visible word,
+and `.cp-rise` resolving `cqh` to exactly −(track + pill) with opacity fading in
+and out. ⚠ A CSS keyframe does **not advance** while the pane is not compositing
+(the documented artifact, now with a third symptom): sampling the pill's position
+over time returned six identical values. Read a keyframe's resolved state instead
+by pausing the animation at a negative `animation-delay` — `getComputedStyle`
+forces a synchronous recalc and needs no frame. **Not verified on a real
+authenticated screen**; the leaderboard, attendance and scanner screens all need a
+login.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained
@@ -3624,33 +3966,54 @@ Gotchas:
 - `leaderboard_comments` denormalizes `display_name`/`avatar_url` at post time so
   a realtime INSERT payload can render a pill with no extra fetch. Rows live 24h,
   so staleness is a non-issue. `student_id is null` ⇒ posted by the instructor.
-- The danmaku keyframe (`.cp-fly`) needs `container-type: inline-size` on the
-  deck — `cqw` resolves against it. Without it pills start mid-board instead of
-  off the right edge. Keep it as `cqw`, never `vw`: `cqw` measures the DECK, and
-  that is what kept the animation correct when the deck changed shape.
-  **The deck is now a FULL-SCREEN overlay** (it used to be a sticky band above
-  the podium — reversed on the user's instruction, 2026-08-31). `pointer-events-none`
-  on it is LOAD-BEARING: without it the layer swallows every tap on the board,
+- The floating-comment keyframe (`.cp-rise`) needs **`container-type: size`** on
+  the track — `cqh` resolves against it. ⚠ **`inline-size` is NOT enough, and the
+  failure is not the one you would guess.** It establishes a query container on
+  the INLINE axis only, so `cqh` skips the track and falls back to the small
+  VIEWPORT: measured, a 206px track moves a 38px pill −244px correctly and
+  **−849px** under `inline-size`. The pill does not sit still — it travels about
+  four times too far in the duration `flightDurationMs` computed from the track's
+  height, so every pill moves four times too fast and the no-overlap guarantee in
+  `danmaku.ts` silently stops holding. On screen it reads as "a bit fast".
+  Keep it as `cqh`, never `vh`: `cqh` measures the TRACK, which is what keeps the
+  animation correct when the track changes shape.
+  **The deck is a FULL-SCREEN overlay** containing a narrow TRACK, centred to the
+  app's own `max-w-2xl` reading column so comments rise beside the board on a wide
+  screen rather than against the far edge of the window. `pointer-events-none` on
+  the deck is LOAD-BEARING: without it the layer swallows every tap on the board,
   the section picker and the tab bar. Verified with `elementFromPoint` — over a
-  plain pill the tap reaches the control beneath; over a tappable pill it hits
-  the pill. Lanes stop short of the header and the tab bar (`TOP_INSET` /
-  `BOTTOM_INSET`) so comments never cover the app's own chrome. Tapping a student
-  pill fires `onOpenProfile` up to the leaderboard (which owns the profile
-  sheet); instructor moderation lives only in the Recent comments list.
-- **`src/lib/danmaku.ts` owns the flying-comment timing, and it is TESTED.** The
+  plain pill the tap reaches the control beneath; over a tappable pill it hits the
+  pill. ⚠ Re-verify that with **`elementsFromPoint`** (plural, index 0): the
+  singular API returns a stale node while the pane is not compositing. The track
+  is inset from the header and the tab bar (`TOP_INSET` / `BOTTOM_INSET`) so
+  comments never cover the app's own chrome — and as the TRACK's geometry rather
+  than a per-lane Y position, which is the stronger guarantee: a pill travelling
+  vertically crosses every Y it passes, so "stay off the chrome" cannot be a
+  starting position. Tapping a student pill fires `onOpenProfile` up to the
+  leaderboard (which owns the profile sheet); instructor moderation lives only in
+  the Recent comments list.
+- **`src/lib/danmaku.ts` owns the floating-comment timing, and it is TESTED.** The
   old code was capped at `LANES = 1` — one comment on screen at a time, roughly
   seven a minute, with only the newest six of twenty ever flying — and it
   reserved a lane from an ESTIMATED width (`96 + chars * 6.6`). That estimate WAS
   the anti-overlap guarantee, and it could not account for wrapping, the width
   cap, emoji or a long name, so it was wrong in both directions at once. A pill
-  now mounts parked off the right edge, is MEASURED at its real size, and only
-  then gets a lane. `danmaku.test.ts` simulates two pills sharing a lane at the
-  earliest instant the rules allow and asserts their boxes stay disjoint.
+  now mounts parked outside the track, is MEASURED at its real size, and only
+  then gets a duration. `danmaku.test.ts` simulates two pills sharing a lane at
+  the earliest instant the rules allow and asserts their boxes stay disjoint.
+  **The module is AXIS-AGNOSTIC** since the column rewrite (2026-11-08): its
+  parameters are `travelPx` / `pillPx`, not `deckWidth` / `pillWidth`, because the
+  guarantee is about a distance and a size and never cared which axis they were
+  measured on. ⚠ The caller must pass the size **on the axis of travel** —
+  `offsetHeight` for the rising column. Passing the width while the pill rises
+  holds the column for the wrong duration and lets a tall comment be overtaken,
+  which nothing else would catch. `laneCount` was DELETED with that rewrite: it
+  derived a lane count from the viewport height, which only means something when
+  lanes are stacked vertically, and one column needs no such answer.
   **Pills wrap to three lines rather than truncating** — the clamp sits on the
   WRAPPER, not the body: `line-clamp` makes its element a `-webkit-box`, so on
-  the body alone the sender's name breaks onto its own line. Measured at 375px:
-  a 3-line pill is 78px in a 90px lane, and both a 400-word comment and a
-  204-character unbroken string stay inside it (`[overflow-wrap:anywhere]`).
+  the body alone the sender's name breaks onto its own line. In a column a taller
+  pill costs nothing, where in the old horizontal lanes it risked the lane below.
 - `get_profile_visitors` (0022) returns the viewer's `student_id` + section/points/
   rank so a tapped visitor row opens their profile. VisitorsSheet bubbles the row
   up via `onOpenViewer` (Profile owns the preview) to avoid a component→feature
