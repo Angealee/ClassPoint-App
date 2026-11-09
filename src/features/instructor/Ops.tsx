@@ -82,6 +82,11 @@ export function Ops() {
 
 function BackupHealthCard() {
   const [rows, setRows] = useState<BackupHealth[]>([])
+  // When these rows were fetched. "Is the backup stale" is a question about the
+  // moment the answer was read, so it is recorded WITH the answer rather than
+  // taken from the clock while rendering (which is impure, and drifts on every
+  // re-render that has nothing to do with the data).
+  const [loadedAt, setLoadedAt] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -90,6 +95,7 @@ function BackupHealthCard() {
     setError(null)
     try {
       setRows(await getBackupHealth())
+      setLoadedAt(Date.now())
     } catch (e) {
       setError(errorText(e, "Couldn't read backup health."))
     } finally {
@@ -103,8 +109,10 @@ function BackupHealthCard() {
 
   // The nightly job runs at 02:00 Manila. Anything that hasn't captured since
   // yesterday means the cron didn't run — which is the failure this card is for.
-  const today = new Date().toISOString().slice(0, 10)
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+  // `loadedAt` is 0 until the first answer; the rows are empty then too, so the
+  // 1970 dates below are never compared against anything.
+  const today = new Date(loadedAt).toISOString().slice(0, 10)
+  const yesterday = new Date(loadedAt - 86_400_000).toISOString().slice(0, 10)
   const stale = rows.filter((r) => !r.lastSnapshot || r.lastSnapshot < yesterday)
   const healthy = rows.length > 0 && stale.length === 0
 
@@ -220,6 +228,10 @@ function LeaderboardCard() {
 
 function AuthEventsCard() {
   const [rows, setRows] = useState<AuthEvent[]>([])
+  // The fifteen-minute window is measured from when the rows were READ, and
+  // stored with them: taken from the clock at render time it would slide on
+  // every unrelated re-render and could count differently for identical data.
+  const [loadedAt, setLoadedAt] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -228,6 +240,7 @@ function AuthEventsCard() {
     setError(null)
     try {
       setRows(await listAuthEvents(25))
+      setLoadedAt(Date.now())
     } catch (e) {
       setError(errorText(e, "Couldn't read auth events."))
     } finally {
@@ -242,7 +255,7 @@ function AuthEventsCard() {
   // The edge functions lock an IP at 30 failures in 15 minutes (0026). Counting
   // the same window here answers "is this student actually locked out?" — the
   // question this card exists for.
-  const cutoff = Date.now() - 15 * 60_000
+  const cutoff = loadedAt - 15 * 60_000
   const recentFails = new Map<string, number>()
   for (const r of rows) {
     if (r.success || !r.ip || r.detail === 'rate_limited') continue
@@ -492,10 +505,15 @@ function StudentGradesCard() {
   async function apply(next: boolean) {
     setBusy(true)
     try {
-      setOn(await setStudentGradesEnabled(next))
+      const result = await setStudentGradesEnabled(next)
+      setOn(result.enabled)
       setConfirming(false)
       toast(
-        next ? 'Students can now see their grades.' : 'Student grades are hidden again.',
+        next
+          ? result.notified > 0
+            ? `Students can now see their grades — ${result.notified} notified.`
+            : 'Students can now see their grades.'
+          : 'Student grades are hidden again.',
         'success',
       )
     } catch (e) {
@@ -541,7 +559,7 @@ function StudentGradesCard() {
         variant="default"
         title="Open grades to students?"
         message="Every student will see their own marks and a “so far” figure for each subject, and can ask to spend points on any column you have flagged."
-        detail="Check the marks first. A student who has seen a mark has seen it."
+        detail="Check the marks first. Every student in a class that has marks is sent a notification, and a student who has seen a mark has seen it."
         confirmLabel="Open grades"
         busy={busy}
         onConfirm={() => apply(true)}

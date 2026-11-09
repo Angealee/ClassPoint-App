@@ -77,7 +77,7 @@ export function AttendanceSession({
   const { toast } = useToast()
   const [payload, setPayload] = useState('')
   const [rotateIn, setRotateIn] = useState(QR_STEP_SECONDS)
-  const [nowMs, setNowMs] = useState(Date.now())
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const [roster, setRoster] = useState<AttendanceRosterRow[]>([])
   // Students the instructor checked in by hand this session (for the "manual" tag).
   const [manualIds, setManualIds] = useState<Set<string>>(new Set())

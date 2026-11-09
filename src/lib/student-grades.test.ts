@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { boostableCount, latestSoFar, summarizeTerm, termsWithItems } from './student-grades'
+import {
+  boostableCount,
+  explainTerm,
+  latestSoFar,
+  summarizeTerm,
+  termsWithItems,
+} from './student-grades'
 import { defaultPolicy, sumsFromScores, termGrade } from './grading'
 import type { GradePolicy, MyGradeItem, MyGradeSubject, TermKey } from './types'
 
@@ -133,6 +139,58 @@ describe('termsWithItems / latestSoFar', () => {
 
   it('is null when nothing is marked anywhere', () => {
     expect(latestSoFar(subject([it_({ id: 'a', score: null })]))).toBeNull()
+  })
+})
+
+describe('explainTerm', () => {
+  it('turns "50% of 60%" into the shares a student can reason with', () => {
+    // 0.6 × 0.5 = 30, 0.6 × 0.25 = 15, 0.6 × 0.25 = 15, exam 40 — worked by hand.
+    const e = explainTerm(subject([]), 'prelim')
+    expect(e?.parts.map((p) => [p.component, p.sharePct])).toEqual([
+      ['performance_task', 30],
+      ['quiz', 15],
+      ['recitation', 15],
+      ['exam', 40],
+    ])
+    // The shares of a term add to the whole of it.
+    expect(e?.parts.reduce((n, p) => n + p.sharePct, 0)).toBe(100)
+  })
+
+  it('states the scale a part is scored on', () => {
+    expect(explainTerm(subject([]), 'prelim')).toMatchObject({ floor: 60, ceiling: 100 })
+  })
+
+  it('follows a changed policy, with no floating-point residue', () => {
+    // CS 70 / Exam 30, and 40/30/30 inside CS → 28, 21, 21, 30.
+    const custom: GradePolicy = {
+      ...defaultPolicy('s1', 'prelim'),
+      csWeight: 0.7,
+      examWeight: 0.3,
+      ptWeight: 0.4,
+      quizWeight: 0.3,
+      recitWeight: 0.3,
+    }
+    const e = explainTerm(subject([], [custom]), 'prelim')
+    expect(e?.parts.map((p) => p.sharePct)).toEqual([28, 21, 21, 30])
+  })
+
+  it('leaves out a part that carries no weight', () => {
+    const noRecit: GradePolicy = {
+      ...defaultPolicy('s1', 'prelim'),
+      ptWeight: 0.5,
+      quizWeight: 0.5,
+      recitWeight: 0,
+    }
+    const e = explainTerm(subject([], [noRecit]), 'prelim')
+    expect(e?.parts.map((p) => p.component)).toEqual(['performance_task', 'quiz', 'exam'])
+  })
+
+  it('explains nothing when the weights are broken or missing', () => {
+    // The same rule that withholds the term figure: do not explain a number that
+    // is not being shown.
+    const bad: GradePolicy = { ...defaultPolicy('s1', 'prelim'), ptWeight: 0.9 }
+    expect(explainTerm(subject([], [bad]), 'prelim')).toBeNull()
+    expect(explainTerm(subject([], []), 'prelim')).toBeNull()
   })
 })
 

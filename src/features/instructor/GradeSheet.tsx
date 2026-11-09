@@ -757,6 +757,8 @@ export function GradeSheet() {
           students={students}
           items={liveItems}
           scores={grid.scores}
+          policy={effectivePolicy}
+          view={view}
           failed={failed}
           onCommit={onCommit}
         />

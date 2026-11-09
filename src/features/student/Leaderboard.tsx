@@ -416,7 +416,7 @@ function useRankDelta(
       return
     }
     const key = `cp_rank_track_${studentId}_${view}`
-    let stored: { capturedAt: string; rank: number; prevRank: number | null } | null = null
+    let stored: { capturedAt: string; rank: number; prevRank: number | null } | null
     try {
       stored = JSON.parse(localStorage.getItem(key) ?? 'null')
     } catch {

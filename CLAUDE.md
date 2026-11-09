@@ -74,9 +74,10 @@ and the leaderboard **reset each semester**; achievements and the all-time total
   WARNINGS for now, dominated by react-hooks v7's `set-state-in-effect` and `purity`
   performance opinions (the purity hits are all `Math.random()` in decorative
   confetti). It already earned its place by catching a real ordering smell in
-  `Students.tsx`. **The count is 109 and `lint:eslint` is CAPPED at it
-  (`--max-warnings 109`)** so `verify` fails if it grows — see the Era 8.0 Phase 6 note
-  under 0062. (Earlier figures in this file — 47, 105, 107 — were true when written.)
+  `Students.tsx`. **The count is 95 and `lint:eslint` is CAPPED at it
+  (`--max-warnings 95`)** so `verify` fails if it grows — see the Era 8.0 Phase 6 and
+  follow-up notes under 0062. (Earlier figures in this file — 47, 105, 107, 109 — were true
+  when written.)
 - **Env validation:** missing `VITE_SUPABASE_*` now THROWS in production
   (`lib/supabase.ts`) instead of falling through to placeholder credentials — a typo'd
   Vercel env used to boot fine and fail every request with an opaque network error.
@@ -4209,6 +4210,74 @@ sequential DELETEs inside one flush; it is now one delete per column per chunk o
   "covered text" hit with rects and a screenshot before changing layout for it.**
   Also confirmed: `PodiumBoard`'s `layout` animation is still gated on reduced motion at
   both call sites (`layout={!reduced}`).
+
+**Grades follow-ups (2026-11-09, after Phase 4 was committed).** Decisions (user): **push
+students when grades open** · **reverse ANY boost, not just recent ones** · **"How is this
+worked out?" on the term card** · **term figure on the mobile entry screen** · **pay down the
+safe lint warnings** · **a real-device checklist** · the tour stays NEW STUDENTS ONLY. NOT
+built, and a known gap: **past-semester grades** — `get_my_grades` reads the student's
+CURRENT section, so the moment rollover promotes them, last semester's marks disappear from
+their screen (and an archived student has no grades at all).
+- **Opening grades notifies, once.** `set_student_grades_enabled` (0062 §1) now returns
+  `jsonb { enabled, notified }` and on the OFF → ON transition queues one `grades_open`
+  notification for every active student in an active-semester section that has at least one
+  LIVE column (a push to a screen that says "nothing set up yet" is noise). The transition
+  test is load-bearing — the flag is read BEFORE the write, so a retry or double tap while it
+  is already on pushes nobody a second time. Same shape as `send_broadcast`: one bulk
+  INSERT, audit row BEFORE dispatch, dispatch chunked at 50. The Ops confirm says students
+  will be notified, and the toast reports the real count. `grades_open` is in
+  `NotificationType` and `TYPE_META` (table icon, `info`). That "never twice" guard is NOT
+  reachable from the UI (the switch only offers the opposite state) — it is checked by 0062's
+  verify item 3, not by a click.
+- **`Boosts applied (N)` in Requests → Points** lists EVERY approved boost with Reverse.
+  Reverse used to hang only off "Recent decisions", which is the newest 30 of the newest
+  100, so a boost approved a month ago could not be undone from the app. It has its own
+  fetch and its own try/catch (`listRedemptions({ gradeLinked: true, limit: 500 })` plus the
+  receipts), which deliberately has NO fallback to the pre-0062 column list — a filter on a
+  column that does not exist cannot be answered by selecting fewer columns, and an empty
+  list would read as "no boosts" instead of "not applied yet". It is collapsed by default,
+  shows 8 rows, grows a name/column filter past 8, and takes `17 → 20 (+3)` from the
+  RECEIPT (the request only knows the bonus the student agreed to; the receipt knows what
+  was written after the cap). A boost whose receipt could not be read still lists, without
+  the arrow, and Reverse works off item + student, not the receipt.
+- **"How is this worked out?"** (`explainTerm` in `student-grades.ts`, 5 tests) states each
+  part's share of the TERM — 30 / 15 / 15 / 40 — rather than "50% of 60%", which a student
+  cannot reason with, and the scale ("no marks earns 60, full marks earns 100"). It only
+  restates the weights `termGrade` already reads, derives nothing new, rounds from thousandths
+  (0.6 × 0.25 reads 15, not 15.000000000000002), omits zero-weight parts, and returns null
+  when the policy is unusable — **the same rule that withholds the term figure: do not
+  explain a number that is not being shown.**
+- **The phone entry screen shows each student's term figure under their name**
+  (`GradeItemEntry` now takes `policy` and `view`). No arithmetic of its own: it calls
+  `sumsFromScores` + `termGrade`, the very functions the grid's rows call. A mark typed this
+  session lives in `values` (keyed like `cellKey`), everything else in `scores`, and a
+  cleared mark drops out of the denominator as on the grid. Hand-checked: quiz 18/20 and exam
+  44/50 reads 79.48 (quiz 96, others 60 → CS 69; exam 95.2; 69×.6 + 95.2×.4); quiz 9/20 alone
+  reads 62.70; nothing marked reads "—".
+- **ESLint 109 → 95, and the cap follows (`--max-warnings 95`).** Fourteen mechanical fixes:
+  `ConfettiBurst` draws its pieces through a module-level `makePieces` in a lazy `useState`
+  (6 — randomness in render; `count` is never changed on a live burst); `useState(() =>
+  Date.now())` in `AttendanceSession` and `EventConsole` (2 — the argument was evaluated on
+  EVERY render though only the first value was used); Ops' backup and auth cards record
+  `loadedAt` WITH the rows instead of reading the clock while rendering (2 — "is the backup
+  stale" and "the last 15 minutes" are about the moment the data was read, and a render-time
+  clock slid on every unrelated re-render); two `let x = …` that both branches overwrote (2);
+  one unused `eslint-disable` (1); and one narrow, reasoned disable on a `Date.now()` inside a
+  click handler (1). **Deliberately LEFT:** 82 `set-state-in-effect` (the fetch-on-mount
+  pattern every screen uses — "fixing" one changes when its effect runs), 8 `refs`
+  (`Sheet`'s focus trap, `PullToRefresh`, the notifications swipe — core components that cannot
+  be exercised without a login) and 3 memoization hints in `ChatRoom` / `StudentData`.
+  Verified: passes at 95, exits 1 at 94.
+- **`REAL_DEVICE_PASS.md`** at the repo root is the ordered list of everything no code session
+  could verify: the migration paste order with BLOCK 2 first, the 0061 activation, closing a
+  semester and the archived student, the tour across three opens, the full boost cycle (ask →
+  approve → reverse → retype → clear → decline), scanning, the leaderboard, the lazy sound on
+  iOS, and the authenticated phone-width sweep. Work it top to bottom; a failing step number is
+  the report.
+- Verified by probe (removed, residue-checked) at 320px: the explainer open (30/15/15/40, a
+  65.10 that hand-checks), the entry screen (figures above, zero overflow) and the Boosts
+  list (collapsed → 8 rows + filter → "Show all 11" → 11 rows). **Not verified:** the notification
+  actually arriving, and every write path against a database.
 
 **SQL syntax is now checkable without a database.** `libpg-query` (npm, installed into a
 scratch directory, NOT the project) parses a migration's top-level statements AND each

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 
 /** Gold + brand confetti, with a few white motes for sparkle. */
@@ -9,24 +9,30 @@ const COLORS = ['#ffba1f', '#ffcd4a', '#f29e0a', '#e11d2a', '#ffffff']
  * parent. Pieces fan out and fall, then fade. No-ops under reduced-motion.
  * The parent controls lifetime (mount it, then unmount after ~2s).
  */
+/**
+ * Scatter the pieces. Lives OUTSIDE the component on purpose: randomness is
+ * impure, and calling it while rendering is exactly what the react-hooks purity
+ * rule exists to flag. Drawn once per mount through a lazy state initialiser —
+ * which is what the old memo effectively did, since the parent mounts a fresh
+ * burst each time and `count` is never changed on a live one.
+ */
+function makePieces(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i,
+    x: (Math.random() - 0.5) * 340, // horizontal fan-out (px)
+    y: 130 + Math.random() * 180, // fall distance (px)
+    rot: (Math.random() - 0.5) * 540,
+    delay: Math.random() * 0.25,
+    dur: 0.9 + Math.random() * 0.8,
+    color: COLORS[i % COLORS.length],
+    size: 6 + Math.random() * 5,
+    round: i % 3 === 0,
+  }))
+}
+
 export function ConfettiBurst({ count = 28 }: { count?: number }) {
   const reduced = useReducedMotion() ?? false
-
-  const pieces = useMemo(
-    () =>
-      Array.from({ length: count }, (_, i) => ({
-        id: i,
-        x: (Math.random() - 0.5) * 340, // horizontal fan-out (px)
-        y: 130 + Math.random() * 180, // fall distance (px)
-        rot: (Math.random() - 0.5) * 540,
-        delay: Math.random() * 0.25,
-        dur: 0.9 + Math.random() * 0.8,
-        color: COLORS[i % COLORS.length],
-        size: 6 + Math.random() * 5,
-        round: i % 3 === 0,
-      })),
-    [count],
-  )
+  const [pieces] = useState(() => makePieces(count))
 
   if (reduced) return null
 

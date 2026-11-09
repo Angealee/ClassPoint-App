@@ -98,17 +98,42 @@ grant execute on function public.cp_student_grades_flag() to authenticated;
 
 -- Audited, like set_space_flag: "when did students get to see grades" is a
 -- question you will be asked, and the flag row only remembers the latest answer.
+--
+-- OPENING NOTIFIES, ONCE. Flipping the switch used to tell no one, so students
+-- found out by chance. On the OFF → ON transition this queues one notification
+-- for every active student in an active-semester section that has at least one
+-- live grade column — a section with no columns has nothing to show, and a push
+-- to a screen that says "nothing set up yet" is noise. The transition test is
+-- load-bearing: turning it on when it is already on (a double tap, a retried
+-- request) must not push the whole class a second time.
+--
+-- Same shape as send_broadcast (0034): one bulk INSERT rather than N
+-- cp_queue_notification calls, the audit row written BEFORE dispatch so the
+-- record survives a push failure, and dispatch chunked at 50 because
+-- cp_push_dispatch puts every id in a single HTTP body.
+--
+-- Returns jsonb { enabled, notified } so the screen can report what actually
+-- happened rather than what it predicted.
 drop function if exists public.set_student_grades_enabled(boolean);
 create function public.set_student_grades_enabled(p_enabled boolean)
-returns boolean
+returns jsonb
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_was   boolean;
+  v_ids   uuid[];
+  v_chunk uuid[];
+  v_total integer := 0;
+  i       integer;
 begin
   if not public.is_instructor() then
     raise exception 'Only the instructor can change that.';
   end if;
+
+  -- Read BEFORE the write: this is what makes "already on" detectable.
+  v_was := public.cp_student_grades_flag();
 
   insert into public.app_flags (key, enabled, updated_at, updated_by)
        values ('student_grades', p_enabled, now(), auth.uid())
@@ -117,12 +142,46 @@ begin
          updated_at = excluded.updated_at,
          updated_by = excluded.updated_by;
 
+  if p_enabled and not v_was then
+    with targets as (
+      select s.id
+        from public.students s
+        join public.sections sec on sec.id = s.section_id
+       where s.archived_at is null
+         and sec.semester_id = public.cp_active_semester_id()
+         and exists (
+           select 1 from public.grade_items gi
+            where gi.section_id = s.section_id and gi.archived_at is null
+         )
+    ), inserted as (
+      insert into public.notifications (student_id, type, title, body, url)
+      select t.id, 'grades_open', 'Your grades are open',
+             'See your marks and where you stand so far.', '/app/grades'
+        from targets t
+      returning id
+    )
+    select array_agg(id) into v_ids from inserted;
+
+    v_total := coalesce(array_length(v_ids, 1), 0);
+  end if;
+
+  -- Audit BEFORE dispatch, as send_broadcast does.
   insert into public.audit_log (actor, action, table_name, row_id, summary, row_data)
        values (auth.uid(), 'grade_visibility', 'app_flags', null,
-               case when p_enabled then 'Student grades OPENED' else 'Student grades HIDDEN' end,
-               jsonb_build_object('key', 'student_grades', 'enabled', p_enabled));
+               case when p_enabled
+                    then format('Student grades OPENED (%s notified)', v_total)
+                    else 'Student grades HIDDEN' end,
+               jsonb_build_object('key', 'student_grades', 'enabled', p_enabled,
+                                  'was', v_was, 'notified', v_total));
 
-  return p_enabled;
+  i := 1;
+  while i <= v_total loop
+    v_chunk := v_ids[i : i + 49];
+    perform public.cp_push_dispatch(v_chunk);
+    i := i + 50;
+  end loop;
+
+  return jsonb_build_object('enabled', p_enabled, 'notified', v_total);
 end;
 $$;
 
@@ -993,7 +1052,12 @@ revoke execute on function public.cp_nightly_backup() from public, anon, authent
 --
 --   3. Turn it on, then as a student:
 --        select public.set_student_grades_enabled(true);        -- instructor
+--        -- {"enabled": true, "notified": N}   N = active students whose section
+--        -- has at least one live grade column. Run it AGAIN: notified must be 0
+--        -- (it is already on, so nobody is pushed twice).
 --        select public.get_my_grades();   -- your OWN marks only, no one else's
+--        select title, url from public.notifications
+--         where type = 'grades_open' order by created_at desc limit 3;
 --
 --   4. Eligibility is both-or-neither:
 --        update public.grade_items set points_cost = 5 where id = '<item>';

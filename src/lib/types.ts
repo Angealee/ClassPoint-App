@@ -782,6 +782,8 @@ export type NotificationType =
   | 'peer_eval_open'
   /** Your peer feedback was released (0051). */
   | 'peer_eval_results'
+  /** The instructor opened student grades (0062). Deep-links to /app/grades. */
+  | 'grades_open'
   | 'test'
 
 /** One row of the student's notification history (the bell). */

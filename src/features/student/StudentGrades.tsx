@@ -10,7 +10,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
-import { TableIcon } from '@/components/ui/icons'
+import { ChevronDownIcon, TableIcon } from '@/components/ui/icons'
 import { listMyRedemptions, requestGradeBoost } from '@/lib/api'
 import { errorText } from '@/lib/errors'
 import { boostState, formatMarks, type BoostState } from '@/lib/grade-boost'
@@ -18,10 +18,12 @@ import { displayGrade } from '@/lib/grading'
 import {
   TERM_TITLE,
   boostableCount,
+  explainTerm,
   latestSoFar,
   summarizeTerm,
   termsWithItems,
 } from '@/lib/student-grades'
+import { cn } from '@/lib/cn'
 import {
   MAX_PENDING_REDEMPTIONS,
   type MyGradeItem,
@@ -64,6 +66,7 @@ export function StudentGrades() {
   // the screen pointing at nothing.
   const [pickedSubject, setPickedSubject] = useState<string | null>(null)
   const [pickedTerm, setPickedTerm] = useState<TermKey | null>(null)
+  const [explainOpen, setExplainOpen] = useState(false)
 
   const subject = subjects.find((s) => s.subjectId === pickedSubject) ?? subjects[0] ?? null
   const terms = useMemo(() => (subject ? termsWithItems(subject) : []), [subject])
@@ -184,6 +187,7 @@ export function StudentGrades() {
   }
 
   const summary = summarizeTerm(subject, term)
+  const explanation = explainTerm(subject, term)
   const boostable = boostableCount(subjects)
 
   return (
@@ -252,6 +256,43 @@ export function StudentGrades() {
               : 'Based on what’s marked so far. Parts your instructor hasn’t marked yet count at the 60 minimum, so this moves as marks come in.'}
           </p>
         </Card>
+
+        {/* What the figure is made of. Shown as the shares of THIS term, not as
+            "50% of 60%", and only when the weights are usable — the same rule
+            that withholds the figure itself. */}
+        {explanation && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setExplainOpen((o) => !o)}
+              aria-expanded={explainOpen}
+              className="cp-tap-y flex w-full items-center gap-1.5 px-1 text-left text-xs font-semibold text-accent"
+            >
+              How is this worked out?
+              <ChevronDownIcon
+                className={cn('h-3.5 w-3.5 transition-transform', explainOpen && 'rotate-180')}
+              />
+            </button>
+            {explainOpen && (
+              <Card pad="tight" className="mt-1 space-y-2">
+                <p className="text-xs text-muted">What each part is worth in {TERM_TITLE[term]}:</p>
+                <div className="divide-y divide-line">
+                  {explanation.parts.map((p) => (
+                    <div key={p.component} className="flex items-center justify-between py-1.5 text-sm">
+                      <span>{p.label}</span>
+                      <span className="font-semibold tabular-nums">{p.sharePct}%</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted">
+                  Each part is scored out of 100: no marks earns {explanation.floor}, full marks
+                  earns {explanation.ceiling}. Only marked columns count toward a part, and a part
+                  with nothing marked yet counts as {explanation.floor}.
+                </p>
+              </Card>
+            )}
+          </div>
+        )}
 
         {boostable > 0 && !semesterEnded && (
           <p className="rounded-lg bg-gold-400/10 px-3 py-2 text-xs font-medium text-warn">

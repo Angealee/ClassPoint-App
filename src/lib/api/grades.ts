@@ -583,8 +583,21 @@ export async function getStudentGradesEnabled(): Promise<boolean> {
   return (await rpc<boolean>('cp_student_grades_flag')) === true
 }
 
-export async function setStudentGradesEnabled(enabled: boolean): Promise<boolean> {
-  return (await rpc<boolean>('set_student_grades_enabled', { p_enabled: enabled })) === true
+/**
+ * Turn the student Grades screen on or off.
+ *
+ * Opening it also notifies every student whose class has marks — once: the
+ * server only pushes on the OFF → ON transition, so a double tap or a retry
+ * reports `notified: 0` rather than telling the class twice. The count is what
+ * actually happened, not a prediction.
+ */
+export async function setStudentGradesEnabled(
+  enabled: boolean,
+): Promise<{ enabled: boolean; notified: number }> {
+  const data = await rpc<{ enabled: boolean; notified: number }>('set_student_grades_enabled', {
+    p_enabled: enabled,
+  })
+  return { enabled: data?.enabled === true, notified: num(data?.notified) ?? 0 }
 }
 
 /**

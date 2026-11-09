@@ -13,9 +13,15 @@ import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { TicketIcon } from '@/components/ui/icons'
-import { decideRedemption, listRedemptions, listTopSpenders, reverseGradeBoost } from '@/lib/api'
+import {
+  decideRedemption,
+  listGradeBoosts,
+  listRedemptions,
+  listTopSpenders,
+  reverseGradeBoost,
+} from '@/lib/api'
 import { boostGain, formatMarks } from '@/lib/grade-boost'
-import { COMPONENT_LABEL } from '@/lib/grading'
+import { cellKey, COMPONENT_LABEL } from '@/lib/grading'
 import { timeAgo } from '@/lib/time'
 import { supabase, uniqueChannel } from '@/lib/supabase'
 import { cn } from '@/lib/cn'
@@ -23,7 +29,13 @@ import { TONE } from '@/lib/tone'
 import { useInstructor } from './InstructorLayout'
 import { ExcusesInbox } from './ExcusesInbox'
 import { RewardsCatalog } from './RewardsCatalog'
-import type { RedemptionKind, RedemptionRequest, RedemptionStatus, SpenderStat } from '@/lib/types'
+import type {
+  GradeBoost,
+  RedemptionKind,
+  RedemptionRequest,
+  RedemptionStatus,
+  SpenderStat,
+} from '@/lib/types'
 
 type RequestsTab = 'points' | 'excuses' | 'rewards' | 'reports'
 
@@ -65,6 +77,11 @@ export function Redemptions() {
   const [tab, setTab] = useState<RequestsTab>('points')
   // An approved grade boost the instructor is about to undo (0062).
   const [reversing, setReversing] = useState<RedemptionRequest | null>(null)
+  // EVERY approved boost (not just the recent ones) and its receipt, so any of
+  // them can be reversed. Own state, own fetch, own try/catch: before 0062 there
+  // is no such column, and that must cost this list and nothing else.
+  const [boosts, setBoosts] = useState<RedemptionRequest[]>([])
+  const [receipts, setReceipts] = useState<Map<string, GradeBoost>>(() => new Map())
 
   const sectionName = useCallback(
     (id: string) => sections.find((s) => s.id === id)?.name ?? '',
@@ -81,6 +98,20 @@ export function Redemptions() {
       toast('Could not load requests.', 'error')
     } finally {
       setLoading(false)
+    }
+
+    // Separate from the inbox above, deliberately. The inbox shows the newest 100
+    // requests and "Recent decisions" the newest 30 of those, so a boost approved
+    // a month ago was out of reach of Reverse. This asks for every approved boost.
+    try {
+      const applied = await listRedemptions({ status: 'approved', gradeLinked: true, limit: 500 })
+      const itemIds = [...new Set(applied.map((r) => r.gradeItemId as string))]
+      const rows = await listGradeBoosts(itemIds)
+      setBoosts(applied)
+      setReceipts(new Map(rows.map((b) => [cellKey(b.itemId, b.studentId), b])))
+    } catch {
+      setBoosts([])
+      setReceipts(new Map())
     }
   }, [toast])
 
@@ -252,6 +283,13 @@ export function Redemptions() {
             )}
           </div>
 
+          {/* Every boost that is currently applied. Reversal used to be reachable
+              only from the newest 30 decisions, so an older boost could not be
+              undone from the app at all. */}
+          {boosts.length > 0 && (
+            <BoostsApplied boosts={boosts} receipts={receipts} onReverse={setReversing} />
+          )}
+
           {/* Top spenders */}
           {spenders.length > 0 && (
             <Card className="p-5">
@@ -412,6 +450,115 @@ export function Redemptions() {
       />
 
       <SuccessTick show={tick} onDone={() => setTick(false)} />
+    </div>
+  )
+}
+
+/** Rows shown before "Show all" — the list is for finding one, not for reading. */
+const BOOSTS_PREVIEW = 8
+
+/**
+ * Every grade boost that is currently applied, newest first, each with Reverse.
+ *
+ * Collapsed by default: most weeks you never need it, and a list that grows all
+ * semester should not push the inbox you came here for down the page. The
+ * name filter appears once there are enough rows to need one.
+ *
+ * The mark change comes from the RECEIPT (`17 → 20`), not from the request: the
+ * request only knows the bonus the student agreed to, and the receipt knows what
+ * was actually written after the cap. A boost whose receipt could not be read
+ * still lists, without the arrow — Reverse works off the item and the student,
+ * not the receipt.
+ */
+function BoostsApplied({
+  boosts,
+  receipts,
+  onReverse,
+}: {
+  boosts: RedemptionRequest[]
+  receipts: Map<string, GradeBoost>
+  onReverse: (r: RedemptionRequest) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const needle = query.trim().toLowerCase()
+  const matching = needle
+    ? boosts.filter(
+        (r) =>
+          r.studentName.toLowerCase().includes(needle) ||
+          (r.grade?.itemName ?? '').toLowerCase().includes(needle),
+      )
+    : boosts
+  const visible = showAll || needle ? matching : matching.slice(0, BOOSTS_PREVIEW)
+
+  return (
+    <div>
+      <SectionLabel
+        action={
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className="cp-tap-y shrink-0 text-xs font-semibold text-accent"
+          >
+            {open ? 'Hide' : 'Show'}
+          </button>
+        }
+      >
+        Boosts applied ({boosts.length})
+      </SectionLabel>
+
+      {open && (
+        <div className="space-y-2">
+          {boosts.length > BOOSTS_PREVIEW && (
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Find a student or column"
+              aria-label="Find a boost"
+            />
+          )}
+
+          {matching.length === 0 ? (
+            <EmptyState compact>No boost matches that.</EmptyState>
+          ) : (
+            <Rows>
+              {visible.map((r) => {
+                const receipt = r.gradeItemId
+                  ? receipts.get(cellKey(r.gradeItemId, r.studentId))
+                  : undefined
+                return (
+                  <div key={r.id} className="flex items-center gap-3 p-3.5">
+                    <Avatar name={r.studentName} url={r.avatarUrl} className="h-9 w-9" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{r.studentName}</p>
+                      <p className="truncate text-xs tabular-nums text-muted">
+                        {r.grade?.itemName ?? 'A column'}
+                        {receipt
+                          ? ` · ${formatMarks(receipt.scoreBefore)} → ${formatMarks(receipt.scoreAfter)} (+${formatMarks(receipt.marksGranted)})`
+                          : ''}
+                        {` · ${r.points} pts`}
+                        {r.decidedAt ? ` · ${timeAgo(r.decidedAt)}` : ''}
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => onReverse(r)}>
+                      Reverse
+                    </Button>
+                  </div>
+                )
+              })}
+            </Rows>
+          )}
+
+          {!needle && matching.length > BOOSTS_PREVIEW && (
+            <Button size="sm" variant="ghost" className="w-full" onClick={() => setShowAll((s) => !s)}>
+              {showAll ? 'Show fewer' : `Show all ${matching.length}`}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

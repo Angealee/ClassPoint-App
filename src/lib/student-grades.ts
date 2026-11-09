@@ -124,6 +124,53 @@ export function summarizeTerm(subject: MyGradeSubject, term: TermKey): TermSumma
   }
 }
 
+export interface TermExplanation {
+  /** What each part is worth of THIS term, as a percentage. Zero-weight parts are left out. */
+  parts: Array<{ component: GradeComponent; label: string; sharePct: number }>
+  /** What a part scores with no marks, and with full marks — out of 100. */
+  floor: number
+  ceiling: number
+}
+
+/**
+ * "How is this worked out?" — what each part is worth, in plain percentages.
+ *
+ * A part's share of the TERM is its weight inside Class Standing times Class
+ * Standing's weight, or the exam's own weight: with the usual 50/25/25 and 60/40
+ * that is 30 / 15 / 15 / 40, which is the number a student can actually reason
+ * with, where "50% of 60%" is not. It reads the same policy `termGrade` does and
+ * derives nothing new — it only restates the weights.
+ *
+ * Null when there is no usable policy, for the same reason the term figure is:
+ * explaining weights that do not add up would be explaining a number that is not
+ * being shown.
+ *
+ * Rounded to one decimal, from thousandths, so 0.6 × 0.25 reads 15 and not
+ * 15.000000000000002.
+ */
+export function explainTerm(subject: MyGradeSubject, term: TermKey): TermExplanation | null {
+  const policy = policyFor(subject, term)
+  if (policy === null || policyError(policy) !== null) return null
+
+  const share = (w: number) => Math.round(w * 1000) / 10
+  const weights: Record<GradeComponent, number> = {
+    performance_task: policy.csWeight * policy.ptWeight,
+    quiz: policy.csWeight * policy.quizWeight,
+    recitation: policy.csWeight * policy.recitWeight,
+    exam: policy.examWeight,
+  }
+
+  return {
+    parts: GRADE_COMPONENTS.filter((c) => weights[c] > 0).map((c) => ({
+      component: c,
+      label: COMPONENT_LABEL[c],
+      sharePct: share(weights[c]),
+    })),
+    floor: Math.round(policy.transmuteBase * 1000) / 10,
+    ceiling: Math.round((policy.transmuteBase + policy.transmuteSpan) * 1000) / 10,
+  }
+}
+
 /** Only the terms that have at least one column — an empty Finals is not a row. */
 export function termsWithItems(subject: MyGradeSubject): TermKey[] {
   return TERM_ORDER.filter((t) => subject.items.some((i) => i.term === t))

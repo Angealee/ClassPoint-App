@@ -1055,7 +1055,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const [achSeenBump, setAchSeenBump] = useState(0)
   const hasUnseenAchievements = useMemo(() => {
     if (!me) return false
-    let seen: string[] = []
+    let seen: string[]
     try {
       seen = JSON.parse(localStorage.getItem(seenAchKey(me.id)) ?? '[]')
     } catch {
@@ -1186,7 +1186,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       markAllRead,
       spaceAccess,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [loading, error, me, sections, leaderboard, capturedAt, events, awayEvents, clearAwayRecap, live, rank, sectionName, load, saveProfile, saveAvatar, clearAvatar, saveBanner, saveHeader, clearHeader, saveHeaderPos, removeBanner, levelUp, clearLevelUp, achievements, achievementsLoading, achievementsError, retryAchievements, attendanceTick, liveSession, liveStatus, liveEvent, liveEventChecked, noteEventCheckedIn, semesterEnded, attendance, attendanceLoading, grades, gradesLoading, gradesError, loadGrades, achievementProgress, unlockedAchievement, clearUnlockedAchievement, syncMyAchievements, hasUnseenAchievements, markAchievementsSeen, setDisplayTitleField, setPinnedAchievementsField, unreadCount, markAllRead, spaceAccess],
   )
 

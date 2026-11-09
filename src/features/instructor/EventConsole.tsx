@@ -219,7 +219,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
   const { toast } = useToast()
   const [payload, setPayload] = useState('')
   const [rotateIn, setRotateIn] = useState(QR_STEP_SECONDS)
-  const [nowMs, setNowMs] = useState(Date.now())
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const [stats, setStats] = useState<EventStats | null>(null)
   const [ending, setEnding] = useState(false)
   const [confirmEnd, setConfirmEnd] = useState(false)

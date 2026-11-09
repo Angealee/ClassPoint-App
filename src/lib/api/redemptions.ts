@@ -106,6 +106,15 @@ export async function listMyRedemptions(studentId: string): Promise<Redemption[]
 export async function listRedemptions(opts?: {
   status?: RedemptionStatus
   limit?: number
+  /**
+   * Only grade-boost requests (0062).
+   *
+   * Has NO fallback to the pre-0062 column list, unlike the plain call: a filter
+   * on a column that does not exist cannot be answered by selecting fewer
+   * columns, and an empty list would read as "no boosts" rather than "not
+   * applied yet". The caller catches and decides.
+   */
+  gradeLinked?: boolean
 }): Promise<RedemptionRequest[]> {
   const run = (cols: string) => {
     let query = supabase
@@ -114,11 +123,16 @@ export async function listRedemptions(opts?: {
       .order('requested_at', { ascending: false })
       .limit(opts?.limit ?? 100)
     if (opts?.status) query = query.eq('status', opts.status)
+    if (opts?.gradeLinked) query = query.not('grade_item_id', 'is', null)
     return query
   }
 
   let { data, error } = await run(REDEMPTION_COLS_WITH_GRADE)
-  if (error && (error.code === '42703' || /grade_(item_id|bonus)/.test(error.message ?? ''))) {
+  if (
+    error &&
+    !opts?.gradeLinked &&
+    (error.code === '42703' || /grade_(item_id|bonus)/.test(error.message ?? ''))
+  ) {
     ;({ data, error } = await run(REDEMPTION_COLS))
   }
   if (error) throw error
