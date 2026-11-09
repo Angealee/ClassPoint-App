@@ -4279,6 +4279,45 @@ their screen (and an archived student has no grades at all).
   list (collapsed → 8 rows + filter → "Show all 11" → 11 rows). **Not verified:** the notification
   actually arriving, and every write path against a database.
 
+**Use points is now the spending hub (2026-11-09).** From the user's screenshots of
+`/app/grades` and `/app/points`: nothing on Grades told a student their points could be used,
+and `/app/points` was a generic form that did not know about their columns. Decisions (user,
+all the recommended ones): **the hub on /app/points** · **actionable columns first** · **keep the
+free-form request and the catalog below as "Something else"** · **an always-visible banner plus
+row links on Grades**. Where the user's plan was right and where it was corrected:
+- **One confirm flow, not two.** The boost confirm used to live on Grades, so spending was split
+  across two screens and the warning and rules existed twice. It now lives ONLY in
+  `components/points/GradeColumns.tsx` (rendered by `UsePoints`); `StudentGrades` no longer
+  imports `requestGradeBoost`, the confirm dialog, or even the student's redemption list (one
+  fewer query per visit).
+- **Routing is a query param, not a new route:** `/app/points?column=<id>`. The column is
+  scrolled into view and ringed; a deep link to a column that is NOT actionable opens the
+  collapsed list and highlights it there, because a highlight on something nobody can see is
+  worse than none. The existing history-aware back arrow returns to Grades.
+- **Not every column is a row.** Most are not boostable, and a screen of mostly dead rows teaches
+  students to ignore it. `boostColumns` (in `student-grades.ts`, 6 tests) splits them: boostable
+  ones are cards grouped by subject and term in the grid's own order (`17 → 20 / 20`, the REAL
+  gain after the cap, the bonus note when it was capped); everything else is one collapsed
+  "Not available yet (N)" list that says WHY (`boostReason`: waiting, mark not in, already full,
+  not offered, or "+3 from 5 pts"). It asks `boostState`, never re-derives it, and a test pins
+  that it agrees with `boostableCount`.
+- **The banner on Grades is never a dead end.** It shows even when nothing is boostable and says
+  "no column offers a boost yet" — a link that appeared only when there was something to do
+  would leave a student with nothing to tap in exactly the situation in the user's screenshot.
+  Each boostable row carries `+3 · use points ›`, a LINK (44px tap region), not a button.
+- **Enabled and disabled are no longer twins:** "Use 5 points" is the filled primary button;
+  "Need 45 more points", "3 requests waiting" and "Closed" are outline and disabled.
+- **While grades are switched off** the hub cannot list columns, so that section says "Grades
+  aren't open yet" and the catalog and free-form request below keep working.
+- `student-grades.test.ts`'s "never the official figure" guard now also reads `UsePoints.tsx` and
+  `GradeColumns.tsx`.
+- Verified by probe (removed, residue-checked) with fixture data on the REAL screens: 1440 dark,
+  375 and 320 in dark and light — zero overflow and zero overlapping tap targets on both
+  screens; the three row links carry the right column ids; deep links to an actionable and to a
+  non-actionable column; the hidden, "none boostable" and normal states. **Not verified:** the
+  request itself from this screen (it is the same RPC call moved, but it has still never run
+  against the database) and anything on a real login.
+
 **Grades UI rework (2026-11-09, from the user's screenshot: "it is a mess").** Decisions
 (user): **one compact toolbar** · **keep the grid compact and CENTRE it (REVERSED below — it now fills)** · **in So far, show
 only the computed parts that have marks** · **all four extras** (flat cells, partial flag, column

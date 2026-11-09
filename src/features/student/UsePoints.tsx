@@ -1,7 +1,8 @@
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { GradeColumns } from '@/components/points/GradeColumns'
 import { motion } from 'framer-motion'
 import { settle } from '@/lib/motion'
 import { Card, Rows } from '@/components/ui/Card'
@@ -65,6 +66,9 @@ function errorText(e: unknown, fallback: string): string {
 /** Put your class points toward a grade — request, instructor decides. */
 export function UsePoints() {
   const navigate = useNavigate()
+  // ?column=<id> — the grade column the student came from on /app/grades.
+  const [params] = useSearchParams()
+  const highlightId = params.get('column')
   const { me, refresh } = useStudentData()
   const { toast } = useToast()
   const studentId = me?.id
@@ -190,7 +194,7 @@ export function UsePoints() {
     <div className="space-y-4 pb-4">
       <PageHeader
         title="Use points"
-        subtitle="Put your points toward a quiz or activity grade."
+        subtitle="Choose where your points go."
         fallback="/app"
         actions={
           // The permanent entry to the full ledger. It belongs on the points
@@ -273,11 +277,26 @@ export function UsePoints() {
         )}
       </Card>
 
+      {/* THE MAIN SCREEN: the student's own grade columns, and where their points
+          can go. Boostable ones first; the rest one collapsed list that says why.
+          Spending a boost is requested HERE and nowhere else — /app/grades only
+          links in. */}
+      <GradeColumns
+        available={available}
+        tooMany={tooMany}
+        highlightId={highlightId}
+        onRequested={() => void load()}
+      />
+
+      {/* Everything below is for what is NOT one of your grade columns: the
+          instructor's price list, and a free-form request. Unchanged on the server. */}
+      <SectionLabel>Something else</SectionLabel>
+
       {/* The shop (0032). Without a price list a student has no way to know what
           10 points is worth — this is the whole point of the catalog. */}
       {catalog.length > 0 && (
         <div>
-          <SectionLabel>What you can get</SectionLabel>
+          <p className="mb-2 px-1 text-xs text-muted">What you can get</p>
           <div className="grid grid-cols-2 gap-3">
             {catalog.map((item) => {
               const affordable = item.points <= available
@@ -329,7 +348,7 @@ export function UsePoints() {
           </span>
           <div>
             <p className="font-display font-bold">
-              {catalog.length > 0 ? 'Something else' : 'New request'}
+              {catalog.length > 0 ? 'Something not listed' : 'New request'}
             </p>
             <p className="text-xs text-muted">Up to {MAX_REDEEM_POINTS} points at a time.</p>
           </div>

@@ -193,3 +193,18 @@ routes, with fixture data):
 Tell me which steps failed, with the step number. If everything passed, the next thing worth
 doing is opening grades to the real class (**Ops → Student grades**) — after glancing at the
 marks once more, because a student who has seen a mark has seen it.
+
+## 11. Use points as the spending hub
+
+- [ ] Student, `/app/grades`: a **Use your points** banner is always under the term figure. It
+      says how many columns can be boosted, or "no column offers a boost yet".
+- [ ] A boostable row shows **+3 · use points ›**. Tapping it opens `/app/points` with **that
+      column ringed and in view**; the back arrow returns to Grades.
+- [ ] `/app/points` lists boostable columns as cards first (`17 → 20 / 20`), with **Not
+      available yet (N)** collapsed below and **Something else** (catalog and free-form request)
+      underneath.
+- [ ] Tap **Use 5 points** → the confirm states the real gain and the rank warning → send → the
+      card moves to "Waiting on your instructor" and the banner count drops. This is the first
+      time this request path runs from the new screen — do it with a scratch student.
+- [ ] With **Ops → Student grades** switched off, `/app/points` says "Grades aren't open yet" in
+      the columns section and the rest of the screen still works.

@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  boostColumns,
+  boostReason,
   boostableCount,
   explainTerm,
   latestSoFar,
@@ -194,6 +196,61 @@ describe('explainTerm', () => {
   })
 })
 
+describe('boostColumns / boostReason', () => {
+  const offered = { pointsCost: 5, pointsBonus: 4 }
+
+  it('puts boostable columns in one list and everything else in another', () => {
+    const s = subject([
+      it_({ id: 'ok', score: 5, ...offered }),
+      it_({ id: 'unmarked', score: null, ...offered }),
+      it_({ id: 'full', score: 10, ...offered }),
+      it_({ id: 'pending', score: 5, ...offered, pending: true }),
+      it_({ id: 'done', score: 9, ...offered, boost: { marks: 4, points: 5, before: 5 } }),
+      it_({ id: 'none', score: 5 }),
+    ])
+    const { actionable, other } = boostColumns([s])
+    expect(actionable.map((c) => c.item.id)).toEqual(['ok'])
+    expect(other.map((c) => c.item.id).sort()).toEqual(
+      ['done', 'full', 'none', 'pending', 'unmarked'].sort(),
+    )
+    // Nothing is lost between the two lists.
+    expect(actionable.length + other.length).toBe(6)
+  })
+
+  it('agrees with boostableCount — the two screens cannot disagree about a column', () => {
+    const s = subject([
+      it_({ id: 'a', score: 5, ...offered }),
+      it_({ id: 'b', score: 6, ...offered }),
+      it_({ id: 'c', score: null, ...offered }),
+    ])
+    expect(boostColumns([s]).actionable.length).toBe(boostableCount([s]))
+  })
+
+  it('keeps the grid’s order: term, then component, then position', () => {
+    const s = subject([
+      it_({ id: 'fin', term: 'finals', score: 1, ...offered }),
+      it_({ id: 'q2', term: 'prelim', component: 'quiz', position: 1, score: 1, ...offered }),
+      it_({ id: 'pt', term: 'prelim', component: 'performance_task', score: 1, ...offered }),
+      it_({ id: 'q1', term: 'prelim', component: 'quiz', position: 0, score: 1, ...offered }),
+    ])
+    expect(boostColumns([s]).actionable.map((c) => c.item.id)).toEqual(['pt', 'q1', 'q2', 'fin'])
+  })
+
+  it('carries the subject with each column, across subjects', () => {
+    const a = subject([it_({ id: 'x', score: 1, ...offered })])
+    const b = { ...subject([it_({ id: 'y', score: 1, ...offered })]), subjectId: 's2', code: 'EL 1' }
+    expect(boostColumns([a, b]).actionable.map((c) => c.subject.code)).toEqual(['IT 32', 'EL 1'])
+  })
+
+  it('says why a column is not actionable, in plain words', () => {
+    expect(boostReason({ kind: 'pending' })).toMatch(/waiting/i)
+    expect(boostReason({ kind: 'unmarked', cost: 5, bonus: 4 })).toMatch(/isn.t in/i)
+    expect(boostReason({ kind: 'full' })).toMatch(/full marks/i)
+    expect(boostReason({ kind: 'not-offered' })).toMatch(/not offered/i)
+    expect(boostReason({ kind: 'boosted', marks: 3, points: 5, before: 17 })).toBe('+3 from 5 pts')
+  })
+})
+
 describe('boostableCount', () => {
   it('counts only columns a request could be made on right now', () => {
     const s = subject([
@@ -240,6 +297,8 @@ describe('a student is never shown the official grade', () => {
     'src/lib/grade-boost.ts',
     'src/features/student/StudentGrades.tsx',
     'src/features/student/Dashboard.tsx',
+    'src/features/student/UsePoints.tsx',
+    'src/components/points/GradeColumns.tsx',
   ]
 
   it.each(STUDENT_FILES)('%s has no path to the official view', (file) => {
