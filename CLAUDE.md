@@ -4188,6 +4188,27 @@ sequential DELETEs inside one flush; it is now one delete per column per chunk o
   not a reflex.** Verified: passes at 109, exits 1 at 108. A new fetch-on-mount effect can
   stay clean by clearing its flag when the answer ARRIVES rather than calling a setter
   before the request (`StudentGradesCard` in Ops does this).
+- **Mobile sweep of the new screens (2026-11-09).** The student Grades screen, the Home
+  Grades card and the Columns edit row, with worst-case fixtures (a 59-character subject
+  name, a 32-character student name, four-digit points, a 50-point cost), at
+  **320 / 360 / 390 / 414 in dark and 320 / 414 in light**, plus the empty and loading
+  states: zero page overflow everywhere. It found ONE real defect, and it was
+  pre-existing: **the Columns row put two `sm` IconButtons at `gap-2`**, so their 44px hit
+  regions overlapped by 4px and a tap near the seam hit Retire (the later element) instead
+  of Edit. `gap-3` makes the centres 44px apart. It is the adjacency rule from the tap-target
+  pass, caught here by measuring at 320 rather than by reading. `StudentGrades` and
+  `ColumnsPanel` rows also carry `title={name}` now, since a name truncated to ~19
+  characters at 320px is otherwise unreadable.
+  ⚠ **False positives worth recognising** (each was checked, not assumed): a `truncate`d
+  paragraph reports its FULL text width, so its centre can sit under a sibling button while
+  the visible, ellipsised box ends 12px short of it (`pBox` right 173 vs button left 185);
+  a large number's line box overlaps its label's box by ~10px with no glyph collision
+  (`elementsFromPoint` index 0 is the number, the screenshot shows clean separation);
+  a skeleton's shimmer layer is translated outside its clipped parent; and an
+  `IconButton`'s `::before` hit region reads as `scrollWidth 38 > clientWidth 32`. **Confirm a
+  "covered text" hit with rects and a screenshot before changing layout for it.**
+  Also confirmed: `PodiumBoard`'s `layout` animation is still gated on reduced motion at
+  both call sites (`layout={!reduced}`).
 
 **SQL syntax is now checkable without a database.** `libpg-query` (npm, installed into a
 scratch directory, NOT the project) parses a migration's top-level statements AND each

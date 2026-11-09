@@ -356,7 +356,9 @@ function ItemRow({
   return (
     <div className="flex items-center gap-3 p-3.5">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{item.name}</p>
+        <p className="truncate text-sm font-medium" title={item.name}>
+          {item.name}
+        </p>
         <p className="text-xs tabular-nums text-muted">
           {scoreLine}
           {state.kind === 'boosted' && ` · was ${formatMarks(state.before)}`}

@@ -232,9 +232,16 @@ export function ColumnsPanel({
                       onSave={(n, m, boost) => void saveEdit(item, n, m, boost)}
                     />
                   ) : (
-                    <div key={item.id} className="flex items-center gap-2 p-3">
+                    // ⚠ `gap-3`, not `gap-2`: two `sm` IconButtons (32px) have
+                    // 44px hit regions, and centres 40px apart overlap by 4px —
+                    // where the LATER element wins, so a tap near the seam hit
+                    // Retire instead of Edit. 32 + 12 = 44 touches exactly. This
+                    // is the adjacency rule in IconButton, measured here at 320px.
+                    <div key={item.id} className="flex items-center gap-3 p-3">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm">{item.name}</p>
+                        <p className="truncate text-sm" title={item.name}>
+                          {item.name}
+                        </p>
                         <p className="text-2xs text-muted">
                           out of {item.maxScore} · {markedCounts.get(item.id) ?? 0} marked
                           {item.pointsCost !== null && item.pointsBonus !== null && (
