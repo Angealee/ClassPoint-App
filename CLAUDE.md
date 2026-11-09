@@ -203,7 +203,7 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   isolated tables, so it depends only on 0001–0041 machinery + 0045's `event` category, which
   it re-lists when it widens `point_events_category_check`). It also makes an ownership move of
   `cp_notify_point_event` (0025 → 0055).
-  **0056 is WRITTEN AND NOT YET APPLIED** — the event-award guard bypass. 0055 shipped with a
+  **0056 is APPLIED (applied_state.sql BLOCK 6 read `true`, confirmed by the user) — the rest of this paragraph is the history of why it exists.** The event-award guard bypass. 0055 shipped with a
   latent bug: `scan_event_attendance` runs under the STUDENT's JWT (SECURITY DEFINER does not
   change `auth.uid()`), its `point_events` insert fires `cp_recompute_points`, whose
   `students` UPDATE trips `cp_guard_student_update` (0009) — so a real student scan died with
@@ -227,11 +227,11 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   are fully exercised (they are pure), but every call in `api/grades.ts` 400s —
   so every grades fetch gets its OWN try/catch and `ErrorState` (the 0034
   SectionGrid precedent), and nothing else in the instructor area is affected.
-  **0061 is WRITTEN AND NOT YET APPLIED** — the `set_active_semester` WHERE-clause
+  **0061 is APPLIED (BLOCK 6 read `true`, confirmed by the user) — activating a semester should now work; try it.** The `set_active_semester` WHERE-clause
   fix. See the pg_safeupdate bullet above; activating a semester fails with
   "UPDATE requires a WHERE clause" until this is pasted, and nothing is switched.
   It depends on nothing after 0035 and can be pasted on its own, ahead of 0042–0060.
-  **0062 is WRITTEN AND NOT YET APPLIED** — student grades and grade boosts. It MUST
+  **0060, 0061 and 0062 are ALL APPLIED AND CONFIRMED (user, 2026-11-09): BLOCK 6 true for 0056/0061/0062's two body probes; a five-column existence query true for `grade_boosts`, `get_my_grades`, `save_subject_policy`, `farewell_message` and `archive_semester_students`; BLOCK 7 returned zero rows (the audit constraint holds all 18); and activating a new semester worked, so the 0061 fix is proven in use.** What has NOT been run is 0062's verify block (request, approve, reverse) — that is `REAL_DEVICE_PASS.md` section 5. Student grades and grade boosts. It MUST
   go after 0057 and 0058 (it writes `grade_items` / `grade_scores`), and it takes
   `decide_point_redemption` from 0029 and `cp_nightly_backup` from 0057. Run
   `applied_state.sql` BLOCK 2 first: it re-lists `audit_log_action_check`. Until it
@@ -4279,6 +4279,79 @@ their screen (and an archived student has no grades at all).
   list (collapsed → 8 rows + filter → "Show all 11" → 11 rows). **Not verified:** the notification
   actually arriving, and every write path against a database.
 
+**Grades UI rework (2026-11-09, from the user's screenshot: "it is a mess").** Decisions
+(user): **one compact toolbar** · **keep the grid compact and CENTRE it (REVERSED below — it now fills)** · **in So far, show
+only the computed parts that have marks** · **all four extras** (flat cells, partial flag, column
+footer, calmer header band). Two real defects were found first and fixed outright, no choice
+needed:
+- **The icon rail printed text it had no room for.** On the grade screen the sidebar is a 64px
+  rail (`width="full"`), but its header still rendered the logo, "ClassPoint" and the
+  "Instructor" badge in a row, so the words spilled over the screen title; the footer's
+  64px theme pill and its 170px ROW of four round buttons overflowed a 48px usable width and
+  were cut off at the screen edge. In the rail the header is the mark alone (the words stay as
+  `sr-only` and a tooltip), the pill is 40px, and `actions` is flipped to a column with a
+  variant selector on its direct child (the layout owns its own classes, so the shell cannot
+  change them, but `[&>div]:flex-col` outranks a plain `flex`).
+- **The instructor's MOBILE header overflowed at every phone width.** Mark + wordmark + badge +
+  theme switch + four buttons came to ~440px against 343, nothing wrapped, so Ops and Sign out
+  were pushed past the screen edge and `body { overflow-x: clip }` hid the evidence — measured
+  `scrollWidth 439` on a 375 viewport, 375 after. When a badge is passed (only the instructor
+  passes one) the wordmark and badge now wait for `min-[480px]`; the student header keeps its
+  wordmark at every width. Not seen on a real phone — found by mounting the real `Shell` in a
+  probe — so confirm it on one.
+- **Toolbar:** Section and Subject are auto-width pickers (they were each HALF the window),
+  followed by the term tabs, the So-far/Official toggle and the help link on ONE row; the
+  "Entered" line gained a hairline meter for the term on screen. About 150px of height back.
+  `text-base` below `md` (the iOS zoom rule), compact `h-9 text-sm` from `md`. Every control is
+  full width and stacked on a phone. Changing scope still NAVIGATES — the scope has to stay in
+  the path because `Shell` reads `pathname` for the width.
+- **~~Centred~~ → FILLS THE WIDTH (the user reversed this after seeing it on real data:
+  "make it fill, matching the header content").** Centring left a narrow island in a 1,900px
+  window. The table is `w-full min-w-max`: the whole scroller, edge to edge with the toolbar
+  (measured 32–1568 against the toolbar's 32–1568 at 1600px), and at least its content width so
+  a 14-column term still scrolls (2,080px, 88px columns, no page overflow). The spare width goes
+  to the SCORE columns only — gutter `w-8`, name `w-60`, computed `w-28`, Term grade `w-32`; in an
+  auto-layout table the excess is handed to the columns without a fixed width (two columns
+  measured 456px each). ⚠ **The old `max-w-22` on the header name had to go, and the guard it
+  represented is kept differently:** a hard cap would stop the columns taking their share, so the
+  name's box is `w-0 min-w-full truncate` — it contributes NOTHING to the column's intrinsic width,
+  then stretches to whatever the column ends up with and truncates there. Verified: a 55-character
+  column name leaves both columns at 456px. The scroller's `pb-2` was removed (it left an 8px strip under the pinned footer where rows
+  showed through; it only existed for an OUTER focus ring, and the ring is `ring-inset` now).
+- **Computed parts follow the data.** In So far a part nobody has a mark in is not a column, and
+  the band says "Computed · N hidden" with the names in its tooltip; Official shows all five,
+  because there an unmarked part counts as a zero. Which parts are on show is held as a STRING
+  and split back, so the array's identity changes only when the SET does — a new mark in a part
+  that already had marks must not hand all forty memoised rows a fresh array. A new part
+  appears the moment its first mark COMMITS (the grid mirrors commits into a `live` map; the
+  rows still take the ORIGINAL `scores` snapshot and a stable `handleCommit`, so a commit
+  costs one grid-level render and re-renders no row). Anything that changes marks from
+  outside still remounts the grid, re-seeding it.
+- **Partial term grades** (`weightedComponents` / `componentShare` in `grading.ts`, 4 tests —
+  the one place the product `csWeight × partWeight` is written; `explainTerm` now reads it too):
+  a So-far grade missing at least one part that carries weight shows dimmed with a small
+  "partial" and a tooltip ("from 2 of 4 parts"). A zero-weight part is not "missing".
+- **Footer:** a pinned bottom row with each column's class average (of the MARKED scores, raw —
+  not a percentage, blanks not counted as zeros) and "marked n/N" (amber while incomplete), and
+  the class average of the Term grade itself from the same `termGrade` the rows call. Verified by
+  hand: columns 23/19 and 41/32 average 21 and 36.5; term grades 63.84 and 63.06 average 63.45.
+  Pinned at scrollTop 0, mid and end (footer bottom minus scroller bottom = 0 each time).
+- **Flat cells + calmer band:** data cells take the SAME opaque surface as the frozen name beside
+  them (they were `bg-transparent` over the canvas, which read as black holes next to the lighter
+  frozen cells), with hairlines right and below. The component band is sentence-case muted text
+  with NO bottom border, so it reads as the first line of one header block whose only rule is the
+  hairline under the column names.
+- **A latent bug fixed in passing:** the row crosshair tinted every cell with `bg-accent-solid/5`,
+  which REPLACED the frozen name and Term-grade cells' opaque background with a translucent one,
+  so while a cell was focused and the grid scrolled sideways the marks underneath showed straight
+  through the name column. Both halves of the crosshair are an inset box-shadow now, which
+  paints over a background instead of swapping it.
+- Verified by probe (removed, residue-checked) with the REAL toolbar markup, grid and `Shell`:
+  1600px dark and light, 2 columns and 7 columns × 26 students, So far and Official, scrolling
+  with the header and footer both pinned, 1024px, and the mobile header at 375 / 320 / 600.
+  **Not verified:** the full `GradeSheet` (its data calls need a login — the toolbar was mounted
+  from the same markup, not the component), and any of it on real data.
+
 **SQL syntax is now checkable without a database.** `libpg-query` (npm, installed into a
 scratch directory, NOT the project) parses a migration's top-level statements AND each
 `$$` function body as PL/pgSQL. 0060, 0061 and 0062 all parse clean, and the checker was
@@ -4286,6 +4359,16 @@ verified to fail on a deliberately broken body and a broken top-level statement 
 "clean" means something. **It checks syntax only**: a wrong column name or a type
 mismatch still fails at runtime, which is why the verify block, not the parse, is the
 test. It would have caught the `$$` → `$` slip that shipped in 0041.
+**THE PASTE ORDER OF 0060 AND 0062 USED TO MATTER, AND NO LONGER DOES.** Both re-list
+`audit_log_action_check`, and 0060 originally listed only sixteen values. Pasted AFTER 0062
+it would have silently dropped `grade_boost` and `grade_visibility`, and every boost
+approval, reversal and "open grades" switch would then have died on a check violation — the
+third time that constraint has been at risk. It was found because the user pasted 0062 FIRST
+(their BLOCK 6 screenshot showed 0062's body probes already `true` while 0060 was
+unconfirmed). 0060 §6 now lists all eighteen too, with the reason. **`applied_state.sql`
+BLOCK 7 is the guard: run it after pasting either file; ZERO ROWS means the live constraint
+equals the eighteen the app writes.** It names which direction a mismatch goes ("MISSING from
+live" → paste 0062; "LIVE but not listed" → add it to both files first).
 **Run across ALL 62 migrations and both `supabase/queries/` files (2026-11-09): every one
 parses clean except 0025**, and that one is a known false positive — `select … into
 v_session.topic, v_session.started_at` assigns to fields of a `%rowtype` variable, which is

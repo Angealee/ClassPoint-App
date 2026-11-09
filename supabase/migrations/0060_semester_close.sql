@@ -386,8 +386,17 @@ grant execute on function public.request_point_redemption(int, text, text) to au
 --      how 0043's first break-glass read would have failed, caught only because
 --      the file had not been pasted yet.
 --
---    The list below is 0059's fifteen plus the new one. If BLOCK 2 of
---    applied_state.sql showed a value that is not here, STOP and add it.
+--    The list below is 0059's fifteen plus the new one — AND the two values 0062
+--    adds ('grade_boost', 'grade_visibility'). Those two are listed here on
+--    purpose, although nothing in THIS file writes them: 0062 is the file that
+--    writes them, and if 0062 is pasted BEFORE this one, a list that stopped at
+--    sixteen would silently NARROW the constraint back, and every grade-boost
+--    approval, reversal and "open grades" switch would then die on a check
+--    violation. Listing all eighteen makes the paste order irrelevant. An
+--    allowed value nobody writes yet costs nothing.
+--
+--    If BLOCK 2 of applied_state.sql showed a value that is not here, STOP and
+--    add it. After pasting either file, BLOCK 7 must return ZERO rows.
 -- ----------------------------------------------------------------------------
 alter table public.audit_log drop constraint if exists audit_log_action_check;
 alter table public.audit_log add constraint audit_log_action_check
@@ -398,7 +407,8 @@ alter table public.audit_log add constraint audit_log_action_check
     'space_break_glass', 'space_moderate',
     'peer_group', 'peer_eval',
     'edit_name',
-    'semester_archive'
+    'semester_archive',
+    'grade_boost', 'grade_visibility'
   ));
 
 

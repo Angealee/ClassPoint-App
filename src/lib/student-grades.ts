@@ -3,10 +3,12 @@ import {
   COMPONENT_LABEL,
   GRADE_COMPONENTS,
   componentScores,
+  componentShare,
   orderedItems,
   policyError,
   sumsFromScores,
   termGrade,
+  weightedComponents,
 } from './grading'
 import type {
   GradeComponent,
@@ -153,18 +155,12 @@ export function explainTerm(subject: MyGradeSubject, term: TermKey): TermExplana
   if (policy === null || policyError(policy) !== null) return null
 
   const share = (w: number) => Math.round(w * 1000) / 10
-  const weights: Record<GradeComponent, number> = {
-    performance_task: policy.csWeight * policy.ptWeight,
-    quiz: policy.csWeight * policy.quizWeight,
-    recitation: policy.csWeight * policy.recitWeight,
-    exam: policy.examWeight,
-  }
 
   return {
-    parts: GRADE_COMPONENTS.filter((c) => weights[c] > 0).map((c) => ({
+    parts: weightedComponents(policy).map((c) => ({
       component: c,
       label: COMPONENT_LABEL[c],
-      sharePct: share(weights[c]),
+      sharePct: share(componentShare(policy, c)),
     })),
     floor: Math.round(policy.transmuteBase * 1000) / 10,
     ceiling: Math.round((policy.transmuteBase + policy.transmuteSpan) * 1000) / 10,

@@ -343,3 +343,54 @@ select
      where conname = 'point_events_points_check'
        and pg_get_constraintdef(oid) like '%points <= 50)%'
   );
+
+
+-- ----------------------------------------------------------------------------
+-- BLOCK 7 · Does the live audit constraint hold every action the app writes?
+--
+--   Run this AFTER pasting 0060 and/or 0062, in either order. ZERO ROWS = good.
+--
+--   Both files re-list the constraint, and a drop-and-recreate that omits a value
+--   silently NARROWS it — the failure shows up much later, as a check violation
+--   the first time something writes the omitted action (here: approving or
+--   reversing a grade boost, or opening student grades). This is the cheap way
+--   to find out now instead.
+--
+--   'MISSING from live'  → a value the app writes is not allowed. Paste 0062
+--                          (it re-lists all eighteen) and run this again.
+--   'LIVE but not listed' → the database allows a value these files do not list,
+--                          so pasting them would REMOVE it. Add it to 0060 §6
+--                          and 0062 §8 before pasting.
+--   'constraint not found' → audit_log_action_check does not exist at all.
+--
+--   ⚠ Postgres stores each value as 'name'::text inside an ARRAY, which is what
+--     the pattern below reads; matching the words "IN (" finds nothing.
+-- ----------------------------------------------------------------------------
+with live as (
+  select distinct (regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g'))[1] as v
+    from pg_constraint c
+   where c.conname = 'audit_log_action_check'
+),
+wanted(v) as (
+  values
+    ('delete'), ('archive'), ('restore'), ('hard_delete'), ('broadcast'),
+    ('promote'), ('semester_activate'),
+    ('space_flag'), ('space_section'), ('space_timeout'),
+    ('space_break_glass'), ('space_moderate'),
+    ('peer_group'), ('peer_eval'),
+    ('edit_name'),
+    ('semester_archive'),
+    ('grade_boost'), ('grade_visibility')
+)
+select 'MISSING from live — paste 0062' as problem, w.v as action
+  from wanted w
+  left join live l on l.v = w.v
+ where l.v is null
+union all
+select 'LIVE but not listed — add it to 0060 §6 and 0062 §8 first', l.v
+  from live l
+  left join wanted w on w.v = l.v
+ where w.v is null
+union all
+select 'constraint not found', null
+ where not exists (select 1 from pg_constraint where conname = 'audit_log_action_check');

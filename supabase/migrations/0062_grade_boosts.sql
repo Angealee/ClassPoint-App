@@ -839,6 +839,11 @@ grant execute on function public.save_subject_policy(uuid, jsonb) to authenticat
 -- ----------------------------------------------------------------------------
 -- 8. audit_log_action_check — widen with 'grade_boost' and 'grade_visibility'
 --
+--    0060 ALSO lists all eighteen of these (see its §6), so 0060 and 0062 can be
+--    pasted in EITHER order. Before that was true, 0060 pasted after 0062 would
+--    have silently dropped the two values below. After pasting either file,
+--    applied_state.sql BLOCK 7 must return ZERO rows.
+--
 --    ⚠ Re-lists every prior value (0060's sixteen). Dropping and recreating this
 --      constraint while omitting one silently NARROWS it, and the next migration
 --      that writes the omitted action dies on a check violation. If BLOCK 2 of

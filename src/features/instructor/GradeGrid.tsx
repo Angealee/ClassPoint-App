@@ -14,6 +14,7 @@ import {
   GRADE_COMPONENTS,
   sumsFromScores,
   termGrade,
+  weightedComponents,
 } from '@/lib/grading'
 import {
   formatScoreInput,
@@ -159,6 +160,105 @@ export function GradeGrid({
    */
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null)
 
+  /**
+   * Every mark on screen, kept current as cells commit.
+   *
+   * Rows own their values while you type (that is the whole point of the
+   * uncontrolled design), so nothing above them knows a mark has been entered
+   * until it commits. The footer's averages and "which computed parts are worth
+   * showing" both need that, so each commit is mirrored here.
+   *
+   * ⚠ This costs one grid-level render PER COMMIT (a blur or an Enter), never per
+   *   keystroke — and it does not re-render the rows: they take `scores`, which
+   *   is the ORIGINAL snapshot, and the stable `handleCommit` below. Anything
+   *   that changes marks from outside still remounts the grid, re-seeding this.
+   */
+  const [live, setLive] = useState(() => new Map(scores))
+
+  const handleCommit = useCallback(
+    (edit: CellEdit, previous: number | null) => {
+      setLive((prev) => {
+        const next = new Map(prev)
+        const key = cellKey(edit.itemId, edit.studentId)
+        if (edit.value === null) next.delete(key)
+        else next.set(key, edit.value)
+        return next
+      })
+      onCommit(edit, previous)
+    },
+    [onCommit],
+  )
+
+  /** Per column: how many marks, and what they add to. */
+  const itemStats = useMemo(() => {
+    const m = new Map<string, { sum: number; count: number }>()
+    for (const item of items) m.set(item.id, { sum: 0, count: 0 })
+    for (const [key, value] of live) {
+      const stat = m.get(key.slice(0, key.indexOf(':')))
+      if (stat) {
+        stat.sum += value
+        stat.count += 1
+      }
+    }
+    return m
+  }, [items, live])
+
+  /**
+   * Which computed parts are worth a column.
+   *
+   * In SO FAR, a part with no mark from anyone reads "—" down the whole class —
+   * three or four grey columns that say nothing, beside the two that matter. So
+   * it is left out, and the band says how many are hidden. OFFICIAL shows all of
+   * them, because there an unmarked part really does count (as a zero).
+   *
+   * Held as a STRING and split back, so the array's identity only changes when
+   * the SET does — a new mark in a part that already had marks must not hand
+   * every memoised row a fresh array and re-render all forty of them.
+   */
+  const visibleKey =
+    view === 'official'
+      ? 'all'
+      : GRADE_COMPONENTS.filter((c) =>
+          items.some((i) => i.component === c && (itemStats.get(i.id)?.count ?? 0) > 0),
+        ).join(',')
+  const visibleComps = useMemo<GradeComponent[]>(
+    () =>
+      visibleKey === 'all'
+        ? [...GRADE_COMPONENTS]
+        : visibleKey === ''
+          ? []
+          : (visibleKey.split(',') as GradeComponent[]),
+    [visibleKey],
+  )
+  const hiddenComps = GRADE_COMPONENTS.filter((c) => !visibleComps.includes(c))
+  // Class standing is derived from three of the parts: worth a column only if at
+  // least one of them is on show (Official always shows it).
+  const showCs = view === 'official' || visibleComps.some((c) => CS_COMPONENTS.includes(c))
+  // Columns between the marks and Term grade.
+  const middleCols = visibleComps.length + (showCs ? 1 : 0)
+
+  /** The parts that carry weight — what a "partial" grade is missing. */
+  const weighted = useMemo(() => weightedComponents(policy), [policy])
+
+  /** Class average of the Term grade column, from the same functions the rows use. */
+  const termAverage = useMemo(() => {
+    let sum = 0
+    let n = 0
+    for (const s of students) {
+      const marks = new Map<string, number>()
+      for (const item of items) {
+        const v = live.get(cellKey(item.id, s.id))
+        if (v !== undefined) marks.set(item.id, v)
+      }
+      const g = termGrade(sumsFromScores(items, marks), policy, view)
+      if (g !== null) {
+        sum += g
+        n += 1
+      }
+    }
+    return { average: n > 0 ? sum / n : null, graded: n }
+  }, [students, items, live, policy, view])
+
   if (items.length === 0) {
     return (
       <EmptyState
@@ -198,8 +298,20 @@ export function GradeGrid({
     // `max-h-[75dvh]` survives as the MOBILE fallback, where the page still
     // scrolls normally, and `min-h-64` means a broken chain can only ever make
     // this short — never zero-height, which would look like a failed render.
-    <TableScroller fill className="pb-2">
-      <table className="w-max border-separate border-spacing-0 text-sm">
+    // No bottom padding: the pinned footer sits at the scrollport's edge, and
+    // 8px of padding under it was a strip where rows scrolled by. It was only
+    // there so an OUTER focus ring would not be clipped, and the ring is inset now.
+    <TableScroller fill>
+      {/* FILLS THE WIDTH, edge to edge with the toolbar above it.
+          Centring (the previous try) left a narrow island in a 1,900px window;
+          the instructor asked for the grid to line up with the header instead.
+
+          `w-full min-w-max`: at least as wide as its content (so a 20-column
+          term still scrolls sideways) and otherwise the whole scroller. The
+          spare width goes to the SCORE columns only — the gutter, the name and
+          the computed columns have fixed widths, and in an auto-layout table
+          the excess is handed to the columns that do not. */}
+      <table className="w-full min-w-max border-separate border-spacing-0 text-sm">
         <thead>
           {/* ── THE COMPONENT BAND ───────────────────────────────────────────
               Which component a column belongs to used to live only in the
@@ -221,30 +333,47 @@ export function GradeGrid({
             <th
               scope="col"
               colSpan={2}
-              className="sticky left-0 top-0 z-40 h-6 border-b border-line bg-card px-3 text-left text-2xs font-semibold uppercase tracking-wider text-muted"
+              className="sticky left-0 top-0 z-40 h-6 bg-card px-3 text-left"
             >
               {/* The gutter + the name column. Deliberately blank: a label
                   here would be a second screen title. */}
             </th>
+            {/* CALM, on purpose. The band used to be a row of boxes — uppercase,
+                tracked, bordered underneath and on the left — which shouted
+                over the column names it exists to explain. Now it is quiet
+                sentence-case text with NO bottom border, so it reads as the
+                first line of one header block whose only rule is the hairline
+                under the column names below. A faint left hairline stays so the
+                groups are still groups. */}
             {bands.map((band) => (
               <th
                 key={band.component}
                 scope="colgroup"
                 colSpan={band.span}
-                className="sticky top-0 z-30 h-6 border-b border-l border-line bg-card px-2 text-center text-2xs font-semibold uppercase tracking-wider text-muted"
+                className="sticky top-0 z-30 h-6 border-l border-line/40 bg-card px-3 text-left text-xs font-medium text-muted"
                 title={COMPONENT_LABEL[band.component]}
               >
                 <span className="block truncate">{COMPONENT_LABEL[band.component]}</span>
               </th>
             ))}
             {/* Where typing ends and arithmetic begins — the same `border-l-2`
-                the header below uses, so the seam is one line down the grid. */}
+                the header below uses, so the seam is one line down the grid.
+                Says what it left out, because a column that vanishes without
+                a word looks like a bug. */}
             <th
               scope="colgroup"
-              colSpan={GRADE_COMPONENTS.length + 2}
-              className="sticky top-0 z-30 h-6 border-b border-l-2 border-line border-l-line bg-card-2 px-2 text-center text-2xs font-semibold uppercase tracking-wider text-muted"
+              colSpan={middleCols + 1}
+              className="sticky top-0 z-30 h-6 border-l-2 border-line bg-card-2 px-3 text-left text-xs font-medium text-muted"
+              title={
+                hiddenComps.length > 0
+                  ? `Not shown yet (nothing marked): ${hiddenComps.map((c) => COMPONENT_LABEL[c]).join(', ')}. Official shows them all.`
+                  : undefined
+              }
             >
               Computed
+              {hiddenComps.length > 0 && (
+                <span className="font-normal text-muted/70"> · {hiddenComps.length} hidden</span>
+              )}
             </th>
           </tr>
 
@@ -253,13 +382,13 @@ export function GradeGrid({
                 a gutter that scrolls away is worse than none. */}
             <th
               scope="col"
-              className="sticky left-0 top-6 z-30 w-8 min-w-8 border-b border-line bg-card px-0 py-2 text-center text-2xs font-semibold text-muted"
+              className="sticky left-0 top-6 z-30 w-8 min-w-8 border-b border-line bg-card px-0 py-2 text-center text-2xs font-medium text-muted"
             >
               #
             </th>
             <th
               scope="col"
-              className="sticky left-8 top-6 z-30 border-b border-line bg-card px-3 py-2 text-left font-semibold"
+              className="sticky left-8 top-6 z-30 w-60 min-w-60 border-b border-line bg-card px-3 py-2 text-left font-semibold"
             >
               Student
             </th>
@@ -267,26 +396,32 @@ export function GradeGrid({
               <th
                 key={item.id}
                 scope="col"
-                // ⚠ `max-w` IS LOAD-BEARING, and its absence was a real bug: an
-                // auto-layout column sizes to its widest content, and that is
-                // the HEADER, not the input. `size={4}` caps the cell at ~88px
-                // while a name like "Sample Recitation" pushed its column to
-                // ~180px, so a few long names shoved the term grade off screen.
-                // The cap plus `truncate` keeps every column the same width,
-                // and the full name stays in the title.
-                className="sticky top-6 z-20 w-22 min-w-22 max-w-22 border-b border-line bg-card px-2 py-1.5 text-center font-semibold"
+                // ⚠ THE NAME MUST NOT SET THE COLUMN'S WIDTH, and that is a real
+                // bug it prevents: an auto-layout column sizes to its widest
+                // content, and that is the HEADER, not the input. A name like
+                // "Sample Recitation" once pushed its column to ~180px, so a few
+                // long names shoved the term grade off screen.
+                //
+                // The table now FILLS its container, so a hard `max-w` would
+                // also stop the columns taking their share of the spare width.
+                // Instead the name's box is `w-0 min-w-full`: it contributes
+                // NOTHING to the column's intrinsic width (so the input and
+                // `min-w-22` decide it), then stretches to whatever width the
+                // column ends up with and truncates there. The full name stays
+                // in the title.
+                className="sticky top-6 z-20 min-w-22 border-b border-r border-line border-r-line/40 bg-card px-2 py-1.5 text-center font-semibold"
                 title={`${item.name} · ${COMPONENT_LABEL[item.component]} · out of ${item.maxScore}`}
               >
-                <span className="block truncate">{item.name}</span>
+                <span className="block w-0 min-w-full truncate">{item.name}</span>
                 <span className="block text-2xs font-normal text-muted">/{item.maxScore}</span>
               </th>
             ))}
-            {GRADE_COMPONENTS.map((c, i) => (
+            {visibleComps.map((c, i) => (
               <th
                 key={c}
                 scope="col"
                 className={cn(
-                  'sticky top-6 z-20 min-w-20 border-b border-line bg-card-2 px-2 py-1.5 text-center text-2xs font-semibold text-muted',
+                  'sticky top-6 z-20 w-28 min-w-28 border-b border-line bg-card-2 px-2 py-1.5 text-center text-2xs font-semibold text-muted',
                   // Where typing ends and arithmetic begins. Without it the two
                   // halves blend and a derived column invites a click.
                   i === 0 && 'border-l-2 border-l-line',
@@ -295,18 +430,23 @@ export function GradeGrid({
                 {COMPONENT_LABEL[c]}
               </th>
             ))}
-            <th
-              scope="col"
-              className="sticky top-6 z-20 min-w-20 border-b border-line bg-card-2 px-2 py-1.5 text-center text-2xs font-semibold text-muted"
-            >
-              Class standing
-            </th>
+            {showCs && (
+              <th
+                scope="col"
+                className={cn(
+                  'sticky top-6 z-20 w-28 min-w-28 border-b border-line bg-card-2 px-2 py-1.5 text-center text-2xs font-semibold text-muted',
+                  visibleComps.length === 0 && 'border-l-2 border-l-line',
+                )}
+              >
+                Class standing
+              </th>
+            )}
             {/* Pinned to the right edge: the name says who a row is, this says
                 what it comes to, and the marks scroll between them. It is the
                 point of the screen and was the one column you could not see. */}
             <th
               scope="col"
-              className="sticky right-0 top-6 z-30 min-w-20 border-b border-l-2 border-line border-l-line bg-card-2 px-2 py-1.5 text-center font-semibold"
+              className="sticky right-0 top-6 z-30 w-32 min-w-32 border-b border-l-2 border-line border-l-line bg-card-2 px-2 py-1.5 text-center font-semibold"
             >
               Term grade
             </th>
@@ -324,16 +464,83 @@ export function GradeGrid({
               view={view}
               failed={failed}
               boosts={boosts}
-              onCommit={onCommit}
+              onCommit={handleCommit}
               onPasteColumn={onPasteColumn}
               registerInput={registerInput}
               moveFocus={moveFocus}
               indexById={indexById}
               focusedItemId={focusedItemId}
               onFocusColumn={setFocusedItemId}
+              visibleComps={visibleComps}
+              showCs={showCs}
+              weighted={weighted}
             />
           ))}
         </tbody>
+
+        {/* ── THE FOOTER: WHAT IS STILL MISSING ────────────────────────────────
+            Per column, the class average and how many marks are in. "How many of
+            the forty have I entered for Quiz 2" used to mean scrolling the whole
+            roster and counting blanks. Pinned to the bottom of the scroller so
+            it is on screen whatever the roster length.
+
+            Average of the MARKED scores, raw — not a percentage, and not
+            counting blanks as zeros: it answers "how did the class do on this",
+            which an unmarked student has no part in yet. The right-hand cell is
+            the class average of the Term grade itself, from the same functions
+            the rows use. */}
+        <tfoot>
+          <tr>
+            <td
+              colSpan={2}
+              className="sticky bottom-0 left-0 z-30 border-t border-line bg-card px-3 py-1 text-left text-2xs leading-tight text-muted"
+            >
+              <span className="block font-semibold text-ink">Class average</span>
+              <span className="block">Marked</span>
+            </td>
+            {items.map((item) => {
+              const stat = itemStats.get(item.id) ?? { sum: 0, count: 0 }
+              const average = stat.count > 0 ? stat.sum / stat.count : null
+              return (
+                <td
+                  key={item.id}
+                  className="sticky bottom-0 z-20 border-t border-r border-line border-r-line/40 bg-card px-2 py-1 text-center tabular-nums leading-tight"
+                >
+                  <span className="block text-xs font-semibold">
+                    {average === null ? '—' : String(Math.round(average * 100) / 100)}
+                  </span>
+                  <span
+                    className={cn(
+                      'block text-2xs',
+                      stat.count < students.length ? 'text-warn' : 'text-muted',
+                    )}
+                  >
+                    {stat.count}/{students.length}
+                  </span>
+                </td>
+              )
+            })}
+            {middleCols > 0 && (
+              <td
+                colSpan={middleCols}
+                className="sticky bottom-0 z-20 border-l-2 border-t border-line border-l-line bg-card-2"
+              />
+            )}
+            <td
+              className={cn(
+                'sticky bottom-0 right-0 z-30 border-t border-line bg-card-2 px-2 py-1 text-center tabular-nums leading-tight',
+                middleCols === 0 && 'border-l-2 border-l-line',
+              )}
+            >
+              <span className="block text-xs font-semibold">
+                {termAverage.average === null ? '—' : displayGrade(termAverage.average)}
+              </span>
+              <span className="block text-2xs text-muted">
+                {termAverage.graded}/{students.length}
+              </span>
+            </td>
+          </tr>
+        </tfoot>
       </table>
     </TableScroller>
   )
@@ -356,6 +563,11 @@ interface GradeRowProps {
   /** The column with focus, for the crosshair. Null when nothing has it. */
   focusedItemId: string | null
   onFocusColumn: (itemId: string) => void
+  /** The computed parts on show. Identity changes only when the SET does. */
+  visibleComps: GradeComponent[]
+  showCs: boolean
+  /** The parts that carry weight, for flagging a partial term grade. */
+  weighted: GradeComponent[]
 }
 
 /**
@@ -379,6 +591,9 @@ const GradeRow = memo(function GradeRow({
   moveFocus,
   focusedItemId,
   onFocusColumn,
+  visibleComps,
+  showCs,
+  weighted,
 }: GradeRowProps) {
   // The row's committed values. Seeded once from the parent's map; anything
   // that changes them from outside remounts the grid (see the file header).
@@ -407,14 +622,22 @@ const GradeRow = memo(function GradeRow({
     // the three it would otherwise read 60.00 beside three dashes, which is the
     // same floor the dashes exist to stop showing.
     const csUnmarked = CS_COMPONENTS.every((c) => unmarked[c])
+    const term = termGrade(sums, policy, view)
+    // PARTIAL: a So-far grade that is missing at least one part that counts. It
+    // is a real number — the instructor's own So-far figure — but two quizzes
+    // alone read 63.84, and a bold 63.84 in the Term grade column looks like a
+    // grade somebody earned. Dimmed and marked, it reads as "so far".
+    const partial = view === 'soFar' && term !== null && weighted.some((c) => unmarked[c])
     return {
       comps,
       unmarked,
       csUnmarked,
       cs: classStanding(comps, policy),
-      term: termGrade(sums, policy, view),
+      term,
+      partial,
+      partsMarked: weighted.filter((c) => !unmarked[c]).length,
     }
-  }, [values, items, policy, view])
+  }, [values, items, policy, view, weighted])
 
   function commit(item: GradeItem, el: HTMLInputElement) {
     const parsed = parseScoreInput(el.value)
@@ -476,7 +699,14 @@ const GradeRow = memo(function GradeRow({
   return (
     // `focus-within` is the row half of the crosshair, and it costs nothing:
     // no state, no re-render, pure CSS.
-    <tr className="group focus-within:[&>*]:bg-accent-solid/5">
+    //
+    // ⚠ An INSET BOX-SHADOW, not a background. The tint used to be
+    //   `bg-accent-solid/5` on every child, which REPLACED the frozen name and
+    //   Term-grade cells' opaque background with a translucent one — so while a
+    //   cell in the row was focused and the grid was scrolled sideways, the
+    //   marks scrolling underneath showed straight through the name column. A
+    //   shadow paints over the existing background instead of swapping it.
+    <tr className="group focus-within:[&>*]:shadow-[inset_0_0_0_999px_color-mix(in_oklab,var(--color-accent-solid)_7%,transparent)]">
       <th
         scope="row"
         className={cn(
@@ -490,7 +720,7 @@ const GradeRow = memo(function GradeRow({
       <th
         scope="row"
         className={cn(
-          'sticky left-8 z-10 max-w-52 truncate border-b border-line px-3 py-0 text-left font-normal',
+          'sticky left-8 z-10 w-60 min-w-60 max-w-60 truncate border-b border-line px-3 py-0 text-left font-normal',
           zebra ? 'bg-card-2' : 'bg-card',
           'group-hover:bg-card-2',
         )}
@@ -517,14 +747,16 @@ const GradeRow = memo(function GradeRow({
           <td
             key={item.id}
             className={cn(
-              // `relative` anchors the boost dot; the cell is otherwise a plain
-              // pass-through for the input.
-              'relative border-b border-line p-0',
-              zebra && 'bg-card-2/40',
-              // The column half of the crosshair. A tint on the CELL rather
-              // than the input, so it reads as a column rather than as a row
-              // of highlighted boxes.
-              focusedItemId === item.id && 'bg-accent-solid/5',
+              // FLAT, spreadsheet-style: the same opaque surface as the frozen
+              // name beside it (so the row reads as one band, not a lighter
+              // label next to a black hole), a hairline on the bottom and the
+              // right, and nothing heavier. `relative` anchors the boost dot.
+              'relative border-b border-r border-line border-r-line/40 p-0',
+              zebra ? 'bg-card-2' : 'bg-card',
+              // The column half of the crosshair — the same inset shadow as the
+              // row half, so it tints without replacing the background.
+              focusedItemId === item.id &&
+                'shadow-[inset_0_0_0_999px_color-mix(in_oklab,var(--color-accent-solid)_7%,transparent)]',
             )}
           >
             <input
@@ -566,7 +798,10 @@ const GradeRow = memo(function GradeRow({
                 // text-base is not a style choice: below 16px iOS Safari zooms
                 // the viewport on focus and never zooms back.
                 'h-8 w-full bg-transparent px-2 text-center text-base tabular-nums outline-none',
-                'focus:bg-accent-solid/10 focus:ring-2 focus:ring-[var(--color-ring)]',
+                // `ring-inset`: an outer ring spills into the neighbouring cells
+                // and is clipped by the frozen columns; inside the cell it is
+                // crisp and the only emphasis the focused cell needs.
+                'focus:bg-accent-solid/10 focus:ring-2 focus:ring-inset focus:ring-[var(--color-ring)]',
                 isBad && 'bg-danger-solid/10 text-danger',
                 !isBad && over && 'bg-warn-solid/10 text-warn',
                 !isBad && failed.has(key) && 'bg-danger-solid/10',
@@ -591,7 +826,7 @@ const GradeRow = memo(function GradeRow({
         )
       })}
 
-      {GRADE_COMPONENTS.map((c, i) => (
+      {visibleComps.map((c, i) => (
         <td
           key={c}
           className={cn(
@@ -608,21 +843,34 @@ const GradeRow = memo(function GradeRow({
           {figures.unmarked[c] ? <span className="text-muted/50">—</span> : displayGrade(figures.comps[c])}
         </td>
       ))}
-      <td
-        className={cn(
-          'border-b border-line px-2 py-0 text-center text-xs tabular-nums text-muted',
-          zebra ? 'bg-card-2/80' : 'bg-card-2/50',
-        )}
-      >
-        {figures.csUnmarked ? <span className="text-muted/50">—</span> : displayGrade(figures.cs)}
-      </td>
+      {showCs && (
+        <td
+          className={cn(
+            'border-b border-line px-2 py-0 text-center text-xs tabular-nums text-muted',
+            zebra ? 'bg-card-2/80' : 'bg-card-2/50',
+            visibleComps.length === 0 && 'border-l-2 border-l-line',
+          )}
+        >
+          {figures.csUnmarked ? <span className="text-muted/50">—</span> : displayGrade(figures.cs)}
+        </td>
+      )}
       <td
         className={cn(
           'sticky right-0 z-10 border-b border-l-2 border-line border-l-line px-2 py-0 text-center font-display font-bold tabular-nums group-hover:bg-card',
           zebra ? 'bg-card' : 'bg-card-2',
         )}
+        title={
+          figures.partial
+            ? `So far, from ${figures.partsMarked} of ${weighted.length} parts. It will move as the rest are marked.`
+            : undefined
+        }
       >
-        {displayGrade(figures.term)}
+        <span className={cn(figures.partial && 'font-semibold text-muted')}>
+          {displayGrade(figures.term)}
+        </span>
+        {figures.partial && (
+          <span className="ml-1 text-2xs font-normal text-warn">partial</span>
+        )}
       </td>
     </tr>
   )

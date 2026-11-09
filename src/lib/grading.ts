@@ -139,6 +139,38 @@ export function classStanding(
   )
 }
 
+/**
+ * What one part is worth of the WHOLE TERM, as a proportion.
+ *
+ * A Class Standing part is its weight inside Class Standing times Class
+ * Standing's own weight; the exam is just its weight. With the usual 50/25/25 and
+ * 60/40 that is 0.30 / 0.15 / 0.15 / 0.40. This is the one place that product is
+ * written — `explainTerm` (what a student is told) and `weightedComponents`
+ * (which parts a "partial" grade is missing) both read it, so a policy change
+ * moves them together.
+ *
+ * Not used by `termGrade` itself, which multiplies in two steps and is pinned by
+ * the load-bearing precision test; this restates the same weights, it does not
+ * replace that arithmetic.
+ */
+export function componentShare(policy: GradePolicy, component: GradeComponent): number {
+  switch (component) {
+    case 'performance_task':
+      return policy.csWeight * policy.ptWeight
+    case 'quiz':
+      return policy.csWeight * policy.quizWeight
+    case 'recitation':
+      return policy.csWeight * policy.recitWeight
+    case 'exam':
+      return policy.examWeight
+  }
+}
+
+/** The parts that actually count toward this term — a zero-weight part is not "missing". */
+export function weightedComponents(policy: GradePolicy): GradeComponent[] {
+  return GRADE_COMPONENTS.filter((c) => componentShare(policy, c) > 0)
+}
+
 /** Does this term have any item at all (official), or any marked one (so far)? */
 export function hasAnyItems(sums: TermSums, view: GradeView = 'official'): boolean {
   return GRADE_COMPONENTS.some((c) =>

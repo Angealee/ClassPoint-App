@@ -37,10 +37,14 @@ parser limitation and 0025 is long applied.)
 3. [ ] Paste `0061_active_semester_where.sql` (twice).
 4. [ ] Paste `0060_semester_close.sql` (twice).
 5. [ ] Paste `0062_grade_boosts.sql` (twice).
-6. [ ] Run `applied_state.sql` BLOCK 6. All three rows must read `true`:
-       0061, "0062 · decide_point_redemption has the grade branch",
+       0060 and 0062 can go in **either** order: both now list all 18 audit actions. (They
+       did not before — 0060 pasted after 0062 would have silently removed two of them.)
+6. [ ] Run `applied_state.sql` BLOCK 6. All four rows must read `true`: 0056, 0061,
+       "0062 · decide_point_redemption has the grade branch",
        "0062 · point_events accepts a refund".
-7. [ ] Run the **verify block at the foot of each file** (they are comments — copy the
+7. [ ] Run `applied_state.sql` **BLOCK 7**. It must return **zero rows**. Any row names a
+       value the app writes that the live audit constraint would reject.
+8. [ ] Run the **verify block at the foot of each file** (they are comments — copy the
        statements). Items 2, 5, 6, 7, 9 and 15 of 0062's are the ones that matter most.
 
 ## 2. The semester fix (0061)
@@ -157,6 +161,21 @@ done on probe routes so far.
       Points history, Profile (own and someone else's), Settings, Student Space, a chat room.
 - [ ] Instructor: Students, a student record, Attendance (live), History, Grades (grid +
       mobile entry — check the **Term …** line under each name), Requests, Ops, Semesters.
+
+**The Grades redesign and the instructor phone header** (both were verified only on probe
+routes, with fixture data):
+
+- [ ] Laptop, `/teach/grades`: the toolbar is **one row** (Section, Subject, term tabs,
+      So far / Official, "What do these mean?"); the title does **not** overlap the left rail;
+      the grid **fills the width**, edge to edge with the toolbar; the rail shows only the logo, with the theme switch and the four
+      buttons stacked at the bottom, none cut off.
+- [ ] In **So far**, only computed parts that have marks are columns, the band says
+      "Computed · N hidden", and **Official** shows all five.
+- [ ] A term grade built from some of the parts shows dimmed with "partial".
+- [ ] The footer shows each column's average and "marked n/N", and stays pinned while you
+      scroll a long roster; type a mark and the footer updates when you leave the cell.
+- [ ] **Phone, instructor login:** the top bar fits, with all four buttons on screen
+      (Requests, Peer, Ops, Sign out). Before this fix the right-hand ones were off the edge.
 
 ## 10. Things that are **expected**, not bugs
 

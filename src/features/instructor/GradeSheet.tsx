@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/Select'
 import { Chip } from '@/components/ui/Chip'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ListSkeleton } from '@/components/ui/Skeleton'
+import { Meter } from '@/components/ui/Meter'
 import { StickyBar } from '@/components/ui/StickyBar'
 import { useToast } from '@/components/ui/Toast'
 import {
@@ -568,21 +569,29 @@ export function GradeSheet() {
         }
       />
 
-      {/* ── THE SCOPE, AS TWO PICKERS RATHER THAN A SCREEN OF CARDS ──────────
-          This is what replaced `GradesConsole`. Changing either one NAVIGATES,
-          because the scope has to stay in the path — `Shell` reads `pathname`
-          to decide this route gets the full window, and a scope in state would
-          strand the grid in the 672px reading column.
+      {/* ── ONE COMPACT BAR ───────────────────────────────────────────────────
+          Scope (section, subject), which term, which figure and the help link,
+          all on one row. The scope used to be two pickers each HALF the window
+          wide, with the term tabs, the figure toggle and the progress line on
+          three more rows beneath — about 150px of the screen spent before the
+          first student, and two controls that dominate the page being the two
+          you touch least.
 
-          Full width and stacked on a phone: a section name is the longest
-          string on the screen and the whole job of the control is to name it.
-          (The leaderboard's capped picker is the counter-example — 136px of
-          box for "BSIT 2A — Platform Technologies Section".) */}
-      <div className="mb-3 grid gap-2 sm:grid-cols-2">
+          The pickers are now the width of what they hold. They still NAVIGATE
+          rather than set state: the scope has to stay in the path, because
+          `Shell` reads `pathname` to decide this route gets the full window.
+
+          On a phone every control is full width and stacked — a section name is
+          the longest string on the screen and the job of the control is to name
+          it. `text-base` below `md` is the iOS zoom rule; the compact `h-9
+          text-sm` is desktop only. */}
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
         <Select
-          label="Section"
+          aria-label="Section"
           value={sectionId}
           onChange={(e) => goTo(e.target.value, subjectId, tab)}
+          wrapperClassName="w-full sm:w-auto sm:min-w-40 sm:max-w-72"
+          className="md:h-9 md:text-sm"
         >
           {sections.map((s) => (
             <option key={s.id} value={s.id}>
@@ -591,40 +600,26 @@ export function GradeSheet() {
           ))}
         </Select>
 
-        <div>
-          <Select
-            label="Subject"
-            value={subjectId}
-            onChange={(e) => goTo(sectionId, e.target.value, tab)}
-          >
-            {subjectChoices.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} · {s.name}
-              </option>
-            ))}
-          </Select>
-          {/* GradesConsole's one genuinely useful signal, moved to where the
-              subject actually is. A subject needs all three policy rows and
-              each has to add up; when it does not, EVERY figure on EVERY sheet
-              for that subject is withheld, and finding that out three taps in
-              is what made the old landing feel necessary. */}
-          {subjectProblem && (
-            <p className="mt-1.5 flex items-start gap-1.5 text-xs text-warn">
-              <Chip tone="warn" size="sm">
-                Check weights
-              </Chip>
-              <span className="min-w-0">{subjectProblem}</span>
-            </p>
-          )}
-        </div>
-      </div>
+        <Select
+          aria-label="Subject"
+          value={subjectId}
+          onChange={(e) => goTo(sectionId, e.target.value, tab)}
+          wrapperClassName="w-full sm:w-auto sm:min-w-48 sm:max-w-80"
+          className="md:h-9 md:text-sm"
+        >
+          {subjectChoices.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.code} · {s.name}
+            </option>
+          ))}
+        </Select>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
         <SegmentedControl
           label="Term"
           value={tab}
           onChange={(next) => goTo(sectionId, subjectId, next)}
           options={TABS.map((t) => ({ value: t, label: TAB_LABEL[t] }))}
+          className="w-full sm:w-80"
         />
         {/* QUIET, not accent. Two filled strips side by side read as one
             control with two active items — the term tabs own the red, because
@@ -647,44 +642,66 @@ export function GradeSheet() {
               { value: 'soFar', label: 'So far' },
               { value: 'official', label: 'Official' },
             ]}
+            className="w-full sm:w-44"
           />
         )}
         <button
           type="button"
           onClick={() => setNoteOpen((o) => !o)}
           aria-expanded={noteOpen}
-          className="ml-auto text-xs text-muted underline-offset-2 hover:underline"
+          className="cp-tap-y ml-auto text-xs text-muted underline-offset-2 hover:underline"
         >
           {noteOpen ? 'Hide' : 'What do these mean?'}
         </button>
       </div>
 
-      {/* ── HOW MUCH IS ENTERED ───────────────────────────────────────────────
-          "What is left to do" is the question the old landing never answered,
-          and the reason it felt like a menu you had to guess your way through.
-
-          All three terms on one line rather than a percentage inside each tab:
-          the four-tab strip is ~85px per tab at 375px, and "Prelim 18%" does
-          not fit there without shrinking the text below the point of being
-          readable. One line says more and costs the same height.
-
-          A term with no columns reads "—", never 0% — the instructor has not
-          fallen behind on a term they have not set up yet. */}
-      {allSums.length > 0 && (
-        <p className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-          <span className="font-semibold">Entered</span>
-          {TERMS.map((t) => {
-            const pct = completion[t]
-            return (
-              <span key={t} className={cn(t === term && !isOverall && 'text-ink')}>
-                {TERM_LABEL[t]}{' '}
-                <span className="font-semibold tabular-nums">
-                  {pct === null ? '—' : `${pct}%`}
-                </span>
-              </span>
-            )
-          })}
+      {/* GradesConsole's one genuinely useful signal, kept where the subject
+          actually is. A subject needs all three policy rows and each has to add
+          up; when it does not, EVERY figure on EVERY sheet for that subject is
+          withheld, and finding that out three taps in is what made the old
+          landing feel necessary. Its own line, not squeezed into the bar. */}
+      {subjectProblem && (
+        <p className="mb-2 flex items-start gap-1.5 text-xs text-warn">
+          <Chip tone="warn" size="sm">
+            Check weights
+          </Chip>
+          <span className="min-w-0">{subjectProblem}</span>
         </p>
+      )}
+
+      {/* ── HOW MUCH IS ENTERED ───────────────────────────────────────────────
+          "What is left to do" is the question the old landing never answered.
+          A hairline meter for the term on screen, then all three on one line:
+          a percentage inside each tab does not fit a four-tab strip at phone
+          width. A term with no columns reads "—", never 0% — the instructor has
+          not fallen behind on a term they have not set up yet. */}
+      {allSums.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+          {!isOverall && completion[term] !== null && (
+            <Meter
+              value={completion[term] ?? 0}
+              max={100}
+              size="sm"
+              tone={completion[term] === 100 ? 'success' : 'accent'}
+              label={TERM_LABEL[term] + ' entered'}
+              className="w-40"
+            />
+          )}
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-semibold">Entered</span>
+            {TERMS.map((t) => {
+              const pct = completion[t]
+              return (
+                <span key={t} className={cn(t === term && !isOverall && 'text-ink')}>
+                  {TERM_LABEL[t]}{' '}
+                  <span className="font-semibold tabular-nums">
+                    {pct === null ? '—' : pct + '%'}
+                  </span>
+                </span>
+              )
+            })}
+          </span>
+        </div>
       )}
 
       {/* Collapsed by default: it is a two-line explanation you need once, on a
