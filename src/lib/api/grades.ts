@@ -1,6 +1,9 @@
 import { supabase } from '@/lib/supabase'
 import { fetchAllPages, num, rpc, withAuthRetry } from './_internal'
 import type {
+  GradeAbsence,
+  GradeAssistDefault,
+  GradeAttendance,
   GradeBoost,
   GradeItem,
   GradePolicy,
@@ -77,6 +80,9 @@ type ItemRow = {
   /** 0062. Absent when the row was read from a database that lacks it. */
   points_cost?: number | null
   points_bonus?: number | string | null
+  /** 0063. Absent when the row was read from a database that lacks it. */
+  assist_off?: boolean
+  session_id?: string | null
 }
 
 function mapItem(row: ItemRow): GradeItem {
@@ -92,6 +98,8 @@ function mapItem(row: ItemRow): GradeItem {
     archivedAt: row.archived_at,
     pointsCost: row.points_cost ?? null,
     pointsBonus: num(row.points_bonus),
+    assistOff: row.assist_off === true,
+    sessionId: row.session_id ?? null,
   }
 }
 
@@ -110,9 +118,15 @@ const ITEM_COLS =
  */
 const ITEM_COLS_WITH_BOOST = `${ITEM_COLS}, points_cost, points_bonus`
 
+/** …and the 0063 pair: a column switched off, and the class it was held in. */
+const ITEM_COLS_WITH_ASSIST = `${ITEM_COLS_WITH_BOOST}, assist_off, session_id`
+
 /** PostgREST's "that column is not there" — Postgres 42703 reaches us as this. */
 function isMissingBoostColumn(error: { code?: string; message?: string }): boolean {
-  return error.code === '42703' || /points_(cost|bonus)/.test(error.message ?? '')
+  return (
+    error.code === '42703' ||
+    /points_(cost|bonus)|assist_off|session_id/.test(error.message ?? '')
+  )
 }
 
 // ----------------------------------------------------------------------------
@@ -218,7 +232,14 @@ export async function saveGradePolicies(
 // Items — the score columns
 // ----------------------------------------------------------------------------
 
-/** Every score column for a scope. Archived ones are included, flagged. */
+/**
+ * Every score column for a scope. Archived ones are included, flagged.
+ *
+ * RECITATION COLUMNS ARE NOT RETURNED (0063). The Recitation part is the term's
+ * attendance rate now, so a typed column there would be a number nothing reads.
+ * The rows stay in `grade_items` — retired, not deleted — and in the nightly
+ * backup; they are simply not part of the grade.
+ */
 export async function listGradeItems(
   sectionId: string,
   subjectId: string,
@@ -230,11 +251,17 @@ export async function listGradeItems(
       .select(cols)
       .eq('section_id', sectionId)
       .eq('subject_id', subjectId)
+      .neq('component', 'recitation')
     if (term) q = q.eq('term', term)
     return q.order('component').order('position').order('created_at')
   }
 
-  let { data, error } = await run(ITEM_COLS_WITH_BOOST)
+  // Newest column set first, falling back one migration at a time: pasting the
+  // client before 0063 (or 0062) costs those fields and nothing else.
+  let { data, error } = await run(ITEM_COLS_WITH_ASSIST)
+  if (error && isMissingBoostColumn(error)) {
+    ;({ data, error } = await run(ITEM_COLS_WITH_BOOST))
+  }
   if (error && isMissingBoostColumn(error)) {
     ;({ data, error } = await run(ITEM_COLS))
   }
@@ -280,7 +307,12 @@ export async function createGradeItem(input: NewGradeItem): Promise<GradeItem> {
  */
 export async function updateGradeItem(
   id: string,
-  patch: Partial<Pick<GradeItem, 'name' | 'maxScore' | 'position' | 'pointsCost' | 'pointsBonus'>>,
+  patch: Partial<
+    Pick<
+      GradeItem,
+      'name' | 'maxScore' | 'position' | 'pointsCost' | 'pointsBonus' | 'assistOff' | 'sessionId'
+    >
+  >,
 ): Promise<void> {
   const row: {
     name?: string
@@ -288,10 +320,15 @@ export async function updateGradeItem(
     position?: number
     points_cost?: number | null
     points_bonus?: number | null
+    assist_off?: boolean
+    session_id?: string | null
   } = {}
   if (patch.name !== undefined) row.name = patch.name.trim()
   if (patch.maxScore !== undefined) row.max_score = patch.maxScore
   if (patch.position !== undefined) row.position = patch.position
+  // 0063. Sent only when CHANGED, so a rename still works before the migration.
+  if (patch.assistOff !== undefined) row.assist_off = patch.assistOff
+  if (patch.sessionId !== undefined) row.session_id = patch.sessionId
   // The pair is written TOGETHER or not at all: the table CHECKs both-or-neither,
   // so sending one half would be rejected with a constraint name nobody can read.
   if (patch.pointsCost !== undefined || patch.pointsBonus !== undefined) {
@@ -427,6 +464,162 @@ export async function clearGradeScores(cells: Array<Pick<GradeScore, 'itemId' | 
       })
     }
   }
+}
+
+// ----------------------------------------------------------------------------
+// Absent marks and attendance (migration 0063)
+//
+// Every call here fails on a database without 0063, so each caller fetches in its
+// OWN try/catch: a missing function must cost the A marks or the Recitation
+// figure, never the grid (the 0034 SectionGrid precedent).
+// ----------------------------------------------------------------------------
+
+/**
+ * Every Absent mark in a scope — the ones typed by hand AND the ones derived
+ * from attendance for columns tied to a class. One jsonb array, because a
+ * section-term can hold ~800 cells, past PostgREST's silent 1000-row cap.
+ */
+export async function getGradeAbsences(
+  sectionId: string,
+  subjectId: string,
+  term?: TermKey,
+): Promise<GradeAbsence[]> {
+  const raw = await rpc<GradeAbsence[] | null>('get_grade_absences', {
+    p_section_id: sectionId,
+    p_subject_id: subjectId,
+    p_term: term ?? null,
+  })
+  return (raw ?? []).map((a) => ({
+    itemId: a.itemId,
+    studentId: a.studentId,
+    source: a.source === 'auto' ? 'auto' : 'manual',
+  }))
+}
+
+/**
+ * Mark cells Absent. The server removes any mark in the same cell (a trigger, so
+ * no code path can leave a cell saying both).
+ */
+export async function saveGradeAbsences(cells: Array<Pick<GradeScore, 'itemId' | 'studentId'>>) {
+  if (cells.length === 0) return
+  await withAuthRetry(async () => {
+    const { error } = await supabase.from('grade_absences').upsert(
+      cells.map((c) => ({ item_id: c.itemId, student_id: c.studentId })),
+      { onConflict: 'item_id,student_id' },
+    )
+    if (error) throw error
+  })
+}
+
+/** Take the typed Absent mark off cells. A derived one (from attendance) stays. */
+export async function clearGradeAbsences(cells: Array<Pick<GradeScore, 'itemId' | 'studentId'>>) {
+  if (cells.length === 0) return
+  const byItem = new Map<string, string[]>()
+  for (const cell of cells) {
+    const list = byItem.get(cell.itemId)
+    if (list) list.push(cell.studentId)
+    else byItem.set(cell.itemId, [cell.studentId])
+  }
+  for (const [itemId, studentIds] of byItem) {
+    for (let i = 0; i < studentIds.length; i += CHUNK) {
+      const chunk = studentIds.slice(i, i + CHUNK)
+      await withAuthRetry(async () => {
+        const { error } = await supabase
+          .from('grade_absences')
+          .delete()
+          .eq('item_id', itemId)
+          .in('student_id', chunk)
+        if (error) throw error
+      })
+    }
+  }
+}
+
+/**
+ * Each student's attendance COUNTS for one subject and term — the inputs to the
+ * Recitation grade. Counts only: the rate is computed by `grading.ts`, the one
+ * definition. A student with no classes in the term is simply absent from the map.
+ */
+export async function getGradeAttendance(
+  sectionId: string,
+  subjectId: string,
+  term: TermKey,
+): Promise<Map<string, GradeAttendance>> {
+  const rows = await rpc<
+    Array<{ student_id: string; showed: number | string; counted: number | string }>
+  >('get_grade_attendance', {
+    p_section_id: sectionId,
+    p_subject_id: subjectId,
+    p_term: term,
+  })
+  const out = new Map<string, GradeAttendance>()
+  for (const r of rows ?? []) {
+    out.set(r.student_id, { showed: num(r.showed) ?? 0, counted: num(r.counted) ?? 0 })
+  }
+  return out
+}
+
+// ----------------------------------------------------------------------------
+// Points-assist terms per part (migration 0063)
+// ----------------------------------------------------------------------------
+
+/** The subject's terms for each part. Missing parts simply have none. */
+export async function listGradeAssistDefaults(subjectId: string): Promise<GradeAssistDefault[]> {
+  const { data, error } = await supabase
+    .from('grade_assist_defaults')
+    .select('subject_id, component, points_cost, points_bonus')
+    .eq('subject_id', subjectId)
+  if (error) throw error
+  return ((data ?? []) as Array<{
+    subject_id: string
+    component: GradeAssistDefault['component']
+    points_cost: number
+    points_bonus: number | string
+  }>).map((r) => ({
+    subjectId: r.subject_id,
+    component: r.component,
+    pointsCost: r.points_cost,
+    pointsBonus: num(r.points_bonus) ?? 0,
+  }))
+}
+
+/**
+ * Save the terms for every part at once. A part with `null` terms is removed
+ * (its columns stop being offered unless they carry their own terms).
+ */
+export async function saveGradeAssistDefaults(
+  subjectId: string,
+  terms: Array<{
+    component: GradeAssistDefault['component']
+    terms: { pointsCost: number; pointsBonus: number } | null
+  }>,
+): Promise<void> {
+  const keep = terms.filter((t) => t.terms !== null)
+  const drop = terms.filter((t) => t.terms === null).map((t) => t.component)
+
+  await withAuthRetry(async () => {
+    if (keep.length > 0) {
+      const { error } = await supabase.from('grade_assist_defaults').upsert(
+        keep.map((t) => ({
+          subject_id: subjectId,
+          component: t.component,
+          points_cost: t.terms!.pointsCost,
+          points_bonus: t.terms!.pointsBonus,
+          updated_at: new Date().toISOString(),
+        })),
+        { onConflict: 'subject_id,component' },
+      )
+      if (error) throw error
+    }
+    if (drop.length > 0) {
+      const { error } = await supabase
+        .from('grade_assist_defaults')
+        .delete()
+        .eq('subject_id', subjectId)
+        .in('component', drop)
+      if (error) throw error
+    }
+  })
 }
 
 // ----------------------------------------------------------------------------
@@ -675,6 +868,8 @@ type MyGradesRaw = {
     code: string
     name: string
     policies: Array<Omit<GradePolicy, 'subjectId'>>
+    /** 0063 — absent on a database without it. */
+    attendance?: Partial<Record<TermKey, { showed?: number | string; counted?: number | string }>>
     items: MyGradeItem[]
   }>
 }
@@ -708,12 +903,22 @@ export async function getMyGrades(): Promise<MyGrades> {
         transmuteBase: num(p.transmuteBase) ?? 0,
         transmuteSpan: num(p.transmuteSpan) ?? 0,
       })),
+      attendance: Object.fromEntries(
+        (['prelim', 'midterm', 'finals'] as TermKey[]).map((t) => [
+          t,
+          {
+            showed: num(s.attendance?.[t]?.showed) ?? 0,
+            counted: num(s.attendance?.[t]?.counted) ?? 0,
+          },
+        ]),
+      ) as Record<TermKey, GradeAttendance>,
       items: (s.items ?? []).map((i) => ({
         ...i,
         maxScore: num(i.maxScore) ?? 0,
         score: num(i.score),
         pointsCost: i.pointsCost ?? null,
         pointsBonus: num(i.pointsBonus),
+        absent: i.absent === true,
         boost: i.boost
           ? {
               marks: num(i.boost.marks) ?? 0,

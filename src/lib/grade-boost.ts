@@ -28,6 +28,11 @@ export type BoostState =
   | { kind: 'pending' }
   /** The instructor has not offered this column. */
   | { kind: 'not-offered' }
+  /**
+   * Offered, but this student was absent for it (0063) — marked absent, or recorded
+   * absent / excused in the class it was held in. Server: "You were marked absent for …".
+   */
+  | { kind: 'absent' }
   /** Offered, but their mark is not in — "Your mark … isn't in yet". */
   | { kind: 'unmarked'; cost: number; bonus: number }
   /** Offered, but already at the maximum — "You already have full marks". */
@@ -72,6 +77,11 @@ export function boostState(item: MyGradeItem): BoostState {
   }
   if (item.pending) return { kind: 'pending' }
   if (item.pointsCost === null || item.pointsBonus === null) return { kind: 'not-offered' }
+
+  // Absent comes BEFORE "unmarked", as it does on the server: "you were absent" is
+  // the truer reason and tells them not to wait for a mark that is not coming. It
+  // applies even when a mark was typed (an absentee given a 0 cannot be assisted).
+  if (item.absent) return { kind: 'absent' }
 
   const cost = item.pointsCost
   const bonus = item.pointsBonus

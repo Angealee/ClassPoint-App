@@ -94,9 +94,12 @@ export function summarizeTerm(subject: MyGradeSubject, term: TermKey): TermSumma
   for (const i of items) if (i.score !== null) scoreById.set(i.id, i.score)
 
   // `archivedAt: null` — get_my_grades only ever returns live columns.
+  // Recitation is the student’s attendance rate for the term (0063), so the counts
+  // travel with the subject and go in beside their marks.
   const sums = sumsFromScores(
     items.map((i) => ({ id: i.id, component: i.component, maxScore: i.maxScore, archivedAt: null })),
     scoreById,
+    subject.attendance?.[term],
   )
 
   const usable = policy !== null && policyError(policy) === null
@@ -243,6 +246,8 @@ export function boostReason(state: BoostState): string {
       return 'Already at full marks'
     case 'not-offered':
       return 'Not offered for points'
+    case 'absent':
+      return 'You were absent for this one'
     case 'available':
       return 'Available'
   }

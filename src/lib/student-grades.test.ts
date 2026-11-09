@@ -32,6 +32,7 @@ function it_(over: Partial<MyGradeItem> & { id: string }): MyGradeItem {
     score: null,
     pointsCost: null,
     pointsBonus: null,
+    absent: false,
     boost: null,
     pending: false,
     ...over,
@@ -45,6 +46,11 @@ function subject(items: MyGradeItem[], policies?: GradePolicy[]): MyGradeSubject
     name: 'Platform Technologies',
     policies:
       policies ?? (['prelim', 'midterm', 'finals'] as TermKey[]).map((t) => defaultPolicy('s1', t)),
+    attendance: {
+      prelim: { showed: 0, counted: 0 },
+      midterm: { showed: 0, counted: 0 },
+      finals: { showed: 0, counted: 0 },
+    },
     items,
   }
 }
@@ -328,5 +334,51 @@ describe('a student is never shown the official grade', () => {
     const offending = "const g = termGrade(sums, policy, 'official')"
     expect(offending).toMatch(/['"]official['"]/)
     expect('const f = finalGrade(terms)').toMatch(/\bfinalGrade\b/)
+  })
+})
+
+describe('Recitation from attendance (0063)', () => {
+  it('uses the student’s attendance rate as-is, beside their marks', () => {
+    // Hand-computed. PT unmarked → 60. Quiz 10/10 → 100. Recitation 9 of 10
+    // classes → 90 (as-is: no floor, no transmutation). Exam unmarked → 60.
+    // CS = 60*.5 + 100*.25 + 90*.25 = 77.5;  term = 77.5*.6 + 60*.4 = 70.5.
+    const s = subject([
+      it_({ id: 'pt', component: 'performance_task', maxScore: 20, score: null }),
+      it_({ id: 'q', component: 'quiz', maxScore: 10, score: 10 }),
+      it_({ id: 'e', component: 'exam', maxScore: 50, score: null }),
+    ])
+    s.attendance.prelim = { showed: 9, counted: 10 }
+    const t = summarizeTerm(s, 'prelim')
+    expect(t.soFar).toBeCloseTo(70.5, 9)
+    const recit = t.components.find((c) => c.component === 'recitation')
+    expect(recit?.score).toBeCloseTo(90, 9)
+    expect(recit?.earned).toBe(9)
+    expect(recit?.possible).toBe(10)
+  })
+
+  it('shows a dash for Recitation, not 60, before any class has been counted', () => {
+    const s = subject([it_({ id: 'q', component: 'quiz', maxScore: 10, score: 10 })])
+    const recit = summarizeTerm(s, 'prelim').components.find((c) => c.component === 'recitation')
+    expect(recit?.score).toBeNull()
+  })
+
+  it('scopes attendance to the term it belongs to', () => {
+    const s = subject([it_({ id: 'q', component: 'quiz', maxScore: 10, score: 10, term: 'midterm' })])
+    s.attendance.prelim = { showed: 1, counted: 10 }
+    s.attendance.midterm = { showed: 10, counted: 10 }
+    const recit = summarizeTerm(s, 'midterm').components.find((c) => c.component === 'recitation')
+    expect(recit?.score).toBeCloseTo(100, 9)
+  })
+
+  it('explains an absent column in words', () => {
+    expect(boostReason({ kind: 'absent' })).toBe('You were absent for this one')
+  })
+
+  it('files an absent column under “not available”, never as something to act on', () => {
+    const s = subject([it_({ id: 'q', component: 'quiz', score: 4, pointsCost: 3, pointsBonus: 2, absent: true })])
+    const { actionable, other } = boostColumns([s])
+    expect(actionable).toHaveLength(0)
+    expect(other[0].state.kind).toBe('absent')
+    expect(boostableCount([s])).toBe(0)
   })
 })

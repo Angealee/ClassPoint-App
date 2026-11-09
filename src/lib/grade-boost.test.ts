@@ -24,6 +24,7 @@ function item(over: Partial<MyGradeItem> = {}): MyGradeItem {
     score: 12,
     pointsCost: 5,
     pointsBonus: 4,
+    absent: false,
     boost: null,
     pending: false,
     ...over,
@@ -147,5 +148,36 @@ describe('boostTermsError', () => {
     expect(boostTermsError(5, 0, 20)).not.toBeNull()
     expect(boostTermsError(5, 21, 20)).not.toBeNull()
     expect(boostTermsError(5, 20, 20)).toBeNull()
+  })
+})
+
+describe('boostState — absent (0063)', () => {
+  it('refuses an absent student even with a mark typed — a 0 for an absentee is not eligible', () => {
+    // The instructor’s rule: ONLY absentees are kept out. A typed 0 would
+    // otherwise be the easiest column in the class to gain on.
+    expect(boostState(item({ absent: true, score: 0 })).kind).toBe('absent')
+    expect(boostState(item({ absent: true, score: 12 })).kind).toBe('absent')
+  })
+
+  it('says absent rather than “your mark isn’t in yet” for an absent student with no mark', () => {
+    // Waiting would be the wrong advice: no mark is coming.
+    expect(boostState(item({ absent: true, score: null })).kind).toBe('absent')
+  })
+
+  it('lets everyone else through: a mark, room to gain, not absent', () => {
+    expect(boostState(item({ absent: false })).kind).toBe('available')
+  })
+
+  it('keeps the receipt and the waiting request ahead of absent — those are history', () => {
+    expect(
+      boostState(item({ absent: true, boost: { marks: 3, points: 5, before: 12 } })).kind,
+    ).toBe('boosted')
+    expect(boostState(item({ absent: true, pending: true })).kind).toBe('pending')
+  })
+
+  it('is not offered before it is absent — a column with no terms stays quiet', () => {
+    expect(boostState(item({ absent: true, pointsCost: null, pointsBonus: null })).kind).toBe(
+      'not-offered',
+    )
   })
 })

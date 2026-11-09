@@ -49,6 +49,18 @@ describe('parseScoreInput', () => {
     }
   })
 
+  it('reads A as the Absent mark, in any case, and nothing else made of letters', () => {
+    for (const a of ['A', 'a', ' abs ', 'ABSENT', 'ab']) {
+      expect(parseScoreInput(a), a).toEqual({ ok: true, value: null, absent: true })
+    }
+    // A typo is not an absence: 'abc' and 'absentee' must stay rejected.
+    for (const bad of ['abc', 'absentee', 'aa', 'x']) {
+      expect(parseScoreInput(bad).ok, bad).toBe(false)
+    }
+    // And a plain blank is still just blank, not absent.
+    expect(parseScoreInput('')).toEqual({ ok: true, value: null })
+  })
+
   it('rounds to the two decimals the column actually stores', () => {
     // numeric(6,2) would round this on the way in, and the cell would keep
     // showing 18.567 until the next reload.

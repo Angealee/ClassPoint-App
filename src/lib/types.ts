@@ -1650,6 +1650,44 @@ export interface GradeItem {
    */
   pointsCost: number | null
   pointsBonus: number | null
+  /**
+   * Switched off (0063): not offered even though its part is. Only meaningful when
+   * the column has no terms of its own; false when read from a database without 0063.
+   */
+  assistOff: boolean
+  /**
+   * The class this column was held in (0063). Anyone recorded absent OR excused in
+   * that class is Absent on this column. Null = not tied to a class.
+   */
+  sessionId: string | null
+}
+
+/**
+ * The subject's terms for one PART (0063): every column of that part follows them
+ * unless it has its own or is switched off. Recitation is not a part here — it is
+ * computed from attendance, so there is no mark to add to.
+ */
+export interface GradeAssistDefault {
+  subjectId: string
+  component: Exclude<GradeComponent, 'recitation'>
+  pointsCost: number
+  pointsBonus: number
+}
+
+/**
+ * One Absent mark (0063): 'manual' = the instructor typed A, 'auto' = the student
+ * is recorded absent or excused in the class the column is tied to.
+ */
+export interface GradeAbsence {
+  itemId: string
+  studentId: string
+  source: 'manual' | 'auto'
+}
+
+/** Classes a student showed up to, and classes counted — the Recitation inputs. */
+export interface GradeAttendance {
+  showed: number
+  counted: number
 }
 
 /** Mirrors `request_point_redemption`'s own ceiling; a column cannot cost more. */
@@ -1699,9 +1737,11 @@ export interface MyGradeItem {
   position: number
   /** null = not marked yet. Never a zero standing in for that. */
   score: number | null
-  /** The terms on offer, or null when points cannot be used on this column. */
+  /** The terms on offer (the column's own, else its part's), or null when none. */
   pointsCost: number | null
   pointsBonus: number | null
+  /** Marked absent, or recorded absent / excused in the class it was held in (0063). */
+  absent: boolean
   /** Set once a boost has been applied to this column. */
   boost: { marks: number; points: number; before: number } | null
   /** A boost request for this column is waiting on the instructor. */
@@ -1714,6 +1754,8 @@ export interface MyGradeSubject {
   name: string
   /** The weights, so the client can derive the "so far" figure with grading.ts. */
   policies: GradePolicy[]
+  /** Attendance counts per term — Recitation is computed from them (0063). */
+  attendance: Record<TermKey, GradeAttendance>
   items: MyGradeItem[]
 }
 

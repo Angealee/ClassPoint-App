@@ -12,7 +12,8 @@ export const SCORE_MAX = 9999.99
 export const SCORE_DECIMALS = 2
 
 export type ParsedScore =
-  | { ok: true; value: number | null }
+  /** `absent: true` is the letter A (0063): no mark, and the student was not there. */
+  | { ok: true; value: number | null; absent?: boolean }
   | { ok: false; reason: string }
 
 /**
@@ -31,15 +32,20 @@ export function parseScoreInput(raw: string): ParsedScore {
   const s = raw.trim()
   if (s === '') return { ok: true, value: null }
 
+  // The Absent mark. `A`, `ab`, `abs` or `absent` in any case: one keystroke for
+  // the person who knows, the long word for the first time. Any OTHER run of
+  // letters is still a typo, not an absence.
+  if (/^(a|ab|abs|absent)$/i.test(s)) return { ok: true, value: null, absent: true }
+
   if (!/^(\d+(\.\d+)?|\.\d+)$/.test(s)) {
     // Covers letters, a stray minus, exponents and thousands separators. The
     // message names what IS accepted rather than what was wrong — the input is
     // one cell wide and there is no room for a diagnosis.
-    return { ok: false, reason: 'Only a number, like 18 or 18.5.' }
+    return { ok: false, reason: 'Only a number, like 18 or 18.5 — or A for absent.' }
   }
 
   const n = Number(s)
-  if (!Number.isFinite(n)) return { ok: false, reason: 'Only a number, like 18 or 18.5.' }
+  if (!Number.isFinite(n)) return { ok: false, reason: 'Only a number, like 18 or 18.5 — or A for absent.' }
   if (n > SCORE_MAX) return { ok: false, reason: `That is above the largest score, ${SCORE_MAX}.` }
 
   // Round here rather than letting Postgres do it on the way in: numeric(6,2)

@@ -702,6 +702,29 @@ export interface Database {
         points_cost: number | null
         /** 0062 — "…to add this many marks". Both set or both null. */
         points_bonus: number | null
+        /** 0063 — switched off even though its part is offered. */
+        assist_off: boolean
+        /** 0063 — the class this column was held in (absent there = Absent here). */
+        session_id: UUID | null
+      }>
+
+      /** 0063 — the subject's points-assist terms for one PART. */
+      grade_assist_defaults: Row<{
+        subject_id: UUID
+        component: 'performance_task' | 'quiz' | 'exam'
+        points_cost: number
+        points_bonus: number
+        updated_at: Timestamp
+      }>
+
+      /**
+       * 0063 — an Absent mark typed by hand. A cell is a mark OR this, never both
+       * (a trigger enforces it). Absence DERIVED from attendance has no row.
+       */
+      grade_absences: Row<{
+        item_id: UUID
+        student_id: UUID
+        created_at: Timestamp
       }>
 
       /**
