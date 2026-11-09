@@ -4286,6 +4286,16 @@ verified to fail on a deliberately broken body and a broken top-level statement 
 "clean" means something. **It checks syntax only**: a wrong column name or a type
 mismatch still fails at runtime, which is why the verify block, not the parse, is the
 test. It would have caught the `$$` → `$` slip that shipped in 0041.
+**Run across ALL 62 migrations and both `supabase/queries/` files (2026-11-09): every one
+parses clean except 0025**, and that one is a known false positive — `select … into
+v_session.topic, v_session.started_at` assigns to fields of a `%rowtype` variable, which is
+valid PL/pgSQL but which a catalog-less parser cannot resolve ("`v_session.topic` is not a
+known variable"). 0025 has been applied and in daily use since long before this check
+existed. **So a pending paste (0042–0062) is not going to die on a syntax error;** what can
+still fail is a name or type that only the database knows, which is what each file's verify
+block and `applied_state.sql` are for. To re-run it, install `libpg-query` in a scratch
+directory (never the project) and feed it each file's top-level statements plus each
+`create function … as $$ … $$;` body.
 
 **Verified: 0 errors, 109 warnings (unchanged), 530 tests** (from 0/109/490). Probe
 route (removed, residue-checked) at 375×812 with fixture data: the Grades screen with

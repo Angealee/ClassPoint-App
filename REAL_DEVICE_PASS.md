@@ -22,6 +22,12 @@ behave as written, stop there and tell me the step number and what you saw.
 Open the Supabase SQL editor. Paste each file **whole**, then paste it **a second time**
 (the second run must print no error — that is the idempotency test).
 
+Every migration (0001–0062) and both query files have already been run through a real
+PostgreSQL parser and are syntactically valid, so a paste will not fail on a typo or a
+stray `$`. What the parser **cannot** see is a column or type that only your database knows
+about — that is what the verify blocks below catch. (It flags 0025 on one line; that is a
+parser limitation and 0025 is long applied.)
+
 1. [ ] Run `supabase/queries/applied_state.sql` **BLOCK 2** and keep the output. It is the
        live `audit_log_action_check`. Every value in it must also appear in 0062 §8
        (18 values). If one is missing, **stop** and tell me — pasting would fail or narrow it.
