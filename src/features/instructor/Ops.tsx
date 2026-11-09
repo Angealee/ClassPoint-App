@@ -6,13 +6,16 @@ import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
-import { CalendarIcon, SaturnIcon } from '@/components/ui/icons'
+import { CalendarIcon, SaturnIcon, TableIcon } from '@/components/ui/icons'
+import { Toggle } from '@/components/ui/Toggle'
 import {
   forceLeaderboardRefresh,
   getBackupHealth,
   getSectionHeadcounts,
+  getStudentGradesEnabled,
   listAuditLog,
   listAuthEvents,
+  setStudentGradesEnabled,
 } from '@/lib/api'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { AttendanceWorkbook } from './AttendanceWorkbook'
@@ -59,6 +62,7 @@ export function Ops() {
 
       <SemestersCard />
       <SpaceCard />
+      <StudentGradesCard />
 
       {/* Acting-on-students first, inspection below — the order you'd want on
           a Monday morning. */}
@@ -78,6 +82,11 @@ export function Ops() {
 
 function BackupHealthCard() {
   const [rows, setRows] = useState<BackupHealth[]>([])
+  // When these rows were fetched. "Is the backup stale" is a question about the
+  // moment the answer was read, so it is recorded WITH the answer rather than
+  // taken from the clock while rendering (which is impure, and drifts on every
+  // re-render that has nothing to do with the data).
+  const [loadedAt, setLoadedAt] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -86,6 +95,7 @@ function BackupHealthCard() {
     setError(null)
     try {
       setRows(await getBackupHealth())
+      setLoadedAt(Date.now())
     } catch (e) {
       setError(errorText(e, "Couldn't read backup health."))
     } finally {
@@ -99,8 +109,10 @@ function BackupHealthCard() {
 
   // The nightly job runs at 02:00 Manila. Anything that hasn't captured since
   // yesterday means the cron didn't run — which is the failure this card is for.
-  const today = new Date().toISOString().slice(0, 10)
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+  // `loadedAt` is 0 until the first answer; the rows are empty then too, so the
+  // 1970 dates below are never compared against anything.
+  const today = new Date(loadedAt).toISOString().slice(0, 10)
+  const yesterday = new Date(loadedAt - 86_400_000).toISOString().slice(0, 10)
   const stale = rows.filter((r) => !r.lastSnapshot || r.lastSnapshot < yesterday)
   const healthy = rows.length > 0 && stale.length === 0
 
@@ -216,6 +228,10 @@ function LeaderboardCard() {
 
 function AuthEventsCard() {
   const [rows, setRows] = useState<AuthEvent[]>([])
+  // The fifteen-minute window is measured from when the rows were READ, and
+  // stored with them: taken from the clock at render time it would slide on
+  // every unrelated re-render and could count differently for identical data.
+  const [loadedAt, setLoadedAt] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -224,6 +240,7 @@ function AuthEventsCard() {
     setError(null)
     try {
       setRows(await listAuthEvents(25))
+      setLoadedAt(Date.now())
     } catch (e) {
       setError(errorText(e, "Couldn't read auth events."))
     } finally {
@@ -238,7 +255,7 @@ function AuthEventsCard() {
   // The edge functions lock an IP at 30 failures in 15 minutes (0026). Counting
   // the same window here answers "is this student actually locked out?" — the
   // question this card exists for.
-  const cutoff = Date.now() - 15 * 60_000
+  const cutoff = loadedAt - 15 * 60_000
   const recentFails = new Map<string, number>()
   for (const r of rows) {
     if (r.success || !r.ip || r.detail === 'rate_limited') continue
@@ -447,6 +464,108 @@ function SpaceCard() {
       </span>
       <span className="shrink-0 text-lg text-muted">›</span>
     </button>
+  )
+}
+
+/**
+ * Whether students can see their own grades at all (0062).
+ *
+ * It lives here, beside the Student Space entry, because it is the same kind of
+ * lever: a master switch you reach for when you are about to open something to
+ * the whole class. It ships OFF — pasting the migration exposes nothing — so the
+ * first time this matters is the day you have checked the marks and are ready.
+ *
+ * Turning it ON goes through a confirm, because it is outward-facing and not
+ * quietly reversible: a student who has seen a mark has seen it. Turning it OFF
+ * does not, because the cost of hesitating there is worse than the cost of a
+ * mis-tap (fix the marks, and the screen is already hidden).
+ */
+function StudentGradesCard() {
+  const { toast } = useToast()
+  const [on, setOn] = useState<boolean | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+
+  // No synchronous setState before the request: the failure flag clears when an
+  // answer ARRIVES, which keeps this effect off the fetch-on-mount warning list.
+  const load = useCallback(() => {
+    getStudentGradesEnabled()
+      .then((value) => {
+        setOn(value)
+        setFailed(false)
+      })
+      .catch(() => setFailed(true))
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function apply(next: boolean) {
+    setBusy(true)
+    try {
+      const result = await setStudentGradesEnabled(next)
+      setOn(result.enabled)
+      setConfirming(false)
+      toast(
+        next
+          ? result.notified > 0
+            ? `Students can now see their grades — ${result.notified} notified.`
+            : 'Students can now see their grades.'
+          : 'Student grades are hidden again.',
+        'success',
+      )
+    } catch (e) {
+      toast(errorText(e, 'Could not change that.'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-3 rounded-2xl border border-line bg-card p-4">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-solid/10 text-accent">
+          <TableIcon className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">Student grades</span>
+          <span className="block text-sm text-muted">
+            {failed
+              ? 'Couldn’t read the setting. This needs migration 0062 applied.'
+              : on
+                ? 'Students can see their marks and spend points on flagged columns.'
+                : 'Hidden. Students are told grades aren’t open yet.'}
+          </span>
+          {failed && (
+            <button type="button" onClick={load} className="mt-1 text-xs font-semibold text-accent">
+              Try again
+            </button>
+          )}
+        </span>
+        {on !== null && (
+          <Toggle
+            on={on}
+            busy={busy}
+            label="Students can see their grades"
+            onChange={(next) => (next ? setConfirming(true) : void apply(false))}
+          />
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={confirming}
+        variant="default"
+        title="Open grades to students?"
+        message="Every student will see their own marks and a “so far” figure for each subject, and can ask to spend points on any column you have flagged."
+        detail="Check the marks first. Every student in a class that has marks is sent a notification, and a student who has seen a mark has seen it."
+        confirmLabel="Open grades"
+        busy={busy}
+        onConfirm={() => apply(true)}
+        onClose={() => setConfirming(false)}
+      />
+    </>
   )
 }
 

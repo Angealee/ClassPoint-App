@@ -13,7 +13,7 @@ import {
 import { supabase, uniqueChannel } from '@/lib/supabase'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
-import { flightDurationMs, laneCount, laneHoldMs, pickLane } from '@/lib/danmaku'
+import { flightDurationMs, laneHoldMs, pickLane } from '@/lib/danmaku'
 import {
   MAX_COMMENT_LENGTH,
   MAX_COMMENTS_PER_DAY,
@@ -21,14 +21,14 @@ import {
 } from '@/lib/types'
 
 /**
- * Tall enough for a pill wrapped to its 3-line maximum, plus breathing room.
- * Every lane is sized for the tallest possible pill so lane N always starts
- * where lane N-1 ended, whatever is in it.
+ * Keep the page header and the bottom tab bar clear of floating comments.
+ *
+ * These used to pick each lane's Y position; they are now the TRACK's own top
+ * and bottom, which is a stronger guarantee. A pill travelling vertically
+ * crosses every Y it passes, so "stay off the chrome" cannot be expressed as a
+ * starting position — it has to be the boundary of the thing the pill moves
+ * inside.
  */
-const LANE_HEIGHT = 90
-/** Ceiling on lanes regardless of screen height — past this it reads as noise. */
-const MAX_LANES = 5
-/** Keep the page header and the bottom tab bar clear of flying comments. */
 const TOP_INSET = 76
 const BOTTOM_INSET = 104
 /** Mounted-but-unlaunched pills waiting for a lane. Beyond this we drop the
@@ -85,15 +85,27 @@ interface CommentsOverlayProps {
 }
 
 /**
- * Flying comments across the top of the leaderboard, plus the composer and the
- * moderation list. One global stream — every comment flies on every board view.
+ * Floating comments over the leaderboard, plus the composer and the moderation
+ * list. One global stream — every comment appears on every board view.
  *
- * The flying band is a STICKY strip above the board (not an absolute overlay on
- * top of it), so it never covers the podium/crown and stays visible as you
- * scroll the rankings. Each pill is a CSS keyframe transform (see `.cp-fly` in
- * index.css), removed from state on animationend. Lanes are scheduled so two
- * pills never share a lane within LANE_GAP_MS; anything that would collide
- * waits in a queue and launches when a lane frees up.
+ * ── A RISING COLUMN, NOT A HORIZONTAL STREAM (the instructor's call, 2026-11-08)
+ * Pills used to fly right-to-left across up to five lanes spanning the whole
+ * screen, which meant the podium, the scope picker and the rank rows all sat
+ * behind moving text. They now rise up a single narrow column on the left,
+ * centred to the app's own reading column so they stay beside the board on a
+ * wide screen. One strip is covered instead of the whole board, and a comment
+ * can be three lines tall without threatening anything.
+ *
+ * Each pill is a CSS keyframe transform (`.cp-rise` in index.css), removed
+ * from state on animationend. The column is scheduled so two pills never
+ * converge — see lib/danmaku, where that property is asserted rather than
+ * eyeballed. Anything that would collide waits, parked and invisible, until
+ * the column frees.
+ *
+ * ⚠ This doc described a STICKY BAND above the board for a long time after
+ *   that stopped being true — it had already become a full-screen overlay. A
+ *   comment describing intent reads exactly like one describing fact, so if
+ *   the geometry changes again, change these words with it.
  */
 export function CommentsOverlay({
   studentId,
@@ -119,46 +131,40 @@ export function CommentsOverlay({
     [],
   )
 
-  const laneFreeAtRef = useRef<number[]>([])
+  /**
+   * One column, so one lane. Kept as an array because `pickLane` is the single
+   * scheduling rule and takes one — see the note in lib/danmaku.
+   */
+  const laneFreeAtRef = useRef<number[]>([0])
   const seenRef = useRef<Set<string>>(new Set())
-  /** The full-screen flight deck. Its width is the distance a pill travels. */
-  const deckRef = useRef<HTMLDivElement>(null)
+  /** The track a pill rises up. Its HEIGHT is the distance travelled. */
+  const trackRef = useRef<HTMLDivElement>(null)
   /** Live nodes, so a pill can be measured at its real rendered size. */
   const pillRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   /**
-   * How many lanes fit between the header and the tab bar.
+   * Measure every parked pill and launch it once the column is free.
    *
-   * Derived from the viewport rather than hard-coded: a tall phone gets more
-   * lanes than a short one, and rotating re-derives it.
-   */
-  const [lanes, setLanes] = useState(3)
-  useEffect(() => {
-    if (reduced) return
-    const calc = () =>
-      setLanes(laneCount(window.innerHeight, TOP_INSET, BOTTOM_INSET, LANE_HEIGHT, MAX_LANES))
-    calc()
-    window.addEventListener('resize', calc)
-    return () => window.removeEventListener('resize', calc)
-  }, [reduced])
-
-  /**
-   * Measure every parked pill and launch the ones whose lane is free.
-   *
-   * A pill mounts with `lane: null`, parked off the right edge and not
+   * A pill mounts with `lane: null`, parked just below the track and not
    * animating, so the browser lays it out at its true width and height. Only
-   * then is it given a lane and a duration. That is the whole difference from
-   * the old version, which guessed the width before the pill existed.
+   * then is it given a duration. That is the whole difference from the version
+   * before last, which guessed the size before the pill existed.
+   *
+   * ⚠ `offsetHeight` NOW, WHERE IT USED TO BE `offsetWidth`. The arithmetic in
+   *   lib/danmaku is about a distance and a size on whichever axis the pill
+   *   moves; feeding it the width while the pill rises would hold the column
+   *   for the wrong duration and let a tall comment be overtaken.
    */
   const assign = useCallback(() => {
     if (reduced) return
-    const deckW = deckRef.current?.clientWidth || window.innerWidth || 360
+    // The track is positioned against both edges of a fixed full-screen deck,
+    // so its height is definite. The fallback only matters for the first tick
+    // before layout.
+    const trackH =
+      trackRef.current?.clientHeight ||
+      Math.max(120, (window.innerHeight || 720) - TOP_INSET - BOTTOM_INSET)
     const now = Date.now()
-
-    // Grow/shrink the lane bookkeeping to match the current lane count.
     const free = laneFreeAtRef.current
-    while (free.length < lanes) free.push(0)
-    if (free.length > lanes) free.length = lanes
 
     setFlying((prev) => {
       let changed = false
@@ -170,23 +176,28 @@ export function CommentsOverlay({
         // The timing rules live in lib/danmaku, where the no-overlap property
         // is actually asserted rather than eyeballed on a moving screen.
         const lane = pickLane(free, now)
-        if (lane === null) return p // every lane still busy — keep waiting
+        if (lane === null) return p // column still busy — keep waiting
 
-        const pillW = el.offsetWidth
-        free[lane] = now + laneHoldMs(pillW)
+        const pillH = el.offsetHeight
+        free[lane] = now + laneHoldMs(pillH)
         changed = true
-        return { ...p, lane, durationMs: flightDurationMs(deckW, pillW) }
+        return { ...p, lane, durationMs: flightDurationMs(trackH, pillH) }
       })
       return changed ? next : prev
     })
-  }, [reduced, lanes])
+  }, [reduced])
 
   // One light interval drives both measuring and launching.
+  //
+  // Gated on there being something parked: it used to run for the life of the
+  // screen whether or not a pill was waiting, which is a timer firing five
+  // times a second behind an idle leaderboard.
+  const waiting = flying.some((p) => p.lane === null)
   useEffect(() => {
-    if (reduced) return
+    if (reduced || !waiting) return
     const t = setInterval(assign, 200)
     return () => clearInterval(t)
-  }, [assign, reduced])
+  }, [assign, reduced, waiting])
 
   const enqueue = useCallback(
     (c: LeaderboardComment) => {
@@ -318,70 +329,90 @@ export function CommentsOverlay({
           BOTTOM_INSET) so comments never cover the app's own chrome. */}
       {!reduced && (
         <div
-          ref={deckRef}
           aria-hidden
           className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
-          // container-type makes `cqw` in the cp-fly keyframe resolve against
-          // this deck's width — that's what tells a pill how far to travel.
-          style={{ containerType: 'inline-size' }}
         >
-          {flying.map((p) => {
-            const tappable = p.studentId !== null && !!onOpenProfile
-            const launched = p.lane !== null
-            return (
-              <div
-                key={p.key}
-                ref={(el) => {
-                  pillRefs.current[p.key] = el
-                }}
-                // Parked off the right edge until measured; .cp-fly then takes
-                // over the same `left: 100%` and animates the transform.
-                className={cn('absolute', launched && 'cp-fly')}
-                style={
-                  {
-                    left: '100%',
-                    top: TOP_INSET + (p.lane ?? 0) * LANE_HEIGHT,
-                    width: 'max-content',
-                    maxWidth: '76cqw',
-                    ...(launched ? { '--cp-fly-dur': `${p.durationMs}ms` } : null),
-                  } as React.CSSProperties
-                }
-                onAnimationEnd={() => {
-                  delete pillRefs.current[p.key]
-                  setFlying((f) => f.filter((x) => x.key !== p.key))
-                }}
-              >
-                <span
-                  className={cn(
-                    'flex items-start gap-2 rounded-2xl border px-3 py-2 text-sm shadow-lg',
-                    p.studentId === null
-                      ? 'border-accent-solid/50 bg-accent-solid/25 text-accent'
-                      : 'border-line bg-card/92 text-ink',
-                    tappable && 'pointer-events-auto cursor-pointer',
-                  )}
-                  onClick={tappable ? () => onOpenProfile!(p) : undefined}
-                >
-                  {p.studentId === null ? (
-                    <span className="mt-0.5 shrink-0 text-2xs font-bold uppercase tracking-wide">
-                      Instructor
+          {/* Centred to the app's own reading column, so on a wide screen the
+              comments rise beside the board rather than against the far left
+              edge of a 1900px window. On a phone this is the full width and the
+              track sits in the normal 16px gutter. */}
+          <div className="relative mx-auto h-full w-full max-w-2xl">
+            <div
+              ref={trackRef}
+              // ⚠ `container-type: size`, NOT `inline-size`. The keyframe
+              //   travels `-100cqh`, and `inline-size` establishes a query
+              //   container on the INLINE axis only — so `cqh` skips this
+              //   track and falls back to the small VIEWPORT. Measured: a
+              //   206px track takes a pill -244px correctly and -849px under
+              //   `inline-size`. The pill does not stop, it goes four times too
+              //   far in the duration computed from the track's height, which
+              //   voids the no-overlap guarantee in lib/danmaku while looking
+              //   merely fast. `size` is legal here precisely because the track
+              //   is pinned to both edges of a fixed deck and therefore has a
+              //   definite height.
+              className="absolute left-4 w-[min(78%,20rem)]"
+              style={{ top: TOP_INSET, bottom: BOTTOM_INSET, containerType: 'size' }}
+            >
+              {flying.map((p) => {
+                const tappable = p.studentId !== null && !!onOpenProfile
+                const launched = p.lane !== null
+                return (
+                  <div
+                    key={p.key}
+                    ref={(el) => {
+                      pillRefs.current[p.key] = el
+                    }}
+                    // Parked below the track until measured. `opacity-0` rather
+                    // than `hidden` or unmounted: the pill has to be LAID OUT
+                    // to be measured, and a parked pill sits in the tab-bar
+                    // zone where it would otherwise be visible and static.
+                    className={cn('absolute left-0 w-max max-w-full', launched ? 'cp-rise' : 'opacity-0')}
+                    style={
+                      {
+                        top: '100%',
+                        ...(launched ? { '--cp-rise-dur': `${p.durationMs}ms` } : null),
+                      } as React.CSSProperties
+                    }
+                    onAnimationEnd={() => {
+                      delete pillRefs.current[p.key]
+                      setFlying((f) => f.filter((x) => x.key !== p.key))
+                    }}
+                  >
+                    <span
+                      className={cn(
+                        'flex items-start gap-2 rounded-2xl border px-3 py-2 text-sm shadow-lg',
+                        p.studentId === null
+                          ? 'border-accent-solid/50 bg-accent-solid/25 text-accent'
+                          : 'border-line bg-card/92 text-ink',
+                        tappable && 'pointer-events-auto cursor-pointer',
+                      )}
+                      onClick={tappable ? () => onOpenProfile!(p) : undefined}
+                    >
+                      {p.studentId === null ? (
+                        <span className="mt-0.5 shrink-0 text-2xs font-bold uppercase tracking-wide">
+                          Instructor
+                        </span>
+                      ) : (
+                        <Avatar
+                          name={p.displayName}
+                          url={p.avatarUrl}
+                          className="mt-0.5 h-5 w-5 shrink-0 text-2xs"
+                        />
+                      )}
+                      {/* Wraps to three lines rather than truncating. A comment
+                          you cannot finish reading is worse than a taller pill —
+                          and in a column a taller pill costs nothing, where in
+                          the old horizontal lanes it risked the lane below. */}
+                      <span className="line-clamp-3 min-w-0 [overflow-wrap:anywhere]">
+                        <span className="font-semibold">{p.displayName}</span>{' '}
+                        <span className="text-muted">{p.body}</span>
+                      </span>
                     </span>
-                  ) : (
-                    <Avatar
-                      name={p.displayName}
-                      url={p.avatarUrl}
-                      className="mt-0.5 h-5 w-5 shrink-0 text-2xs"
-                    />
-                  )}
-                  {/* Wraps to three lines rather than truncating. A comment you
-                      cannot finish reading is worse than a taller pill. */}
-                  <span className="line-clamp-3 min-w-0 [overflow-wrap:anywhere]">
-                    <span className="font-semibold">{p.displayName}</span>{' '}
-                    <span className="text-muted">{p.body}</span>
-                  </span>
-                </span>
-              </div>
-            )
-          })}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )}
 
@@ -405,6 +436,12 @@ export function CommentsOverlay({
         <div className="flex items-center gap-2">
           <input
             value={draft}
+            // `maxLength` as well as the slice. The slice is what actually
+            // enforces it (a paste can exceed maxLength in some engines), but
+            // without the attribute the field silently swallows keystrokes at
+            // the limit with no explanation — which is what the counter below
+            // now provides.
+            maxLength={MAX_COMMENT_LENGTH}
             onChange={(e) => setDraft(e.target.value.slice(0, MAX_COMMENT_LENGTH))}
             onKeyDown={(e) => e.key === 'Enter' && canSend && void send()}
             placeholder={
@@ -427,11 +464,28 @@ export function CommentsOverlay({
           </Button>
         </div>
 
-        <p className="px-1 text-xs text-muted">
-          {isInstructor
-            ? 'Posts as Instructor. Tap any comment to delete it.'
-            : `${left} of ${MAX_COMMENTS_PER_DAY} left today · comments disappear after 24 hours.`}
-        </p>
+        <div className="flex items-baseline justify-between gap-2 px-1 text-xs">
+          <p className="min-w-0 text-muted">
+            {isInstructor
+              ? 'Posts as Instructor. Tap any comment to delete it.'
+              : `${left} of ${MAX_COMMENTS_PER_DAY} left today · comments disappear after 24 hours.`}
+          </p>
+          {/* The limit has always been 120 — in types.ts, in the table's CHECK
+              and in the RPC. What was missing was any way to SEE it: the field
+              simply stopped accepting characters. Appears once there is
+              something to count, and warns over the last 20 so you find out
+              before you are cut off rather than after. */}
+          {draft.length > 0 && (
+            <span
+              className={cn(
+                'shrink-0 tabular-nums',
+                draft.length >= MAX_COMMENT_LENGTH - 20 ? 'font-semibold text-warn' : 'text-muted',
+              )}
+            >
+              {draft.length}/{MAX_COMMENT_LENGTH}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* The reliable read/moderate surface — pills fly by, this doesn't. */}

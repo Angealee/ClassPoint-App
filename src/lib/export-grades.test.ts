@@ -36,6 +36,9 @@ const item = (id: string, name: string, maxScore: number, archivedAt: string | n
     maxScore,
     position: 0,
     archivedAt,
+    // 0062 — the boost terms are not part of any export.
+    pointsCost: null,
+    pointsBonus: null,
   }) satisfies GradeItem
 
 describe('buildTermSheet', () => {

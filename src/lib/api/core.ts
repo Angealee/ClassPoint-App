@@ -30,7 +30,8 @@ import type { NameParts } from '@/lib/student-name'
 
 // ── Semesters, terms & subjects (0027) ───────────────────────────────────────
 
-const SEMESTER_COLS = 'id, name, starts_on, is_active, semester_terms(term, starts_on, ends_on)'
+const SEMESTER_COLS =
+  'id, name, starts_on, is_active, farewell_message, semester_terms(term, starts_on, ends_on)'
 
 /** Six weeks per term: prelim weeks 1–6, midterm 7–12, finals 13–18. */
 const TERM_OFFSETS: Array<{ term: TermKey; from: number; to: number }> = [
@@ -59,6 +60,10 @@ function mapSemester(row: Record<string, unknown>): Semester {
     name: row.name as string,
     startsOn: row.starts_on as string,
     isActive: !!row.is_active,
+    // `?? null` rather than a bare cast: a client running ahead of migration
+    // 0060 gets undefined here, and undefined would flow into the farewell
+    // screen as a message that is neither absent nor present.
+    farewellMessage: (row.farewell_message as string | null) ?? null,
     terms,
   }
 }
@@ -113,6 +118,8 @@ export async function createSemester(name: string, startsOn: string): Promise<Se
     name: name.trim(),
     startsOn,
     isActive: false,
+    // A new semester has nobody to say goodbye to yet.
+    farewellMessage: null,
     terms: TERM_OFFSETS.map((t) => ({
       term: t.term,
       startsOn: addDays(startsOn, t.from),
@@ -139,6 +146,29 @@ export async function updateSemesterTerm(
     .update({ starts_on: startsOn, ends_on: endsOn })
     .eq('semester_id', semesterId)
     .eq('term', term)
+  if (error) throw error
+}
+
+/**
+ * Set (or clear) the send-off an archived student reads on their way out (0060).
+ *
+ * A direct update rather than an RPC: `semesters_write` is already gated on
+ * `is_instructor()`, and the 400-character limit is a CHECK on the column, so
+ * there is no rule here for a function to enforce.
+ *
+ * An empty string stores NULL, not '' — the column's CHECK refuses a blank
+ * non-null value, and "the instructor cleared it" and "they never wrote one"
+ * are the same state as far as the farewell screen is concerned.
+ */
+export async function setSemesterFarewell(
+  semesterId: string,
+  message: string,
+): Promise<void> {
+  const trimmed = message.trim()
+  const { error } = await supabase
+    .from('semesters')
+    .update({ farewell_message: trimmed === '' ? null : trimmed })
+    .eq('id', semesterId)
   if (error) throw error
 }
 
@@ -518,29 +548,55 @@ export async function hardDeleteStudent(studentId: string): Promise<void> {
 }
 
 /** Archived students for a section, most recently archived first. */
-export async function listArchivedStudents(sectionId: string): Promise<ArchivedStudent[]> {
-  const { data, error } = await supabase
+/**
+ * Archived students — one section's, or every one of them.
+ *
+ * ⚠ `sectionId` BECAME OPTIONAL IN 0060, and the unfiltered call is the one
+ *   that matters for a returning student. After a semester is closed, every
+ *   archived student sits in a section of a FINISHED semester — a section that
+ *   is not in the instructor's current section list at all — so the
+ *   per-section drawer could not reach a single one of them. A roster scoped
+ *   to this semester cannot answer a question about last semester.
+ *
+ * The section and semester names ride along so a cross-semester list is
+ * legible: thirty archived names with no context is not a list anyone can act
+ * on. They are read through `oneEmbed` because a many-to-one embed comes back
+ * as an object at runtime while the generated types infer an array.
+ */
+export async function listArchivedStudents(sectionId?: string): Promise<ArchivedStudent[]> {
+  let query = supabase
     .from('students')
-    .select('id, full_name, display_name, avatar_url, lifetime_points, archived_at')
-    .eq('section_id', sectionId)
+    .select(
+      'id, full_name, display_name, avatar_url, lifetime_points, archived_at, sections(name, semesters(name))',
+    )
     .not('archived_at', 'is', null)
     .order('archived_at', { ascending: false })
+  if (sectionId) query = query.eq('section_id', sectionId)
+
+  const { data, error } = await query
   if (error) throw error
-  return ((data ?? []) as Array<{
+  return ((data ?? []) as unknown as Array<{
     id: string
     full_name: string
     display_name: string
     avatar_url: string | null
     lifetime_points: number
     archived_at: string
-  }>).map((r) => ({
-    id: r.id,
-    fullName: r.full_name,
-    displayName: r.display_name,
-    avatarUrl: r.avatar_url,
-    lifetimePoints: r.lifetime_points,
-    archivedAt: r.archived_at,
-  }))
+    sections: unknown
+  }>).map((r) => {
+    const section = oneEmbed<{ name: string; semesters: unknown }>(r.sections)
+    const semester = oneEmbed<{ name: string }>(section?.semesters)
+    return {
+      id: r.id,
+      fullName: r.full_name,
+      displayName: r.display_name,
+      avatarUrl: r.avatar_url,
+      lifetimePoints: r.lifetime_points,
+      archivedAt: r.archived_at,
+      sectionName: section?.name ?? null,
+      semesterName: semester?.name ?? null,
+    }
+  })
 }
 
 /**
@@ -685,7 +741,7 @@ export async function getMyStudent(userId: string): Promise<StudentSelf | null> 
   const { data, error } = await supabase
     .from('students')
     .select(
-      'id, section_id, full_name, display_name, avatar_url, bio, interests, banner_urls, header_url, header_pos, display_title, pinned_achievements, semester_points, lifetime_points',
+      'id, section_id, full_name, display_name, avatar_url, bio, interests, banner_urls, header_url, header_pos, display_title, pinned_achievements, semester_points, lifetime_points, archived_at',
     )
     .eq('user_id', userId)
     .maybeSingle()

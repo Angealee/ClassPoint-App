@@ -245,10 +245,22 @@ export function Shell({
           'theme-transition sticky top-0 hidden h-[100dvh] shrink-0 flex-col border-r border-line bg-canvas/60 py-5 backdrop-blur-md md:flex',
           full ? 'w-16 px-2' : 'w-64 px-4',
         )}>
-        <div className="flex items-center gap-2 px-2">
-          <Logo className="h-8 w-8" />
-          <span className="font-display text-lg font-bold tracking-tight">ClassPoint</span>
-          {badge}
+        {/* ⚠ In the icon rail (`full`) the sidebar is 64px wide, and this row used
+            to print the wordmark and the badge anyway — "ClassPoint" and the
+            "Instructor" pill overflowed the rail and painted straight over the
+            screen title beside it. The rail shows the mark alone; the words stay
+            in the DOM for a screen reader and as a tooltip. */}
+        <div
+          className={cn('flex items-center gap-2', full ? 'justify-center' : 'px-2')}
+          title={full ? 'ClassPoint' : undefined}
+        >
+          <Logo className="h-8 w-8 shrink-0" />
+          <span
+            className={cn('font-display text-lg font-bold tracking-tight', full && 'sr-only')}
+          >
+            ClassPoint
+          </span>
+          <span className={cn(full && 'sr-only')}>{badge}</span>
         </div>
 
         {/* The nav SCROLLS and the footer is pinned. Measured at 800x560 with the
@@ -306,8 +318,17 @@ export function Shell({
             so the menu expands UP into empty sidebar space and never into these. */}
         <div className="shrink-0 space-y-3 pt-3">
           <div className={cn('flex items-center', full ? 'flex-col gap-2' : 'justify-between px-1')}>
-            <ThemeToggle />
-            {actions}
+            {/* The rail has 48px of usable width: the 64px pill overflowed it and
+                was cut off at the screen edge. A 40px pill keeps the knob
+                travelling. */}
+            <ThemeToggle className={full ? 'w-10' : undefined} />
+            {/* `actions` is a ROW of round buttons owned by the layout (about
+                170px wide). In the rail it has to be a column, and the layout's
+                own classes cannot be changed from here — so its direct child is
+                flipped with a variant selector, which outranks a plain `flex`. */}
+            <div className={cn(full && 'flex flex-col items-center [&>div]:flex-col')}>
+              {actions}
+            </div>
           </div>
           {accountSlot}
         </div>
@@ -316,12 +337,28 @@ export function Shell({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
         <header className="theme-transition sticky top-0 z-20 flex items-center justify-between border-b border-line bg-canvas/80 px-4 py-3 backdrop-blur-md md:hidden">
-          <div className="flex items-center gap-2">
-            <Logo className="h-7 w-7" />
-            <span className="font-display text-lg font-bold tracking-tight">ClassPoint</span>
-            {badge}
+          {/* ⚠ The instructor's header is the crowded one: the mark, the wordmark,
+              the "Instructor" badge, the theme switch AND four round buttons
+              (Requests, Peer, Ops, Sign out) came to about 440px against the
+              343 a 375px phone has. Nothing wrapped, so the right-hand buttons
+              were pushed past the screen edge — and `body { overflow-x: clip }`
+              hid the evidence, leaving Ops and Sign out simply unreachable.
+              When a badge is passed (only the instructor passes one) the words
+              wait until there is room for them; the student's header, which has
+              one small button, keeps its wordmark at every width. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <Logo className="h-7 w-7 shrink-0" />
+            <span
+              className={cn(
+                'font-display text-lg font-bold tracking-tight',
+                !!badge && 'hidden min-[480px]:inline',
+              )}
+            >
+              ClassPoint
+            </span>
+            {badge && <span className="hidden min-[480px]:contents">{badge}</span>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <ThemeToggle />
             {actions}
           </div>

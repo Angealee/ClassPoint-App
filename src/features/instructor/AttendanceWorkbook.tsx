@@ -46,8 +46,8 @@ export function AttendanceWorkbook() {
       <h2 className="text-sm font-semibold">Attendance workbook</h2>
       <p className="mb-3 mt-0.5 text-xs text-muted">
         One sheet per section: present, late, absent, excused, irregular and
-        show-up rate for the term. Points are not included — they aren't part of
-        a grade.
+        attendance rate for the term. Points are not included — they aren&rsquo;t
+        part of a grade.
       </p>
 
       <div className="mb-3 flex gap-1.5">

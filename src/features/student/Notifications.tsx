@@ -16,6 +16,7 @@ import {
   BoltIcon,
   CheckIcon,
   StarIcon,
+  TableIcon,
   TicketIcon,
   TrophyIcon,
   XIcon,
@@ -47,6 +48,8 @@ const TYPE_META: Record<
   redemption: { Icon: TicketIcon, cls: TONE.success.chip },
   excuse: { Icon: CheckIcon, cls: TONE.success.chip },
   broadcast: { Icon: BellIcon, cls: TONE.accent.chip },
+  // 0062 — "Your grades are open". Same table icon as the Grades nav entry.
+  grades_open: { Icon: TableIcon, cls: TONE.info.chip },
 }
 const DEFAULT_META = { Icon: BellIcon, cls: TONE.neutral.chip }
 

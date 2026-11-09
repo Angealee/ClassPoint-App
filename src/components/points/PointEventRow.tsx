@@ -36,6 +36,11 @@ export function PointEventRow({
 }) {
   const negative = e.points < 0
   const tone = negative ? 'danger' : e.category === 'activity' ? 'accent' : 'reward'
+  // A POSITIVE `redeem` row is the refund of a reversed grade boost (0062), not
+  // a spend — "redeem · 2h ago" under a +5 would read as the opposite. The
+  // ledger note already names the column ("Refund · Grade boost reversed ·
+  // Quiz 1"), so only the category word needs the sign.
+  const categoryLabel = e.category === 'redeem' ? (negative ? 'spent' : 'refund') : e.category
 
   return (
     <div className="flex items-center gap-3 p-4">
@@ -53,7 +58,7 @@ export function PointEventRow({
           {e.note ?? (negative ? 'Deduction' : 'Class points')}
         </p>
         <p className="text-xs capitalize text-muted">
-          {e.category} · {timeAgo(e.created_at)}
+          {categoryLabel} · {timeAgo(e.created_at)}
         </p>
       </div>
     </div>

@@ -1,4 +1,11 @@
-/** 'redeem' rows are debits from an approved spend request (always negative). */
+/**
+ * 'redeem' rows are debits from an approved spend request (negative) — EXCEPT
+ * the refund of a reversed grade boost (0062), which is a positive 'redeem' row.
+ * That is deliberate: the spend board sums -points over 'redeem', so a refund
+ * nets out of "spent" with no change to the snapshot, and the generic
+ * "you earned points" push (which skips 'redeem') stays silent. Test the SIGN,
+ * not the category, to tell a spend from a refund.
+ */
 /**
  * `event` is a Random Event payout (0045). It is its own category rather than
  * reusing `activity` so "how many points came from events?" stays answerable —
@@ -38,6 +45,14 @@ export interface Semester {
   /** 'YYYY-MM-DD' — a Monday; anchors week 1. */
   startsOn: string
   isActive: boolean
+  /**
+   * What a student archived out of this semester reads on their way out (0060).
+   *
+   * Per SEMESTER rather than one global message, so next year's batch gets its
+   * own and this year's keeps the words written for them. Null = show the
+   * semester name and their recap, nothing else.
+   */
+  farewellMessage: string | null
   terms: SemesterTerm[]
 }
 
@@ -187,6 +202,21 @@ export interface StudentSelf {
   semester_points: number
   /** Career total across every semester. Achievements stay pinned to this. */
   all_time_points: number
+  /**
+   * Set when the instructor archived this student (0023 column, selected here
+   * for the first time by 0060).
+   *
+   * ⚠ This ONE column is the whole client-side gate for the archived
+   *   experience, which is why it is on the row the app already fetches rather
+   *   than behind an RPC: no extra round trip, and the decision is made before
+   *   the first screen paints.
+   *
+   * ⚠ It is NOT the same question as `semesterEnded` on StudentData, which is
+   *   derived from section membership. A student can be archived while still
+   *   sitting in an active-semester section, and can be in a past-semester
+   *   section without being archived. Both flags exist; this one wins.
+   */
+  archived_at: string | null
 }
 
 /** A point event as shown on another student's public profile preview. */
@@ -311,7 +341,12 @@ export const MAX_COMMENT_LENGTH = 120
 
 /** What a student is putting their points toward. */
 export type RedemptionKind = 'quiz' | 'activity' | 'exam' | 'other'
-export type RedemptionStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+/**
+ * `reversed` (0062) is an APPROVED grade boost the instructor later undid. It is
+ * not `cancelled`, which means a student withdrew a still-pending request —
+ * calling a spent boost "Cancelled" would mislead.
+ */
+export type RedemptionStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'reversed'
 
 /** The most points a student may put into one request (mirrors the DB CHECK). */
 export const MAX_REDEEM_POINTS = 50
@@ -345,6 +380,29 @@ export interface Redemption {
   requestedAt: string
   decidedAt: string | null
   decisionNote: string | null
+  /**
+   * Set when the request is a grade boost (0062): the column it points at, and
+   * the bonus the student AGREED TO at request time. Null on every ordinary
+   * request, and on every row read from a database that has not had 0062 yet.
+   */
+  gradeItemId?: string | null
+  gradeBonus?: number | null
+}
+
+/**
+ * The column a boost request points at, with the student's mark as it stands
+ * NOW — what approving would actually change.
+ */
+export interface RedemptionGradeContext {
+  itemId: string
+  itemName: string
+  component: GradeComponent
+  term: TermKey
+  maxScore: number
+  /** The bonus the student agreed to. */
+  bonus: number
+  /** Their current mark, or null if it has been cleared since they asked. */
+  currentScore: number | null
 }
 
 /** A pending/decided request as the instructor sees it (student joined in). */
@@ -352,6 +410,8 @@ export interface RedemptionRequest extends Redemption {
   studentName: string
   avatarUrl: string | null
   sectionId: string
+  /** Present only for a grade boost. */
+  grade?: RedemptionGradeContext
   /**
    * The student's SPENDABLE balance right now — this semester's points (0029),
    * not their career total. Context for the approve decision, and the same
@@ -450,6 +510,16 @@ export interface ArchivedStudent {
   avatarUrl: string | null
   lifetimePoints: number
   archivedAt: string
+  /**
+   * Where they were when they were archived (0060).
+   *
+   * Null only if the section was deleted out from under them. Carried so a
+   * CROSS-SEMESTER archive list is legible — thirty names with no context is
+   * not a list anyone can act on — and so a restore can say what it is moving
+   * them away from.
+   */
+  sectionName: string | null
+  semesterName: string | null
 }
 
 /** The result a student sees after scanning. */
@@ -712,6 +782,8 @@ export type NotificationType =
   | 'peer_eval_open'
   /** Your peer feedback was released (0051). */
   | 'peer_eval_results'
+  /** The instructor opened student grades (0062). Deep-links to /app/grades. */
+  | 'grades_open'
   | 'test'
 
 /** One row of the student's notification history (the bell). */
@@ -835,6 +907,19 @@ export interface RolloverCheck {
   severity: 'block' | 'warn'
   count: number
   detail: string
+}
+
+/**
+ * One student who would be archived by closing a semester (0060).
+ *
+ * `fullName`, not `displayName`: this list is read to check nobody is being
+ * archived by mistake, and the official "Dela Cruz, Juan M." is what the
+ * instructor matches against their own records.
+ */
+export interface SemesterCloseRow {
+  studentId: string
+  fullName: string
+  sectionName: string
 }
 
 /**
@@ -1557,13 +1642,85 @@ export interface GradeItem {
   position: number
   /** Set when retired: leaves the denominator, keeps its scores. */
   archivedAt: string | null
+  /**
+   * The instructor's terms for letting students spend points on this column
+   * (0062): "spend `pointsCost` points to add `pointsBonus` marks". Both null =
+   * not offered. Always both or neither — the table CHECKs it. Null too when
+   * read from a database that has not had 0062 yet.
+   */
+  pointsCost: number | null
+  pointsBonus: number | null
 }
+
+/** Mirrors `request_point_redemption`'s own ceiling; a column cannot cost more. */
+export const MAX_BOOST_COST = MAX_REDEEM_POINTS
 
 /** One mark. The ABSENCE of one of these means "not marked yet". */
 export interface GradeScore {
   itemId: string
   studentId: string
   score: number
+}
+
+/**
+ * The receipt for a boost (0062): what the mark was before points changed it.
+ * Instructor-readable only — a student sees their own through `get_my_grades`.
+ */
+export interface GradeBoost {
+  itemId: string
+  studentId: string
+  scoreBefore: number
+  /** What the boost WROTE. A cell that no longer holds this has been retyped. */
+  scoreAfter: number
+  /** The real gain after the cap, which can be less than the column's bonus. */
+  marksGranted: number
+  pointsSpent: number
+  appliedAt: string
+}
+
+/** What `reverse_grade_boost` reports back. */
+export interface ReverseBoostResult {
+  /** False when the mark had been retyped since, so it was left alone. */
+  markRestored: boolean
+  pointsRefunded: number
+  /** The mark as it stands after the reversal. */
+  scoreNow: number | null
+}
+
+// ── What a student sees of their own grades (0062 `get_my_grades`) ──────────
+
+/** One column as the student sees it. */
+export interface MyGradeItem {
+  id: string
+  term: TermKey
+  component: GradeComponent
+  name: string
+  maxScore: number
+  position: number
+  /** null = not marked yet. Never a zero standing in for that. */
+  score: number | null
+  /** The terms on offer, or null when points cannot be used on this column. */
+  pointsCost: number | null
+  pointsBonus: number | null
+  /** Set once a boost has been applied to this column. */
+  boost: { marks: number; points: number; before: number } | null
+  /** A boost request for this column is waiting on the instructor. */
+  pending: boolean
+}
+
+export interface MyGradeSubject {
+  subjectId: string
+  code: string
+  name: string
+  /** The weights, so the client can derive the "so far" figure with grading.ts. */
+  policies: GradePolicy[]
+  items: MyGradeItem[]
+}
+
+export interface MyGrades {
+  /** False while the instructor has grades switched off (or the account is archived). */
+  enabled: boolean
+  subjects: MyGradeSubject[]
 }
 
 /** One student's raw component totals for one term (`get_section_grade_sums`). */

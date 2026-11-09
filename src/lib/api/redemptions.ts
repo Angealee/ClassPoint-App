@@ -1,11 +1,14 @@
 import { supabase } from '@/lib/supabase'
-import { oneEmbed, rpc } from './_internal'
+import { num, oneEmbed, rpc } from './_internal'
 import type {
+  GradeComponent,
   Redemption,
+  RedemptionGradeContext,
   RedemptionKind,
   RedemptionRequest,
   RedemptionStatus,
   SpenderStat,
+  TermKey,
 } from '@/lib/types'
 
 // ============================================================================
@@ -14,6 +17,14 @@ import type {
 
 const REDEMPTION_COLS =
   'id, student_id, points, kind, note, status, requested_at, decided_at, decision_note'
+
+/**
+ * Plus the grade-boost link (0062). Only the instructor's inbox reads these,
+ * and it falls back to the plain list when the database does not have them yet,
+ * so pasting the client before the migration costs the boost detail and not the
+ * whole inbox.
+ */
+const REDEMPTION_COLS_WITH_GRADE = `${REDEMPTION_COLS}, grade_item_id, grade_bonus`
 
 interface RedemptionRow {
   id: string
@@ -25,6 +36,8 @@ interface RedemptionRow {
   requested_at: string
   decided_at: string | null
   decision_note: string | null
+  grade_item_id?: string | null
+  grade_bonus?: number | string | null
 }
 
 const mapRedemption = (r: RedemptionRow): Redemption => ({
@@ -37,6 +50,8 @@ const mapRedemption = (r: RedemptionRow): Redemption => ({
   requestedAt: r.requested_at,
   decidedAt: r.decided_at,
   decisionNote: r.decision_note,
+  gradeItemId: r.grade_item_id ?? null,
+  gradeBonus: num(r.grade_bonus),
 })
 
 /**
@@ -91,14 +106,35 @@ export async function listMyRedemptions(studentId: string): Promise<Redemption[]
 export async function listRedemptions(opts?: {
   status?: RedemptionStatus
   limit?: number
+  /**
+   * Only grade-boost requests (0062).
+   *
+   * Has NO fallback to the pre-0062 column list, unlike the plain call: a filter
+   * on a column that does not exist cannot be answered by selecting fewer
+   * columns, and an empty list would read as "no boosts" rather than "not
+   * applied yet". The caller catches and decides.
+   */
+  gradeLinked?: boolean
 }): Promise<RedemptionRequest[]> {
-  let query = supabase
-    .from('point_redemptions')
-    .select(`${REDEMPTION_COLS}, students(full_name, avatar_url, section_id, semester_points)`)
-    .order('requested_at', { ascending: false })
-    .limit(opts?.limit ?? 100)
-  if (opts?.status) query = query.eq('status', opts.status)
-  const { data, error } = await query
+  const run = (cols: string) => {
+    let query = supabase
+      .from('point_redemptions')
+      .select(`${cols}, students(full_name, avatar_url, section_id, semester_points)`)
+      .order('requested_at', { ascending: false })
+      .limit(opts?.limit ?? 100)
+    if (opts?.status) query = query.eq('status', opts.status)
+    if (opts?.gradeLinked) query = query.not('grade_item_id', 'is', null)
+    return query
+  }
+
+  let { data, error } = await run(REDEMPTION_COLS_WITH_GRADE)
+  if (
+    error &&
+    !opts?.gradeLinked &&
+    (error.code === '42703' || /grade_(item_id|bonus)/.test(error.message ?? ''))
+  ) {
+    ;({ data, error } = await run(REDEMPTION_COLS))
+  }
   if (error) throw error
   type Row = RedemptionRow & {
     students: {
@@ -108,7 +144,7 @@ export async function listRedemptions(opts?: {
       semester_points: number
     } | null
   }
-  return ((data ?? []) as unknown as Row[]).map((r) => ({
+  const out: RedemptionRequest[] = ((data ?? []) as unknown as Row[]).map((r) => ({
     ...mapRedemption(r),
     studentName: r.students?.full_name ?? 'Unknown',
     avatarUrl: r.students?.avatar_url ?? null,
@@ -116,6 +152,84 @@ export async function listRedemptions(opts?: {
     // The spendable balance the approve check re-validates against (0029).
     semesterPoints: r.students?.semester_points ?? 0,
   }))
+
+  await attachGradeContext(out)
+  return out
+}
+
+/**
+ * For each grade-boost request, the column and the student's mark AS IT STANDS
+ * NOW — the thing approving would actually change. The mark has to be read fresh
+ * rather than remembered from the request: it can be entered, retyped or cleared
+ * between asking and deciding, and the approve screen is only honest if it shows
+ * what approval will do today.
+ *
+ * Mutates `rows` in place. One read per distinct column rather than one big
+ * item × student cross product, which could run past PostgREST's 1000-row cap.
+ *
+ * Failure is swallowed ON PURPOSE: a boost request without its context still
+ * renders as a plain request, and approving it is still safe because the server
+ * re-checks the mark itself. Losing the inbox over a missing preview is the
+ * wrong trade.
+ */
+async function attachGradeContext(rows: RedemptionRequest[]): Promise<void> {
+  const boosts = rows.filter((r) => r.gradeItemId)
+  if (boosts.length === 0) return
+
+  try {
+    const itemIds = [...new Set(boosts.map((r) => r.gradeItemId as string))]
+
+    const { data: items, error } = await supabase
+      .from('grade_items')
+      .select('id, name, component, term, max_score')
+      .in('id', itemIds)
+    if (error) throw error
+    const itemById = new Map(
+      ((items ?? []) as unknown as Array<{
+        id: string
+        name: string
+        component: GradeComponent
+        term: TermKey
+        max_score: number | string
+      }>).map((i) => [i.id, i]),
+    )
+
+    const scoreByPair = new Map<string, number>()
+    await Promise.all(
+      itemIds.map(async (itemId) => {
+        const studentIds = boosts.filter((r) => r.gradeItemId === itemId).map((r) => r.studentId)
+        const { data: scores, error: scoreError } = await supabase
+          .from('grade_scores')
+          .select('student_id, score')
+          .eq('item_id', itemId)
+          .in('student_id', studentIds)
+        if (scoreError) throw scoreError
+        for (const s of (scores ?? []) as unknown as Array<{
+          student_id: string
+          score: number | string
+        }>) {
+          scoreByPair.set(`${itemId}:${s.student_id}`, num(s.score) ?? 0)
+        }
+      }),
+    )
+
+    for (const r of boosts) {
+      const item = itemById.get(r.gradeItemId as string)
+      if (!item) continue
+      const grade: RedemptionGradeContext = {
+        itemId: item.id,
+        itemName: item.name,
+        component: item.component,
+        term: item.term,
+        maxScore: num(item.max_score) ?? 0,
+        bonus: r.gradeBonus ?? 0,
+        currentScore: scoreByPair.get(`${item.id}:${r.studentId}`) ?? null,
+      }
+      r.grade = grade
+    }
+  } catch {
+    // See the header: a missing preview must not take the inbox down with it.
+  }
 }
 
 /** How many requests are waiting — drives the instructor's inbox badge. */

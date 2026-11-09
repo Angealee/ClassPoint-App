@@ -245,7 +245,7 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
           {/* Weekly trend */}
           {trend.length > 1 && (
             <Card className="p-5">
-              <p className="font-display font-bold">Weekly show-up rate</p>
+              <p className="font-display font-bold">Weekly attendance rate</p>
               <p className="mb-3 text-xs text-muted">
                 Present + late, out of the sessions that counted.
               </p>

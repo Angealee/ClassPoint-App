@@ -316,7 +316,7 @@ export function Attendance() {
           <BoltIcon className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Global event check-in</p>
+          <p className="text-sm font-semibold">Global event attendance</p>
           <p className="text-xs text-muted">
             A school-wide QR any section can scan — for a special event.
           </p>
@@ -332,7 +332,7 @@ export function Attendance() {
           </span>
           <div>
             <p className="font-display font-bold">Start a class</p>
-            <p className="text-xs text-muted">Students scan the QR to check in.</p>
+            <p className="text-xs text-muted">Students scan the QR to record attendance.</p>
           </div>
         </div>
 

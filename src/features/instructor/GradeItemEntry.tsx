@@ -1,13 +1,20 @@
-import { useMemo, useState, type KeyboardEvent } from 'react'
+import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Rows } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
 import { Meter } from '@/components/ui/Meter'
 import { cn } from '@/lib/cn'
-import { cellKey, COMPONENT_LABEL, GRADE_COMPONENTS } from '@/lib/grading'
+import {
+  cellKey,
+  COMPONENT_LABEL,
+  displayGrade,
+  GRADE_COMPONENTS,
+  sumsFromScores,
+  termGrade,
+} from '@/lib/grading'
 import { formatScoreInput, isOverMax, parseScoreInput } from '@/lib/grade-entry'
 import { type CellEdit } from './GradeGrid'
-import type { GradeItem, RosterPerson } from '@/lib/types'
+import type { GradeItem, GradePolicy, GradeView, RosterPerson } from '@/lib/types'
 
 /**
  * Entering marks on a phone: one column at a time, down the roster.
@@ -26,11 +33,22 @@ interface GradeItemEntryProps {
   students: RosterPerson[]
   items: GradeItem[]
   scores: Map<string, number>
+  /** For the term figure under each name — the same policy and view the grid uses. */
+  policy: GradePolicy
+  view: GradeView
   failed: Set<string>
   onCommit: (edit: CellEdit, previous: number | null) => void
 }
 
-export function GradeItemEntry({ students, items, scores, failed, onCommit }: GradeItemEntryProps) {
+export function GradeItemEntry({
+  students,
+  items,
+  scores,
+  policy,
+  view,
+  failed,
+  onCommit,
+}: GradeItemEntryProps) {
   const [itemId, setItemId] = useState<string>(() => items[0]?.id ?? '')
   const item = items.find((i) => i.id === itemId) ?? items[0]
 
@@ -38,6 +56,12 @@ export function GradeItemEntry({ students, items, scores, failed, onCommit }: Gr
   // always current because every commit writes through to it.
   const [values, setValues] = useState<Map<string, number | null>>(new Map())
   const [badCell, setBadCell] = useState<{ studentId: string; reason: string } | null>(null)
+
+  // The roster's inputs, by row. Enter walks to the next one through this map
+  // rather than `document.getElementById('entry-N')`: that was a convention in a
+  // global namespace (any other element with the same id would have taken the
+  // walk) and a lookup that has to search the whole document on every Enter.
+  const inputs = useRef(new Map<number, HTMLInputElement>())
 
   const current = useMemo(() => {
     if (!item) return new Map<string, number | null>()
@@ -57,6 +81,31 @@ export function GradeItemEntry({ students, items, scores, failed, onCommit }: Gr
     () => [...current.values()].filter((v) => v !== null).length,
     [current],
   )
+
+  /**
+   * Each student's TERM figure, so you can see what the mark you are typing does
+   * to them without leaving the phone for the desktop grid.
+   *
+   * No arithmetic of its own: `sumsFromScores` and `termGrade` are the very
+   * functions the grid's rows call, so the two screens cannot disagree about a
+   * grade. A mark typed in THIS session lives in `values` (keyed like cellKey),
+   * everything else in `scores`; a cleared mark is `null` and drops out of the
+   * denominator exactly as it does on the grid.
+   */
+  const termFigures = useMemo(() => {
+    const out = new Map<string, number | null>()
+    for (const s of students) {
+      const marks = new Map<string, number>()
+      for (const i of items) {
+        const key = cellKey(i.id, s.id)
+        const typed = values.get(key)
+        const v = typed !== undefined ? typed : scores.get(key)
+        if (v !== undefined && v !== null) marks.set(i.id, v)
+      }
+      out.set(s.id, termGrade(sumsFromScores(items, marks), policy, view))
+    }
+    return out
+  }, [students, items, scores, values, policy, view])
 
   if (!item) {
     return (
@@ -88,8 +137,8 @@ export function GradeItemEntry({ students, items, scores, failed, onCommit }: Gr
     e.preventDefault()
     e.currentTarget.blur()
     // Walk down the roster, the way the grid's Enter does.
-    const next = document.getElementById(`entry-${index + 1}`)
-    if (next instanceof HTMLInputElement) {
+    const next = inputs.current.get(index + 1)
+    if (next) {
       next.focus()
       next.select()
     }
@@ -134,9 +183,18 @@ export function GradeItemEntry({ students, items, scores, failed, onCommit }: Gr
           const isBad = badCell?.studentId === student.id
           return (
             <div key={student.id} className="flex items-center gap-3 p-3">
-              <span className="min-w-0 flex-1 truncate text-sm">{student.fullName}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm">{student.fullName}</p>
+                <p className="text-2xs tabular-nums text-muted">
+                  Term {displayGrade(termFigures.get(student.id) ?? null)}
+                  {view === 'soFar' ? ' so far' : ''}
+                </p>
+              </div>
               <input
-                id={`entry-${index}`}
+                ref={(el) => {
+                  if (el) inputs.current.set(index, el)
+                  else inputs.current.delete(index)
+                }}
                 type="text"
                 inputMode="decimal"
                 defaultValue={formatScoreInput(value)}

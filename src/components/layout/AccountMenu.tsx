@@ -117,9 +117,19 @@ export function SignOutRow({
       onClick={onRequestSignOut}
       className={cn(
         ROW,
-        // Rests muted and reddens on hover — the same restraint every other
-        // destructive control here uses, so a menu never looks alarming at rest.
-        'text-muted hover:bg-danger-solid/10 hover:text-danger',
+        // ⚠ RED AT REST, and this REVERSES an earlier decision in this file.
+        //
+        // It used to rest muted and redden only on hover, on the reasoning that
+        // every other destructive control here does the same so a menu never
+        // looks alarming. The instructor overruled it (2026-11-08): in a menu of
+        // five ink-coloured nav rows plus an ink Settings row, a muted Sign out
+        // read as DISABLED rather than as "careful" — the same failure mode the
+        // comment on SettingsRow above already describes for muted text here.
+        // Red is the one colour that says what this row does.
+        //
+        // Do not revert this to muted without asking. The hover still deepens,
+        // so the row is not shouting at rest, it is simply legible.
+        'text-danger hover:bg-danger-solid/10',
         className,
       )}
     >

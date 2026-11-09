@@ -139,6 +139,38 @@ export function classStanding(
   )
 }
 
+/**
+ * What one part is worth of the WHOLE TERM, as a proportion.
+ *
+ * A Class Standing part is its weight inside Class Standing times Class
+ * Standing's own weight; the exam is just its weight. With the usual 50/25/25 and
+ * 60/40 that is 0.30 / 0.15 / 0.15 / 0.40. This is the one place that product is
+ * written — `explainTerm` (what a student is told) and `weightedComponents`
+ * (which parts a "partial" grade is missing) both read it, so a policy change
+ * moves them together.
+ *
+ * Not used by `termGrade` itself, which multiplies in two steps and is pinned by
+ * the load-bearing precision test; this restates the same weights, it does not
+ * replace that arithmetic.
+ */
+export function componentShare(policy: GradePolicy, component: GradeComponent): number {
+  switch (component) {
+    case 'performance_task':
+      return policy.csWeight * policy.ptWeight
+    case 'quiz':
+      return policy.csWeight * policy.quizWeight
+    case 'recitation':
+      return policy.csWeight * policy.recitWeight
+    case 'exam':
+      return policy.examWeight
+  }
+}
+
+/** The parts that actually count toward this term — a zero-weight part is not "missing". */
+export function weightedComponents(policy: GradePolicy): GradeComponent[] {
+  return GRADE_COMPONENTS.filter((c) => componentShare(policy, c) > 0)
+}
+
 /** Does this term have any item at all (official), or any marked one (so far)? */
 export function hasAnyItems(sums: TermSums, view: GradeView = 'official'): boolean {
   return GRADE_COMPONENTS.some((c) =>
@@ -325,4 +357,43 @@ export function displayGrade(value: number | null): string {
  */
 export function cellKey(itemId: string, studentId: string): string {
   return `${itemId}:${studentId}`
+}
+
+/**
+ * How much of each term has actually been marked, 0–100, or null for a term
+ * with no score columns at all.
+ *
+ * ⚠ THE DENOMINATOR IS `sumMax`, NOT `sumMaxMarked`, and getting that backwards
+ *   gives a figure that is ALWAYS 100% — which is the worst possible failure for
+ *   a progress read, because it says "nothing left to do" and looks plausible.
+ *   `sumMaxMarked` is the total this student HAS a score for; `sumMax` is every
+ *   non-archived column. Their ratio is the fraction entered.
+ *
+ * null rather than 0 for an empty term: the instructor has not fallen behind on
+ * a term they have not set up, and 0% invites them to go looking for marks that
+ * cannot exist yet. It is the same blank-versus-zero distinction the whole
+ * feature rests on, one level up.
+ *
+ * Takes the AGGREGATE rows, never raw cells — three terms of a section is
+ * ~2,400 score rows, past PostgREST's silent 1000-row cap (the 0031 lesson).
+ */
+export function completionByTerm(
+  rows: ReadonlyArray<{ term: TermKey; sums: TermSums }>,
+): Record<TermKey, number | null> {
+  const marked: Record<string, number> = {}
+  const total: Record<string, number> = {}
+
+  for (const row of rows) {
+    for (const c of GRADE_COMPONENTS) {
+      marked[row.term] = (marked[row.term] ?? 0) + row.sums[c].sumMaxMarked
+      total[row.term] = (total[row.term] ?? 0) + row.sums[c].sumMax
+    }
+  }
+
+  const out = {} as Record<TermKey, number | null>
+  for (const t of ['prelim', 'midterm', 'finals'] as TermKey[]) {
+    const max = total[t] ?? 0
+    out[t] = max <= 0 ? null : Math.round(((marked[t] ?? 0) / max) * 100)
+  }
+  return out
 }

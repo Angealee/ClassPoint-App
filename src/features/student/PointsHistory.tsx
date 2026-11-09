@@ -26,7 +26,7 @@ const CATEGORY_META: Record<PointCategory, { label: string; dot: string; text: s
   // Gold, like recitations: an event payout is points you earned.
   event: { label: 'Events', dot: TONE.reward.dot, text: TONE.reward.text },
   // 0055 — a global-event check-in award; earned points, so gold too.
-  event_attend: { label: 'Event check-in', dot: TONE.reward.dot, text: TONE.reward.text },
+  event_attend: { label: 'Event attendance', dot: TONE.reward.dot, text: TONE.reward.text },
 }
 
 /**

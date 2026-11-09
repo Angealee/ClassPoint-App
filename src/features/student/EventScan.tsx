@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { BoltIcon, CheckIcon, ScanIcon } from '@/components/ui/icons'
-import { QrScanner } from '@/components/attendance/QrScanner'
+import { ScanStage } from '@/components/attendance/ScanStage'
 import { StudentEventHistory } from '@/components/attendance/StudentEventHistory'
 import { scanEventAttendance } from '@/lib/api'
 import { parseEventPayload } from '@/lib/qr'
@@ -19,7 +19,7 @@ import { useStudentData } from './StudentData'
 function errorText(e: unknown): string {
   const m = (e as { message?: string } | null)?.message
   if (m && m.length <= 160) return m
-  return 'Could not check in — scan the current QR and try again.'
+  return 'Could not record your attendance — scan the current QR and try again.'
 }
 
 /**
@@ -96,8 +96,8 @@ export function EventScan() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Event check-in"
-        subtitle="Scan the QR at the event to check in."
+        title="Event attendance"
+        subtitle="Scan the QR at the event to record your attendance."
         fallback="/app"
       />
 
@@ -108,7 +108,7 @@ export function EventScan() {
       ) : submitting ? (
         <Card pad="roomy" className="flex flex-col items-center gap-3 py-10 text-sm text-muted">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-accent-solid" />
-          Checking you in…
+          Recording your attendance…
         </Card>
       ) : liveEvent ? (
         <Card pad="roomy" className="space-y-4 text-center">
@@ -116,7 +116,7 @@ export function EventScan() {
             <p className="font-display text-xl font-bold">{liveEvent.name}</p>
             {liveEvent.pointsPerScan > 0 && (
               <p className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-reward">
-                <BoltIcon className="h-4 w-4" /> +{liveEvent.pointsPerScan} points for checking in
+                <BoltIcon className="h-4 w-4" /> +{liveEvent.pointsPerScan} points for attending
               </p>
             )}
           </div>
@@ -126,19 +126,29 @@ export function EventScan() {
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-success-solid/15 text-success">
                 <CheckIcon className="h-6 w-6" />
               </span>
-              <p className="text-sm font-semibold text-ink">You're already checked in.</p>
+              <p className="text-sm font-semibold text-ink">Your attendance is already recorded.</p>
             </div>
           ) : scanning ? (
-            <div className="space-y-3">
-              <QrScanner key={scanKey} onDetect={(t) => void onDetect(t)} />
-              <p className="text-center text-xs text-muted">Center the event QR inside the frame.</p>
-              <Button variant="ghost" className="w-full text-muted" onClick={() => setScanning(false)}>
-                Cancel
-              </Button>
-            </div>
+            // The same stage Attendance uses, so the two scanners cannot drift
+            // apart again. This one keeps its own Cancel: unlike the sheet,
+            // there is no back bar here to get out by.
+            <ScanStage
+              scanKey={scanKey}
+              onDetect={(t) => void onDetect(t)}
+              caption="Point your camera at the QR at the event."
+              footer={
+                <Button
+                  variant="ghost"
+                  className="w-full text-muted"
+                  onClick={() => setScanning(false)}
+                >
+                  Cancel
+                </Button>
+              }
+            />
           ) : (
             <Button size="lg" className="w-full" onClick={startScan}>
-              <ScanIcon className="h-5 w-5" /> Scan to check in
+              <ScanIcon className="h-5 w-5" /> Scan to record attendance
             </Button>
           )}
 
@@ -171,7 +181,7 @@ function ResultView({ result, onDone }: { result: EventScanResult; onDone: () =>
       </motion.span>
       <div>
         <p className="font-display text-xl font-bold">
-          {result.already ? "You're already in" : "You're checked in!"}
+          {result.already ? 'Already recorded' : 'Attendance recorded'}
         </p>
         <p className="mt-1 text-sm text-muted">{result.eventName}</p>
       </div>

@@ -20,6 +20,7 @@ import { termLabel, weekOf } from '@/lib/term'
 import type { Semester, TermKey } from '@/lib/types'
 import { useInstructor } from './InstructorLayout'
 import { SemesterRollover } from './SemesterRollover'
+import { SemesterClosePanel } from './SemesterClosePanel'
 
 const TERM_ORDER: TermKey[] = ['prelim', 'midterm', 'finals']
 
@@ -172,6 +173,11 @@ export function ManageSemesters() {
           Started {longDate(semester.startsOn)} · currently week {currentWeek}
         </p>
       </div>
+
+      {/* ── Closing the one that just ended (0060) ─────────────────────────
+          ABOVE the rollover panel on purpose: the order on screen is the order
+          of the work. You finish a semester, then you build the next one. */}
+      <SemesterClosePanel />
 
       {/* ── Rollover (Phase I) ─────────────────────────────────────────── */}
       <RolloverPanel />

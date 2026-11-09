@@ -126,7 +126,7 @@ function EventSetup({
           maxLength={80}
         />
         <Input
-          label="Points per check-in"
+          label="Points per scan"
           type="number"
           inputMode="numeric"
           min={0}
@@ -219,7 +219,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
   const { toast } = useToast()
   const [payload, setPayload] = useState('')
   const [rotateIn, setRotateIn] = useState(QR_STEP_SECONDS)
-  const [nowMs, setNowMs] = useState(Date.now())
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const [stats, setStats] = useState<EventStats | null>(null)
   const [ending, setEnding] = useState(false)
   const [confirmEnd, setConfirmEnd] = useState(false)
@@ -295,7 +295,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
 
   return (
     <div className="space-y-5">
-      <PageHeader title={event.name} subtitle="Live event check-in" fallback="/teach/attendance" />
+      <PageHeader title={event.name} subtitle="Live event attendance" fallback="/teach/attendance" />
 
       <Card pad="roomy" elevation="raised" className="relative flex flex-col items-center gap-3">
         <IconButton
@@ -333,7 +333,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
         <p className="font-display text-5xl font-bold tabular-nums text-reward">
           {stats?.total ?? 0}
         </p>
-        <p className="text-xs text-muted">checked in</p>
+        <p className="text-xs text-muted">recorded</p>
       </Card>
 
       {/* Per-section turnout */}
@@ -392,7 +392,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
             />
             <div className="text-center">
               <p className="font-display text-2xl font-bold">{event.name}</p>
-              <p className="text-sm text-muted">Scan to check in</p>
+              <p className="text-sm text-muted">Scan to record attendance</p>
             </div>
             <div className="rounded-3xl bg-white p-5 shadow-lg">
               {payload ? (
@@ -406,7 +406,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
                 {stats?.total ?? 0}
               </p>
               <p className="text-sm text-muted">
-                checked in · code refreshes in <span className="tabular-nums">{rotateIn}s</span>
+                recorded · code refreshes in <span className="tabular-nums">{rotateIn}s</span>
                 {event.pointsPerScan > 0 ? ` · +${event.pointsPerScan} pts each` : ''}
               </p>
             </div>
@@ -424,7 +424,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
       <ConfirmDialog
         open={confirmEnd}
         title="End this event?"
-        message="Students can no longer check in. Points already earned stay. This can't be undone."
+        message="Students can no longer record attendance. Points already earned stay. This can't be undone."
         confirmLabel="End event"
         variant="danger"
         onConfirm={() => void onEnd()}
@@ -466,7 +466,7 @@ function AttendeeList({ eventId, version }: { eventId: string; version: number }
   return (
     <div>
       <p className="mb-2 px-1 text-sm font-semibold text-muted">
-        Checked in{people.length > 0 ? ` · ${people.length}` : ''}
+        Recorded{people.length > 0 ? ` · ${people.length}` : ''}
       </p>
       <Card pad="none" className="divide-y divide-line">
         {!loaded ? (
@@ -535,7 +535,7 @@ function EventReview({ event, onBack }: { event: EventSession; onBack: () => voi
           {stats?.total ?? 0}
         </p>
         <p className="text-xs text-muted">
-          checked in{event.pointsPerScan > 0 ? ` · +${event.pointsPerScan} pts each` : ''}
+          recorded{event.pointsPerScan > 0 ? ` · +${event.pointsPerScan} pts each` : ''}
         </p>
       </Card>
 
@@ -563,7 +563,7 @@ function EventReview({ event, onBack }: { event: EventSession; onBack: () => voi
 
       <AttendeeList eventId={event.id} version={0} />
 
-      {stats?.total === 0 && <EmptyState>Nobody checked in to this event.</EmptyState>}
+      {stats?.total === 0 && <EmptyState>Nobody attended this event.</EmptyState>}
     </div>
   )
 }
