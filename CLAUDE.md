@@ -241,7 +241,7 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   state; boost requests and the Ops switch fail with a readable message.
   0062 also carries `save_subject_policy` (the atomic weights save) — until it lands the
   weights editor works as before, at the old non-atomic risk.
-  **Next number: 0064.** (0063 is written, see its section below.)
+  **Next number: 0064.** (0063 is pasted, see its section below.)
   ⚠ **EVERY "WRITTEN AND NOT YET APPLIED" CLAIM IN THE BLOCK ABOVE IS NOW
   UNVERIFIED PROSE — ASK THE DATABASE INSTEAD.** It was written file by file
   over months, nobody could check it without reading every migration and
@@ -4438,10 +4438,12 @@ Since 0063 (Points assist, the Absent mark, Recitation from attendance — Era 8
 Decisions (instructor, 2026-11-09/11): **automatic by part, with defaults** · **fixed marks per
 part** · **an Absent mark, tied to attendance** · **Recitation IS the attendance rate** ·
 **"boost" becomes "points assist" everywhere a person reads it, server wording included**.
-**0063 is WRITTEN AND NOT YET APPLIED** — paste it AFTER 0062, twice, then run `applied_state.sql`
-BLOCK 1b and BLOCK 6 (two new rows). Until it lands the client degrades rather than breaks: the A
-marks, the Points-assist tab and the class picker each fail in their own catch, and Recitation
-reads the 60 floor (no attendance counts to read).
+**0063 is PASTED (the user, 2026-11-11 — "Success. No rows returned"); NOT YET CONFIRMED by
+`applied_state.sql`.** Run BLOCK 1b (0063 should read ALL PRESENT) and BLOCK 6 (its two new rows
+must read `true`), and paste the file a second time to prove idempotency, before trusting it. Had it
+not been applied the client would have degraded rather than broken: the A marks, the Points-assist
+tab and the class picker each fail in their own catch, and Recitation would read the 60 floor (no
+attendance counts to read).
 
 **"BOOST" IS NOW A WORD ONLY CODE USES.** Identifiers (`request_grade_boost`, `grade_boosts`,
 `'grade_boost'` audit action, `grade-boost.ts`, `BoostState`) keep their names — renaming a function
@@ -4515,8 +4517,8 @@ overflow, inputs 16px, A buttons 44×44, the derived A's button disabled — but
 ~94px wide beside the field, the A button and "/20", so a long name truncates early (its `title`
 carries it); widen it if that reads badly on a real phone.
 
-**NOT verified against a database:** the whole of 0063 (parsed clean, bodies extracted and diffed,
-never run), the absent rules end to end, the attendance counts, the triggers. **Not built:** an
+**NOT verified against a database:** the BEHAVIOUR of 0063 (it pasted clean; its bodies were
+extracted, diffed and parsed, but the rules have never been exercised), the absent rules end to end, the attendance counts, the triggers. **Not built:** an
 Absent mark on imported marks (the importer writes marks only); per-student overrides of a derived A.
 
 ## DB map (migrations 0001–0016 are the source of truth)
