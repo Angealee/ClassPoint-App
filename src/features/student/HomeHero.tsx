@@ -5,33 +5,6 @@ import { FlameIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { getLevelProgress } from '@/lib/leveling'
 
-/**
- * The home screen's scoreboard.
- *
- * ── WHY IT IS ALWAYS DARK ──────────────────────────────────────────────────
- * This is the one element in the app that does NOT flip with the theme. That is
- * the whole idea: a fixed dark plate reads as a scoreboard — an object — rather
- * than as one more card in a stack of cards, and it gives the screen a single
- * anchor without needing a large coloured fill to do it. Its surface comes from
- * `--color-plate`, declared in the FIXED @theme block for exactly that reason.
- *
- * It replaces a `from-brand-500 to-brand-700` gradient that was the largest
- * brand-red surface in the app and carried only the level number, while points
- * — the same quantity, since points ARE the XP — sat in a separate tile below.
- * Splitting one idea across two blocks is what made the old home screen feel
- * like a list of widgets.
- *
- * ── WHAT IT CARRIES, AND IN WHAT ORDER ─────────────────────────────────────
- * Level is the headline because it is the thing that changes rarely and means
- * the most. Points sit beside it because they are the same number in different
- * clothes and a student checks them constantly. The XP rail is the bridge: it
- * shows how one becomes the other. Rank and streak are the footer — real, but
- * not what you open the app for.
- *
- * Deliberately NOT a button. A previous version made the whole hero tappable,
- * which is a large target with no visible affordance; the feed's "See all" is
- * the way into the ledger.
- */
 export function HomeHero({
   points,
   allTimePoints,
@@ -45,7 +18,6 @@ export function HomeHero({
   rank: number | null
   /** e.g. "as of 12:30 PM" — the board is a snapshot, not live. */
   rankNote?: string
-  /** `present_streak`: classes in a row, all present. Null while loading. */
   streak: number | null
   className?: string
 }) {
@@ -56,23 +28,17 @@ export function HomeHero({
     <div
       className={cn(
         'relative overflow-hidden rounded-2xl',
-        // A two-stop plate rather than a flat fill: enough dimension that the
-        // object reads as raised, with no hue that would compete with the gold.
         'bg-gradient-to-br from-plate-2 to-plate',
-        // In light mode this sits on a near-white canvas, so it needs a real
-        // edge or it looks like a hole punched in the page.
         'shadow-lg shadow-black/25 ring-1 ring-white/10',
         className,
       )}
     >
-      {/* A soft gold bloom behind the level, so the plate isn't uniformly flat. */}
       <div
         aria-hidden
         className="pointer-events-none absolute -left-10 -top-16 h-44 w-44 rounded-full bg-gold-400/12 blur-3xl"
       />
 
       <div className="relative p-5">
-        {/* Level + points — one line, two figures, related by the rail below. */}
         <div className="flex items-end justify-between gap-4">
           <div className="min-w-0">
             <p className="text-2xs font-semibold uppercase tracking-widest text-white/60">Level</p>
@@ -100,7 +66,6 @@ export function HomeHero({
           </div>
         </div>
 
-        {/* The rail: how points become the next level. */}
         <div className="mt-5">
           <div
             className="h-2 w-full overflow-hidden rounded-full bg-white/10"
@@ -127,7 +92,6 @@ export function HomeHero({
           </div>
         </div>
 
-        {/* Footer marks — real, but not why you opened the app. */}
         <div className="mt-4 flex items-center gap-4 border-t border-white/10 pt-3">
           <div className="min-w-0">
             <p className="font-display text-base font-bold leading-none tabular-nums text-white">
@@ -160,21 +124,12 @@ export function HomeHero({
   )
 }
 
-/**
- * One line naming the nearest thing worth chasing.
- *
- * Compares points-to-next-level against points-to-overtake-the-rank-above and
- * names the SMALLER. Always showing the level would hide the fact that one
- * recitation sometimes gains a place — which is the more motivating of the two,
- * and the one a student can act on today.
- */
 export function NextMilestone({
   points,
   pointsToOvertake,
   className,
 }: {
   points: number
-  /** Points needed to pass the student ranked directly above. Null if unknown. */
   pointsToOvertake: number | null
   className?: string
 }) {

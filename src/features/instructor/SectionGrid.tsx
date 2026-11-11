@@ -33,18 +33,14 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
     }
   }
 
-
   useEffect(() => {
     void loadStats()
-
   }, [sections.length])
 
   async function onAdd(e: FormEvent) {
     e.preventDefault()
     const name = newName.trim()
     if (!name) return
-    // Sections are semester-scoped since 0027 — creating one without a
-    // semester is not possible, so fail loudly rather than at the API.
     if (!semester) {
       toast('No active semester — set one up first.', 'error')
       return

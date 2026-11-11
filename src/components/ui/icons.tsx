@@ -48,13 +48,6 @@ export function UserIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-/**
- * Hamburger. Added for the student "Menu" tab, which replaced the Profile tab
- * when Profile moved behind the account menu.
- *
- * Lines at 6 / 12 / 18 rather than a tighter 7/12/17 stack: at the 24px this
- * renders in the tab bar, tighter spacing reads as one thick smudge.
- */
 export function MenuIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>
@@ -65,26 +58,6 @@ export function MenuIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-/**
- * Saturn — Student Space.
- *
- * ── WHY NOT AN ASTRONAUT HELMET ────────────────────────────────────────────
- * A helmet was drawn first and rejected on measurement: a dome with a visor is,
- * at the 20px the sidebar renders, a horizontal bar inside a circle — which is
- * the universal "deny / no entry" glyph. Widening the visor to 76% of the dome
- * and adding an antenna did not fix it, because ANY shape enclosed by a circle
- * collapses into a symbol at that size. Rendered against the real nav at
- * 20/24/48 alongside a rocket and chat bubbles, Saturn was the clear winner.
- *
- * The ring is what makes it work: it extends OUTSIDE the body, so the shape can
- * never read as concentric. Drawn as one open path rather than a rotated
- * ellipse so the ring passes behind the planet without a mask.
- *
- * Drawn rather than using public/studentSpace.ico: a nav icon must take
- * `currentColor` to turn accent on the active route and survive a theme flip,
- * and a 32x32 raster is soft at 24px. That art is used at 2x on the Space
- * screens instead — see AstronautArt.
- */
 export function SaturnIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>
@@ -331,7 +304,6 @@ export function PencilIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-/** Speaker with sound waves — the live-session check-in chime toggle. */
 export function SoundIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>
@@ -341,7 +313,6 @@ export function SoundIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-/** Expand to fullscreen — the "present the QR on a big screen" action. */
 export function ExpandIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>
@@ -350,18 +321,6 @@ export function ExpandIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-/**
- * A flame — the attendance/rank streak marker.
- *
- * FILLED rather than stroked, unlike the rest of this file: at the 14–16px
- * these render at, a 1.75px outline leaves almost no interior and the shape
- * reads as a blob. It replaced a 🔥 emoji, which rendered differently on every
- * platform and could never be recoloured to match the surrounding pill.
- *
- * Add `className="cp-flame"` for the flicker animation (see index.css). The
- * inner core is a lighter overlay of the same colour, which gives the flame
- * depth without needing a second fill.
- */
 export function FlameIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -376,7 +335,6 @@ export function FlameIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-/** Concentric target — marks the "next thing to chase" line on the dashboard. */
 export function TargetIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>
@@ -396,13 +354,6 @@ export function ChevronDownIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-/**
- * The ⋯ overflow button.
- *
- * FILLED dots, not stroked circles — at the 16-20px this renders at, a 1.75px
- * outline around a 1px-radius circle leaves no interior and the three read as
- * smudges. Same reasoning as FlameIcon.
- */
 export function MoreIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props} fill="currentColor" strokeWidth={0}>
@@ -432,14 +383,6 @@ export function PinIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-/**
- * Clipboard with a tick — Peer Evaluation.
- *
- * A rubric being filled in, which is what the feature is. Nothing else in the
- * app claims it: `StarIcon` already means an achievement and `TargetIcon`
- * already means the next milestone, so reusing either would give one glyph two
- * meanings across the student and instructor areas.
- */
 export function ClipboardIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>
@@ -450,13 +393,6 @@ export function ClipboardIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-/**
- * A grade sheet: a table with its header row and name column picked out.
- *
- * Stroked like every other icon here. The two interior lines are the frozen
- * header and name column the grid itself has, so the glyph says "spreadsheet"
- * rather than "generic grid".
- */
 export function TableIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>

@@ -6,29 +6,12 @@ import { timeAgo } from '@/lib/time'
 import { NEUTRAL_STATUSES } from '@/lib/types'
 import { useStudentData } from './StudentData'
 
-/**
- * "Class is live right now" (0033).
- *
- * Before this, a student could only find out class had started by being in the
- * room — the app knew, and never said. `class_sessions` joined the realtime
- * publication in 0033, so this appears the moment the instructor taps Start and
- * clears itself when they end the session.
- *
- * Renders nothing when no class is running, so both hosts can mount it
- * unconditionally.
- *
- * @param onScan Opens the scanner in place (the Attendance screen owns the
- *   scanner sheet). Omit it — as the Dashboard does — and the button routes to
- *   Attendance with `?scan=1`, which opens the sheet on arrival.
- */
 export function LiveClassBanner({ onScan }: { onScan?: () => void }) {
   const { liveSession, liveStatus } = useStudentData()
   const navigate = useNavigate()
 
   if (!liveSession) return null
 
-  // 'excused' and 'irregular' are NEUTRAL (types.ts) — an excused student has
-  // been dealt with, not checked in, so prompting them to scan would be wrong.
   const checkedIn = liveStatus !== null
   const neutral = liveStatus !== null && NEUTRAL_STATUSES.includes(liveStatus)
   const subject = liveSession.subjectCode ?? 'Class'
@@ -50,7 +33,6 @@ export function LiveClassBanner({ onScan }: { onScan?: () => void }) {
       ) : (
         <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-solid/20 text-accent">
           <QrIcon className="h-5 w-5" />
-          {/* Pulsing ring — the one thing on the screen that's happening NOW. */}
           <span className="absolute inset-0 animate-ping rounded-full bg-accent-solid/30" />
         </span>
       )}

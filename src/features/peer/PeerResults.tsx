@@ -11,20 +11,6 @@ import { errorText } from '@/lib/errors'
 import { joinLabels, strengthsOf } from '@/lib/peer-strengths'
 import type { MyPeerResults } from '@/lib/types'
 
-/**
- * What your classmates said about you.
- *
- * ── THE SHAPE OF THE PAGE IS THE POINT ─────────────────────────────────────
- * Overall first, then the per-criterion breakdown, then the words. The
- * breakdown is the actionable half: a student who scores well on effort and
- * badly on communication learns something the single number hides, and a single
- * number on its own reads as a mark.
- *
- * ── COMMENTS ARE STRINGS, AND THEY ARRIVE THAT WAY ─────────────────────────
- * The RPC returns bare strings, so there is no evaluator field for this screen
- * to forget to hide. Below three raters the server sends none at all and says
- * why — that decision is made in SQL, and this screen only explains it.
- */
 export function PeerResults() {
   const { evaluationId = '' } = useParams()
   const [data, setData] = useState<MyPeerResults | null>(null)
@@ -37,8 +23,6 @@ export function PeerResults() {
     try {
       setData(await getMyPeerResults(evaluationId))
     } catch (e) {
-      // The RPC's refusals are real sentences ("Those results have not been
-      // released yet"), and that one is the common case rather than a fault.
       setLoadError(errorText(e, "Couldn't load your results."))
     } finally {
       setLoading(false)
@@ -56,8 +40,6 @@ export function PeerResults() {
   if (!data) return null
 
   const rated = data.raterCount > 0 && data.overallPct !== null
-  // Null with one question, or when every question scored the same — see
-  // lib/peer-strengths for why it says nothing rather than inventing a winner.
   const strengths = rated ? strengthsOf(data.criteria) : null
 
   return (
@@ -81,9 +63,6 @@ export function PeerResults() {
               <span className="ml-0.5 text-xl font-semibold text-muted">%</span>
             </p>
             <p className="mt-1 text-xs text-muted">
-              {/* The raw figure is labelled raw and never leads, so it cannot be
-                  mistaken for a mark. It is also a mean across mixed units when
-                  the criteria use different scales, which the caption says. */}
               Raw average {data.overallRaw}
               {!data.sameScale && ' across different scales'} · from{' '}
               {data.raterCount} classmate{data.raterCount === 1 ? '' : 's'}
@@ -91,10 +70,6 @@ export function PeerResults() {
           </Card>
 
           {strengths && (
-            // Neutral wording (the instructor's call), matching the plain voice
-            // of the results notification. Framing for the number above, not a
-            // second verdict: both lines point at questions the student can
-            // read the detail of directly below.
             <Card className="grid grid-cols-2 gap-3">
               <div className="min-w-0">
                 <p className="text-xs text-muted">Strongest</p>
@@ -142,8 +117,6 @@ export function PeerResults() {
             ) : (
               <div className="space-y-3">
                 {data.comments.map((body, i) => (
-                  // Index as key: these are unordered anonymous strings with no
-                  // id by design, and the list never reorders or filters.
                   <Card key={i} pad="tight">
                     <p className="whitespace-pre-wrap text-sm">{body}</p>
                   </Card>

@@ -1,42 +1,9 @@
-// ClassPoint · Edge Functions · shared security helpers (migration 0026)
-//
-// Used by the two PUBLIC functions — claim-token and reset-pin. Both run with
-// JWT verification turned OFF by design (a student claiming an account or
-// resetting a forgotten PIN is not signed in yet), which makes them the app's
-// only unauthenticated surface. These helpers give them the three things they
-// were missing:
-//
-//   • CORS      — echo the caller's Origin only when it's allowlisted, instead
-//                 of the blanket '*' that let any website POST here from a
-//                 student's browser.
-//   • Rate limit — count recent FAILURES per IP in public.auth_events.
-//   • Audit      — record every attempt so a brute-force run is visible after
-//                 the fact instead of leaving no trace at all.
-//
-// Everything here fails OPEN on infrastructure errors. A logging insert that
-// fails, or a counter query that errors, must never stop a legitimate student
-// from claiming their account — the security win isn't worth locking a class
-// out of the app.
 
-/**
- * Failed attempts allowed per IP inside RATE_WINDOW_MIN before a hard 429.
- *
- * Deliberately generous: a whole classroom shares ONE public IP behind school
- * Wi-Fi NAT, so a strict limit would lock out 40 students the moment a handful
- * mistype their tokens. Brute force is already hopeless against the 64-bit
- * tokens 0026 generates (2^64 guesses), so this is defence in depth against
- * abuse and resource exhaustion, not the primary wall.
- */
 export const RATE_LIMIT = 30
 export const RATE_WINDOW_MIN = 15
 
 export const RATE_LIMIT_MESSAGE = 'Too many attempts. Please try again in a few minutes.'
 
-/**
- * Minimal shape of the service-role client these helpers need. Typed loosely on
- * purpose — the full SupabaseClient generic buys nothing here and would couple
- * this file to the esm.sh type resolution.
- */
 // deno-lint-ignore no-explicit-any
 export type AdminClient = { from: (table: string) => any }
 
@@ -48,52 +15,22 @@ export interface AuthEvent {
   ip: string | null
   userAgent: string | null
   studentId?: string | null
-  /** Coarse machine-readable reason: 'ok', 'token_not_found', 'expired', … */
   detail: string
 }
 
-/**
- * Is this a usable browser origin?
- *
- * ── WHY THIS EXISTS ────────────────────────────────────────────────────────
- * The original fail-safe only covered an UNSET secret. It did not cover a
- * secret set to something unusable — and the first thing that actually
- * happened in production was `ALLOWED_ORIGINS` being saved as the literal
- * placeholder from the setup notes, `https://<your-vercel-domain>`.
- *
- * That is worse than leaving it empty. A non-empty allowlist made the code
- * take the "configured" branch and echo that string back as
- * `Access-Control-Allow-Origin`, which is not a valid header value, so EVERY
- * browser rejected the preflight and both public functions became unreachable.
- * Students could not claim an account or reset a PIN at all.
- *
- * So an entry has to survive parsing to count. Anything that doesn't is
- * dropped, and if nothing survives we are back to the documented fail-safe of
- * '*' — the pre-0026 behaviour. A misconfigured secret can now only fail to
- * TIGHTEN CORS; it can never take the app down.
- */
 function parseOrigin(raw: string): string | null {
   const s = raw.trim().replace(/\/+$/, '')
   if (!s) return null
-  // Placeholder text ("https://<your-domain>") and anything with whitespace is
-  // never a real origin — reject before URL() gets a chance to be lenient.
   if (/[<>\s]/.test(s)) return null
   try {
     const u = new URL(s)
     if (u.protocol !== 'https:' && u.protocol !== 'http:') return null
-    // Normalise to scheme + host + port: an origin is nothing more than that,
-    // so a value pasted with a trailing path still matches what browsers send.
     return u.origin
   } catch {
     return null
   }
 }
 
-/**
- * Allowlisted browser origins, from the ALLOWED_ORIGINS function secret
- * (comma-separated). FAIL-SAFE: when unset — or when nothing in it parses as a
- * real origin — we fall back to '*', i.e. exactly the behaviour before 0026.
- */
 const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
   .split(',')
   .map(parseOrigin)
@@ -101,9 +38,6 @@ const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
 
 export function corsHeaders(req: Request): Record<string, string> {
   const origin = parseOrigin(req.headers.get('origin') ?? '') ?? ''
-  // With no allowlist configured, stay permissive. With one configured, echo
-  // the origin when it matches; otherwise answer with the first allowed origin
-  // so the browser itself blocks the response for everyone else.
   const allow =
     ALLOWED_ORIGINS.length === 0
       ? '*'
@@ -126,7 +60,6 @@ export function json(req: Request, body: unknown, status = 200): Response {
   })
 }
 
-/** First hop of x-forwarded-for — the caller as the edge sees them. */
 export function clientIp(req: Request): string | null {
   const first = (req.headers.get('x-forwarded-for') ?? '').split(',')[0]?.trim()
   return first || null
@@ -136,14 +69,6 @@ export function userAgent(req: Request): string | null {
   return req.headers.get('user-agent')?.slice(0, 300) ?? null
 }
 
-/**
- * True when this IP has burned through RATE_LIMIT failures in the window.
- *
- * Rows logged as 'rate_limited' are excluded from the count on purpose: if
- * blocked attempts fed the counter, a classroom that tripped the limit by
- * accident would keep extending its own lockout by retrying. The window drains
- * 15 minutes after the last GENUINE attempt.
- */
 export async function tooManyAttempts(admin: AdminClient, ip: string | null): Promise<boolean> {
   if (!ip) return false
   const since = new Date(Date.now() - RATE_WINDOW_MIN * 60_000).toISOString()
@@ -157,12 +82,11 @@ export async function tooManyAttempts(admin: AdminClient, ip: string | null): Pr
 
   if (error) {
     console.error('[auth] rate-limit lookup failed:', error.message)
-    return false // fail open — never lock students out over a counter error
+    return false
   }
   return (count ?? 0) >= RATE_LIMIT
 }
 
-/** Record one attempt. Never throws: the audit trail must not break the flow. */
 export async function logAuthEvent(admin: AdminClient, event: AuthEvent): Promise<void> {
   const { error } = await admin.from('auth_events').insert({
     kind: event.kind,

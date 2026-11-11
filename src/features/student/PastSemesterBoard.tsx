@@ -10,17 +10,6 @@ import { cn } from '@/lib/cn'
 import type { PastLeaderboardEntry, Semester } from '@/lib/types'
 import { useStudentData } from './StudentData'
 
-/**
- * A past semester's final leaderboard (0035).
- *
- * Deliberately a separate sheet rather than another option in the live board's
- * picker: that picker chooses which SECTIONS to show, and folding a second,
- * unrelated axis into it makes both harder to read.
- *
- * The board is recomputed from the ledger by `get_semester_leaderboard`, so it
- * includes students who have since been archived — they were on that board when
- * it counted.
- */
 export function PastSemesterBoard({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { me } = useStudentData()
   const [semesters, setSemesters] = useState<Semester[]>([])
@@ -29,7 +18,6 @@ export function PastSemesterBoard({ open, onClose }: { open: boolean; onClose: (
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Past semesters only — the live board already covers the active one.
   useEffect(() => {
     if (!open) return
     listSemesters()
@@ -79,7 +67,6 @@ export function PastSemesterBoard({ open, onClose }: { open: boolean; onClose: (
             ))}
           </Select>
 
-          {/* Their own final placing, pulled out so they don't have to hunt. */}
           {mine && (
             <div className="rounded-xl bg-gold-400/15 p-3">
               <p className="text-xs text-muted">You finished</p>

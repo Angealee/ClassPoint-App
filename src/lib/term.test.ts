@@ -13,14 +13,6 @@ import {
   weekRange,
 } from './term'
 
-/**
- * Week/term maths. The highest-risk part is date parsing: `new Date('2026-06-15')`
- * is UTC midnight, which lands on the PREVIOUS day in any negative-offset
- * timezone. term.ts parses date-only strings as LOCAL midnight specifically to
- * avoid that, and these tests would catch a regression to the naive form.
- *
- * term.ts holds a module-level calendar, so every test configures it first.
- */
 const CALENDAR = {
   semesterId: 'sem-1',
   semesterName: '1st Sem AY 2026–2027',
@@ -32,7 +24,6 @@ const CALENDAR = {
   ],
 }
 
-/** Local-midnight date, matching how term.ts interprets a calendar day. */
 const local = (y: number, m: number, d: number) => new Date(y, m - 1, d)
 
 beforeEach(() => {
@@ -41,8 +32,6 @@ beforeEach(() => {
 
 describe('configureTermCalendar', () => {
   it('parses date-only strings as LOCAL midnight, not UTC', () => {
-    // The bug this guards: UTC parsing would make the semester start on Jun 14
-    // for anyone west of Greenwich, shifting every week number by one.
     const start = termStart()
     expect(start.getFullYear()).toBe(2026)
     expect(start.getMonth()).toBe(5) // June
@@ -193,23 +182,12 @@ describe('groupByTerm', () => {
 })
 
 describe('the attendance-rate term filter (Era 8.0)', () => {
-  /**
-   * The Attendance summary card filters its own history with `termOf` to scope
-   * the counts and the rate to one term. Two properties have to hold or the
-   * card double-counts or loses a class, and neither failure looks like a bug
-   * on screen — the numbers are simply wrong.
-   */
-
   it('puts a class exactly on a term boundary in exactly one term', () => {
-    // The seam the instructor's stored dates create: prelim ends 2026-07-26
-    // and midterm starts 2026-07-27, so these two days are where an
-    // off-by-one in either direction would show up.
     const boundaries: Array<[Date, string]> = [
       [local(2026, 7, 26), 'prelim'],
       [local(2026, 7, 27), 'midterm'],
       [local(2026, 9, 6), 'midterm'],
       [local(2026, 9, 7), 'finals'],
-      // And the outer edges, where a class could fall out of every term.
       [local(2026, 6, 15), 'prelim'],
       [local(2026, 10, 18), 'finals'],
     ]
@@ -219,10 +197,6 @@ describe('the attendance-rate term filter (Era 8.0)', () => {
   })
 
   it('leaves no day inside the semester belonging to two terms', () => {
-    // The real invariant behind the test above: filtering by term must
-    // PARTITION the history. If two ranges overlapped, a class on the overlap
-    // would be counted in both terms and the per-term rates would not
-    // reconcile with Overall.
     const ranges = termRanges()
     for (let i = 1; i < ranges.length; i += 1) {
       expect(
@@ -233,10 +207,6 @@ describe('the attendance-rate term filter (Era 8.0)', () => {
   })
 
   it('reports a term with no classes as an empty slice, not a zero one', () => {
-    // What the card's `scopeOptions` relies on: a term the student has no
-    // classes in produces NOTHING to tally, which is how the card knows to
-    // draw a dash instead of 0%. `rateOf([])` is 0, and 0% on an empty term
-    // reads as "you attended none of them".
     const history = [
       { at: local(2026, 6, 16).toISOString() }, // prelim
       { at: local(2026, 6, 23).toISOString() }, // prelim
@@ -249,10 +219,6 @@ describe('the attendance-rate term filter (Era 8.0)', () => {
   })
 
   it('offers no term picker before the calendar is configured', () => {
-    // term.ts falls back to hardcoded dates when nothing has configured it,
-    // and StudentData configures it from the semester it already fetches. If
-    // that ever stops happening, `termRanges()` must still be answerable
-    // rather than throwing — the card reads it on every render.
     expect(() => termRanges()).not.toThrow()
     expect(termRanges().length).toBeGreaterThan(0)
     expect(termLabel(null)).toBe('Outside term')

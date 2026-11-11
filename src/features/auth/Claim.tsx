@@ -15,9 +15,6 @@ import { listVariants, rowVariants } from '@/lib/motion'
 
 export function Claim() {
   const { claim } = useAuth()
-  // Client-side speed bump over the server's per-IP limit. Only SERVER
-  // rejections count — a local typo caught by validate() below is not an
-  // attempt at anything.
   const lock = useLockout('cp_claim', { threshold: 5, baseMs: 60_000 })
   const transition = useAuthTransition()
   const { capsOn, capsProps } = useCapsLock()
@@ -64,7 +61,6 @@ export function Claim() {
       setError(error)
     } else {
       lock.reset()
-      // So their first ordinary sign-in on this phone remembers them.
       rememberUsername(username)
       setDone(true)
       transition.start()
@@ -87,9 +83,6 @@ export function Claim() {
         </>
       }
     >
-      {/* Six stacked fields read as a wall, and they are not one job: the token
-          is something you were HANDED, the rest is something you CHOOSE. The
-          two groups say that, so nobody hunts for which box the token goes in. */}
       <motion.form
         onSubmit={onSubmit}
         className="space-y-6"
@@ -156,9 +149,6 @@ export function Claim() {
           />
         </motion.section>
 
-        {/* The error used to render under "Confirm PIN" whatever it was about,
-            so "Enter the token your instructor gave you." appeared at the far
-            end of the form from the token box. It gets its own block now. */}
         {error && (
           <motion.p
             variants={rowVariants}

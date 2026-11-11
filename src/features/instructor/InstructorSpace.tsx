@@ -22,19 +22,6 @@ import {
 import { errorText } from '@/lib/errors'
 import type { SpaceAdminSection, SpaceTimeout } from '@/lib/types'
 
-/**
- * `/teach/space` — the Student Space control room.
- *
- * Both gates live here together, which is the point: during a beta you flip the
- * roster and the kill switch in the same sitting, and splitting them across
- * ManageSections and Ops would mean hunting for the lever precisely when you
- * are in a hurry to pull it.
- *
- * Phase 6 grows the Random Event composer onto this screen; Phase 5 adds the
- * report queue to /teach/redemptions. The timeout list is here now because the
- * enforcement it drives ships in 0041.
- */
-
 export function InstructorSpace() {
   const { toast } = useToast()
   const [flag, setFlag] = useState<boolean | null>(null)
@@ -135,8 +122,6 @@ export function InstructorSpace() {
         <ErrorState onRetry={() => void load()}>Could not load the Student Space settings.</ErrorState>
       ) : (
         <>
-          {/* The instructor IS a participant in Global and every section room —
-              the database always allowed it, there was simply no screen. */}
           <Link to="/teach/space/chats" className="block">
             <Card pad="roomy" interactive>
               <div className="flex items-center gap-3">
@@ -154,10 +139,6 @@ export function InstructorSpace() {
 
           <EventComposer />
 
-          {/* ── The kill switch ─────────────────────────────────────────────
-              Pausing goes through ConfirmDialog because it takes the feature
-              away from everyone at once; turning it back ON does not, since
-              restoring service is never the dangerous direction. */}
           <div>
             <SectionLabel>Master switch</SectionLabel>
             <Card pad="roomy">
@@ -188,7 +169,6 @@ export function InstructorSpace() {
             </Card>
           </div>
 
-          {/* ── The beta roster ─────────────────────────────────────────── */}
           <div>
             <SectionLabel
               action={
@@ -228,7 +208,6 @@ export function InstructorSpace() {
             )}
           </div>
 
-          {/* ── Timeouts ────────────────────────────────────────────────── */}
           <div>
             <SectionLabel>Muted students</SectionLabel>
             {timeouts.length === 0 ? (

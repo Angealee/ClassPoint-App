@@ -5,11 +5,6 @@ import type {
   ExcuseStatus,
 } from '@/lib/types'
 
-// ============================================================================
-// Absence excuses — the DCT-CCS admission-slip flow (migration 0025)
-// ============================================================================
-
-/** File an excuse for one of your own absent records (7-day window). */
 export async function requestAbsenceExcuse(
   recordId: string,
   reason: string,
@@ -23,7 +18,6 @@ export async function requestAbsenceExcuse(
   if (error) throw error
 }
 
-/** Flip your pending excuse's slip status when the Dean issues (or you lose) it. */
 export async function setExcuseSlipStatus(id: string, hasSlip: boolean): Promise<void> {
   const { error } = await supabase.rpc('set_excuse_slip_status', { p_id: id, p_has_slip: hasSlip })
   if (error) throw error
@@ -35,7 +29,6 @@ export async function cancelAbsenceExcuse(id: string): Promise<void> {
   if (error) throw error
 }
 
-/** Instructor: excuse (on sight of the slip) or reject, with an optional note. */
 export async function decideAbsenceExcuse(
   id: string,
   approve: boolean,
@@ -49,7 +42,6 @@ export async function decideAbsenceExcuse(
   if (error) throw error
 }
 
-/** A student's own excuse requests (join into attendance history by recordId). */
 export async function listMyExcuses(studentId: string): Promise<AbsenceExcuse[]> {
   const { data, error } = await supabase
     .from('absence_excuses')
@@ -80,7 +72,6 @@ export async function listMyExcuses(studentId: string): Promise<AbsenceExcuse[]>
   }))
 }
 
-/** Instructor: every excuse (optionally just pending), newest first, with context. */
 export async function listExcuses(opts?: {
   status?: ExcuseStatus
   limit?: number
@@ -127,7 +118,6 @@ export async function listExcuses(opts?: {
   }))
 }
 
-/** How many excuse requests are waiting — feeds the instructor inbox badge. */
 export async function getPendingExcuseCount(): Promise<number> {
   const { count, error } = await supabase
     .from('absence_excuses')

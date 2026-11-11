@@ -7,11 +7,6 @@ import {
   shuffled,
 } from './peer-shuffle'
 
-/**
- * Pins the shuffle sheet's arithmetic. Every mistake here is saved to the
- * database exactly as previewed, so the preview being wrong IS the bug.
- */
-
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 
 describe('planGroupSizes', () => {
@@ -23,12 +18,6 @@ describe('planGroupSizes', () => {
     expect(sizes.filter((s) => s === 4)).toHaveLength(8)
   })
 
-  /**
-   * THE ONE THAT MATTERS. A trailing pair would have its comments withheld by
-   * the three-rater rule forever. Across a range of class sizes, no group may
-   * come out smaller than the size asked for once there are enough students to
-   * fill one.
-   */
   it('never produces a group smaller than the size once one group is filled', () => {
     for (let count = 4; count <= 60; count++) {
       const sizes = planGroupSizes(count, 4)
@@ -80,7 +69,6 @@ describe('shuffled', () => {
   })
 
   it('follows the injected random source', () => {
-    // rng 0 swaps each position with index 0: a deterministic rotation.
     expect(shuffled(['a', 'b', 'c'], () => 0)).toEqual(['b', 'c', 'a'])
   })
 })
@@ -90,10 +78,6 @@ describe('nextGroupNames', () => {
     expect(nextGroupNames([], 3)).toEqual(['Group 1', 'Group 2', 'Group 3'])
   })
 
-  /**
-   * Continuing from the COUNT would produce "Group 3" here, which the unique
-   * index refuses — and the whole shuffle with it.
-   */
   it('continues after the highest existing number, not the count', () => {
     expect(nextGroupNames(['Group 1', 'Group 3'], 2)).toEqual(['Group 4', 'Group 5'])
   })

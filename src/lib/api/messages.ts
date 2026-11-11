@@ -10,18 +10,6 @@ import type {
   SpaceRoom,
 } from '@/lib/types'
 
-// ============================================================================
-// Student Space messaging (migration 0043)
-//
-// Reads go through RPCs for the same reason the Lounge's do: `mentions_me`,
-// `can_delete` and the per-viewer reaction tallies are computed in the same
-// scan, and none of them is expressible as a PostgREST embed.
-//
-// ⚠ A DM is readable ONLY by its members — the instructor included, and only
-// when they are one. Their break-glass path is `readDmThread`, which writes an
-// audit row before returning anything.
-// ============================================================================
-
 interface RoomRow {
   id: string
   kind: string
@@ -50,7 +38,6 @@ const mapRoom = (r: RoomRow): SpaceRoom => ({
   memberCount: r.member_count ?? 0,
 })
 
-/** Every room you are in. Provisions the section and Global rooms on the way. */
 export async function listMyRooms(): Promise<SpaceRoom[]> {
   const rows = await rpc<RoomRow[]>('list_my_rooms')
   return (rows ?? []).map(mapRoom)
@@ -97,13 +84,6 @@ export interface MessageCursor {
   id: string
 }
 
-/**
- * One page of a room, NEWEST FIRST.
- *
- * Returned descending because that is the order the keyset cursor pages in;
- * the screen reverses for display. Compound cursor, because two messages can
- * share a millisecond and a timestamp alone would drop or repeat one.
- */
 export async function getRoomMessages(
   roomId: string,
   opts?: { limit?: number; before?: MessageCursor | null },
@@ -117,13 +97,6 @@ export async function getRoomMessages(
   return (rows ?? []).map(mapMessage)
 }
 
-/**
- * Why the caller cannot post here, or null if they can.
- *
- * One server-side answer for all four rules — space state, timeout,
- * announce-only, slow mode — so the composer's disabled state and the send
- * itself can never disagree about why.
- */
 export async function getRoomPostBlock(roomId: string): Promise<string | null> {
   return (await rpc<string | null>('cp_room_post_block', { p_room: roomId })) ?? null
 }
@@ -146,7 +119,6 @@ export async function reactToMessage(messageId: string, code: ReactionCode): Pro
   return !!(await rpc<boolean>('react_to_message', { p_message: messageId, p_code: code }))
 }
 
-/** Soft delete — leaves a tombstone so a reply to it still reads. */
 export async function deleteMyMessage(id: string): Promise<void> {
   await rpc('delete_my_message', { p_id: id })
 }
@@ -160,8 +132,6 @@ export async function setRoomMuted(roomId: string, muted: boolean): Promise<bool
   return !!(await rpc<boolean>('set_room_muted', { p_room: roomId, p_muted: muted }))
 }
 
-// ── The room panel (migration 0046) ─────────────────────────────────────────
-
 interface PinRow {
   message_id: string
   author_id: string | null
@@ -174,7 +144,6 @@ interface PinRow {
   can_unpin: boolean
 }
 
-/** Newest pin first. A hidden or deleted message keeps its row but loses its body. */
 export async function listRoomPins(roomId: string): Promise<RoomPin[]> {
   const rows = await rpc<PinRow[]>('get_room_pins', { p_room: roomId })
   return (rows ?? []).map((r) => ({
@@ -190,17 +159,6 @@ export async function listRoomPins(roomId: string): Promise<RoomPin[]> {
   }))
 }
 
-/**
- * Who is in this room, resolved WITHOUT a new RPC.
- *
- * `list_my_rooms` does not return `section_id`, but `space_rooms` carries a
- * SELECT policy gated on `cp_can_read_room()` — so the two facts the audience
- * needs are readable directly, and the roster to match them against is the one
- * `listSpacePeople()` already fetched for the XP rings and mentions.
- *
- * The one place a component may touch `.from()` is a Realtime subscription, so
- * this read lives here rather than in the screen.
- */
 export async function getRoomAudience(roomId: string): Promise<RoomAudience> {
   const { data: room, error } = await supabase
     .from('space_rooms')
@@ -225,12 +183,9 @@ export async function getRoomAudience(roomId: string): Promise<RoomAudience> {
     kind,
     sectionId: null,
     memberIds: rows.map((m) => m.student_id).filter((id): id is string => id !== null),
-    // A null student_id in a DM IS the instructor (0020's convention).
     hasInstructor: rows.some((m) => m.student_id === null),
   }
 }
-
-// ── Instructor ──────────────────────────────────────────────────────────────
 
 export async function setRoomControls(
   roomId: string,
@@ -252,12 +207,6 @@ export async function unpinMessage(roomId: string, messageId: string): Promise<v
   await rpc('unpin_message', { p_room: roomId, p_message: messageId })
 }
 
-/**
- * BREAK-GLASS. The instructor reading a DM they are not in.
- *
- * Writes an `audit_log` row before returning a single message. This is the only
- * path — RLS grants the instructor nothing in a DM, deliberately.
- */
 export async function readDmThread(
   roomId: string,
   reason?: string,
@@ -273,16 +222,6 @@ export async function readDmThread(
   }))
 }
 
-// ── Notification level per room (migration 0048) ────────────────────────────
-
-/**
- * Read your own level for a room.
- *
- * A direct select rather than an RPC: `space_room_prefs_select` already scopes
- * the table to `student_id = cp_my_student_id()`, so there is nothing an RPC
- * would add except another function to keep in step. A row only exists once you
- * have changed something, hence the default.
- */
 export async function getRoomLevel(roomId: string): Promise<RoomNotifyLevel> {
   const { data, error } = await supabase
     .from('space_room_prefs')

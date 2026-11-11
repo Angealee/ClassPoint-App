@@ -6,36 +6,12 @@ import { useStudentData } from '@/features/student/StudentData'
 import { getLevelProgress } from '@/lib/leveling'
 import { cn } from '@/lib/cn'
 
-/**
- * The pieces the account surfaces are built from — shared by the desktop
- * sidebar footer and the mobile menu overlay so the two cannot drift.
- *
- * ── WHAT THIS IS *NOT* ANY MORE ────────────────────────────────────────────
- * It briefly held the whole menu — Student Space, Profile, Settings — because
- * Profile had been pulled out of the nav. All three are sidebar links now, so
- * the account block expands to exactly TWO rows: Settings and Sign out. That is
- * why it is a compact popover rather than the tall panel it was; a 360px menu
- * for two items is what made it feel heavy, and what overflowed a short
- * viewport.
- *
- * ⚠ Open state is owned by AppLayout, never here: the nav renders twice
- * (sidebar + tab bar) — see the note on `NavButtonItem` in Shell.tsx.
- */
-
 export interface AccountActions {
   /** Close whatever surface this is in, after navigating. */
   onNavigate: () => void
-  /**
-   * Ask the layout to start the sign-out flow.
-   *
-   * The confirmation is a ConfirmDialog, which is a Sheet. Opening it from
-   * inside the mobile menu would stack two portalled overlays with competing
-   * focus traps, so the layout closes this surface first, then opens the dialog.
-   */
   onRequestSignOut: () => void
 }
 
-/** Identity: avatar, name, level, and the points figure that links to the ledger. */
 export function IdentityBlock({
   onNavigate,
   size = 'md',
@@ -64,7 +40,6 @@ export function IdentityBlock({
         <p className="flex items-center gap-1.5 text-xs text-muted">
           <span className="shrink-0 font-semibold text-ink">Lv {level}</span>
           <span aria-hidden="true">·</span>
-          {/* The one figure that links out — to the ledger, like the home hero. */}
           <Link
             to="/app/history"
             onClick={onNavigate}
@@ -78,7 +53,6 @@ export function IdentityBlock({
   )
 }
 
-/** Shared row geometry, so heights cannot drift between the two surfaces. */
 const ROW =
   'flex h-14 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors'
 
@@ -93,9 +67,6 @@ export function SettingsRow({
     <Link
       to="/app/settings"
       onClick={onNavigate}
-      // `text-ink`, not muted: rendered under five ink-coloured nav rows, a
-      // muted Settings reads as DISABLED rather than secondary. Sign out below
-      // keeps the muted rest state, because that one really is destructive.
       className={cn(ROW, 'text-ink hover:bg-card-2', className)}
     >
       <GearIcon className="h-5 w-5 shrink-0 text-muted" />
@@ -117,18 +88,6 @@ export function SignOutRow({
       onClick={onRequestSignOut}
       className={cn(
         ROW,
-        // ⚠ RED AT REST, and this REVERSES an earlier decision in this file.
-        //
-        // It used to rest muted and redden only on hover, on the reasoning that
-        // every other destructive control here does the same so a menu never
-        // looks alarming. The instructor overruled it (2026-11-08): in a menu of
-        // five ink-coloured nav rows plus an ink Settings row, a muted Sign out
-        // read as DISABLED rather than as "careful" — the same failure mode the
-        // comment on SettingsRow above already describes for muted text here.
-        // Red is the one colour that says what this row does.
-        //
-        // Do not revert this to muted without asking. The hover still deepens,
-        // so the row is not shouting at rest, it is simply legible.
         'text-danger hover:bg-danger-solid/10',
         className,
       )}
@@ -139,15 +98,6 @@ export function SignOutRow({
   )
 }
 
-/**
- * Desktop sidebar footer: a compact account row that expands upward into
- * Settings + Sign out.
- *
- * In-flow rather than absolutely positioned, deliberately. The sidebar is a
- * `backdrop-blur-md` ancestor, and an absolutely-positioned popover inside one
- * needs the same portal escape hatch Sheet documents. An in-flow panel needs
- * nothing and cannot be trapped.
- */
 export function SidebarAccount({
   open,
   onToggle,

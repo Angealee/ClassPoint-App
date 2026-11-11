@@ -13,70 +13,17 @@ import {
   type SpacePerson,
 } from '@/lib/types'
 
-/**
- * One message — Instagram's structure at Discord's density.
- *
- * ── WHAT CHANGED, AND WHY ──────────────────────────────────────────────────
- * Left-aligned for EVERYONE (the user's call), so wide content — ASCII art,
- * emoji walls — keeps the full column instead of the ~78% a right-aligned
- * layout leaves.
- *
- * THERE ARE NO BUBBLES. Messages sit on the plain canvas. A bubble had to be
- * painted on every single line, which turned a run of three into three grey
- * slabs and a busy room into a wall of boxes — that was the "cluttered"
- * complaint, and removing the fill is the fix that a lighter fill was not.
- * What survives is MARKS on a flat surface, and each one means something:
- *
- *   2px accent bar   this one is yours
- *   2px gold bar     the instructor
- *   blue tint        you were @mentioned
- *   red tint         hidden by moderation
- *   card fill        the row you are hovering or holding
- *
- * The avatar sits beside the LAST message of a run — YOURS INCLUDED. Hiding
- * your own made the room read as something happening to other people. The name
- * header shows on the first of every run for the same reason: your rank medal
- * and section dot are part of the fun, and there is no reason you should be the
- * one person who never sees their own.
- *
- * Individual timestamps are gone; the room prints a centred divider on a gap.
- * Actions live in a floating toolbar on hover / long-press, so they cost the
- * message no vertical space.
- */
-
 const LONG_PRESS_MS = 420
 const MOVE_CANCEL_PX = 8
-/**
- * Two taps inside this window are one double-tap.
- *
- * Comfortably under LONG_PRESS_MS, so the two gestures cannot both fire: a
- * finger held still for 420ms opens the toolbar, two quick taps send a 🔥.
- */
 const DOUBLE_TAP_MS = 320
-/** The reaction a double-tap sends. Instagram's heart, spent on this app's W. */
 const DOUBLE_TAP_CODE: ReactionCode = 'fire'
 
-/**
- * Top-three rank, as a TINTED NUMBER rather than a 🥇.
- *
- * Two reasons the medal emoji lost: UI chrome in this app uses icons, not emoji
- * (the user's standing call), and at `text-2xs` a colour-emoji medal beside its
- * own rank number rendered as an unreadable smudge followed by a redundant "1".
- * The number IS the rank, and the colour is the medal.
- */
 const MEDAL: Record<number, string> = {
   1: 'text-reward',
   2: 'text-muted',
   3: 'text-warn',
 }
 
-/**
- * The avatar with an XP ring — the same idea as the podium's, at 28px.
- *
- * Drawn as an SVG ring rather than a conic gradient so it renders identically
- * in both themes and needs no mask. `pathLength={100}` lets the dash array be
- * the percentage directly, instead of computing a circumference.
- */
 function RingAvatar({ person, name, url }: { person?: SpacePerson; name: string; url: string | null }) {
   const pct = person ? getLevelProgress(person.semesterPoints).progressPct : 0
   return (
@@ -117,13 +64,7 @@ function Inline({ text, names }: { text: string; names: readonly string[] }) {
             href={t.href}
             target="_blank"
             rel="noopener noreferrer nofollow"
-            // stopPropagation, or opening a link also counts as a tap toward
-            // the double-tap reaction.
             onClick={(e) => e.stopPropagation()}
-            // `overflow-wrap:anywhere`, not `break-all`: a long URL still has to
-            // break rather than push the page sideways, but a short one is not
-            // chopped mid-word for no reason. Accent because Era 6.0 Phase 10
-            // already put inline links on the accent role.
             className="font-medium text-accent underline decoration-accent/40 underline-offset-2 [overflow-wrap:anywhere]"
           >
             {t.content}
@@ -143,13 +84,6 @@ function Inline({ text, names }: { text: string; names: readonly string[] }) {
   )
 }
 
-/**
- * Copy-to-clipboard, with the confirmation ON the button.
- *
- * A toast would be the app's usual answer, but this fires from inside a message
- * row and the point of copying a code block is that you are about to paste it —
- * a banner at the other end of the screen is the wrong place to look.
- */
 function useCopy() {
   const [done, setDone] = useState(false)
   useEffect(() => {
@@ -158,8 +92,6 @@ function useCopy() {
     return () => window.clearTimeout(t)
   }, [done])
   const copy = (text: string) => {
-    // `clipboard` is undefined on an insecure origin; failing silently is right
-    // here, because the alternative is an error toast for a convenience.
     void navigator.clipboard?.writeText(text).then(
       () => setDone(true),
       () => {},
@@ -172,8 +104,6 @@ function CodeBlock({ content }: { content: string }) {
   const { done, copy } = useCopy()
   return (
     <div className="group/code relative my-1">
-      {/* Its OWN horizontal scroll: art keeps its shape instead of rewrapping
-          into noise, and it still cannot push the page sideways. */}
       <pre className="overflow-x-auto rounded-lg border border-line bg-card px-2.5 py-2 pr-12 font-mono text-xs leading-tight text-ink">
         {content}
       </pre>
@@ -184,8 +114,6 @@ function CodeBlock({ content }: { content: string }) {
           copy(content)
         }}
         aria-label={done ? 'Copied' : 'Copy code'}
-        // Always visible on touch (where there is no hover to reveal it) and on
-        // focus; the mouse gets it on hover so a quiet room stays quiet.
         className={cn(
           'absolute right-1.5 top-1.5 rounded-lg border border-line bg-card-2 px-2 py-1 text-2xs font-semibold transition-opacity',
           'opacity-100 md:opacity-0 md:group-hover/code:opacity-100 md:focus-visible:opacity-100',
@@ -236,16 +164,11 @@ export function MessageRow({
   message: SpaceMessage
   /** Game facts for the author, from the room's one roster fetch. */
   person?: SpacePerson
-  /** Where this sits in a run — drives the name header and the avatar. */
   runPosition: 'only' | 'first' | 'middle' | 'last'
   mine?: boolean
   isInstructor?: boolean
   /** Only the Global room, where several sections mix. */
   showSectionDot?: boolean
-  /**
-   * Everyone in this room, for styling `@Name` in the body. Names ONLY — a bare
-   * `@word` is never styled, so "@everyone" cannot pretend to be a person.
-   */
   mentionNames?: readonly string[]
   onReact: (m: SpaceMessage, code: ReactionCode) => void
   onReply: (m: SpaceMessage) => void
@@ -253,7 +176,6 @@ export function MessageRow({
   onReport?: (m: SpaceMessage) => void
   onJumpToParent?: (id: string) => void
   onOpenPerson?: (m: SpaceMessage) => void
-  /** Instructor only — the toolbar hides this entirely for everyone else. */
   onPin?: (m: SpaceMessage, pinned: boolean) => void
   pinned?: boolean
   canReact: boolean
@@ -301,19 +223,11 @@ export function MessageRow({
   function onPointerMove(e: React.PointerEvent) {
     const s = startRef.current
     if (!s) return
-    // Without this, a scroll opens the toolbar of every message it passes.
     if (Math.abs(e.clientX - s.x) > MOVE_CANCEL_PX || Math.abs(e.clientY - s.y) > MOVE_CANCEL_PX) {
       clearTimer()
     }
   }
 
-  /**
-   * Double-tap to react — the one gesture in the room with no chrome at all.
-   *
-   * Counted from `click` rather than `dblclick` so a phone and a mouse take the
-   * same path, and guarded against clicks that were meant for something else:
-   * a link, the reply quote, or a reaction pill inside the message.
-   */
   function onBodyClick(e: React.MouseEvent) {
     if (!canReact || removed || hidden) return
     if ((e.target as HTMLElement).closest('a,button')) return
@@ -341,9 +255,6 @@ export function MessageRow({
       id={`msg-${message.id}`}
       className={cn('group relative flex items-end gap-2', startsRun ? 'mt-2' : 'mt-0.5')}
     >
-      {/* Avatar gutter. Reserved on every row so text stays in one column, and
-          DRAWN on the last message of every run — yours included. Hiding your
-          own avatar made the room feel like it was happening to someone else. */}
       <div className="w-7 shrink-0">
         {endsRun && (
           <button
@@ -360,9 +271,6 @@ export function MessageRow({
       <div className="min-w-0 flex-1">
         {startsRun && (
           <div className="mb-0.5 flex items-center gap-1.5 pl-3">
-            {/* Both theme values ride as CSS variables rather than reading the
-                theme once in JS, so the dot follows a theme switch — the same
-                arrangement PodiumBoard uses for the identical dot. */}
             {showSectionDot && person?.sectionId && (
               <span
                 aria-hidden="true"
@@ -378,11 +286,6 @@ export function MessageRow({
             <span className="min-w-0 truncate text-2xs font-semibold text-muted">
               {message.displayName}
             </span>
-            {/* The XP ring around the avatar shows PROGRESS through the level;
-                this reads out WHICH. Deliberately MUTED rather than the reward
-                gold levels wear elsewhere: at rank 1 the medal is also gold, and
-                two gold chips side by side blurred into one. The medal is the
-                rarer fact, so it keeps the colour. */}
             {person && (
               <span className="shrink-0 text-2xs font-semibold tabular-nums text-muted">
                 Lv {getLevelProgress(person.semesterPoints).level}
@@ -413,30 +316,12 @@ export function MessageRow({
           // Or a double-click selects a word under the burst.
           onDoubleClick={(e) => e.preventDefault()}
           className={cn(
-            // NO BUBBLE. Messages sit on the plain canvas — the user's call, and
-            // it is what lets a run read as one block of talk instead of a stack
-            // of grey slabs. Everything below is a MARK on that flat surface,
-            // never a fill: the only things that paint are the ones that mean
-            // something (yours, a mention, hidden, and the row you are touching).
             'relative rounded-xl px-3 py-1 text-sm transition-colors',
-            // A mention is INFO ("this is addressed to you"), deliberately NOT
-            // accent: accent is already the bar down your OWN run, so an accent
-            // tint here made someone else's message read as one of yours — and
-            // a red wash reads as an error besides.
             message.mentionsMe && !mine && 'bg-info-solid/10',
             hidden && 'bg-danger-solid/8',
-            // The row you are pointing at is the one surface that lights up, so
-            // the floating toolbar has something to belong to.
             actionsVisible ? 'bg-card' : 'group-hover:bg-card/60',
           )}
         >
-          {/* The identity rule.
-              It is a positioned SPAN, not a `border-l` on this box: a border
-              follows the box's own `rounded-xl`, so each message in a run bowed
-              inward at both ends and three consecutive messages rendered as
-              three parentheses. This draws one straight 2px rule that BLEEDS
-              into the 2px gap below (`-bottom-0.5`) unless it is the last of the
-              run, so a run of five reads as a single unbroken line. */}
           {(mine || isInstructor) && (
             <span
               aria-hidden="true"
@@ -449,9 +334,6 @@ export function MessageRow({
             />
           )}
 
-          {/* The double-tap's only feedback. `MotionConfig reducedMotion="user"`
-              in App.tsx neutralises it for anyone who asked for less motion, so
-              it needs no guard of its own. */}
           <AnimatePresence>
             {burst > 0 && (
               <motion.span
@@ -490,9 +372,6 @@ export function MessageRow({
           )}
 
           {tallies.length > 0 && !removed && (
-            // The old -mb pulled these up over the bubble's bottom edge. With no
-            // bubble there is no edge to hide behind, and the overlap would put
-            // a pill on top of the next message.
             <div className="mt-1 flex flex-wrap items-center gap-1">
               {tallies.map((code) => {
                 const isMine = message.myReactions.includes(code)

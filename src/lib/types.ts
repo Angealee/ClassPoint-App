@@ -1,23 +1,9 @@
-/**
- * 'redeem' rows are debits from an approved spend request (negative) — EXCEPT
- * the refund of a reversed grade boost (0062), which is a positive 'redeem' row.
- * That is deliberate: the spend board sums -points over 'redeem', so a refund
- * nets out of "spent" with no change to the snapshot, and the generic
- * "you earned points" push (which skips 'redeem') stays silent. Test the SIGN,
- * not the category, to tell a spend from a refund.
- */
-/**
- * `event` is a Random Event payout (0045). It is its own category rather than
- * reusing `activity` so "how many points came from events?" stays answerable —
- * the ledger is the one place in this app that has to stay honest.
- */
 export type PointCategory =
   | 'recitation'
   | 'activity'
   | 'penalty'
   | 'redeem'
   | 'event'
-  /** 0055 — a global-event check-in award (silent, one shared pool). */
   | 'event_attend'
 
 export interface Section {
@@ -29,7 +15,6 @@ export interface Section {
 
 export type TermKey = 'prelim' | 'midterm' | 'finals'
 
-/** One of the three grading periods, with editable real-world dates (0027). */
 export interface SemesterTerm {
   term: TermKey
   /** 'YYYY-MM-DD' */
@@ -38,25 +23,16 @@ export interface SemesterTerm {
   endsOn: string
 }
 
-/** An academic semester. Exactly one is active at a time (0027). */
 export interface Semester {
   id: string
   name: string
   /** 'YYYY-MM-DD' — a Monday; anchors week 1. */
   startsOn: string
   isActive: boolean
-  /**
-   * What a student archived out of this semester reads on their way out (0060).
-   *
-   * Per SEMESTER rather than one global message, so next year's batch gets its
-   * own and this year's keeps the words written for them. Null = show the
-   * semester name and their recap, nothing else.
-   */
   farewellMessage: string | null
   terms: SemesterTerm[]
 }
 
-/** A subject offered in a semester, e.g. "IT 32 · Platform Technologies" (0027). */
 export interface Subject {
   id: string
   semesterId: string
@@ -64,19 +40,16 @@ export interface Subject {
   name: string
 }
 
-/** A student as the instructor manages them (profile + secret token info). */
 export interface SectionStudent {
   id: string
   section_id: string
   full_name: string
   display_name: string
-  /** Structured name fields (0059). NULL for students created before 0059. */
   last_name: string | null
   first_name: string | null
   middle_name: string | null
   suffix: string | null
   avatar_url: string | null
-  /** This semester's points — what the roster and Award screen show (0029). */
   semester_points: number
   /** Career total across every semester. */
   lifetime_points: number
@@ -100,43 +73,15 @@ export interface LeaderboardEntry {
   student_id: string
   display_name: string
   section_id: string
-  /**
-   * This semester's points — the board resets each semester (0029), so ranking
-   * on an all-time total would pit a new cohort against veterans.
-   */
   points: number
   rank: number
-  /** Merged in live from `students` at read time (the snapshot doesn't store it). */
   avatar_url: string | null
-  /**
-   * Rank at the PREVIOUS refresh, or null if this is their first board (0037).
-   * `previous_rank - rank` is how many places they moved: positive is a climb.
-   */
   previous_rank: number | null
-  /**
-   * When the current run began, where a run is "held this rank or better".
-   * Climbing keeps it; only dropping resets it. Drives the tenure flame.
-   */
   rank_since: string
-  /**
-   * Points cashed out on approved redemptions THIS SEMESTER (0038).
-   *
-   * The spend board ranks on this, and `points + spent_points` is what the
-   * student would have had if they'd never spent — which is where the shadow
-   * rank on the leaderboard comes from.
-   */
   spent_points: number
-  /**
-   * Place on the spend board, or null for a student who hasn't spent anything.
-   *
-   * Null is not "last": most students will have spent nothing, and ordering a
-   * ~170-way tie at zero by name would look like a ranking while meaning
-   * nothing. Those students are simply not on that board yet.
-   */
   spend_rank: number | null
 }
 
-/** A recent point award/penalty as the instructor reviews it (for undo). */
 export interface AwardRecord {
   id: string
   student_id: string
@@ -176,50 +121,17 @@ export interface StudentSelf {
   interests: string | null
   /** Up to 3 public "showcase" photo URLs on the profile. */
   banner_urls: string[] | null
-  /**
-   * Wide cover image at the top of the profile (0039).
-   *
-   * Deliberately NOT banner_urls[0]: that array is the photo STRIP, and taking
-   * its first slot would silently change what the strip shows for every student
-   * who already has photos.
-   */
   header_url: string | null
-  /**
-   * Which part of `header_url` to show, 0-100 (0040).
-   *
-   * Renders as CSS `object-position: 50% <n>%`. 50 is centred, which is what
-   * every cover did before this existed — and what cut the heads off portraits.
-   */
   header_pos: number
   /** The currently-equipped achievement title, or null. */
   display_title: string | null
   /** Up to 3 favorite unlocked achievement codes, featured first. */
   pinned_achievements: string[] | null
-  /**
-   * This semester's points (0029) — the spendable balance, and what drives XP,
-   * level and rank. Shown to students simply as "This semester".
-   */
   semester_points: number
-  /** Career total across every semester. Achievements stay pinned to this. */
   all_time_points: number
-  /**
-   * Set when the instructor archived this student (0023 column, selected here
-   * for the first time by 0060).
-   *
-   * ⚠ This ONE column is the whole client-side gate for the archived
-   *   experience, which is why it is on the row the app already fetches rather
-   *   than behind an RPC: no extra round trip, and the decision is made before
-   *   the first screen paints.
-   *
-   * ⚠ It is NOT the same question as `semesterEnded` on StudentData, which is
-   *   derived from section membership. A student can be archived while still
-   *   sitting in an active-semester section, and can be in a past-semester
-   *   section without being archived. Both flags exist; this one wins.
-   */
   archived_at: string | null
 }
 
-/** A point event as shown on another student's public profile preview. */
 export interface PublicPointEvent {
   id: string
   points: number
@@ -228,20 +140,13 @@ export interface PublicPointEvent {
   created_at: string
 }
 
-/**
- * 'excused' and 'irregular' are NEUTRAL: no penalty, and the session is
- * excluded from streaks, show-up rate, and achievement metrics entirely.
- * 'irregular' = the student isn't part of that session at all (off-section).
- */
 export type AttendanceStatus = 'present' | 'late' | 'absent' | 'excused' | 'irregular'
 
-/** The two statuses that make a session not count for a student. */
 export const NEUTRAL_STATUSES: readonly AttendanceStatus[] = ['excused', 'irregular']
 
 /** Config the instructor sets before starting a class session. */
 export interface SessionConfig {
   sectionId: string
-  /** Which subject this class is for (0028). Null only if none are assigned. */
   subjectId: string | null
   topic: string
   lateAfterMin: number
@@ -255,7 +160,6 @@ export interface SessionConfig {
 export interface ClassSession {
   id: string
   sectionId: string
-  /** Null for sessions that predate subjects ("untagged") — see 0028. */
   subjectId: string | null
   subjectCode: string | null
   subjectName: string | null
@@ -269,14 +173,12 @@ export interface ClassSession {
   absentPenalty: number
   applyPenalties: boolean
   penaltiesCommitted: boolean
-  /** Rotating-QR secret — only present for the instructor who owns the session. */
   qrSecret?: string
 }
 
 /** A past session summarised for the history list. */
 export interface SessionSummary {
   id: string
-  /** Null for sessions that predate subjects ("untagged") — see 0028. */
   subjectId: string | null
   subjectCode: string | null
   topic: string | null
@@ -288,7 +190,6 @@ export interface SessionSummary {
   absent: number
   excused: number
   irregular: number
-  /** How many records in this session were synced from an offline scan. */
   syncedLate: number
   total: number
   penaltiesCommitted: boolean
@@ -296,15 +197,12 @@ export interface SessionSummary {
 
 export type ExcuseStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
 
-/** Days after a session a student may still file an excuse (mirrors the RPC). */
 export const EXCUSE_DEADLINE_DAYS = 7
 
-/** A student's absence-excuse request (the DCT-CCS admission-slip flow). */
 export interface AbsenceExcuse {
   id: string
   recordId: string
   reason: string
-  /** True once the Dean's office has issued the physical admission slip. */
   hasSlip: boolean
   status: ExcuseStatus
   requestedAt: string
@@ -322,50 +220,33 @@ export interface ExcuseRequest extends AbsenceExcuse {
   sessionStartedAt: string | null
 }
 
-/** One flying comment on the leaderboard. Self-destructs after 24h. */
 export interface LeaderboardComment {
   id: string
   /** Null when the instructor posted it. */
   studentId: string | null
-  /** Denormalized at post time so realtime payloads render with no extra fetch. */
   displayName: string
   avatarUrl: string | null
   body: string
   createdAt: string
 }
 
-/** Comments a student may post per rolling 24h (mirrors the RPC). */
 export const MAX_COMMENTS_PER_DAY = 3
 /** Longest a comment may be (mirrors the DB CHECK). */
 export const MAX_COMMENT_LENGTH = 120
 
 /** What a student is putting their points toward. */
 export type RedemptionKind = 'quiz' | 'activity' | 'exam' | 'other'
-/**
- * `reversed` (0062) is an APPROVED grade boost the instructor later undid. It is
- * not `cancelled`, which means a student withdrew a still-pending request —
- * calling a spent boost "Cancelled" would mislead.
- */
 export type RedemptionStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'reversed'
 
-/** The most points a student may put into one request (mirrors the DB CHECK). */
 export const MAX_REDEEM_POINTS = 50
-/** How many requests a student may have waiting at once (mirrors the RPC). */
 export const MAX_PENDING_REDEMPTIONS = 3
 
-/**
- * One entry in the instructor-authored price list (0032).
- *
- * Tapping one pre-fills a redemption request — it does NOT create a different
- * kind of record, so approval and the point-locking logic are unchanged.
- */
 export interface RewardCatalogItem {
   id: string
   label: string
   points: number
   kind: RedemptionKind
   sortOrder: number
-  /** Set when retired: keeps past redemptions meaningful, stops offering it. */
   archivedAt: string | null
 }
 
@@ -380,19 +261,10 @@ export interface Redemption {
   requestedAt: string
   decidedAt: string | null
   decisionNote: string | null
-  /**
-   * Set when the request is a grade boost (0062): the column it points at, and
-   * the bonus the student AGREED TO at request time. Null on every ordinary
-   * request, and on every row read from a database that has not had 0062 yet.
-   */
   gradeItemId?: string | null
   gradeBonus?: number | null
 }
 
-/**
- * The column a boost request points at, with the student's mark as it stands
- * NOW — what approving would actually change.
- */
 export interface RedemptionGradeContext {
   itemId: string
   itemName: string
@@ -401,37 +273,27 @@ export interface RedemptionGradeContext {
   maxScore: number
   /** The bonus the student agreed to. */
   bonus: number
-  /** Their current mark, or null if it has been cleared since they asked. */
   currentScore: number | null
 }
 
-/** A pending/decided request as the instructor sees it (student joined in). */
 export interface RedemptionRequest extends Redemption {
   studentName: string
   avatarUrl: string | null
   sectionId: string
   /** Present only for a grade boost. */
   grade?: RedemptionGradeContext
-  /**
-   * The student's SPENDABLE balance right now — this semester's points (0029),
-   * not their career total. Context for the approve decision, and the same
-   * number decide_point_redemption re-validates against.
-   */
   semesterPoints: number
 }
 
-/** One student's spending totals, for the instructor's top-spenders view. */
 export interface SpenderStat {
   studentId: string
   studentName: string
   avatarUrl: string | null
-  /** Points actually spent this semester, from the same snapshot students see. */
   spent: number
   /** Place on the spend board (0038). */
   rank: number
 }
 
-/** One student's attendance record across a whole section's sessions. */
 export interface StudentAttendanceStat {
   studentId: string
   fullName: string
@@ -441,27 +303,22 @@ export interface StudentAttendanceStat {
   absent: number
   excused: number
   irregular: number
-  /** Sessions that count toward the rate — excludes excused/irregular. */
   counted: number
-  /** (present + late) / counted, 0–1. Null when nothing counts yet. */
   rate: number | null
 }
 
 /** Everything the Session History analytics view needs. */
 export interface AttendanceAnalytics {
   students: StudentAttendanceStat[]
-  /** Points deducted by attendance penalties across these sessions. */
   penaltyPoints: number
   /** How many students took at least one attendance penalty. */
   penalizedStudents: number
 }
 
-/** One row of the instructor's per-session roster (student + their status). */
 export interface AttendanceRosterRow {
   studentId: string
   fullName: string
   avatarUrl: string | null
-  /** Archived students only appear in sessions where they have a record. */
   archived: boolean
   recordId: string | null
   status: AttendanceStatus | null
@@ -479,7 +336,6 @@ export interface InstructorStudentDetail {
   fullName: string
   displayName: string
   avatarUrl: string | null
-  /** This semester's points — the headline figure on the record page. */
   semesterPoints: number
   /** Career total across every semester. */
   lifetimePoints: number
@@ -488,17 +344,14 @@ export interface InstructorStudentDetail {
   claimed: boolean
 }
 
-/** Whole-section register: students × sessions grid of statuses. */
 export interface SectionRegister {
   sessions: Array<{
     id: string
     topic: string | null
     startedAt: string
-    /** Null when untagged; drives the register's Subject row (0028). */
     subjectCode: string | null
   }>
   students: Array<{ id: string; fullName: string }>
-  /** statuses[studentId][sessionId] = status (missing = no record). */
   statuses: Record<string, Record<string, AttendanceStatus>>
 }
 
@@ -510,14 +363,6 @@ export interface ArchivedStudent {
   avatarUrl: string | null
   lifetimePoints: number
   archivedAt: string
-  /**
-   * Where they were when they were archived (0060).
-   *
-   * Null only if the section was deleted out from under them. Carried so a
-   * CROSS-SEMESTER archive list is legible — thirty names with no context is
-   * not a list anyone can act on — and so a restore can say what it is moving
-   * them away from.
-   */
   sectionName: string | null
   semesterName: string | null
 }
@@ -530,9 +375,6 @@ export interface ScanResult {
   markedAt: string | null
 }
 
-// ── Global events (0055) — isolated from class attendance ───────────────────
-
-/** A live/started global check-in event the instructor is running (0055). */
 export interface EventSession {
   id: string
   name: string
@@ -540,7 +382,6 @@ export interface EventSession {
   status: 'active' | 'ended'
   startedAt: string
   endedAt: string | null
-  /** Rotating-QR secret — present only for the instructor who owns it. */
   qrSecret?: string
 }
 
@@ -559,7 +400,6 @@ export interface EventSectionCount {
   count: number
 }
 
-/** Live event stats for the instructor monitor (polled, not realtime). */
 export interface EventStats {
   total: number
   bySection: EventSectionCount[]
@@ -574,14 +414,12 @@ export interface EventHistoryEntry {
   manual: boolean
 }
 
-/** One checked-in student, for the instructor's live monitor / event review. */
 export interface EventAttendee {
   studentId: string
   displayName: string
   avatarUrl: string | null
   sectionName: string | null
   scannedAt: string
-  /** true when the instructor added this student by hand (no phone). */
   manual: boolean
   points: number
 }
@@ -597,11 +435,9 @@ export interface MyAttendanceEntry {
   startedAt: string
   status: AttendanceStatus
   scannedAt: string | null
-  /** Recorded/upgraded by an offline sync (shown as "Offline check-in"). */
   syncedLate: boolean
 }
 
-/** Server outcome from submit_offline_scan (mirrors the RPC's `outcome`). */
 export type OfflineScanOutcome =
   | 'recorded'
   | 'upgraded'
@@ -611,7 +447,6 @@ export type OfflineScanOutcome =
   | 'session_missing'
   | 'wrong_section'
 
-/** Public-safe profile of any student, shown in the leaderboard tap-preview. */
 export interface PublicProfile {
   id: string
   display_name: string
@@ -633,7 +468,6 @@ export interface PublicProfile {
   semester_points: number
   /** When the roster entry was created — shown as "member since". */
   created_at: string | null
-  /** Their most recent point awards (privacy-aware; from public_point_events). */
   events: PublicPointEvent[]
 }
 
@@ -667,7 +501,6 @@ export interface ProfileVisitorRow {
   viewCount: number
 }
 
-/** A page of the full visitor list, plus the grand total for the header. */
 export interface ProfileVisitorPage {
   rows: ProfileVisitorRow[]
   /** Distinct visitors overall (not just this page). */
@@ -685,7 +518,6 @@ export interface AchievementRarity {
 
 export type AchievementCategory = 'points' | 'attendance' | 'growth' | 'social' | 'fun' | 'recognition'
 
-/** Which raw number (from get_achievement_progress) an achievement tracks. */
 export type AchievementMetric =
   | 'points'
   | 'recitations'
@@ -701,23 +533,12 @@ export type AchievementMetric =
   | 'banner_count'
   | 'points_spent'
   | 'redemptions_approved'
-  /**
-   * Per-term metrics (0036). Each is the student's BEST SINGLE TERM across
-   * every term of every semester — which is what makes the badges read as
-   * "do it in any one term" while still unlocking only once, ever.
-   */
   | 'term_points'
   | 'term_recitations'
   | 'term_early_streak'
   | 'perfect_terms'
-  /**
-   * The STRICT current streak (0036): classes in a row marked present. A late
-   * resets it, unlike `streak`, which only breaks on an absence. Drives the
-   * home-screen flame; no badge uses it.
-   */
   | 'present_streak'
 
-/** One row of the achievement catalog — the static, shared definition. */
 export interface Achievement {
   code: string
   category: AchievementCategory
@@ -725,11 +546,8 @@ export interface Achievement {
   description: string
   /** Hidden as "???" until unlocked. */
   secret: boolean
-  /** 'system' = auto-evaluated by sync_achievements(); 'instructor' = only manually grantable. */
   grantedBy: 'system' | 'instructor'
-  /** Non-null only for achievements that also grant a display title. */
   titleText: string | null
-  /** Which metric this achievement tracks, for a "7/10"-style progress readout. Null = no numeric progress (boolean/one-off/instructor-granted). */
   metric: AchievementMetric | null
   /** The value that clears it (for 'rank', lower is better). */
   threshold: number | null
@@ -738,24 +556,17 @@ export interface Achievement {
 
 /** The catalog merged with one student's unlock state. */
 export interface AchievementState extends Achievement {
-  /** ISO timestamp of when this student unlocked it, or null if still locked. */
   unlockedAt: string | null
 }
 
-/** What sync_achievements() returns for each newly-unlocked achievement (drives the celebration). */
 export interface UnlockedAchievement {
   code: string
   name: string
   titleText: string | null
 }
 
-/** The raw numbers behind locked achievements' progress bars (get_achievement_progress). */
 export type AchievementProgress = Record<AchievementMetric, number | null>
 
-/**
- * What each notification is about — mirrors `notifications.type` in the DB
- * (open set there; unknown values render with the default bell icon).
- */
 export type NotificationType =
   | 'point'
   | 'deduct'
@@ -763,14 +574,10 @@ export type NotificationType =
   | 'rank'
   | 'achievement'
   | 'redemption'
-  // Queued by decide_absence_excuse (0025). Was missing here, so every
-  // admission-slip decision rendered with the generic grey bell.
   | 'excuse'
   /** An instructor announcement sent via send_broadcast (0034). */
   | 'broadcast'
-  /** Someone shouted you out in the Lounge (0042). Deep-links to the post. */
   | 'space_shoutout'
-  /** Someone mentioned you or replied to you in a chat room (0043). */
   | 'space_mention'
   /** A direct message (0043). */
   | 'space_dm'
@@ -782,7 +589,6 @@ export type NotificationType =
   | 'peer_eval_open'
   /** Your peer feedback was released (0051). */
   | 'peer_eval_results'
-  /** The instructor opened student grades (0062). Deep-links to /app/grades. */
   | 'grades_open'
   | 'test'
 
@@ -799,16 +605,12 @@ export interface AppNotification {
   readAt: string | null
 }
 
-// ─── Instructor ops (0034) ──────────────────────────────────────────────────
-
 /** One backed-up table's freshness, from `get_backup_health()`. */
 export interface BackupHealth {
   tableName: string
-  /** Date of the most recent snapshot, or null if the mirror is empty. */
   lastSnapshot: string | null
   /** Rows captured in that most recent snapshot. */
   rowCount: number
-  /** How many distinct daily snapshots are retained (the job keeps 14). */
   snapshotDays: number
 }
 
@@ -837,21 +639,13 @@ export interface AuthEvent {
   detail: string | null
 }
 
-/** Per-section "what needs finishing" signals, from `get_section_overview()`. */
 export interface SectionOverview {
   sectionId: string
   lastSessionAt: string | null
   activeSession: boolean
-  /** Ended sessions set to apply penalties that were never committed. */
   unfinalized: number
 }
 
-/**
- * One student on the cross-section risk list (`get_absence_risk()`).
- *
- * `actionable` is the count still inside 0025's 7-day excuse window — the
- * absences the instructor can still do something about today.
- */
 export interface AbsenceRisk {
   studentId: string
   displayName: string
@@ -860,17 +654,10 @@ export interface AbsenceRisk {
   sectionName: string
   unexcused: number
   actionable: number
-  /** Soonest excuse deadline still open, or null when none are actionable. */
   nextDeadline: string | null
   lastAbsenceAt: string | null
 }
 
-/**
- * One student's attendance across a term (`get_term_attendance()`).
- *
- * ATTENDANCE ONLY, by the instructor's rule: points are never turned into a
- * grade, so there is deliberately no points column here.
- */
 export interface TermAttendanceRow {
   studentId: string
   fullName: string
@@ -880,21 +667,10 @@ export interface TermAttendanceRow {
   absent: number
   excused: number
   irregular: number
-  /** present + late + absent. Neutral statuses are excluded by design. */
   counted: number
   showUpRate: number
 }
 
-// ─── Semester rollover (0035) ───────────────────────────────────────────────
-
-/**
- * One problem found by the rollover pre-flight.
- *
- * `block` items are refused by `set_active_semester` itself — the UI showing
- * them is a courtesy, the SQL is the gate. `warn` items are the instructor's
- * call to override (notably `unplaced`: leaving a student behind is often
- * deliberate — they dropped, transferred or graduated).
- */
 export interface RolloverCheck {
   code:
     | 'active_session'
@@ -909,26 +685,12 @@ export interface RolloverCheck {
   detail: string
 }
 
-/**
- * One student who would be archived by closing a semester (0060).
- *
- * `fullName`, not `displayName`: this list is read to check nobody is being
- * archived by mistake, and the official "Dela Cruz, Juan M." is what the
- * instructor matches against their own records.
- */
 export interface SemesterCloseRow {
   studentId: string
   fullName: string
   sectionName: string
 }
 
-/**
- * One row of a past semester's final leaderboard.
- *
- * Recomputed from the ledger rather than read from the snapshot (which only
- * holds the current board), and it includes archived students — they were on
- * that board when it counted.
- */
 export interface PastLeaderboardEntry {
   studentId: string
   displayName: string
@@ -939,24 +701,13 @@ export interface PastLeaderboardEntry {
   avatarUrl: string | null
 }
 
-// ─── Student Space (0041) ───────────────────────────────────────────────────
-
-/**
- * One section's beta membership, for /teach/space.
- *
- * `SpaceAccess` — the student-facing shape — deliberately lives in
- * lib/space-gate.ts instead of here, beside the functions that interpret it.
- * It is the one type in the app whose meaning is inseparable from its rules.
- */
 export interface SpaceAdminSection {
   sectionId: string
   sectionName: string
   spaceEnabled: boolean
-  /** Active students, so the roster shows what enabling a section costs. */
   studentCount: number
 }
 
-/** A live mute. Lapsed timeouts stay in the table but are never listed. */
 export interface SpaceTimeout {
   studentId: string
   displayName: string
@@ -966,31 +717,17 @@ export interface SpaceTimeout {
   reason: string | null
 }
 
-// ─── The Student Lounge (0042) ──────────────────────────────────────────────
-
-/** What a Lounge card is. `pulse` cards are written by ClassPoint, not a student. */
 export type LoungePostKind = 'text' | 'shoutout' | 'pulse'
 
 /** Which milestone a Class Pulse card announces. */
 export type PulseKind = 'level' | 'podium'
 
-/**
- * One card in the feed.
- *
- * Author and target are DENORMALIZED on the row (0020's rule) so a realtime
- * payload renders with no join and no second round-trip.
- */
 export interface LoungePost {
   id: string
   kind: LoungePostKind
-  /** Null when the instructor wrote it. On a `pulse` card, the student it is about. */
   authorStudentId: string | null
   displayName: string
   avatarUrl: string | null
-  /**
-   * Null when the post is hidden and you are not the instructor — the server
-   * withholds it rather than trusting the client not to draw it.
-   */
   body: string | null
   targetStudentId: string | null
   targetDisplayName: string | null
@@ -1018,7 +755,6 @@ export interface LoungeReply {
   createdAt: string
 }
 
-/** What the composer needs to show its counters without guessing. */
 export interface LoungeQuota {
   postsLeft: number
   shoutoutsLeft: number
@@ -1034,28 +770,14 @@ export interface ShoutoutReceived {
   createdAt: string
 }
 
-/** Longest a post or reply may be (mirrors the DB CHECK and cp_lounge_clean). */
 export const MAX_POST_LENGTH = 600
 /** Text posts per rolling 24h (mirrors post_to_lounge). */
 export const MAX_POSTS_PER_DAY = 5
-/** Shoutouts per rolling 7 days, max one per classmate (mirrors post_shoutout). */
 export const MAX_SHOUTOUTS_PER_WEEK = 3
-/** Ws you can be holding at once, per rolling 24h (mirrors give_w). */
 export const MAX_WS_PER_DAY = 3
-
-// ─── Student Space messaging (0043) ─────────────────────────────────────────
 
 export type RoomKind = 'section' | 'global' | 'dm'
 
-/**
- * The six reactions, as CODE → GLYPH.
- *
- * ⚠ The DATABASE stores the code, never the emoji. Several glyphs carry a
- * variation selector (❤️ is U+2764 U+FE0F), so a CHECK against the character
- * itself fails the moment any layer normalises the string — and the reaction
- * silently does not save. This map is the only place the glyph appears, which
- * also means changing one is a client edit rather than a migration.
- */
 export const CHAT_REACTIONS = {
   like: '👍',
   lol: '😂',
@@ -1091,10 +813,6 @@ export interface SpaceMessage {
   authorStudentId: string | null
   displayName: string
   avatarUrl: string | null
-  /**
-   * Null for a tombstone (deleted) or a hidden message you may not read. The
-   * server withholds it; the client never receives text it should not draw.
-   */
   body: string | null
   replyToId: string | null
   replyToName: string | null
@@ -1110,10 +828,7 @@ export interface SpaceMessage {
   createdAt: string
 }
 
-/** Longest a chat message may be — same limit and normaliser as a Lounge post. */
 export const MAX_MESSAGE_LENGTH = 600
-
-// ─── Student Space moderation (0044) ────────────────────────────────────────
 
 export type ReportTargetType = 'post' | 'reply' | 'message'
 export type ReportReason = 'harassment' | 'inappropriate' | 'spam' | 'other'
@@ -1127,16 +842,8 @@ export const REPORT_REASONS: { value: ReportReason; label: string }[] = [
   { value: 'other', label: 'Something else' },
 ]
 
-/** Distinct reports that auto-hide a target. Mirrors report_content(). */
 export const AUTO_HIDE_AT = 7
 
-/**
- * One item in the instructor's queue — one per TARGET, not per report.
- *
- * `body` is null for a message in a DM room, deliberately: printing it here
- * would make every DM report a silent break-glass. Use `readDmThread`, which
- * writes an audit row.
- */
 export interface ReportQueueItem {
   targetType: ReportTargetType
   targetId: string
@@ -1156,14 +863,6 @@ export interface ReportQueueItem {
   isDeleted: boolean
 }
 
-// ─── Random Events (0045) ───────────────────────────────────────────────────
-
-/**
- * An event as a STUDENT sees it. There is no `answerKey` field anywhere in the
- * client types, deliberately: it is a column the client could select, so every
- * read path in 0045 omits it and only reports `hasKey`. A student who can read
- * the key wins every event.
- */
 export interface LoungeEvent {
   id: string
   question: string
@@ -1173,7 +872,6 @@ export interface LoungeEvent {
   hasKey: boolean
   closesAt: string | null
   answerCount: number
-  /** Your own answer, the only one visible while the event is open. */
   myAnswer: string | null
   createdAt: string
 }
@@ -1209,51 +907,32 @@ export interface LoungeEventSummary {
 /** Most an event can pay per winner (mirrors the DB CHECK). */
 export const MAX_EVENT_POINTS = 50
 
-/**
- * A person in Student Space, with the game facts the social surfaces draw
- * beside a name. Fetched ONCE per screen from `get_space_people()`, never
- * denormalized onto a message — a stamped level would be wrong the moment the
- * student earned a point.
- */
 export interface SpacePerson {
   id: string
   displayName: string
   avatarUrl: string | null
   semesterPoints: number
   sectionId: string | null
-  /** From the twice-daily snapshot, so it matches the leaderboard exactly. */
   rank: number | null
 }
 
-/** One pinned message (migration 0046). At most `MAX_ROOM_PINS` per room. */
 export interface RoomPin {
   messageId: string
   /** Null when the instructor sent it. */
   authorId: string | null
   displayName: string
   avatarUrl: string | null
-  /** Null for a deleted message, or a hidden one you may not read. */
   body: string | null
   createdAt: string
   pinnedAt: string
   /** Null when the instructor pinned it. */
   pinnedBy: string | null
-  /**
-   * Server-computed: the instructor, or whoever pinned it. Anyone who can post
-   * may PIN, but only those two may unpin — otherwise the first student to
-   * disagree can quietly remove the rules post.
-   */
   canUnpin: boolean
 }
 
 /** Mirrors the cap enforced inside `pin_message`. */
 export const MAX_ROOM_PINS = 10
 
-/**
- * Enough to work out who a room's members are, without a members table for the
- * two derived kinds. `section` matches on `sectionId`; `global` is everyone
- * with Space access; only a `dm` has real rows.
- */
 export interface RoomAudience {
   kind: RoomKind
   sectionId: string | null
@@ -1262,31 +941,11 @@ export interface RoomAudience {
   hasInstructor: boolean
 }
 
-/**
- * How much a room notifies you (migration 0048).
- *
- * `mentions` is the default and is what every room did before there was a
- * setting: mentions, replies to you, and DMs. `all` is every message in the
- * room; `none` is what the old `muted` boolean meant, and `space_room_prefs.
- * muted` is now GENERATED from this so the two cannot disagree.
- */
 export type RoomNotifyLevel = 'all' | 'mentions' | 'none'
-
-// ============================================================================
-// Peer Evaluation · groups (migration 0049)
-// ============================================================================
 
 /** Mirrors the CHECK on `peer_groups.name`. */
 export const PEER_GROUP_NAME_MAX = 40
 
-/**
- * A classmate as every peer surface renders them: id, chosen name, photo.
- *
- * ONE shape for group members and for the peers on an evaluation form. They
- * are the same three fields drawn by the same rows, so a second name for it
- * would be the start of the drift this codebase has watched happen four times
- * to the points row.
- */
 export interface PeerPerson {
   id: string
   displayName: string
@@ -1296,14 +955,6 @@ export interface PeerPerson {
 /** One member of a group, as `get_section_groups` returns them. */
 export type PeerGroupMember = PeerPerson
 
-/**
- * A team inside one section.
- *
- * `members` excludes archived students while their membership ROW survives, so
- * a restored student comes back to the team they were on. That means
- * `memberCount` is the live headcount, not the number of rows in the table —
- * which is the figure the builder should show either way.
- */
 export interface PeerGroup {
   id: string
   name: string
@@ -1313,13 +964,6 @@ export interface PeerGroup {
   createdAt: string
 }
 
-/**
- * A roster row with no secrets attached — see `listRosterBasics`.
- *
- * `fullName` is the roster name the instructor sorts and searches by;
- * `displayName` is what the student chose to be called, and is what any surface
- * a student can see must use.
- */
 export interface RosterPerson {
   id: string
   fullName: string
@@ -1327,11 +971,6 @@ export interface RosterPerson {
   avatarUrl: string | null
 }
 
-// ============================================================================
-// Peer Evaluation · evaluations and submission (migration 0050)
-// ============================================================================
-
-/** Mirrors the CHECKs on `peer_evaluations` and `peer_comments`. */
 export const PEER_TITLE_MAX = 80
 export const PEER_INSTRUCTIONS_MAX = 600
 export const PEER_CRITERION_LABEL_MAX = 60
@@ -1351,15 +990,9 @@ export interface PeerCriterion {
   scale: PeerScaleOption[]
 }
 
-/**
- * Section-wide or group-scoped, chosen once at creation and locked the moment
- * anyone submits — changing it afterwards would change who a submitted rating
- * was about.
- */
 export type PeerEvalScope = 'section' | 'group'
 export type PeerEvalStatus = 'open' | 'closed'
 
-/** 'paused' means the kill switch is off, not that a student is excluded. */
 export type PeerEvalState = 'open' | 'paused'
 
 /** A row in the student's list at `/app/peer`. */
@@ -1373,19 +1006,11 @@ export interface PeerEvaluationSummary {
   status: PeerEvalStatus
   closesAt: string | null
   resultsReleasedAt: string | null
-  /**
-   * How many classmates this student must rate.
-   *
-   * ZERO IS MEANINGFUL, not an error: in a group-scoped evaluation it means
-   * they have not been placed on a team. The list says so rather than showing
-   * an empty form.
-   */
   peerCount: number
   submittedAt: string | null
   createdAt: string
 }
 
-/** The whole form, as `get_peer_evaluation` returns it in one call. */
 export interface PeerEvaluationForm {
   id: string
   title: string
@@ -1400,7 +1025,6 @@ export interface PeerEvaluationForm {
   peers: PeerPerson[]
 }
 
-/** One rating, as the submit RPC wants it. Snake_case: see `submitPeerEvaluation`. */
 export interface PeerRatingInput {
   ratee_id: string
   criterion_id: string
@@ -1424,10 +1048,6 @@ export interface PeerEvaluationListItem {
   closedAt: string | null
   resultsReleasedAt: string | null
   sectionNames: string[]
-  /**
-   * The teams it is aimed at (0052). EMPTY means all groups in those sections,
-   * or a section-wide evaluation — not "no teams".
-   */
   groupNames: string[]
   criteriaCount: number
   submittedCount: number
@@ -1443,31 +1063,12 @@ export interface PeerCompletionRow {
   fullName: string
   avatarUrl: string | null
   sectionName: string
-  /** Null in a section-scoped evaluation, or when they are on no team. */
   groupName: string | null
   peerCount: number
   submittedAt: string | null
-  /**
-   * False when they have nobody to rate.
-   *
-   * The third state peer2peer could not express. Such a student is NOT
-   * outstanding, and listing them as missing sends the instructor chasing
-   * someone with nothing to do.
-   */
   applicable: boolean
 }
 
-// ============================================================================
-// Peer Evaluation · results (migration 0051)
-// ============================================================================
-
-/**
- * Below this many raters a student's COMMENTS are withheld from them.
- *
- * ⚠ Mirrors `c_min_raters` in `get_my_peer_results`, which is where it is
- * ENFORCED. This copy exists only so a screen can explain the rule; a client
- * that forgot it would show nothing, never leak anything.
- */
 export const PEER_MIN_RATERS_FOR_COMMENTS = 3
 
 /** One criterion's aggregate for one student. */
@@ -1480,7 +1081,6 @@ export interface PeerCriterionResult {
   pct: number
   scaleMin: number
   scaleMax: number
-  /** How many ratings went into it. Absent on the student's own view. */
   ratings?: number
 }
 
@@ -1491,10 +1091,6 @@ export interface PeerCommentRow {
   evaluatorId: string
   evaluatorName: string
   hiddenAt: string | null
-  /**
-   * The banned-word filter matched at submit (0054). Permanent: a comment you
-   * restored stays flagged. Whether the student sees it is `hiddenAt`.
-   */
   flagged: boolean
   createdAt: string
 }
@@ -1507,30 +1103,15 @@ export interface PeerResultRow {
   avatarUrl: string | null
   sectionName: string
   groupName: string | null
-  /** How many different classmates rated them. Zero is a real answer. */
   raterCount: number
   /** Null when nobody rated them. */
   overallPct: number | null
   overallRaw: number | null
-  /**
-   * Whether every criterion shares one scale.
-   *
-   * False makes `overallRaw` a mean across mixed scales, which is a number
-   * without a unit. The percentages stay comparable either way, so the screen
-   * keeps the headline and captions the raw figure.
-   */
   sameScale: boolean
   criteria: PeerCriterionResult[]
   comments: PeerCommentRow[]
 }
 
-/**
- * What a student gets back about themselves.
- *
- * `comments` are BARE STRINGS. Not objects with the evaluator stripped out —
- * the shape has no room for a name, so there is no field anyone can forget to
- * remove.
- */
 export interface MyPeerResults {
   id: string
   title: string
@@ -1543,44 +1124,19 @@ export interface MyPeerResults {
   overallRaw: number | null
   criteria: PeerCriterionResult[]
   comments: string[]
-  /** True when too few people rated them for a comment to stay anonymous. */
   commentsWithheld: boolean
-  /** The threshold the server applied, so the screen can say the real number. */
   minRaters: number
 }
 
-// ============================================================================
-// Peer Evaluation · duplicate and shuffle (migration 0054)
-// ============================================================================
-
-/**
- * An existing evaluation's shape, for pre-filling the composer (Duplicate).
- *
- * Nothing is created from this until the instructor presses Open, so there is
- * no server-side draft. The deadline is deliberately absent: a copied deadline
- * is almost always already in the past.
- */
 export interface PeerEvaluationTemplate {
   title: string
   instructions: string
   scope: PeerEvalScope
   subjectId: string
   sectionIds: string[]
-  /** Empty means all groups in those sections (0052's rule), not none. */
   groupIds: string[]
   criteria: { label: string; scale: PeerScaleOption[] }[]
 }
-
-// ============================================================================
-// Grades (migration 0057)
-//
-// Instructor-only, end to end: all three tables are instructor-gated in RLS
-// with no student branch at all. Nothing here touches point_events, in either
-// direction — points are never turned into a grade.
-//
-// The ARITHMETIC lives in src/lib/grading.ts and nowhere else, deliberately
-// without a SQL mirror. These are the shapes it works on.
-// ============================================================================
 
 /** One of the four things a term grade is made of. */
 export type GradeComponent = 'performance_task' | 'quiz' | 'recitation' | 'exam'
@@ -1588,13 +1144,6 @@ export type GradeComponent = 'performance_task' | 'quiz' | 'recitation' | 'exam'
 /** Which figure a screen is showing — see ComponentSums. */
 export type GradeView = 'official' | 'soFar'
 
-/**
- * What a term's grade is made of, for one subject.
- *
- * Every weight is a PROPORTION (0.5, never 50). `finalWeight` is this term's
- * own share of the final computed grade — never a stored triple, because
- * "30/30/40" reads like one and invites it.
- */
 export interface GradePolicy {
   subjectId: string
   term: TermKey
@@ -1605,23 +1154,11 @@ export interface GradePolicy {
   /** Term split — these two must sum to 1. */
   csWeight: number
   examWeight: number
-  /** This term's share of the final grade. The three terms' must sum to 1. */
   finalWeight: number
-  /** `(raw/total * span + base) * 100`. Base 0.6 gives the 60.00 floor. */
   transmuteBase: number
   transmuteSpan: number
 }
 
-/**
- * One component's totals for one student.
- *
- * The two denominators answer different questions, and keeping both is what
- * lets one screen show an official grade and an honest in-progress one:
- *   • `sumMax` — every non-archived item, so an unmarked one counts as a zero.
- *     This is what the spreadsheet does and what the official grade must be.
- *   • `sumMaxMarked` — only the items this student has a score for. A missing
- *     row means "not marked yet"; a real zero is stored as 0 and has a row.
- */
 export interface ComponentSums {
   sumScore: number
   sumMax: number
@@ -1642,63 +1179,34 @@ export interface GradeItem {
   position: number
   /** Set when retired: leaves the denominator, keeps its scores. */
   archivedAt: string | null
-  /**
-   * The instructor's terms for letting students spend points on this column
-   * (0062): "spend `pointsCost` points to add `pointsBonus` marks". Both null =
-   * not offered. Always both or neither — the table CHECKs it. Null too when
-   * read from a database that has not had 0062 yet.
-   */
-  /**
-   * The ONE instructor control over points assist (0063/0064): points can't be used
-   * on this column. Every column is otherwise open — 1 point = 1 mark, the student
-   * chooses how many, never past the maximum. False when read from a database
-   * without 0063.
-   */
   assistOff: boolean
-  /**
-   * The class this column was held in (0063). Anyone recorded absent OR excused in
-   * that class is Absent on this column. Null = not tied to a class.
-   */
   sessionId: string | null
 }
 
-/**
- * One Absent mark (0063): 'manual' = the instructor typed A, 'auto' = the student
- * is recorded absent or excused in the class the column is tied to.
- */
 export interface GradeAbsence {
   itemId: string
   studentId: string
   source: 'manual' | 'auto'
 }
 
-/** Classes a student showed up to, and classes counted — the Recitation inputs. */
 export interface GradeAttendance {
   showed: number
   counted: number
 }
 
-/** Mirrors `request_point_redemption`'s own ceiling; a column cannot cost more. */
 export const MAX_BOOST_COST = MAX_REDEEM_POINTS
 
-/** One mark. The ABSENCE of one of these means "not marked yet". */
 export interface GradeScore {
   itemId: string
   studentId: string
   score: number
 }
 
-/**
- * The receipt for a boost (0062): what the mark was before points changed it.
- * Instructor-readable only — a student sees their own through `get_my_grades`.
- */
 export interface GradeBoost {
   itemId: string
   studentId: string
   scoreBefore: number
-  /** What the boost WROTE. A cell that no longer holds this has been retyped. */
   scoreAfter: number
-  /** The real gain after the cap, which can be less than the column's bonus. */
   marksGranted: number
   pointsSpent: number
   appliedAt: string
@@ -1706,14 +1214,11 @@ export interface GradeBoost {
 
 /** What `reverse_grade_boost` reports back. */
 export interface ReverseBoostResult {
-  /** False when the mark had been retyped since, so it was left alone. */
   markRestored: boolean
   pointsRefunded: number
   /** The mark as it stands after the reversal. */
   scoreNow: number | null
 }
-
-// ── What a student sees of their own grades (0062 `get_my_grades`) ──────────
 
 /** One column as the student sees it. */
 export interface MyGradeItem {
@@ -1725,16 +1230,10 @@ export interface MyGradeItem {
   position: number
   /** null = not marked yet. Never a zero standing in for that. */
   score: number | null
-  /**
-   * Points can be used on this column (0064): every column is open unless the
-   * instructor switched it off. The amount is the STUDENT's choice, 1 point = 1 mark.
-   */
   offered: boolean
-  /** Marked absent, or recorded absent / excused in the class it was held in (0063). */
   absent: boolean
   /** Set once a boost has been applied to this column. */
   boost: { marks: number; points: number; before: number } | null
-  /** A boost request for this column is waiting on the instructor. */
   pending: boolean
 }
 
@@ -1742,30 +1241,17 @@ export interface MyGradeSubject {
   subjectId: string
   code: string
   name: string
-  /** The weights, so the client can derive the "so far" figure with grading.ts. */
   policies: GradePolicy[]
-  /** Attendance counts per term — Recitation is computed from them (0063). */
   attendance: Record<TermKey, GradeAttendance>
   items: MyGradeItem[]
 }
 
 export interface MyGrades {
-  /**
-   * The screen is available. False only for an ARCHIVED account (0065) — a student
-   * always sees their own marks, whatever the grade switch says.
-   */
   enabled: boolean
-  /**
-   * The GRADE FIGURES may be shown (the term "so far" grade, the part scores, how
-   * it is worked out). False while the instructor's switch is off: marks and
-   * points still work, and the weights and attendance are withheld by the server
-   * so a grade cannot be computed from the payload.
-   */
   figures: boolean
   subjects: MyGradeSubject[]
 }
 
-/** One student's raw component totals for one term (`get_section_grade_sums`). */
 export interface GradeSumsRow {
   studentId: string
   fullName: string

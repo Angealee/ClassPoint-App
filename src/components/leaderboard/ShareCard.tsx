@@ -1,28 +1,11 @@
 import { forwardRef } from 'react'
 import type { LeaderboardEntry } from '@/lib/types'
 
-/**
- * A social story: 1080×1920, exactly 9:16.
- *
- * This is the size Instagram, Facebook and WhatsApp Stories expect, so it fills
- * the screen with no bars and no crop. A literal Galaxy S22 panel (1080×2340,
- * 19.5:9) is TALLER than a story — posted as one it would be letterboxed, or
- * cropped through the header and footer.
- *
- * Rendered at full size off-screen; the sheet previews it scaled down.
- */
 export const CARD_W = 1080
 export const CARD_H = 1920
 
 export type ShareVariant = 'podium' | 'list'
 
-/**
- * Hardcoded palette — NOT the app's CSS variables.
- *
- * The capture must look the same regardless of the viewer's theme, and
- * `var(--…)` doesn't reliably resolve inside a cloned capture context anyway.
- * Dark is deliberate: it reads better on a social feed.
- */
 const C = {
   bg: '#0d0d10',
   bgSoft: '#16161b',
@@ -50,11 +33,6 @@ interface ShareCardProps {
   /** "Global" or a section name. */
   scopeLabel: string
   capturedAt?: string | null
-  /**
-   * Who moved up most since the last settle. Computed by the caller from the
-   * FULL ranked list, not from the top ten — the biggest climber is usually
-   * someone still working their way up, which is the point of showing them.
-   */
   climber?: { name: string; places: number } | null
 }
 
@@ -70,11 +48,6 @@ function initials(name: string): string {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?'
 }
 
-/**
- * One avatar. `crossOrigin="anonymous"` matters: Supabase storage serves
- * `access-control-allow-origin: *`, and without the attribute the image taints
- * the capture and the export fails.
- */
 function Face({ url, name, size }: { url: string | null; name: string; size: number }) {
   const ring = Math.max(3, Math.round(size * 0.035))
   if (url) {
@@ -181,7 +154,6 @@ function Title({ sub }: { sub: string }) {
   )
 }
 
-/** Your standing, called out at the bottom. Null-safe for unranked students. */
 function YouChip({ pos, points }: { pos: number; points: number | null }) {
   return (
     <div
@@ -243,14 +215,6 @@ function Footer() {
   )
 }
 
-/** Top 3 on pedestals — order is 2nd, 1st, 3rd so the winner sits centre. */
-/**
- * A drawn crown rather than the 👑 emoji.
- *
- * Emoji render from a font, and which font varies by the capturing device — so
- * the exported image could show an Apple crown, a Google one, or a tofu box
- * depending on whose phone made it. A path always looks the same.
- */
 function Crown() {
   return (
     <svg
@@ -271,12 +235,6 @@ function Crown() {
   )
 }
 
-/**
- * The single most story-worthy thing a leaderboard produces, and it was sitting
- * unused in the data: `previous_rank` has been stored since 0037 and nothing
- * ever surfaced who moved. It also gives students outside the top three a
- * reason to care about the image.
- */
 function ClimberBanner({ climber }: { climber: { name: string; places: number } }) {
   return (
     <div
@@ -317,8 +275,6 @@ function ClimberBanner({ climber }: { climber: { name: string; places: number } 
 
 function Podium({ entries }: { entries: LeaderboardEntry[] }) {
   const [first, second, third] = entries
-  // Faces are the largest thing on the podium: the app has real photos, and a
-  // winner's face makes this worth posting in a way a number does not.
   const cols = [
     { e: second, place: 2, h: 132, face: 176 },
     { e: first, place: 1, h: 186, face: 232 },
@@ -396,14 +352,6 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
   )
 }
 
-/**
- * A ranked row, at one of two densities.
- *
- * `compact` sits under the podium in the podium story, where the three stands
- * have already used most of the height. `roomy` is the whole list story, where
- * ten compact rows left a 448px void — so the rows take the height rather than
- * the padding taking it.
- */
 function RankRow({
   e,
   pos,
@@ -471,19 +419,12 @@ function RankRow({
   )
 }
 
-/**
- * The off-screen node that becomes the shared PNG. Pure presentation — the
- * capture (and its pitfalls) lives in ShareSheet.
- */
 export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function ShareCard(
   { variant, entries, meId, myPos, myPoints, scopeLabel, capturedAt, climber },
   ref,
 ) {
   const top = entries.slice(0, 10)
   const meInTop = !!meId && top.some((e) => e.student_id === meId)
-  // The podium story shows the top three on the stand AND the rest of the ten
-  // below it — a story canvas has the height for the whole board, and the whole
-  // board is what makes the image worth posting.
   const rest = variant === 'podium' ? top.slice(3) : []
 
   return (
@@ -533,7 +474,6 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
 
       {climber && <ClimberBanner climber={climber} />}
 
-      {/* Only call out a rank the list doesn't already show. */}
       {myPos != null && !meInTop && (
         <div style={{ marginTop: 20 }}>
           <YouChip pos={myPos} points={myPoints ?? null} />

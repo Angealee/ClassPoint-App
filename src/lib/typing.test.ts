@@ -17,8 +17,6 @@ describe('noteTyping', () => {
   })
 
   it('REPLACES rather than duplicating on every keystroke', () => {
-    // Without the filter, a fast typist appears once per ping and the label
-    // reads "Ana, Ana and 6 others are typing".
     let s: TypingEntry[] = []
     s = noteTyping(s, 'Ana', T0)
     s = noteTyping(s, 'Ana', T0 + 100)
@@ -42,8 +40,6 @@ describe('activeTypers', () => {
   })
 
   it('treats the exact timeout as stale', () => {
-    // A stuck indicator is worse than none: it says someone is about to speak
-    // when they closed the tab five minutes ago.
     const s = [{ name: 'Ana', at: T0 - TYPING_TIMEOUT_MS }]
     expect(activeTypers(s, T0)).toEqual([])
   })
@@ -74,15 +70,12 @@ describe('shouldBroadcast', () => {
   })
 
   it('throttles', () => {
-    // Without this, every keystroke is a socket message to everyone in the room.
     expect(shouldBroadcast(T0, T0 + 1)).toBe(false)
     expect(shouldBroadcast(T0, T0 + TYPING_THROTTLE_MS - 1)).toBe(false)
     expect(shouldBroadcast(T0, T0 + TYPING_THROTTLE_MS)).toBe(true)
   })
 
   it('re-broadcasts before the receiver times out', () => {
-    // The throttle MUST be shorter than the timeout, or an indicator flickers
-    // off between pings while the person is still typing.
     expect(TYPING_THROTTLE_MS).toBeLessThan(TYPING_TIMEOUT_MS)
   })
 })

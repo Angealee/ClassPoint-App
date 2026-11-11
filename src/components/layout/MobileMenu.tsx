@@ -8,29 +8,6 @@ import { IdentityBlock, SettingsRow, SignOutRow, type AccountActions } from './A
 import { XIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 
-/**
- * The mobile menu: a full-screen overlay that mirrors the desktop sidebar.
- *
- * ── WHY FULL-SCREEN AND NOT A BOTTOM SHEET ─────────────────────────────────
- * This was a Sheet, and it read wrong. A bottom sheet says "a small choice
- * about the screen you are on"; this is the app's navigation, and on desktop it
- * IS the sidebar. Taking the whole screen makes that claim honestly, gives the
- * rows room to be real tap targets, and removes the cramped three-row card that
- * looked like an afterthought.
- *
- * It deliberately repeats Home / Ranks / Attend even though those are tabs
- * underneath (the user's call): the menu is the sidebar, and a sidebar that
- * silently omits three of its five destinations is a different thing wearing
- * the same name.
- *
- * ── DISCIPLINES BORROWED FROM Sheet.tsx ────────────────────────────────────
- * Portalled to <body> (the mobile header is `backdrop-blur`, which would
- * otherwise become the containing block for `fixed inset-0` and trap this in
- * the header strip); scroll-locked; focus-trapped; Escape closes. And `onClose`
- * lives in a REF so the effect depends on `[open]` alone — the exact bug that
- * made every Sheet steal a keystroke from its own form.
- */
-
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -48,12 +25,7 @@ export function MobileMenu({
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
 
-  // See the Sheet.tsx note: an inline-arrow `onClose` changes identity every
-  // render, and listing it here would re-run the trap on every state change.
   const onCloseRef = useRef(onClose)
-  // Assigned in an effect rather than during render: Sheet.tsx does the latter
-  // and earns a react-hooks/refs warning for it. Same guarantee, no warning —
-  // the Escape handler below only ever reads this after paint.
   useEffect(() => {
     onCloseRef.current = onClose
   }, [onClose])
@@ -118,16 +90,12 @@ export function MobileMenu({
           aria-modal="true"
           aria-label="Menu"
           tabIndex={-1}
-          // Rises rather than sliding sideways: it is summoned from the bottom
-          // tab bar, so it should come from where the finger was.
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 24 }}
           transition={glide}
           className="fixed inset-0 z-50 flex flex-col bg-canvas outline-none"
         >
-          {/* Unlike the app's sticky header, this is `fixed inset-0` and starts at
-              the physical top of the screen — so it owns the notch inset. */}
           <header className="flex shrink-0 items-center justify-between border-b border-line px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <h2 className="font-display text-lg font-bold">Menu</h2>
             <button

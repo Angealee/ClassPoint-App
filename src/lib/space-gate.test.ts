@@ -7,15 +7,6 @@ import {
   type SpaceAccess,
 } from './space-gate'
 
-/**
- * Pure-logic, no mocking — in the spirit of the other suites beside `qr`,
- * `term`, `leveling`, `offline-scans`, `attendance` and `danmaku`.
- *
- * The load-bearing case is the LAST one: an unparseable `timeout_until` must
- * leave the student muted. Every other branch here fails visibly; that one
- * would fail by silently handing posting rights to someone who was muted.
- */
-
 const NOW = Date.parse('2026-09-02T12:00:00Z')
 const open = (over: Partial<SpaceAccess> = {}): SpaceAccess => ({
   state: 'open',
@@ -48,15 +39,13 @@ describe('canPostNow', () => {
 
   it('honours a live mute even if the server said canPost', () => {
     const muted = open({
-      canPost: true, // stale — the server answered before the mute landed
+      canPost: true,
       timeoutUntil: new Date(NOW + 60 * 60 * 1000).toISOString(),
     })
     expect(canPostNow(muted, NOW)).toBe(false)
   })
 
   it('lets a lapsed mute expire without a refetch', () => {
-    // The whole reason this is not just `access.canPost`: a one-hour timeout
-    // handed out at 09:00 must stop biting at 10:00 with the app still open.
     const lapsed = open({
       canPost: false, // what the server said an hour ago
       timeoutUntil: new Date(NOW - 1000).toISOString(),
@@ -70,9 +59,6 @@ describe('canPostNow', () => {
   })
 
   it('FAILS CLOSED on an unparseable timeout', () => {
-    // NaN <= now is false, so the student stays muted. If this ever inverts,
-    // a corrupt timestamp hands posting rights to someone who was muted —
-    // the one failure here that would not be noticed.
     const corrupt = open({ canPost: false, timeoutUntil: 'not-a-date' })
     expect(canPostNow(corrupt, NOW)).toBe(false)
   })
@@ -84,8 +70,6 @@ describe('isMuted', () => {
     expect(
       isMuted(open({ timeoutUntil: new Date(NOW + 60_000).toISOString() }), NOW),
     ).toBe(true)
-    // Paused is not "muted" — the student is not being disciplined, and
-    // telling them they are would be a lie with a real sting.
     expect(isMuted(open({ state: 'paused', canPost: false }), NOW)).toBe(false)
   })
 })

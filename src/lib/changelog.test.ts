@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CHANGELOG, LATEST_VERSION, compareVersions } from './changelog'
 
-/**
- * The What's-New gate. `compareVersions` decides whether a student is shown a
- * release, and the CHANGELOG array's ordering decides what LATEST_VERSION is —
- * get either wrong and either everyone is spammed or nobody hears anything.
- */
 describe('compareVersions', () => {
   it('orders by major, then minor, then patch', () => {
     expect(compareVersions('2.0.0', '1.9.9')).toBe(1)
@@ -31,9 +26,6 @@ describe('compareVersions', () => {
   })
 
   it('degrades to zero on unparseable segments (documents current behaviour)', () => {
-    // parseInt('rc') is NaN, coerced to 0 by the `|| 0`. So a pre-release tag
-    // sorts as its base version. Pinned so a future semver-proper parser is a
-    // deliberate change — today nothing in CHANGELOG uses tags.
     expect(compareVersions('4.0.0-rc', '4.0.0')).toBe(0)
   })
 })
@@ -65,12 +57,6 @@ describe('CHANGELOG integrity', () => {
 
 describe('the announced changelog', () => {
   it('is led by a real entry that LATEST_VERSION agrees with', () => {
-    // Was pinned to '4.0.0' when that era shipped and DRAFT_4_0_0 was retired.
-    // Hard-coding the leading version means every release has to edit this
-    // test, which teaches people to edit it without reading it. What actually
-    // matters is that the "What's new" sheet is gated on the entry students
-    // will be shown — LATEST_VERSION reads CHANGELOG[0], so that is the
-    // invariant worth pinning.
     expect(CHANGELOG[0]?.version).toBeTruthy()
     expect(LATEST_VERSION).toBe(CHANGELOG[0]?.version)
   })
@@ -80,9 +66,6 @@ describe('the announced changelog', () => {
   })
 
   it('stays short enough that a student actually reads it', () => {
-    // The draft reached 19 sections and 72 bullets, which nobody reads. If a
-    // future era drifts back past this, trim it before shipping rather than
-    // raising the numbers.
     const entry = CHANGELOG[0]
     const sections = entry?.sections ?? []
     const bullets = sections.reduce((n, sec) => n + sec.items.length, 0)

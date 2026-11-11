@@ -7,14 +7,11 @@ import { SnapshotChip } from '@/components/ui/SnapshotStamp'
 import { ShareIcon, TrophyIcon } from '@/components/ui/icons'
 import { PodiumBoard } from '@/components/leaderboard/PodiumBoard'
 import { CommentsOverlay } from '@/components/leaderboard/CommentsOverlay'
-// The profile-preview sheet is generic (loads any student's public profile);
-// reused here so the instructor can tap a ranked student just like students can.
 import { StudentProfilePreview } from '@/features/student/StudentProfilePreview'
 import { useInstructor } from './InstructorLayout'
 import { getLeaderboardSnapshot } from '@/lib/api'
 import type { LeaderboardComment, LeaderboardEntry } from '@/lib/types'
 
-// Only pulled in once Share is tapped — see the student board for the rationale.
 const ShareSheet = lazy(() =>
   import('@/components/leaderboard/ShareSheet').then((m) => ({ default: m.ShareSheet })),
 )
@@ -41,7 +38,6 @@ export function InstructorLeaderboard() {
 
   const sectionName = (id: string) => sections.find((s) => s.id === id)?.name ?? ''
 
-  /** Open a commenter's profile from the full snapshot (all sections). */
   function openCommenter(c: LeaderboardComment) {
     if (!c.studentId) return
     const entry = entries.find((e) => e.student_id === c.studentId)
@@ -53,8 +49,6 @@ export function InstructorLeaderboard() {
         points: 0,
         avatar_url: c.avatarUrl,
         rank: 0,
-        // Unranked: no movement to report and no run to time, and not on the
-        // spend board either.
         spent_points: 0,
         spend_rank: null,
         previous_rank: null,

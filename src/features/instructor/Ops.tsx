@@ -28,22 +28,9 @@ import type { AuditEntry, AuthEvent, BackupHealth } from '@/lib/types'
 
 const AUDIT_PAGE = 25
 
-/**
- * Ops & trust (Phase G).
- *
- * Four systems have been running in this database with no way to look at them:
- * the nightly backup, the audit log, the auth-event trail, and the on-demand
- * leaderboard refresh (granted since 0006 and never once called). Every card
- * here is a read of something that already existed.
- *
- * Deliberately a standalone route rather than a fifth tab — it's a place you go
- * when you have a question, not part of the teaching loop.
- */
 export function Ops() {
   const [counts, setCounts] = useState<Record<string, number>>({})
 
-  // Headcounts feed the broadcast composer's recipient number. A failure just
-  // leaves it at zero, which disables Send — the safe direction to fail.
   useEffect(() => {
     getSectionHeadcounts()
       .then(setCounts)
@@ -52,8 +39,6 @@ export function Ops() {
 
   return (
     <div className="space-y-5">
-      {/* Reached from a header icon, so no tab lights up — that is by design
-          (four tabs is the stated limit). The missing back button was the bug. */}
       <PageHeader
         title="Ops & trust"
         subtitle="What the system has been doing while you weren't looking."
@@ -64,8 +49,6 @@ export function Ops() {
       <SpaceCard />
       <StudentGradesCard />
 
-      {/* Acting-on-students first, inspection below — the order you'd want on
-          a Monday morning. */}
       <RiskOverview />
       <Broadcast counts={counts} />
       <AttendanceWorkbook />
@@ -78,14 +61,8 @@ export function Ops() {
   )
 }
 
-/* ── Backup health ───────────────────────────────────────────────────────── */
-
 function BackupHealthCard() {
   const [rows, setRows] = useState<BackupHealth[]>([])
-  // When these rows were fetched. "Is the backup stale" is a question about the
-  // moment the answer was read, so it is recorded WITH the answer rather than
-  // taken from the clock while rendering (which is impure, and drifts on every
-  // re-render that has nothing to do with the data).
   const [loadedAt, setLoadedAt] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -107,10 +84,6 @@ function BackupHealthCard() {
     void load()
   }, [load])
 
-  // The nightly job runs at 02:00 Manila. Anything that hasn't captured since
-  // yesterday means the cron didn't run — which is the failure this card is for.
-  // `loadedAt` is 0 until the first answer; the rows are empty then too, so the
-  // 1970 dates below are never compared against anything.
   const today = new Date(loadedAt).toISOString().slice(0, 10)
   const yesterday = new Date(loadedAt - 86_400_000).toISOString().slice(0, 10)
   const stale = rows.filter((r) => !r.lastSnapshot || r.lastSnapshot < yesterday)
@@ -176,8 +149,6 @@ function BackupHealthCard() {
   )
 }
 
-/* ── Leaderboard refresh ─────────────────────────────────────────────────── */
-
 function LeaderboardCard() {
   const { toast } = useToast()
   const [confirm, setConfirm] = useState(false)
@@ -224,13 +195,8 @@ function LeaderboardCard() {
   )
 }
 
-/* ── Auth events ─────────────────────────────────────────────────────────── */
-
 function AuthEventsCard() {
   const [rows, setRows] = useState<AuthEvent[]>([])
-  // The fifteen-minute window is measured from when the rows were READ, and
-  // stored with them: taken from the clock at render time it would slide on
-  // every unrelated re-render and could count differently for identical data.
   const [loadedAt, setLoadedAt] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -252,9 +218,6 @@ function AuthEventsCard() {
     void load()
   }, [load])
 
-  // The edge functions lock an IP at 30 failures in 15 minutes (0026). Counting
-  // the same window here answers "is this student actually locked out?" — the
-  // question this card exists for.
   const cutoff = loadedAt - 15 * 60_000
   const recentFails = new Map<string, number>()
   for (const r of rows) {
@@ -316,8 +279,6 @@ function AuthEventsCard() {
     </Card>
   )
 }
-
-/* ── Audit log ───────────────────────────────────────────────────────────── */
 
 const ACTION_TONE: Record<string, string> = {
   delete: 'bg-danger-solid/10 text-danger',
@@ -410,9 +371,6 @@ function AuditLogCard() {
                   <span className="shrink-0 text-2xs text-muted">{timeAgo(r.at)}</span>
                 </button>
                 {expanded === r.id && (
-                  // The whole deleted row, verbatim. This is the point of the
-                  // audit log — knowing something was deleted is far less
-                  // useful than knowing exactly what it contained.
                   <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-card-2 p-3 text-2xs leading-relaxed">
                     {JSON.stringify(r.rowData, null, 2)}
                   </pre>
@@ -437,14 +395,6 @@ function AuditLogCard() {
   )
 }
 
-/**
- * Entry point to /teach/space — the Student Space beta controls.
- *
- * Same reasoning as SemestersCard: admin work belongs beside backup health and
- * the audit log, not in the daily tab bar. And routes.test.ts enforces it —
- * this link is the ONLY way in, which is exactly the shape that orphaned two
- * screens in production before.
- */
 function SpaceCard() {
   const navigate = useNavigate()
   return (
@@ -467,19 +417,6 @@ function SpaceCard() {
   )
 }
 
-/**
- * Whether students can see their own grades at all (0062).
- *
- * It lives here, beside the Student Space entry, because it is the same kind of
- * lever: a master switch you reach for when you are about to open something to
- * the whole class. It ships OFF — pasting the migration exposes nothing — so the
- * first time this matters is the day you have checked the marks and are ready.
- *
- * Turning it ON goes through a confirm, because it is outward-facing and not
- * quietly reversible: a student who has seen a mark has seen it. Turning it OFF
- * does not, because the cost of hesitating there is worse than the cost of a
- * mis-tap (fix the marks, and the screen is already hidden).
- */
 function StudentGradesCard() {
   const { toast } = useToast()
   const [on, setOn] = useState<boolean | null>(null)
@@ -487,8 +424,6 @@ function StudentGradesCard() {
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
 
-  // No synchronous setState before the request: the failure flag clears when an
-  // answer ARRIVES, which keeps this effect off the fetch-on-mount warning list.
   const load = useCallback(() => {
     getStudentGradesEnabled()
       .then((value) => {
@@ -577,14 +512,6 @@ function ErrorLine({ text, onRetry }: { text: string; onRetry: () => void }) {
   )
 }
 
-/**
- * Entry point to /teach/semesters.
- *
- * That route holds term dates, subject creation and the entire semester
- * rollover wizard — and until now had NO link anywhere in the app, so the only
- * way in was typing the URL. It lives in Ops because it is admin work: it
- * belongs beside backup health and the audit log, not in the daily tab bar.
- */
 function SemestersCard() {
   const navigate = useNavigate()
   return (

@@ -53,7 +53,6 @@ export function Profile() {
   const [confirmPhoto, setConfirmPhoto] = useState(false)
   const [confirmBannerUrl, setConfirmBannerUrl] = useState<string | null>(null)
   const [tick, setTick] = useState(false)
-  // A profile-viewer the student tapped in their "who viewed you" list.
   const [viewerTarget, setViewerTarget] = useState<PreviewTarget | null>(null)
 
   const [editOpen, setEditOpen] = useState(false)
@@ -63,7 +62,6 @@ export function Profile() {
   const [interests, setInterests] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
-
 
   function openEdit() {
     setName(me?.display_name ?? '')
@@ -162,13 +160,6 @@ export function Profile() {
         <EmptyState>We couldn't find your student record.</EmptyState>
       ) : (
         <>
-        {/* ── Identity ────────────────────────────────────────────────────
-            Cover, avatar, name. Splitting the old single card into three is
-            what makes the padding correct BY CONSTRUCTION: each card owns its
-            own padding, so there is no longer a way to add a block and forget
-            to pad it — which is exactly what happened when this became
-            `pad="none"` and Bio, Interests, Photos and Achievements all ended
-            up flush against the card edge. */}
         <Card pad="none" className="overflow-hidden">
           <CoverPhoto
             url={me.header_url}
@@ -208,26 +199,6 @@ export function Profile() {
             onChange={onPickFile}
           />
 
-          {/*
-            THE AVATAR IS POSITIONED, THE TEXT IS NOT — and that separation is
-            the whole fix.
-
-            It used to be a flex row lifted as a unit with `-mt-11`, which put
-            the name INSIDE the cover's box. There it was painted underneath the
-            image: `CoverPhoto` is `position: relative` and this row was static,
-            and positioned elements paint above static ones regardless of DOM
-            order. Confirmed with `elementFromPoint` — the top element at the
-            name was the cover's `<img>`.
-
-            Bottom-aligning the text to a lifted avatar can't fix it either: the
-            largest lift that keeps the text clear is `avatarHeight −
-            textHeight`, about 31px, which is barely an overlap at all.
-
-            So the avatar is absolutely positioned — its overlap is now
-            independent of how tall the text happens to be — and the text is
-            simply indented past it. `z-[1]` keeps the whole block above the
-            cover as a belt to that pair of braces.
-          */}
           <div className="relative z-[1] px-5 pb-5 pt-3">
             <div className="absolute -top-10 left-5 z-[1]">
                 <button
@@ -243,9 +214,6 @@ export function Profile() {
                     className="h-20 w-20 rounded-2xl ring-4 ring-card"
                     textClassName="text-3xl"
                   />
-                  {/* An ALWAYS-VISIBLE badge, not a hover overlay: the separate
-                      "Change photo" button is gone, and on a touch screen
-                      there is no hover to discover the tap target with. */}
                   <span className="absolute -bottom-0.5 -right-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-accent-solid text-white ring-2 ring-card">
                     {uploading ? (
                       <span className="text-2xs">…</span>
@@ -254,9 +222,6 @@ export function Profile() {
                     )}
                   </span>
                 </button>
-                {/* Small and destructive on purpose — the same call made for
-                    PinnedBadges' Unpin and the photo strip's remove: a 44px
-                    target here invites the accidental taps its size prevents. */}
                 {me.avatar_url && (
                   <button
                     type="button"
@@ -270,10 +235,6 @@ export function Profile() {
                 )}
             </div>
 
-            {/* Indented past the 80px avatar plus a 12px gap. `min-h` keeps the
-                block at least as tall as the half of the avatar that hangs
-                below the cover, so a one-line name can't let the buttons ride
-                up underneath it. */}
             <div className="min-h-11 min-w-0 pl-23">
               <p className="truncate font-display text-2xl font-bold leading-tight">
                 {me.display_name}
@@ -300,7 +261,6 @@ export function Profile() {
           </div>
         </Card>
 
-        {/* ── Details ───────────────────────────────────────────────────── */}
         <Card>
           <div className="space-y-3">
             <Field label="Display name" value={me.display_name} />
@@ -327,7 +287,6 @@ export function Profile() {
           )}
         </Card>
 
-        {/* ── Showcase ──────────────────────────────────────────────────── */}
         <Card>
           <div>
             <SectionLabel>Photos</SectionLabel>
@@ -398,9 +357,6 @@ export function Profile() {
         </>
       )}
 
-      {/* Settings moved to their own screen: this one is about who you are,
-          not how the app behaves. The row is the only entry point, so
-          routes.test.ts now enforces it. */}
       <button
         type="button"
         onClick={() => navigate('/app/settings')}
@@ -473,7 +429,6 @@ export function Profile() {
         sectionLabel={me ? sectionName(me.section_id) : ''}
       />
 
-      {/* A viewer tapped from the "who viewed you" list — their real profile. */}
       <StudentProfilePreview
         target={viewerTarget}
         open={!!viewerTarget}
@@ -516,7 +471,6 @@ export function Profile() {
   )
 }
 
-/** Split a comma-separated interests string into trimmed, non-empty tags. */
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl bg-card-2 px-4 py-3">

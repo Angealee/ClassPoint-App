@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { joinLabels, strengthsOf } from './peer-strengths'
 
-/**
- * Pins what a student is told about their own feedback. A wrong answer here is
- * a false statement about how their classmates saw them.
- */
-
 describe('strengthsOf', () => {
   it('names the highest and lowest question', () => {
     expect(
@@ -21,11 +16,6 @@ describe('strengthsOf', () => {
     expect(strengthsOf([{ label: 'Effort', pct: 90 }])).toBeNull()
   })
 
-  /**
-   * THE ONE THAT MATTERS. Equal scores have no strongest. Naming one anyway
-   * would tell a student a difference exists that their classmates never
-   * expressed.
-   */
   it('says nothing when every question scored the same', () => {
     expect(
       strengthsOf([
@@ -44,7 +34,6 @@ describe('strengthsOf', () => {
     ).toBeNull()
   })
 
-  /** Picking the first of two equal scores by question order would be a lie. */
   it('names tied questions together instead of choosing one', () => {
     expect(
       strengthsOf([
@@ -56,7 +45,6 @@ describe('strengthsOf', () => {
   })
 
   it('compares percentages, so mixed scales are comparable', () => {
-    // A 4.0/5 is 75%; a Yes/No at 0.9 is 90%. The raw 4.0 is bigger and wrong.
     expect(
       strengthsOf([
         { label: 'Quality', pct: 75 },

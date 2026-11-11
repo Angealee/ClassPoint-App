@@ -20,22 +20,10 @@ import {
   type LeaderboardComment,
 } from '@/lib/types'
 
-/**
- * Keep the page header and the bottom tab bar clear of floating comments.
- *
- * These used to pick each lane's Y position; they are now the TRACK's own top
- * and bottom, which is a stronger guarantee. A pill travelling vertically
- * crosses every Y it passes, so "stay off the chrome" cannot be expressed as a
- * starting position — it has to be the boundary of the thing the pill moves
- * inside.
- */
 const TOP_INSET = 76
 const BOTTOM_INSET = 104
-/** Mounted-but-unlaunched pills waiting for a lane. Beyond this we drop the
- *  oldest rather than mounting an unbounded number of invisible nodes. */
 const MAX_PENDING = 24
 
-/** Tap-to-fill prompts. A blank box gets far fewer posts than a chip does. */
 const QUICK_CHIPS = [
   'GG 🏆',
   'carry me 😭',
@@ -49,20 +37,7 @@ const QUICK_CHIPS = [
 ]
 
 interface FlyingPill extends LeaderboardComment {
-  /** Unique per flight — a comment can be re-launched, keys must not collide. */
   key: string
-  /**
-   * Null until the pill has been MEASURED.
-   *
-   * The previous version estimated width as `96 + chars * 6.6` and reserved a
-   * lane from that guess. The guess was the whole anti-overlap guarantee, and
-   * it could not account for wrapping, the width cap, emoji, or a long display
-   * name — so the reservation was either too long (throttling the stream to a
-   * few comments a minute) or too short (pills overlapping).
-   *
-   * Now a pill mounts parked off the right edge, is measured at its real
-   * rendered size, and only then gets a lane and a duration.
-   */
   lane: number | null
   durationMs: number | null
 }
@@ -73,40 +48,12 @@ function errorText(e: unknown, fallback: string): string {
 }
 
 interface CommentsOverlayProps {
-  /** Null for the instructor (who posts as "Instructor" and has no daily cap). */
   studentId?: string | null
   isInstructor?: boolean
-  /** Tap a student-authored comment → open that sender's profile. The parent
-   *  owns the profile sheet (it already has the leaderboard entries to build
-   *  the target), so this just hands back the tapped comment. */
   onOpenProfile?: (comment: LeaderboardComment) => void
-  /** The board the comments relate to; rendered below the flying band. */
   children: React.ReactNode
 }
 
-/**
- * Floating comments over the leaderboard, plus the composer and the moderation
- * list. One global stream — every comment appears on every board view.
- *
- * ── A RISING COLUMN, NOT A HORIZONTAL STREAM (the instructor's call, 2026-11-08)
- * Pills used to fly right-to-left across up to five lanes spanning the whole
- * screen, which meant the podium, the scope picker and the rank rows all sat
- * behind moving text. They now rise up a single narrow column on the left,
- * centred to the app's own reading column so they stay beside the board on a
- * wide screen. One strip is covered instead of the whole board, and a comment
- * can be three lines tall without threatening anything.
- *
- * Each pill is a CSS keyframe transform (`.cp-rise` in index.css), removed
- * from state on animationend. The column is scheduled so two pills never
- * converge — see lib/danmaku, where that property is asserted rather than
- * eyeballed. Anything that would collide waits, parked and invisible, until
- * the column frees.
- *
- * ⚠ This doc described a STICKY BAND above the board for a long time after
- *   that stopped being true — it had already become a full-screen overlay. A
- *   comment describing intent reads exactly like one describing fact, so if
- *   the geometry changes again, change these words with it.
- */
 export function CommentsOverlay({
   studentId,
   isInstructor = false,
@@ -122,8 +69,6 @@ export function CommentsOverlay({
   const [deleteTarget, setDeleteTarget] = useState<LeaderboardComment | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  // Reduced motion → a static ticker instead of animation. Read once: a change
-  // mid-session is rare and re-subscribing the channel for it isn't worth it.
   const reduced = useMemo(
     () =>
       typeof window !== 'undefined' &&
@@ -131,35 +76,13 @@ export function CommentsOverlay({
     [],
   )
 
-  /**
-   * One column, so one lane. Kept as an array because `pickLane` is the single
-   * scheduling rule and takes one — see the note in lib/danmaku.
-   */
   const laneFreeAtRef = useRef<number[]>([0])
   const seenRef = useRef<Set<string>>(new Set())
-  /** The track a pill rises up. Its HEIGHT is the distance travelled. */
   const trackRef = useRef<HTMLDivElement>(null)
-  /** Live nodes, so a pill can be measured at its real rendered size. */
   const pillRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
-  /**
-   * Measure every parked pill and launch it once the column is free.
-   *
-   * A pill mounts with `lane: null`, parked just below the track and not
-   * animating, so the browser lays it out at its true width and height. Only
-   * then is it given a duration. That is the whole difference from the version
-   * before last, which guessed the size before the pill existed.
-   *
-   * ⚠ `offsetHeight` NOW, WHERE IT USED TO BE `offsetWidth`. The arithmetic in
-   *   lib/danmaku is about a distance and a size on whichever axis the pill
-   *   moves; feeding it the width while the pill rises would hold the column
-   *   for the wrong duration and let a tall comment be overtaken.
-   */
   const assign = useCallback(() => {
     if (reduced) return
-    // The track is positioned against both edges of a fixed full-screen deck,
-    // so its height is definite. The fallback only matters for the first tick
-    // before layout.
     const trackH =
       trackRef.current?.clientHeight ||
       Math.max(120, (window.innerHeight || 720) - TOP_INSET - BOTTOM_INSET)
@@ -173,8 +96,6 @@ export function CommentsOverlay({
         const el = pillRefs.current[p.key]
         if (!el) return p // not mounted yet — next tick
 
-        // The timing rules live in lib/danmaku, where the no-overlap property
-        // is actually asserted rather than eyeballed on a moving screen.
         const lane = pickLane(free, now)
         if (lane === null) return p // column still busy — keep waiting
 
@@ -187,11 +108,6 @@ export function CommentsOverlay({
     })
   }, [reduced])
 
-  // One light interval drives both measuring and launching.
-  //
-  // Gated on there being something parked: it used to run for the life of the
-  // screen whether or not a pill was waiting, which is a timer firing five
-  // times a second behind an idle leaderboard.
   const waiting = flying.some((p) => p.lane === null)
   useEffect(() => {
     if (reduced || !waiting) return
@@ -207,7 +123,6 @@ export function CommentsOverlay({
       if (reduced) return
       setFlying((f) => {
         const pending = f.filter((p) => p.lane === null).length
-        // Drop the oldest waiting pill rather than mounting without bound.
         const trimmed = pending >= MAX_PENDING ? f.slice(1) : f
         return [
           ...trimmed,
@@ -218,8 +133,6 @@ export function CommentsOverlay({
     [reduced],
   )
 
-  // Seed from the last day. With several lanes the stream actually drains, so
-  // more of the fetched comments get to fly than the old six.
   useEffect(() => {
     let cancelled = false
     listLeaderboardComments(20)
@@ -254,8 +167,6 @@ export function CommentsOverlay({
     countMyCommentsToday(studentId).then(setUsedToday).catch(() => {})
   }, [studentId])
 
-  // Page-scoped channel: subscribed on mount, removed on unmount. The durable
-  // student-self channel is untouched.
   useEffect(() => {
     const channel = uniqueChannel('leaderboard-comments')
       .on(
@@ -291,8 +202,6 @@ export function CommentsOverlay({
       await postLeaderboardComment(body)
       setDraft('')
       if (!isInstructor) setUsedToday((n) => n + 1)
-      // The realtime INSERT echoes it back and enqueues the pill — no optimistic
-      // insert here, or it would fly twice.
     } catch (e) {
       toast(errorText(e, 'Could not post that. Try again.'), 'error')
     } finally {
@@ -317,39 +226,14 @@ export function CommentsOverlay({
 
   return (
     <>
-      {/* The flight deck: a FULL-SCREEN overlay, so comments float in front of
-          the whole board rather than in a strip above it.
-
-          `pointer-events-none` on the deck is load-bearing — without it this
-          layer would swallow every tap on the board, the section picker and the
-          tab bar underneath. Only a tappable pill re-enables pointer events,
-          and only on itself.
-
-          Lanes stop short of the header and the tab bar (TOP_INSET /
-          BOTTOM_INSET) so comments never cover the app's own chrome. */}
       {!reduced && (
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
         >
-          {/* Centred to the app's own reading column, so on a wide screen the
-              comments rise beside the board rather than against the far left
-              edge of a 1900px window. On a phone this is the full width and the
-              track sits in the normal 16px gutter. */}
           <div className="relative mx-auto h-full w-full max-w-2xl">
             <div
               ref={trackRef}
-              // ⚠ `container-type: size`, NOT `inline-size`. The keyframe
-              //   travels `-100cqh`, and `inline-size` establishes a query
-              //   container on the INLINE axis only — so `cqh` skips this
-              //   track and falls back to the small VIEWPORT. Measured: a
-              //   206px track takes a pill -244px correctly and -849px under
-              //   `inline-size`. The pill does not stop, it goes four times too
-              //   far in the duration computed from the track's height, which
-              //   voids the no-overlap guarantee in lib/danmaku while looking
-              //   merely fast. `size` is legal here precisely because the track
-              //   is pinned to both edges of a fixed deck and therefore has a
-              //   definite height.
               className="absolute left-4 w-[min(78%,20rem)]"
               style={{ top: TOP_INSET, bottom: BOTTOM_INSET, containerType: 'size' }}
             >
@@ -362,10 +246,6 @@ export function CommentsOverlay({
                     ref={(el) => {
                       pillRefs.current[p.key] = el
                     }}
-                    // Parked below the track until measured. `opacity-0` rather
-                    // than `hidden` or unmounted: the pill has to be LAID OUT
-                    // to be measured, and a parked pill sits in the tab-bar
-                    // zone where it would otherwise be visible and static.
                     className={cn('absolute left-0 w-max max-w-full', launched ? 'cp-rise' : 'opacity-0')}
                     style={
                       {
@@ -399,10 +279,6 @@ export function CommentsOverlay({
                           className="mt-0.5 h-5 w-5 shrink-0 text-2xs"
                         />
                       )}
-                      {/* Wraps to three lines rather than truncating. A comment
-                          you cannot finish reading is worse than a taller pill —
-                          and in a column a taller pill costs nothing, where in
-                          the old horizontal lanes it risked the lane below. */}
                       <span className="line-clamp-3 min-w-0 [overflow-wrap:anywhere]">
                         <span className="font-semibold">{p.displayName}</span>{' '}
                         <span className="text-muted">{p.body}</span>
@@ -436,11 +312,6 @@ export function CommentsOverlay({
         <div className="flex items-center gap-2">
           <input
             value={draft}
-            // `maxLength` as well as the slice. The slice is what actually
-            // enforces it (a paste can exceed maxLength in some engines), but
-            // without the attribute the field silently swallows keystrokes at
-            // the limit with no explanation — which is what the counter below
-            // now provides.
             maxLength={MAX_COMMENT_LENGTH}
             onChange={(e) => setDraft(e.target.value.slice(0, MAX_COMMENT_LENGTH))}
             onKeyDown={(e) => e.key === 'Enter' && canSend && void send()}
@@ -470,11 +341,6 @@ export function CommentsOverlay({
               ? 'Posts as Instructor. Tap any comment to delete it.'
               : `${left} of ${MAX_COMMENTS_PER_DAY} left today · comments disappear after 24 hours.`}
           </p>
-          {/* The limit has always been 120 — in types.ts, in the table's CHECK
-              and in the RPC. What was missing was any way to SEE it: the field
-              simply stopped accepting characters. Appears once there is
-              something to count, and warns over the last 20 so you find out
-              before you are cut off rather than after. */}
           {draft.length > 0 && (
             <span
               className={cn(
@@ -488,7 +354,6 @@ export function CommentsOverlay({
         </div>
       </div>
 
-      {/* The reliable read/moderate surface — pills fly by, this doesn't. */}
       {recent.length > 0 && (
         <details className="mt-3 rounded-xl border border-line bg-card">
           <summary className="cursor-pointer list-none px-4 py-2.5 text-xs font-semibold text-muted">
@@ -506,7 +371,6 @@ export function CommentsOverlay({
                   ) : (
                     <Avatar name={c.displayName} url={c.avatarUrl} className="h-6 w-6 text-2xs" />
                   )}
-                  {/* Row body opens the sender's profile; Delete stays separate. */}
                   <button
                     type="button"
                     disabled={!tappable}

@@ -7,34 +7,6 @@ import type {
   TermSums,
 } from '@/lib/types'
 
-/**
- * Grade computation — transmutation, component weights, term and final grades.
- *
- * ⚠ THIS FILE IS THE ONLY DEFINITION. THERE IS DELIBERATELY NO SQL MIRROR.
- *
- * That is the opposite of `peer-scale.ts` and `lounge-answers.ts`, which DO
- * mirror a database function, and the difference is worth understanding before
- * anyone "fixes" the inconsistency. Those mirror because the server ACTS on the
- * value: `cp_event_normalize` decides who gets paid, `cp_peer_scale_clean`
- * decides whether a rating is valid. A client preview has to agree with an
- * authority, so the rule exists twice and a test pins the two together.
- *
- * Nothing server-side ever acts on a grade. There is no RLS branch that reads
- * one (grades are instructor-only), no trigger, no notification, and by the
- * project's hard rule no bridge to `point_events`. SQL's entire job here is
- * `sum(score)` and `sum(max_score)` — numbers that cannot drift. So a mirror
- * would be a second definition with nothing requiring it: exactly the pattern
- * that grew FIVE copies of the show-up rate and FOUR of the points row, each
- * pair drifting before it was merged.
- *
- * IF YOU ARE ABOUT TO PUT A WEIGHTING EXPRESSION IN A MIGRATION, STOP.
- *
- * The one place server and client must still agree is WHICH ITEMS COUNT:
- * `sum_max` covers NON-ARCHIVED items only, and `sumsFromScores` below applies
- * the identical filter.
- */
-
-/** Fixed order — the grid, the export and both print routes all read it. */
 export const GRADE_COMPONENTS: readonly GradeComponent[] = [
   'performance_task',
   'quiz',
@@ -58,7 +30,6 @@ const TERM_LABEL: Record<TermKey, string> = {
   finals: 'Finals',
 }
 
-/** DCT's current policy — what a subject gets before anyone edits its weights. */
 export const DEFAULT_WEIGHTS = {
   ptWeight: 0.5,
   quizWeight: 0.25,
@@ -89,30 +60,6 @@ export function emptySums(): TermSums {
   }
 }
 
-/**
- * ── RECITATION IS ATTENDANCE (0063, the instructor's call, 2026-11-09) ──────
- *
- * The Recitation part is NOT typed any more: it is the term's attendance rate,
- * as is. 97% attendance is a Recitation grade of 97 — no 60 floor and no
- * transmutation — so zero attendance is 0, which is harsher than the other parts
- * by choice.
- *
- * It rides in the SAME `recitation` slot of `TermSums` it always had, holding
- * COUNTS rather than marks:
- *
- *   sumScore     = classes the student showed up to   (present + late)
- *   sumMax       = classes counted                    (present + late + absent)
- *   sumMaxMarked = classes counted                    (identical: attendance has
- *                                                      no "not marked yet")
- *
- * so every reader of `TermSums` — the grid, Overall, both exports, both print
- * routes, the weights preview, the student's own screen — needs no change of its
- * own. Excused and irregular classes are NEUTRAL and leave the denominator, the
- * rule `lib/attendance.ts` states and `get_term_attendance` (0034) implements.
- *
- * The counts come from SQL (`cp_term_attendance`); the RATE is computed here and
- * only here, which keeps the "no weighting arithmetic in a migration" rule intact.
- */
 export interface AttendanceCounts {
   showed: number
   counted: number
@@ -126,32 +73,11 @@ export function attendanceSums(a: AttendanceCounts | undefined): TermSums['recit
   return { sumScore: a.showed, sumMax: a.counted, sumMaxMarked: a.counted }
 }
 
-/**
- * The Recitation grade: the attendance rate as-is, 0–100, unrounded.
- *
- * With no classes counted yet there is no rate to take. It reads the transmutation
- * floor — the same "an empty part counts at the minimum" rule `componentScore`
- * follows — rather than 0, which would punish a term whose classes have not
- * happened. It does not make a term "started" (see `hasAnyItems`).
- */
 export function recitationScore(sums: TermSums['recitation'], policy: GradePolicy): number {
   if (!(sums.sumMax > 0)) return policy.transmuteBase * 100
   return (sums.sumScore / sums.sumMax) * 100
 }
 
-/**
- * Transmute one component: `(raw / total * span + base) * 100`.
- *
- * With base 0.6 the floor is 60.00 and a perfect score is 100.00. A score above
- * the item's max is ALLOWED and transmutes past 100 — bonus marks are real, and
- * a silently clamped typo (95 entered on a /50 item) looks correct, which is
- * worse than a number that visibly does not belong.
- *
- * `sumMax <= 0` means the component has no items at all. It returns the floor
- * rather than NaN — the instructor's call: an empty component counts, so a
- * Finals grade reads low until its exam exists, which is what the "so far" view
- * is for. Excel answers #DIV/0! here, so there is no behaviour to be faithful to.
- */
 export function componentScore(
   sumScore: number,
   sumMax: number,
@@ -172,7 +98,6 @@ export function componentScores(
   for (const c of GRADE_COMPONENTS) {
     const s = sums[c]
     if (c === 'recitation') {
-      // Attendance, as-is — identical under both views (see `recitationScore`).
       out[c] = recitationScore(s, policy)
       continue
     }
@@ -182,7 +107,6 @@ export function componentScores(
   return out
 }
 
-/** PT·0.50 + Quiz·0.25 + Recitation·0.25, with this subject-term's weights. */
 export function classStanding(
   scores: Record<GradeComponent, number>,
   policy: GradePolicy,
@@ -194,20 +118,6 @@ export function classStanding(
   )
 }
 
-/**
- * What one part is worth of the WHOLE TERM, as a proportion.
- *
- * A Class Standing part is its weight inside Class Standing times Class
- * Standing's own weight; the exam is just its weight. With the usual 50/25/25 and
- * 60/40 that is 0.30 / 0.15 / 0.15 / 0.40. This is the one place that product is
- * written — `explainTerm` (what a student is told) and `weightedComponents`
- * (which parts a "partial" grade is missing) both read it, so a policy change
- * moves them together.
- *
- * Not used by `termGrade` itself, which multiplies in two steps and is pinned by
- * the load-bearing precision test; this restates the same weights, it does not
- * replace that arithmetic.
- */
 export function componentShare(policy: GradePolicy, component: GradeComponent): number {
   switch (component) {
     case 'performance_task':
@@ -221,18 +131,10 @@ export function componentShare(policy: GradePolicy, component: GradeComponent): 
   }
 }
 
-/** The parts that actually count toward this term — a zero-weight part is not "missing". */
 export function weightedComponents(policy: GradePolicy): GradeComponent[] {
   return GRADE_COMPONENTS.filter((c) => componentShare(policy, c) > 0)
 }
 
-/**
- * Does this term have any item at all (official), or any marked one (so far)?
- *
- * Recitation is left out on purpose: it is attendance, and classes being held does
- * not make a term "started" for grading — a Finals with attendance but no quiz yet
- * would otherwise read a confident, low grade for a term that has no work in it.
- */
 export function hasAnyItems(sums: TermSums, view: GradeView = 'official'): boolean {
   return GRADE_COMPONENTS.some(
     (c) =>
@@ -240,18 +142,6 @@ export function hasAnyItems(sums: TermSums, view: GradeView = 'official'): boole
   )
 }
 
-/**
- * CS·0.60 + Exam·0.40 — the term grade, unrounded.
- *
- * Null when the term has nothing in it at all. A term where no component has a
- * single item has not started, and a confident 60.00 would put a real-looking
- * number on a screen that describes nothing. An empty component INSIDE a term
- * that has other items still scores the floor — see `componentScore`.
- *
- * ⚠ A zero weight is EXCLUDED, never multiplied. `0 * null` is 0 in JavaScript
- * but `0 * NaN` is NaN, so leaning on the arithmetic to neutralise an unused
- * component works right up until the value changes shape.
- */
 export function termGrade(
   sums: TermSums,
   policy: GradePolicy,
@@ -267,17 +157,6 @@ export function termGrade(
   return out
 }
 
-/**
- * Prelim·0.30 + Midterm·0.30 + Finals·0.40, unrounded.
- *
- * Null when any term carrying weight has no grade — never a partial sum. That
- * is the bug this whole feature exists to remove: the live spreadsheet reads
- * 68.508 for a student with 99.64 and 96.54 purely because the Midterms column
- * is empty, and a number that looks like a grade is far worse than no number.
- *
- * Also null when the weights do not sum to 1, rather than renormalising them
- * silently — a misconfigured policy has to be visible, not quietly corrected.
- */
 export function finalGrade(terms: Array<{ grade: number | null; weight: number }>): number | null {
   if (terms.length === 0) return null
   if (!sumsToOne(terms.map((t) => t.weight))) return null
@@ -291,11 +170,6 @@ export function finalGrade(terms: Array<{ grade: number | null; weight: number }
   return out
 }
 
-/**
- * Floating point: 0.1 + 0.2 is not 0.3, and weights are stored as decimals, so
- * every "must sum to 1" check needs a tolerance. One place, so the grid, the
- * weights screen and `finalGrade` cannot disagree about what "sums to 1" means.
- */
 const SUM_EPSILON = 1e-9
 
 export function sumsToOne(values: number[]): boolean {
@@ -308,13 +182,6 @@ function sumError(values: number[]): string | null {
   return `They currently add up to ${roundTo(total * 100, 2)}%.`
 }
 
-/**
- * Why is this policy unusable? The message, or null when it is fine.
- *
- * A sentence rather than a boolean because it is shown to the instructor as-is,
- * and "invalid weights" says nothing about which of the rules was broken — the
- * reasoning `scaleError` in `peer-scale.ts` already follows.
- */
 export function policyError(policy: GradePolicy): string | null {
   const weights: Array<[string, number]> = [
     ['Performance Tasks', policy.ptWeight],
@@ -340,14 +207,6 @@ export function policyError(policy: GradePolicy): string | null {
   return null
 }
 
-/**
- * Why can this subject not be graded? Checked across all three terms.
- *
- * A missing row is ambiguous — it could mean "components unset" or "term share
- * unset" — and defaulting the share to 0 would silently turn a config gap into
- * a final grade computed out of 70%. So a subject is gradeable only once all
- * three rows exist, and the screen names the term that is missing.
- */
 export function subjectPolicyError(policies: GradePolicy[]): string | null {
   const terms: TermKey[] = ['prelim', 'midterm', 'finals']
   for (const t of terms) {
@@ -362,7 +221,6 @@ export function subjectPolicyError(policies: GradePolicy[]): string | null {
   return null
 }
 
-/** The shape `sumsFromScores` needs — the grid's own item rows satisfy it. */
 export interface GradeItemLike {
   id: string
   component: GradeComponent
@@ -370,28 +228,15 @@ export interface GradeItemLike {
   archivedAt: string | null
 }
 
-/**
- * Build one student's component totals from the raw cells.
- *
- * The grid computes its own sums from the scores already on screen rather than
- * asking the server again — but it must reach the same answer the aggregate RPC
- * does, so the archived filter lives here and is stated in both places.
- */
 export function sumsFromScores(
   items: GradeItemLike[],
   scoreByItemId: Map<string, number>,
-  /**
-   * The student's attendance for this subject and term. Recitation IS this (0063),
-   * so a caller that omits it gets an empty Recitation, which reads as the floor.
-   */
   attendance?: AttendanceCounts,
 ): TermSums {
   const out = emptySums()
   out.recitation = attendanceSums(attendance)
   for (const item of items) {
     if (item.archivedAt !== null) continue // archived items leave the denominator
-    // Recitation columns are retired (0063) — the part is attendance now, and a
-    // leftover typed column must not be added to it.
     if (item.component === 'recitation') continue
     const bucket = out[item.component]
     bucket.sumMax += item.maxScore
@@ -403,7 +248,6 @@ export function sumsFromScores(
   return out
 }
 
-/** Column order, defined once so the grid, export and print cannot disagree. */
 export function orderedItems<T extends { component: GradeComponent; position: number }>(
   items: T[],
 ): T[] {
@@ -414,40 +258,14 @@ export function orderedItems<T extends { component: GradeComponent; position: nu
   })
 }
 
-/** Two decimal places — the one place a grade stops being exact. */
 export function displayGrade(value: number | null): string {
   return value === null ? '—' : roundTo(value, 2).toFixed(2)
 }
 
-/**
- * The key a score is held under while a grid is on screen.
- *
- * Lives here rather than beside the grid because the exporter needs the same
- * map and a lib must not import from a feature — the same reason `fileName`
- * moved out of a private scope in `attendance-io.ts`.
- */
 export function cellKey(itemId: string, studentId: string): string {
   return `${itemId}:${studentId}`
 }
 
-/**
- * How much of each term has actually been marked, 0–100, or null for a term
- * with no score columns at all.
- *
- * ⚠ THE DENOMINATOR IS `sumMax`, NOT `sumMaxMarked`, and getting that backwards
- *   gives a figure that is ALWAYS 100% — which is the worst possible failure for
- *   a progress read, because it says "nothing left to do" and looks plausible.
- *   `sumMaxMarked` is the total this student HAS a score for; `sumMax` is every
- *   non-archived column. Their ratio is the fraction entered.
- *
- * null rather than 0 for an empty term: the instructor has not fallen behind on
- * a term they have not set up, and 0% invites them to go looking for marks that
- * cannot exist yet. It is the same blank-versus-zero distinction the whole
- * feature rests on, one level up.
- *
- * Takes the AGGREGATE rows, never raw cells — three terms of a section is
- * ~2,400 score rows, past PostgREST's silent 1000-row cap (the 0031 lesson).
- */
 export function completionByTerm(
   rows: ReadonlyArray<{ term: TermKey; sums: TermSums }>,
 ): Record<TermKey, number | null> {
@@ -456,8 +274,6 @@ export function completionByTerm(
 
   for (const row of rows) {
     for (const c of GRADE_COMPONENTS) {
-      // Recitation is computed from attendance, not entered — there is nothing
-      // for the instructor to "finish" there.
       if (c === 'recitation') continue
       marked[row.term] = (marked[row.term] ?? 0) + row.sums[c].sumMaxMarked
       total[row.term] = (total[row.term] ?? 0) + row.sums[c].sumMax

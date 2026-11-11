@@ -1,17 +1,5 @@
 import { cn } from '@/lib/cn'
 
-/**
- * The instructor's pixel-art astronauts, rendered as ART rather than as icons.
- *
- * These are the 32x32 .ico files in public/. They are deliberately NOT used in
- * the nav — see the note on SaturnIcon — but at an exact 2x or 3x multiple with
- * `image-rendering: pixelated` the pixel grid lands on whole device pixels and
- * the art stays crisp instead of turning to mush. The sizes below are therefore
- * multiples of 32, not arbitrary Tailwind steps.
- *
- * `space` is the plain spaceman (Student Space); `lounge` is the one holding a
- * heart (the Lounge).
- */
 const SRC = {
   space: '/studentSpace.ico',
   lounge: '/studentLounge.ico',

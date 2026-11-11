@@ -19,10 +19,8 @@ import type { GradeComponent, GradeItem, SessionSummary, TermKey } from '@/lib/t
 /** "20" or "17.5" — no trailing zeros. */
 const formatMax = (n: number) => String(Math.round(n * 100) / 100)
 
-/** The parts a typed column can belong to. Recitation is attendance (0063). */
 const COLUMN_PARTS = GRADE_COMPONENTS.filter((c) => c !== 'recitation')
 
-/** "Mon, Jun 15 · IT 32 · Topic" — enough to tell one class from the next. */
 function sessionLabel(s: SessionSummary): string {
   const day = new Date(s.startedAt).toLocaleDateString('en-PH', {
     weekday: 'short',
@@ -32,17 +30,6 @@ function sessionLabel(s: SessionSummary): string {
   })
   return [day, s.subjectCode, s.topic].filter(Boolean).join(' · ')
 }
-
-
-
-/**
- * Add, rename, re-weight and retire the score columns of one term.
- *
- * Two of these actions move every grade in the section and are gated the same
- * way a weight change is: changing an item's maximum, and archiving one. Both
- * rescale the component they belong to, which is not obvious from the control
- * you are pressing — hence the confirm that says how many marks it touches.
- */
 
 interface ColumnsPanelProps {
   sectionId: string
@@ -70,9 +57,6 @@ export function ColumnsPanel({
   const [editing, setEditing] = useState<GradeItem | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<GradeItem | null>(null)
 
-  // This section's classes, in their OWN catch (the 0034 SectionGrid precedent):
-  // before 0063 the link column does not exist, and that must cost the class
-  // picker, never the panel.
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   useEffect(() => {
     let cancelled = false
@@ -112,8 +96,6 @@ export function ColumnsPanel({
       onChanged()
       toast('Column added.', 'success')
     } catch (err) {
-      // The unique index is the likely one: two live columns cannot share a
-      // name inside one component, or the export has two identical headers.
       toast(errorText(err, 'Could not add that column.'), 'error')
     } finally {
       setBusy(false)
@@ -134,9 +116,6 @@ export function ColumnsPanel({
     }
     setBusy(true)
     try {
-      // The points switch and the class link are sent only when they CHANGED. A
-      // rename on a database that has not had 0063 yet must keep working, and it
-      // cannot if every save carries columns it does not know.
       await updateGradeItem(item.id, {
         name: nextName,
         maxScore: parsed.value,
@@ -152,19 +131,6 @@ export function ColumnsPanel({
     }
   }
 
-  /**
-   * Move a column one place earlier or later within its component.
-   *
-   * `position` was written once, at creation, and nothing ever changed it — so a
-   * column added in the wrong order stayed in the wrong order. The list below is
-   * the grid's column order (both come from `orderedItems` over the same
-   * database order), so what moves here moves there.
-   *
-   * Every column in the group is renumbered 0..n-1 rather than just swapping two
-   * values: positions are not guaranteed unique (a restored column keeps its old
-   * number), and swapping two equal numbers does nothing. Only the rows whose
-   * number actually changes are written.
-   */
   async function move(item: GradeItem, dir: -1 | 1) {
     const group = items.filter((i) => i.archivedAt === null && i.component === item.component)
     const from = group.findIndex((i) => i.id === item.id)
@@ -273,11 +239,6 @@ export function ColumnsPanel({
                       onSave={(n, m, off, sessionId) => void saveEdit(item, n, m, off, sessionId)}
                     />
                   ) : (
-                    // ⚠ `gap-3`, not `gap-2`: two `sm` IconButtons (32px) have
-                    // 44px hit regions, and centres 40px apart overlap by 4px —
-                    // where the LATER element wins, so a tap near the seam hit
-                    // Retire instead of Edit. 32 + 12 = 44 touches exactly. This
-                    // is the adjacency rule in IconButton, measured here at 320px.
                     <div key={item.id} className="flex items-center gap-3 p-3">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm" title={item.name}>
@@ -399,8 +360,6 @@ function EditRow({
   const maxParsed = parseScoreInput(maxScore)
   const maxN = maxParsed.ok && maxParsed.value !== null ? maxParsed.value : item.maxScore
 
-  // This term's classes for this subject — plus the linked one, so editing a
-  // column tied to a class outside the list never silently drops the link.
   const choices = sessions.filter(
     (x) => x.id === item.sessionId || termOf(x.startedAt) === term || termOf(x.startedAt) === null,
   )
@@ -429,10 +388,6 @@ function EditRow({
         </p>
       )}
 
-      {/* Column order. Side by side rather than as icon buttons in the row: four
-          small controls in one line would break the tap-target adjacency rule,
-          and two labelled buttons say what they do. Moves are saved at once —
-          they are not part of the Save below. */}
       <div className="grid grid-cols-2 gap-2">
         <Button
           size="sm"
@@ -452,9 +407,6 @@ function EditRow({
         </Button>
       </div>
 
-      {/* The class this column was held in (0063). Anyone recorded absent OR
-          excused there is marked Absent on this column — so an absentee is never
-          typed twice, and cannot be given a points assist for a quiz they missed. */}
       <div className="space-y-1 rounded-xl bg-card-2 p-2.5">
         <Select
           label="Held in class"
@@ -475,9 +427,6 @@ function EditRow({
         </p>
       </div>
 
-      {/* Points assist (0064) is AUTOMATIC: every column is open the moment a
-          student's mark is in — 1 point = 1 mark, they choose how many, never past
-          the maximum. This switch is the only control left. */}
       <div className="flex items-center gap-3 rounded-xl bg-card-2 p-2.5">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium">Students can use points on this column</p>

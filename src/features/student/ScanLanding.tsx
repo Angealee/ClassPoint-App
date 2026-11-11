@@ -8,27 +8,13 @@ import { enqueue, syncOfflineScans } from '@/lib/offline-scans'
 import { writeEventScanCapture } from '@/lib/event-scan-capture'
 import { ScanIcon } from '@/components/ui/icons'
 
-/**
- * Landing route for a NATIVE camera scan of the attendance QR (which now encodes
- * `…/scan#CP1|…`). Public on purpose — a logged-out or not-yet-installed student
- * must land somewhere.
- *
- * Capture-first: the proof is queued the instant we parse it, BEFORE anything
- * else, so the 15-second window can't expire while the student signs in. If
- * they're a signed-in student we push the sync and drop them on Attendance; if
- * signed out we send them to sign-in, and the app-start sync (StudentData)
- * submits the queued proof once they're in — status still counts from the
- * captured window, however long login took.
- */
 export function ScanLanding() {
   const { loading, user, role } = useAuth()
   const navigate = useNavigate()
   const capturedRef = useRef(false)
-  // True when the scanned QR is a GLOBAL EVENT (CP1E), not a class QR (0055).
   const eventRef = useRef(false)
   const [bad, setBad] = useState(false)
 
-  // Capture the proof once, immediately, independent of auth state.
   useEffect(() => {
     if (capturedRef.current) return
     capturedRef.current = true
@@ -58,10 +44,8 @@ export function ScanLanding() {
     }
     if (role === 'student') {
       if (eventRef.current) {
-        // The event screen reads the captured scan and submits it on arrival.
         navigate('/app/event', { replace: true })
       } else {
-        // Fire-and-forget: Attendance shows the queued/result card either way.
         void syncOfflineScans()
         navigate('/app/attendance', { replace: true })
       }

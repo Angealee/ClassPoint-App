@@ -2,7 +2,6 @@
 const SNAPSHOT_HOURS = [12, 19] as const
 const SNAPSHOT_MINUTE = 30
 
-/** The next moment the leaderboard will settle, from `from` (local time). */
 export function nextSnapshotAt(from: Date = new Date()): Date {
   for (const h of SNAPSHOT_HOURS) {
     const t = new Date(from)
@@ -34,7 +33,6 @@ export function snapshotLabel(iso: string | null): string {
   })
 }
 
-/** Compact relative time for the points feed, e.g. "2h ago", "yesterday". */
 export function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
   const sec = Math.round(ms / 1000)

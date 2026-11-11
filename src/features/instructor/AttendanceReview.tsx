@@ -20,10 +20,8 @@ import {
 import { cn } from '@/lib/cn'
 import type { AttendanceRosterRow, AttendanceStatus, ClassSession } from '@/lib/types'
 
-/** The three that drive the headline tallies; the neutral pair is summarised. */
 const TALLY_ORDER: AttendanceStatus[] = ['present', 'late', 'absent']
 
-/** Post-class review: confirm/override each status, then commit penalties. */
 export function AttendanceReview({
   session,
   sectionName,
@@ -107,8 +105,6 @@ export function AttendanceReview({
           : 'Attendance saved. No penalties applied.',
         'success',
       )
-      // Show the tick, then leave — onDone navigates away, so gate it on the
-      // tick finishing rather than calling it here.
       setTick(true)
       return
     } catch {
@@ -120,9 +116,6 @@ export function AttendanceReview({
   return (
     <div className="space-y-4 pb-4">
       <div className="flex items-start gap-3">
-        {/* Until now this screen had NO way out. The only exits were finalising
-            or navigating away via the tab bar, which abandoned the review
-            silently and left the penalties unapplied. */}
         <IconButton
           label="Leave without finalising"
           variant="outline"
@@ -254,8 +247,6 @@ export function AttendanceReview({
         onClose={() => setConfirmCommit(false)}
       />
 
-      {/* Leaving before finalising is the quiet failure this whole screen
-          exists to prevent, so it is the one exit that has to be explicit. */}
       <ConfirmDialog
         open={confirmLeave}
         variant="danger"

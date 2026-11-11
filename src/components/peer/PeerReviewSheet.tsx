@@ -5,20 +5,6 @@ import { Card } from '@/components/ui/Card'
 import { describeOption } from '@/lib/peer-scale'
 import type { PeerCriterion, PeerPerson } from '@/lib/types'
 
-/**
- * The last look before a submission that can never be changed.
- *
- * ── REVIEW, THEN THE USUAL CONFIRM (the instructor's call) ─────────────────
- * The confirm dialog on its own only said how many classmates were being rated,
- * which is the one fact a misclick does not change. This screen shows every
- * answer per classmate, each with Edit, and its Submit opens the same
- * confirmation as before — so the app's rule that hard-to-undo actions go
- * through a confirm still holds, and the confirm now follows an informed look.
- *
- * Full screen rather than a bottom sheet: six classmates with four questions
- * and a comment each is a long read, and a half-height sheet makes it a
- * scroller inside a scroller.
- */
 export function PeerReviewSheet({
   open,
   peers,
@@ -99,10 +85,6 @@ export function PeerReviewSheet({
           )
         })}
 
-        {/* Sticky inside the screen's own scroller, so Submit is always one tap
-            away however far down the review has been read. */}
-        {/* No negative-margin bleed: inside an overflow-y scroller the other axis
-            computes to auto, and a bleed is how the profile sheet once clipped. */}
         <div className="sticky bottom-0 border-t border-line bg-canvas/95 py-3 backdrop-blur-md">
           <Button className="w-full" onClick={onSubmit}>
             Submit

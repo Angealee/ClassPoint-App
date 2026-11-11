@@ -58,7 +58,6 @@ export function Students() {
   const [searchParams, setSearchParams] = useSearchParams()
   const importRef = useRef<HTMLInputElement>(null)
 
-  // Landing on the section grid; opening a card switches to that section's roster.
   const [openId, setOpenId] = useState<string | null>(null)
 
   const [students, setStudents] = useState<SectionStudent[]>([])
@@ -93,23 +92,10 @@ export function Students() {
   const [archivedOpen, setArchivedOpen] = useState(false)
   const [backingUp, setBackingUp] = useState(false)
 
-  // Awarding lives here now (the Award tab is gone). Ticking is bulk by design:
-  // pick several students, choose the amount once, award them together.
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  // The group from the last award, for the "same students again" shortcut.
   const [lastAwarded, setLastAwarded] = useState<string[]>([])
-  // Who actually showed up to this section's most recent class — lets you
-  // reward the room without hunting for names. Empty until it loads; the
-  // selector simply doesn't render then.
   const [lastSessionAttendees, setLastSessionAttendees] = useState<Set<string>>(new Set())
 
-  // ?student=<id> (from the record page's Award button) opens that student's
-  // section and pre-ticks them, so the award bar is already up on arrival.
-  //
-  // Declared HERE, after the state it touches: when this sat above the
-  // useState calls it still worked (effects run after render), but ESLint was
-  // right to flag reading `setSelected` before its declaration — it's exactly
-  // the shape that breaks the day someone converts it to run during render.
   const studentParam = searchParams.get('student')
   useEffect(() => {
     if (!studentParam) return
@@ -125,7 +111,6 @@ export function Students() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentParam])
 
-  // Students from the last award still on screen (drives the reselect shortcut).
   const reselectable = lastAwarded.filter((id) => students.some((s) => s.id === id))
 
   function toggleSelected(id: string) {
@@ -149,7 +134,6 @@ export function Students() {
     listAchievements()
       .then((all) => setRecognitions(all.filter((a) => a.grantedBy === 'instructor')))
       .catch(() => {
-
       })
   }, [])
 
@@ -177,9 +161,7 @@ export function Students() {
 
   useEffect(() => {
     if (openId) void refresh()
-
   }, [openId])
-
 
   useEffect(() => {
     if (!openId) {
@@ -212,9 +194,6 @@ export function Students() {
   function openSection(id: string) {
     setSelectedSectionId(id) // keep Attendance/Leaderboard in sync
     setQuery('')
-    // CRITICAL: ticks are student ids from the section you're leaving. Carrying
-    // them across would dock the award bar over a different roster and award the
-    // WRONG students, with nothing on screen to show whose ids they were.
     setSelected(new Set())
     setLastAwarded([])
     setOpenId(id)
@@ -231,8 +210,6 @@ export function Students() {
     )
   }, [students, query])
 
-  // Bulk-selector inputs. All are scoped to what's currently on screen, so a
-  // search box narrows every one of them.
   const allFilteredSelected = filtered.length > 0 && filtered.every((s) => selected.has(s.id))
   const unclaimedIds = filtered.filter((s) => !s.claimed_at).map((s) => s.id)
   const lastSessionIds = filtered.filter((s) => lastSessionAttendees.has(s.id)).map((s) => s.id)
@@ -434,7 +411,6 @@ export function Students() {
       <button
         type="button"
         onClick={() => {
-          // Same reason as openSection: never carry ticks out of a roster.
           setSelected(new Set())
           setLastAwarded([])
           setOpenId(null)
@@ -536,8 +512,6 @@ export function Students() {
         <EmptyState>No students match “{query}”.</EmptyState>
       ) : (
         <>
-        {/* Bulk selectors — awarding a whole class is one tap, not forty.
-            All three act on `filtered`, so a search narrows what they pick. */}
         <div className="flex flex-wrap items-center gap-2 px-1">
           <button
             type="button"
@@ -579,9 +553,6 @@ export function Students() {
                   selected.has(s.id) && 'bg-accent-solid/8',
                 )}
               >
-                {/* The row body ticks for an award — a safe, reversible action,
-                    unlike the explicit icon buttons beside it. The avatar
-                    doubles as the checkbox so the row gains no extra width. */}
                 <button
                   type="button"
                   onClick={() => toggleSelected(s.id)}
@@ -651,8 +622,6 @@ export function Students() {
                   title="Archive (restorable)"
                   icon={<TrashIcon className="h-4.5 w-4.5" />}
                 />
-                {/* Explicit affordance (user's pick): the row itself stays
-                    inert so reaching for an icon can't mis-navigate. */}
                 <button
                   type="button"
                   onClick={() => navigate(`/teach/student/${s.id}`)}
@@ -668,7 +637,6 @@ export function Students() {
         </>
       )}
 
-      {/* Re-pick the group you just awarded — e.g. to add a second category. */}
       {selected.size === 0 && reselectable.length > 0 && (
         <button
           type="button"
@@ -679,7 +647,6 @@ export function Students() {
         </button>
       )}
 
-      {/* Keeps the last roster row clear of the docked award bar. */}
       {selected.size > 0 && <div aria-hidden className="h-32" />}
 
       <AwardBar
@@ -926,7 +893,6 @@ export function Students() {
         )}
       </Sheet>
 
-      {/* Reset PIN — issue a one-time reset code to hand to the student */}
       <Sheet
         open={!!resetTarget}
         onClose={() => {
@@ -1021,7 +987,6 @@ export function Students() {
         </div>
       </Sheet>
 
-      {/* Archive confirm — calm on purpose: nothing is lost. */}
       <ConfirmDialog
         open={!!deleteTarget}
         title="Archive this student?"

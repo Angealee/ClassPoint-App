@@ -31,13 +31,6 @@ const longDate = (iso: string) =>
     year: 'numeric',
   })
 
-/**
- * Semester setup: term dates, subjects, and which sections take which subject.
- *
- * Term dates are STORED rather than computed — six-week arithmetic is only the
- * default we seed, and real calendars move for holidays and suspensions. Editing
- * a date here re-labels every week and term chip in the instructor area.
- */
 export function ManageSemesters() {
   const { toast } = useToast()
   const { semester, subjects, sections, sectionSubjects, refreshSemester } = useInstructor()
@@ -53,7 +46,6 @@ export function ManageSemesters() {
   const [editName, setEditName] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string }>()
 
-  // Seed the date inputs from the semester whenever it (re)loads.
   useEffect(() => {
     if (!semester) return
     const draft: Record<string, { startsOn: string; endsOn: string }> = {}
@@ -174,15 +166,10 @@ export function ManageSemesters() {
         </p>
       </div>
 
-      {/* ── Closing the one that just ended (0060) ─────────────────────────
-          ABOVE the rollover panel on purpose: the order on screen is the order
-          of the work. You finish a semester, then you build the next one. */}
       <SemesterClosePanel />
 
-      {/* ── Rollover (Phase I) ─────────────────────────────────────────── */}
       <RolloverPanel />
 
-      {/* ── Term dates ─────────────────────────────────────────────────── */}
       <Card className="p-4">
         <h2 className="font-display text-base font-bold">Term dates</h2>
         <p className="mt-0.5 text-sm text-muted">
@@ -237,7 +224,6 @@ export function ManageSemesters() {
         </div>
       </Card>
 
-      {/* ── Subjects ───────────────────────────────────────────────────── */}
       <Card className="p-4">
         <h2 className="font-display text-base font-bold">Subjects</h2>
         <p className="mt-0.5 text-sm text-muted">
@@ -334,7 +320,6 @@ export function ManageSemesters() {
         </form>
       </Card>
 
-      {/* ── Section × subject assignments ──────────────────────────────── */}
       <Card className="p-4">
         <h2 className="font-display text-base font-bold">Who takes what</h2>
         <p className="mt-0.5 text-sm text-muted">
@@ -398,14 +383,6 @@ export function ManageSemesters() {
   )
 }
 
-/**
- * Rollover entry point (Phase I).
- *
- * Lists semesters that exist but aren't active. Creating one does NOT switch to
- * it — you build it out first and activate at the end of the wizard, which is
- * what makes the whole thing safe to do gradually in the weeks before a term
- * ends rather than in one nervous sitting.
- */
 function RolloverPanel() {
   const { semester, refreshSemester } = useInstructor()
   const { toast } = useToast()

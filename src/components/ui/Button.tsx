@@ -7,25 +7,7 @@ type Size = 'sm' | 'md' | 'lg'
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
   size?: Size
-  /**
-   * Shows a spinner in the icon slot and disables the button.
-   *
-   * Replaces 36 hand-rolled loading states that used at least eight different
-   * vocabularies ('…', 'Loading…', 'Saving…', 'Creating…', 'Filing…',
-   * 'Moving…', 'Rebuilding…', 'Adding…'). The label stays put by default, so
-   * the button keeps saying what it does while it does it.
-   *
-   * ⚠ If the button had no `icon`, the spinner is inserted and the button
-   * grows by the spinner plus one gap. That is invisible on a `w-full` button
-   * or one in a grid, which is nearly all of them; pass an `icon` (or a fixed
-   * width) if a mid-row button must not move.
-   */
   loading?: boolean
-  /**
-   * Optional label swap while loading. Reserve it for slow operations where
-   * the verb genuinely tells the user something the resting label does not —
-   * 'Rebuilding…' over 'Rebuild now'. Most buttons should leave it unset.
-   */
   loadingLabel?: ReactNode
   /** Leading icon. Replaced by the spinner while `loading`. */
   icon?: ReactNode
@@ -37,8 +19,6 @@ const variants: Record<Variant, string> = {
   gold: 'bg-gold-400 text-brand-950 hover:bg-gold-300 active:bg-gold-500 shadow-sm shadow-gold-400/30',
   ghost: 'bg-transparent text-ink hover:bg-card-2',
   outline: 'border border-line bg-transparent text-ink hover:bg-card-2',
-  // Destructive actions had NO variant before this: 'Delete session' and
-  // 'Remove record' were bare <button>s hand-styling themselves.
   danger: 'bg-danger-solid text-white hover:brightness-110 active:brightness-95 shadow-sm shadow-danger-solid/30',
 }
 

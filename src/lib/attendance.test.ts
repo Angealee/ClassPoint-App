@@ -2,16 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { bySubject, countedOf, counts, rateOf, rateTone, showedUp, tally } from './attendance'
 import type { AttendanceStatus, MyAttendanceEntry } from './types'
 
-/**
- * Pins the attendance rules that three screens now share.
- *
- * The load-bearing test here is the NEUTRAL one: excused and irregular must
- * leave the denominator entirely. If they ever slipped into it, a student with
- * a legitimate medical excuse would watch their show-up rate fall for a class
- * they were formally excused from — and the instructor's risk overview, which
- * computes it in SQL, would disagree with the app.
- */
-
 let n = 0
 const rec = (status: AttendanceStatus, subject?: [string, string]): MyAttendanceEntry =>
   ({
@@ -79,14 +69,12 @@ describe('tally', () => {
     expect(t.absent).toBe(1)
     expect(t.counted).toBe(4)
     expect(t.neutral).toBe(2)
-    // total includes the neutral rows — they are real classes that happened.
     expect(t.total).toBe(6)
     expect(t.rate).toBe(75)
   })
 })
 
 describe('rateTone', () => {
-  /** 70 is the instructor's at-risk line (0034), not a friendlier student one. */
   it('bands on the same thresholds the instructor sees', () => {
     expect(rateTone(100)).toBe('success')
     expect(rateTone(85)).toBe('success')

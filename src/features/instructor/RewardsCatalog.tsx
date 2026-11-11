@@ -25,14 +25,6 @@ const KINDS: Array<{ value: RedemptionKind; label: string }> = [
   { value: 'other', label: 'Other' },
 ]
 
-/**
- * The price list (0032).
- *
- * Students used to invent their own ask with no idea what points were worth,
- * which made every request a negotiation. Setting prices here turns spending
- * into a shop — and a catalog tap still creates an ordinary redemption request,
- * so approving one works exactly as it always has.
- */
 export function RewardsCatalog() {
   const { toast } = useToast()
   const [items, setItems] = useState<RewardCatalogItem[]>([])
@@ -51,7 +43,6 @@ export function RewardsCatalog() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      // Archived included: retiring is reversible, so they stay visible here.
       setItems(await listCatalogItems(true))
     } catch (e) {
       toast(errorText(e, 'Could not load the rewards.'), 'error')

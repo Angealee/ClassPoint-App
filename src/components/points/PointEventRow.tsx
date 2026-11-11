@@ -3,43 +3,16 @@ import { cn } from '@/lib/cn'
 import { TONE } from '@/lib/tone'
 import type { PublicPointEvent } from '@/lib/types'
 
-/**
- * One row of the points ledger.
- *
- * ── WHY THIS IS SHARED ─────────────────────────────────────────────────────
- * The Dashboard's `FeedRow` and PointsHistory's `LedgerRow` were the same
- * component twice, differing only in the badge geometry (h-10 rounded-xl versus
- * h-9 w-11 rounded-lg). That looks harmless and is not: when brand red was
- * demoted in Era 6.0, the "activity" category was fixed in one twin and missed
- * in the other, so the same event rendered in two different colours depending
- * on which screen you were looking at.
- *
- * ── THE CATEGORY COLOURS ───────────────────────────────────────────────────
- * A negative row is DANGER — it is the only place a student loses something.
- * "activity" is ACCENT (brand red as positive identity, not as a warning), and
- * everything else is REWARD gold. `redeem` rows are negative and therefore land
- * on danger, which is correct: spending really does lower your level and rank.
- */
 export function PointEventRow({
   event: e,
   compact = false,
 }: {
-  /**
-   * Typed as the PUBLIC shape, which is the subset this row actually reads.
-   * `PointEvent` also carries `student_id`, which a row rendering someone
-   * else's profile is deliberately never given — asking for the wider type
-   * would have locked the third call site out of the shared component.
-   */
   event: PublicPointEvent
   /** Narrower badge, for the denser full-ledger list. */
   compact?: boolean
 }) {
   const negative = e.points < 0
   const tone = negative ? 'danger' : e.category === 'activity' ? 'accent' : 'reward'
-  // A POSITIVE `redeem` row is the refund of a reversed grade boost (0062), not
-  // a spend — "redeem · 2h ago" under a +5 would read as the opposite. The
-  // ledger note already names the column ("Refund · Grade boost reversed ·
-  // Quiz 1"), so only the category word needs the sign.
   const categoryLabel = e.category === 'redeem' ? (negative ? 'spent' : 'refund') : e.category
 
   return (

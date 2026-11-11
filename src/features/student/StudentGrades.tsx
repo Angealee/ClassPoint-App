@@ -27,43 +27,15 @@ import { cn } from '@/lib/cn'
 import type { MyGradeItem, TermKey } from '@/lib/types'
 import { useStudentData } from './StudentData'
 
-/**
- * The student's own grades.
- *
- * ── WHAT THIS SCREEN WILL NOT SHOW ─────────────────────────────────────────
- * Never the official figure — the one that counts an unmarked column as a zero.
- * `student-grades.ts` has no path to it. What it shows is each mark, each
- * component, and a "so far" figure that is the SAME number the instructor's own
- * sheet shows under its So-far toggle.
- *
- * ── DATA ───────────────────────────────────────────────────────────────────
- * From `StudentData`, which fetches it once off the critical path, and which the
- * Home card and the Use-points screen read too. This screen fires no query of its
- * own.
- *
- * ── IT DOES NOT SPEND POINTS ───────────────────────────────────────────────
- * Spending lives on /app/points, once, so the confirm dialog and its rules exist
- * in one place. This screen only POINTS there: a banner that is always present
- * (so it is never a dead end, even when no column offers a boost), and a small
- * link on each boostable row that deep-links with `?column=<id>` so that column
- * is brought into view. Everything shown is a PREVIEW of what
- * `request_grade_boost` will accept (see `grade-boost.ts`); the server is the
- * authority.
-  */
 export function StudentGrades() {
   const { me, grades, gradesLoading, gradesError, reloadGrades, refresh, semesterEnded } =
     useStudentData()
 
   const subjects = useMemo(() => grades?.subjects ?? [], [grades])
 
-  // Held only as the student's CHOICE; the effective value is derived below, so
-  // a subject or term that disappears on a reload falls back instead of leaving
-  // the screen pointing at nothing.
   const [pickedSubject, setPickedSubject] = useState<string | null>(null)
   const [pickedTerm, setPickedTerm] = useState<TermKey | null>(null)
   const [explainOpen, setExplainOpen] = useState(false)
-  // How the scores are listed inside each part: as entered, or weakest first so the
-  // columns with the most room to gain are on top.
   const [order, setOrder] = useState<'order' | 'lowest'>('order')
 
   const subject = subjects.find((s) => s.subjectId === pickedSubject) ?? subjects[0] ?? null
@@ -79,7 +51,6 @@ export function StudentGrades() {
     await Promise.all([reloadGrades(), refresh()])
   }
 
-  // ── states ───────────────────────────────────────────────────────────────
   const header = (
     <ScreenTitle
       title="Grades"
@@ -134,9 +105,6 @@ export function StudentGrades() {
   }
 
   const summary = summarizeTerm(subject, term)
-  // While the instructor's switch is off the server withholds the weights, so these
-  // are null anyway — but the screen decides what to SHOW from `figures`, not from
-  // an accident of what is missing.
   const figures = grades.figures
   const explanation = figures ? explainTerm(subject, term) : null
   const boostable = boostableCount(subjects)
@@ -146,8 +114,6 @@ export function StudentGrades() {
       <div className="space-y-4 pb-4">
         {header}
 
-        {/* A failed RE-fetch leaves the last good marks on screen; say so rather
-            than silently showing numbers that may be stale. */}
         {gradesError && (
           <p className="rounded-lg bg-card-2 px-3 py-2 text-xs text-muted">
             Couldn’t refresh just now — these are the marks from a moment ago.{' '}
@@ -209,9 +175,6 @@ export function StudentGrades() {
             </p>
           </Card>
         ) : (
-          // Grades are not open yet (0065): the scores below are the student's own
-          // and stay visible, and so does using points on them. Only the GRADE waits.
-          // One calm line — no big number, no "0 of N marked" to read as a failure.
           <Card pad="tight" className="flex items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card-2 text-muted">
               <LockIcon className="h-5 w-5" />
@@ -223,9 +186,6 @@ export function StudentGrades() {
           </Card>
         )}
 
-        {/* What the figure is made of. Shown as the shares of THIS term, not as
-            "50% of 60%", and only when the weights are usable — the same rule
-            that withholds the figure itself. */}
         {explanation && (
           <div>
             <button
@@ -260,10 +220,6 @@ export function StudentGrades() {
           </div>
         )}
 
-        {/* The way to spend points. ALWAYS shown, because a link that appears only
-            when something is boostable leaves a student with nothing to tap in
-            exactly the case that matters most — a class where the instructor has
-            not offered any column yet. It says so instead. */}
         <Link to="/app/points" className="block">
           <Card interactive>
             <div className="flex items-center gap-3">
@@ -308,8 +264,6 @@ export function StudentGrades() {
           )
           .map((c) =>
             c.component === 'recitation' ? (
-              // Recitation is NOT typed (0063): it is this term's attendance rate,
-              // as-is — 9 of 10 classes is a Recitation of 90.
               <div key={c.component}>
                 <div className="mb-1.5 flex items-baseline justify-between px-1">
                   <h2 className="text-sm font-semibold">{c.label}</h2>
@@ -360,11 +314,9 @@ export function StudentGrades() {
   )
 }
 
-function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has ended — no new requests, whatever the column says. */ locked: boolean }) {
+function ItemRow({ item, locked }: { item: MyGradeItem; locked: boolean }) {
   const state = boostState(item)
 
-  // How well they did on this one, in the same 70 / 85 bands attendance uses — one
-  // threshold app-wide, so a "red" here means what a red means everywhere.
   const pct = item.score !== null && item.maxScore > 0 ? (item.score / item.maxScore) * 100 : null
   const tone = pct === null ? null : rateTone(pct)
 
@@ -401,8 +353,6 @@ function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has end
       </div>
 
       {state.kind === 'boosted' && (
-        // The indicator the instructor asked for: it must still read as boosted
-        // when the mark is now AT the maximum, which is the usual case.
         <Chip tone="reward" size="sm">
           +{formatMarks(state.marks)} from {state.points} pts
         </Chip>
@@ -414,8 +364,6 @@ function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has end
         </Chip>
       )}
 
-      {/* Absent (0063): say why there is no way to use points here, instead of a
-          row that just offers nothing. */}
       {state.kind === 'absent' && (
         <Chip tone="neutral" size="sm">
           Absent
@@ -423,12 +371,6 @@ function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has end
       )}
 
       {state.kind === 'available' && !locked && (
-        // A QUIET LINK, only on a column that can still gain (a perfect score has no
-        // link at all). The old outlined red pill, repeated down every row, competed
-        // with the grade and with itself. A LINK, not a button: the request is made
-        // on /app/points, once, and this carries the column with it so it is brought
-        // into view there. The same 44px tap region as a small button (`cp-tap-y`),
-        // and it names no amount — the amount is the student's choice, on that screen.
         <Link
           to={'/app/points?column=' + item.id}
           className="cp-tap-y inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-accent underline-offset-2 hover:underline"

@@ -8,21 +8,6 @@ import {
   SCORE_MAX,
 } from './grade-entry'
 
-/**
- * Pins what the instructor can type into a cell, and what a paste turns into.
- *
- * The load-bearing one is "an empty cell is null, not zero". Clearing a cell
- * DELETES the row, which takes that item out of the student's in-progress
- * denominator; typing 0 stores a real mark that counts against them. If those
- * two ever collapse into each other, the "so far" figure stops being able to
- * tell a student who is behind from one who has not been marked — and nothing
- * on screen would look wrong.
- *
- * Second: a paste keeps interior blanks. A column copied out of Excel has a gap
- * exactly where a student was unmarked, and dropping those would shift every
- * score below the gap up a row — marks silently assigned to the wrong people.
- */
-
 describe('parseScoreInput', () => {
   it('reads an empty cell as cleared, NOT as zero', () => {
     expect(parseScoreInput('')).toEqual({ ok: true, value: null })
@@ -42,8 +27,6 @@ describe('parseScoreInput', () => {
   })
 
   it('rejects what Number() would quietly accept', () => {
-    // Every one of these parses to a number in JavaScript. '1e3' is the one
-    // that matters: a typo'd exponent becoming 1000 on a quiz out of 20.
     for (const bad of ['1e3', '0x10', '-5', 'abc', '1,000', '12 5', '--1']) {
       expect(parseScoreInput(bad).ok, bad).toBe(false)
     }
@@ -53,7 +36,6 @@ describe('parseScoreInput', () => {
     for (const a of ['A', 'a', ' abs ', 'ABSENT', 'ab']) {
       expect(parseScoreInput(a), a).toEqual({ ok: true, value: null, absent: true })
     }
-    // A typo is not an absence: 'abc' and 'absentee' must stay rejected.
     for (const bad of ['abc', 'absentee', 'aa', 'x']) {
       expect(parseScoreInput(bad).ok, bad).toBe(false)
     }
@@ -62,8 +44,6 @@ describe('parseScoreInput', () => {
   })
 
   it('rounds to the two decimals the column actually stores', () => {
-    // numeric(6,2) would round this on the way in, and the cell would keep
-    // showing 18.567 until the next reload.
     expect(parseScoreInput('18.567')).toEqual({ ok: true, value: 18.57 })
   })
 
@@ -80,7 +60,6 @@ describe('formatScoreInput', () => {
   })
 
   it('does not pad a whole number with decimals', () => {
-    // The grade figures want two decimals; a cell wants what was typed.
     expect(formatScoreInput(18)).toBe('18')
     expect(formatScoreInput(0)).toBe('0')
     expect(formatScoreInput(18.5)).toBe('18.5')
@@ -107,8 +86,6 @@ describe('parsePastedColumn', () => {
   })
 
   it('takes only the first column of a block paste', () => {
-    // Filling sideways would need to know which items the other columns belong
-    // to, and guessing wrong writes marks into the wrong quiz.
     expect(parsePastedColumn('18\t9\n19\t10\n')).toEqual(['18', '19'])
   })
 
@@ -121,7 +98,6 @@ describe('parsePastedColumn', () => {
 describe('isColumnPaste', () => {
   it('is false for an ordinary single value', () => {
     expect(isColumnPaste('18')).toBe(false)
-    // Excel adds a trailing newline even to one cell — still not a column.
     expect(isColumnPaste('18\n')).toBe(false)
   })
 

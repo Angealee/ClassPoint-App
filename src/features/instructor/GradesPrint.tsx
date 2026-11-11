@@ -28,18 +28,6 @@ const TERM_LABEL: Record<TermKey, string> = {
   finals: 'Finals',
 }
 
-/**
- * The class grade sheet, for signing and submitting.
- *
- * Names down, the three term grades across, the final computed grade, and a
- * note naming any term that is still missing. PORTRAIT: five columns fit
- * comfortably, and this is the sheet that actually gets handed in — the full
- * item-by-item working lives on a student's own printout instead.
- *
- * Registered OUTSIDE InstructorLayout (the StudentReport precedent), so it must
- * load the term calendar itself — a route under the layout gets that for free,
- * and this one would otherwise print against term.ts's fallback dates.
- */
 export function GradesPrint() {
   const { sectionId = '', subjectId = '' } = useParams()
   const navigate = useNavigate()
@@ -89,8 +77,6 @@ export function GradesPrint() {
       subtitle={subject?.name}
       onBack={() => navigate(-1)}
       loading={loading}
-      // Printed ON the paper, not just on screen: a page of dashes otherwise
-      // reads as "nobody has a grade" rather than "this failed to load".
       loadError={loadError}
     >
       <div className="gp-scroll">
@@ -181,13 +167,6 @@ function groupLines(rows: GradeSumsRow[], policies: GradePolicy[]): Line[] {
     .sort((a, b) => a.fullName.localeCompare(b.fullName))
 }
 
-/**
- * One student's full working, printed.
- *
- * Shares `StudentGradeBreakdown` with the record page rather than carrying a
- * second copy of the arithmetic — `useForcedLightTheme` is what makes that safe
- * on paper, so no component needs a print-only branch.
- */
 export function StudentGradesPrint() {
   const { studentId = '' } = useParams()
   const navigate = useNavigate()

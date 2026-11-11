@@ -49,7 +49,6 @@ const NEUTRAL = new Set(['excused', 'irregular'])
 const shortDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
-/** The instructor's full per-student record — and the launch point for the printable report. */
 export function StudentRecord() {
   const { studentId = '' } = useParams()
   const navigate = useNavigate()
@@ -68,8 +67,6 @@ export function StudentRecord() {
   const [resetOpen, setResetOpen] = useState(false)
   const [archiveConfirm, setArchiveConfirm] = useState(false)
   const [archiving, setArchiving] = useState(false)
-  // Points ledger paginates on demand — heavy students stay fast, but you can
-  // dig into the full history when a question comes up.
   const [eventsLimit, setEventsLimit] = useState(40)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMoreEvents, setHasMoreEvents] = useState(false)
@@ -93,7 +90,6 @@ export function StudentRecord() {
       ])
       setAttendance(att)
       setEvents(ev)
-      // A full page back suggests there may be older events to fetch.
       setHasMoreEvents(ev.length >= 40)
       setEventsLimit(40)
       setRedemptions(red)
@@ -122,8 +118,6 @@ export function StudentRecord() {
     return { ...c, rate: c.counted ? Math.round(((c.present + c.late) / c.counted) * 100) : null }
   }, [attendance])
 
-  /** The same rate, split per subject (0030) — the number that matters when a
-   *  student is solid in one class and slipping in the other. */
   const bySubject = useMemo(() => {
     const groups = new Map<string, { label: string; present: number; late: number; absent: number }>()
     for (const a of attendance) {
@@ -232,9 +226,6 @@ export function StudentRecord() {
 
       {/* Header */}
       <Card className="p-5">
-        {/* The name and section now title the screen via PageHeader, so this
-            card is the avatar and the four figures — one heading per screen
-            rather than a back link above a second copy of the same name. */}
         <div className="flex items-center gap-4">
           <Avatar
             name={student.fullName}
@@ -256,8 +247,6 @@ export function StudentRecord() {
         <Button onClick={() => navigate(`/teach/student/${student.id}/report`)}>
           <DownloadIcon className="h-5 w-5" /> Print report
         </Button>
-        {/* Awarding lives in the section roster now — this opens it with the
-            student already ticked, so the bulk bar is one tap from here. */}
         <Button variant="outline" onClick={() => navigate(`/teach?student=${student.id}`)}>
           <BoltIcon className="h-5 w-5" /> Award
         </Button>
@@ -341,13 +330,8 @@ export function StudentRecord() {
         )}
       </div>
 
-      {/* Global event check-ins (0055) — separate from class attendance above;
-          self-fetching, renders nothing when this student has no events. */}
       <StudentEventHistory studentId={student.id} />
 
-      {/* Grades (0057). Collapsed per subject — this is the full working, which
-          is what you want when a student asks, and too long to leave open on a
-          record that already carries attendance, points and achievements. */}
       <div>
         <SectionLabel
           action={

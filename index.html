@@ -5,18 +5,8 @@
     <link rel="icon" type="image/svg+xml" href="/app-logo.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <!-- Resolved by the inline script below so it tracks the theme the user actually
-         chose, not the OS preference. A media-scoped pair would disagree with an in-app
-         override; ThemeProvider keeps this in sync on every toggle. -->
     <meta name="theme-color" content="#08080b" />
-    <!-- Apply the stored theme BEFORE first paint.
-         ThemeProvider sets `.dark` in a useEffect, so it only lands once the bundle has
-         downloaded, parsed and mounted. Until then `:root` resolves to light
-         (--canvas #f3f3f6) and every dark-mode user saw a white flash on each cold start
-         of the installed PWA. This mirrors getInitialTheme() in src/lib/theme.tsx exactly,
-         and the effect then writes the same value, so the two cannot disagree.
-         The try/catch is load-bearing: localStorage throws in some private-browsing modes
-         and an uncaught throw in a blocking head script would stop the page dead. -->
+    <!-- Apply theme before first paint -->
     <script>
       (function () {
         try {
@@ -31,9 +21,7 @@
         } catch (e) {}
       })()
     </script>
-    <!-- Capture the install prompt as early as possible: the browser can fire
-         beforeinstallprompt before the app bundle mounts its React listener, and
-         the event is never re-fired. Stash it for PwaInstallProvider to read. -->
+    <!-- Capture install prompt early -->
     <script>
       window.__cpInstall = { event: null, installed: false }
       window.addEventListener('beforeinstallprompt', function (e) {

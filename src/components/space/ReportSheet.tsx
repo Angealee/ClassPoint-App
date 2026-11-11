@@ -8,17 +8,6 @@ import { errorText } from '@/lib/errors'
 import { cn } from '@/lib/cn'
 import { REPORT_REASONS, type ReportReason, type ReportTargetType } from '@/lib/types'
 
-/**
- * The report flow — a reason, an optional note, one call.
- *
- * The reason list is fixed so that "three people said harassment" is a fact the
- * queue can show, and the note is optional because the thing that usually
- * decides what to do — "it's the third time this week" — has no category.
- *
- * Nothing here knows about the auto-hide threshold. The RPC counts distinct
- * reporters and hides at 7; telling the reporter how close they are would turn
- * a safety tool into a scoreboard.
- */
 export function ReportSheet({
   open,
   onClose,
@@ -37,8 +26,6 @@ export function ReportSheet({
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
 
-  // A fresh open always starts blank — the last report's reason pre-selected
-  // on a different piece of content is how the wrong thing gets flagged.
   useEffect(() => {
     if (open) {
       setReason(null)

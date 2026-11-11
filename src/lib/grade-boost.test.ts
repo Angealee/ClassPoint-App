@@ -9,17 +9,6 @@ import {
 } from './grade-boost'
 import type { MyGradeItem } from './types'
 
-/**
- * `request_grade_boost` (0064) is the authority; `boostState` is its preview.
- * Every branch below corresponds to an exception the SQL raises, so a drift
- * between the two shows up here rather than as a button that always fails.
- *
- * THE ONE THAT MATTERS IS THE CAP. Points assist is automatic (0064): 1 point = 1
- * mark, the STUDENT chooses how many, and a mark can never pass the column's
- * maximum. A student at 17/20 may use at most 3 points; at 17.5/20 they may use 3
- * and gain 2.5. The screen must say the real gain BEFORE they confirm.
- */
-
 function item(over: Partial<MyGradeItem> = {}): MyGradeItem {
   return {
     id: 'i1',
@@ -51,7 +40,6 @@ describe('boostGain', () => {
   })
 
   it('never goes negative for a mark typed above the maximum', () => {
-    // Extra credit the instructor chose to allow: points must not TAKE marks.
     expect(boostGain(22, 20, 4)).toBe(0)
   })
 
@@ -83,7 +71,6 @@ describe('maxPointsFor — the most a student may use (mirror of request_grade_b
 
   it('rounds UP to a whole point: 17.5/20 may use 3 (points are whole numbers)', () => {
     expect(maxPointsFor(17.5, 20)).toBe(3)
-    // 19.5/20: half a mark missing, one point is the smallest unit.
     expect(maxPointsFor(19.5, 20)).toBe(1)
   })
 
@@ -99,8 +86,6 @@ describe('maxPointsFor — the most a student may use (mirror of request_grade_b
   })
 
   it('does not round a floating point sliver up into an extra point', () => {
-    // 20 - 19.9 is 0.10000000000000142 in JavaScript — still one point, but
-    // 20 - 17.0000000000001 must not read as a gap of 3.0000000000001 → 4.
     expect(maxPointsFor(17.00000000001, 20)).toBe(3)
   })
 })
@@ -111,9 +96,6 @@ describe('pointsGain — what N points really add (1 point = 1 mark, capped)', (
   })
 
   it('NEVER passes the maximum: a mark of 17.5 on /20 gains 2.5 from 3 points', () => {
-    // The instructor's rule. The student is charged 3 points and the screen says
-    // 2.5 BEFORE they confirm — telling them 3 and delivering 2.5 is the thing
-    // this cap exists to prevent.
     expect(pointsGain(3, 17.5, 20)).toBe(2.5)
     expect(17.5 + pointsGain(3, 17.5, 20)).toBe(20)
   })
@@ -139,7 +121,6 @@ describe('boostState', () => {
   })
 
   it('needs NO setup from the instructor: a marked column below its max is simply open', () => {
-    // The whole point of 0064. No cost, no bonus, no per-part terms.
     expect(boostState(item()).kind).toBe('available')
   })
 
@@ -148,8 +129,6 @@ describe('boostState', () => {
   })
 
   it('says "unmarked" — not "not offered" — when the mark is not in yet', () => {
-    // Different reasons, different sentences: one is "nothing to do here", the
-    // other is "come back once your instructor has marked it".
     expect(boostState(item({ score: null }))).toEqual({ kind: 'unmarked' })
   })
 
@@ -163,14 +142,11 @@ describe('boostState', () => {
   })
 
   it('keeps showing a receipt after the column is switched off', () => {
-    // The receipt is history, not an offer. Hiding it would make the column look
-    // as though the points had never been spent.
     const s = boostState(item({ offered: false, boost: { marks: 3, points: 3, before: 17 } }))
     expect(s).toEqual({ kind: 'boosted', marks: 3, points: 3, before: 17 })
   })
 
   it('shows boosted over pending and over full marks', () => {
-    // After points the mark is often AT the maximum, and "full" must not win.
     const s = boostState(
       item({ score: 20, pending: true, boost: { marks: 3, points: 3, before: 17 } }),
     )
@@ -180,8 +156,6 @@ describe('boostState', () => {
 
 describe('boostState — absent (0063, unchanged by 0064)', () => {
   it('refuses an absent student even with a mark typed — a 0 for an absentee is not eligible', () => {
-    // The instructor’s rule: ONLY absentees are kept out. A typed 0 would
-    // otherwise be the easiest column in the class to gain on.
     expect(boostState(item({ absent: true, score: 0 })).kind).toBe('absent')
     expect(boostState(item({ absent: true, score: 12 })).kind).toBe('absent')
   })

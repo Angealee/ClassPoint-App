@@ -3,21 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { BoltIcon, CheckIcon } from '@/components/ui/icons'
 import { useStudentData } from './StudentData'
 
-/**
- * "An event is starting" (0055) — the GLOBAL check-in banner on Home.
- *
- * Unlike the live-class banner it is NOT section-scoped: a single event_sessions
- * subscription on the durable channel drives it for every student. The whole
- * card is the tap target (req: "tapping it redirects to the Event screen"), so
- * the CTA is a decorative pill, not a nested button. Renders nothing when no
- * event is running, so it mounts unconditionally. Gold, not the class banner's
- * red — an event is points to earn, not a class to attend.
- */
 export function EventStartingBanner() {
   const { liveEvent, liveEventChecked, semesterEnded } = useStudentData()
   const navigate = useNavigate()
-  // A rollover-edge student (their section moved to a past semester) is refused
-  // by scan_event_attendance anyway — don't dangle a banner they can't act on.
   if (!liveEvent || semesterEnded) return null
 
   const reward = liveEvent.pointsPerScan > 0 ? ` · +${liveEvent.pointsPerScan} pts` : ''
@@ -46,7 +34,6 @@ export function EventStartingBanner() {
       ) : (
         <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-reward-solid/20 text-reward">
           <BoltIcon className="h-5 w-5" />
-          {/* Pulsing ring — the one thing on the screen happening NOW. */}
           <span className="absolute inset-0 animate-ping rounded-full bg-reward-solid/30" />
         </span>
       )}

@@ -1,11 +1,3 @@
-/**
- * Instructor ops (0034).
- *
- * The read side for four systems that already ran in the database and had no
- * surface in the app: the nightly backup, the audit log, the auth-event trail,
- * and the on-demand leaderboard refresh. Plus broadcast, the risk overview and
- * the per-term attendance workbook.
- */
 import { supabase } from '@/lib/supabase'
 import { rpc } from './_internal'
 import type {
@@ -22,8 +14,6 @@ import type {
 export async function getBackupHealth(): Promise<BackupHealth[]> {
   const { data, error } = await supabase.rpc('get_backup_health')
   if (error) throw error
-  // RPC returns are typed `unknown` on purpose (see database.types.ts SCOPE) —
-  // cast the array once, the same way the attendance module does.
   return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     tableName: r.table_name as string,
     lastSnapshot: (r.last_snapshot as string | null) ?? null,
@@ -32,12 +22,6 @@ export async function getBackupHealth(): Promise<BackupHealth[]> {
   }))
 }
 
-/**
- * The destructive-action trail, newest first. Offset paging is fine here (and
- * keyset is not worth it): rows are only ever appended by deletes the
- * instructor themselves just performed, so a page boundary can't shift under a
- * reader the way a live student feed would.
- */
 export async function listAuditLog(limit = 30, offset = 0): Promise<AuditEntry[]> {
   const { data, error } = await supabase
     .from('audit_log')
@@ -58,7 +42,6 @@ export async function listAuditLog(limit = 30, offset = 0): Promise<AuditEntry[]
   }))
 }
 
-/** Recent claim / PIN-reset attempts (0026). Instructor-select only by RLS. */
 export async function listAuthEvents(limit = 30): Promise<AuthEvent[]> {
   const { data, error } = await supabase
     .from('auth_events')
@@ -78,7 +61,6 @@ export async function listAuthEvents(limit = 30): Promise<AuthEvent[]> {
   }))
 }
 
-/** Rebuild the frozen leaderboard now instead of waiting for the cron. */
 export async function forceLeaderboardRefresh(): Promise<void> {
   await rpc('force_leaderboard_refresh')
 }
@@ -95,10 +77,6 @@ export async function getSectionOverview(): Promise<SectionOverview[]> {
   }))
 }
 
-/**
- * Students with unexcused absences across every section this semester, with
- * `actionable` counting the ones still inside the 7-day excuse window.
- */
 export async function getAbsenceRisk(): Promise<AbsenceRisk[]> {
   const { data, error } = await supabase.rpc('get_absence_risk')
   if (error) throw error
@@ -115,10 +93,6 @@ export async function getAbsenceRisk(): Promise<AbsenceRisk[]> {
   }))
 }
 
-/**
- * One section's attendance across one term. Attendance only — points never
- * feed a grade, so the workbook deliberately has no points column.
- */
 export async function getTermAttendance(
   sectionId: string,
   term: TermKey,
@@ -142,14 +116,6 @@ export async function getTermAttendance(
   }))
 }
 
-/**
- * Active students per section id.
- *
- * Deliberately not `getSectionStats`, which also fetches every student's claim
- * token in chunks to compute a claimed-count. The broadcast composer needs a
- * headcount and nothing else, and it should not be pulling secrets over the
- * wire to get one.
- */
 export async function getSectionHeadcounts(): Promise<Record<string, number>> {
   const { data, error } = await supabase
     .from('students')
@@ -164,13 +130,6 @@ export async function getSectionHeadcounts(): Promise<Record<string, number>> {
   return counts
 }
 
-/**
- * Send an announcement to one section, or to every section this semester when
- * `sectionId` is null. Returns how many students it actually reached.
- *
- * The SQL refuses an empty target rather than reporting a cheerful zero — an
- * empty send always means the wrong thing was picked.
- */
 export async function sendBroadcast(input: {
   title: string
   body: string

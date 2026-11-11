@@ -1,14 +1,3 @@
-/**
- * App changelog / "What's new" notes.
- *
- * To announce a change to users: add a new entry at the TOP of CHANGELOG with a
- * bumped `version`. On the next app open, anyone who hasn't seen that version
- * gets the WhatsNew sheet listing every release they've missed. That's the whole
- * workflow — no other wiring needed.
- *
- * Sections flagged `major: true` render a "MAJOR" pill so headline features
- * stand out from the smaller updates.
- */
 
 /** A main update with its sub-module bullet points. */
 export interface ChangelogSection {
@@ -16,12 +5,10 @@ export interface ChangelogSection {
   heading: string
   /** The detail bullets under it (the "sub-module updates"). */
   items: string[]
-  /** Flags a headline feature — renders a "MAJOR" pill so it stands out. */
   major?: boolean
 }
 
 export interface ChangelogEntry {
-  /** Semver-ish "major.minor.patch". Must increase for each new release. */
   version: string
   /** ISO date (YYYY-MM-DD) the release shipped. */
   date: string
@@ -29,20 +16,9 @@ export interface ChangelogEntry {
   title: string
   /** Flat bullet points (legacy entries). */
   items?: string[]
-  /**
-   * Grouped updates: each main update with its sub-module bullets. Preferred for
-   * new entries. While a release is still being built, keep ADDING to the
-   * current entry's sections instead of bumping the version each time.
-   */
   sections?: ChangelogSection[]
 }
 
-/**
- * DRAFT — global event check-in (0055). NOT in CHANGELOG yet, so it is invisible
- * to users (LATEST_VERSION reads CHANGELOG[0]). Move it into the array with a
- * bumped version once the instructor says to announce it. Version/date are
- * placeholders until then.
- */
 export const DRAFT_EVENTS: ChangelogEntry = {
   version: '4.2.0',
   date: '2026-09-20',
@@ -66,20 +42,6 @@ export const DRAFT_EVENTS: ChangelogEntry = {
   ],
 }
 
-/**
- * DRAFT — Era 7.0, the material layer. NOT in CHANGELOG yet, so it is invisible
- * to users (LATEST_VERSION reads CHANGELOG[0]). Move it into the array with a
- * bumped version once the instructor says to announce it. Version/date are
- * placeholders until then.
- *
- * Deliberately SHORT, and student-facing only. Most of Era 7.0 was a token and
- * primitive layer plus instructor screens, none of which belongs in a student's
- * "What's new" — that is the 4.0.0 lesson, which was cut from 19 sections and 72
- * bullets to 6 and 19 before it shipped. Three sections, seven bullets.
- *
- * The flash fix leads because it is the only item here a student would have
- * NOTICED as a problem; the rest is polish they feel rather than read about.
- */
 export const DRAFT_7_0_0: ChangelogEntry = {
   version: '5.0.0',
   date: '2026-11-04',
@@ -111,25 +73,6 @@ export const DRAFT_7_0_0: ChangelogEntry = {
   ],
 }
 
-
-/**
- * DRAFT — Era 8.0: closing a semester, and the revision batch. NOT in CHANGELOG
- * yet, so it is invisible to users (LATEST_VERSION reads CHANGELOG[0]). Move it
- * into the array with a bumped version once the instructor says to announce it.
- * Version/date are placeholders until then.
- *
- * ⚠ Keep ADDING to this entry's sections as Era 8.0 phases land, rather than
- *   starting a new draft per phase. Phases 3–6 (the grade admin rebuild, the
- *   student grade screen, the tour) belong here too.
- *
- * Student-facing only, and short — the 4.0.0 lesson, which was cut from 19
- * sections and 72 bullets to 6 and 19 before it shipped. Nothing here about the
- * close-a-semester panel, the farewell editor, the restore-into-a-section flow or
- * the `@layer` fix: that is instructor work and plumbing, and a student reading
- * their "What's new" does not care which cascade layer a rule sits in.
- *
- * Five sections, thirteen bullets.
- */
 export const DRAFT_8_0_0: ChangelogEntry = {
   version: '6.0.0',
   date: '2026-11-08',
@@ -185,7 +128,6 @@ export const DRAFT_8_0_0: ChangelogEntry = {
     },
   ],
 }
-// Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '4.1.0',
@@ -267,7 +209,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-07-19',
     title: 'The big one 🚀',
     sections: [
-      // ── Major updates ──────────────────────────────────────────────────
       {
         heading: 'Attendance, rebuilt',
         major: true,
@@ -324,7 +265,6 @@ export const CHANGELOG: ChangelogEntry[] = [
           'iPhone: push still needs ClassPoint added to your Home Screen (Share → Add to Home Screen). The bell works everywhere regardless.',
         ],
       },
-      // ── Minor updates ──────────────────────────────────────────────────
       {
         heading: 'Excuse an absence, the proper way',
         items: [
@@ -521,20 +461,6 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
 ]
 
-/**
- * ── THE STUDENT SPACE ERA, STILL BEING BUILT ───────────────────────────────
- * Accumulate sections here as phases land; move the whole entry into CHANGELOG
- * only when the era is ready to announce.
- *
- * ⚠ It is exported but deliberately NOT in the CHANGELOG array. LATEST_VERSION
- * reads CHANGELOG[0], so putting a draft in the array would fire the "What's
- * new" sheet at every student mid-build — announcing a beta they cannot open.
- *
- * Trim before shipping. 4.0.0 went out at 6 sections / 19 bullets after being
- * cut down from 19 / 72, and changelog.test.ts now caps the LIVE entry at
- * 8 / 24. Most of what follows is instructor-only plumbing that has no business
- * in a student's release notes.
- */
 export const DRAFT_5_0_0: ChangelogEntry = {
   version: '5.0.0',
   date: '2026-09-02',
@@ -591,18 +517,6 @@ export const DRAFT_5_0_0: ChangelogEntry = {
   ],
 }
 
-/**
- * Peer Evaluation — accumulating, NOT announced.
- *
- * A separate draft from DRAFT_5_0_0 on purpose: Student Space and this are two
- * different releases, and merging them would produce one entry that blows past
- * the 8-section cap changelog.test.ts pins on a live entry. Whichever ships
- * first moves into CHANGELOG on its own.
- *
- * Phase 3 adds the results section. Nothing here mentions groups, the composer
- * or the completion view — all of that is instructor-only, which is exactly the
- * half that got cut from 4.0.0.
- */
 export const DRAFT_5_1_0: ChangelogEntry = {
   version: '5.1.0',
   date: '2026-09-10',
@@ -654,11 +568,9 @@ export function setSeenVersion(version: string): void {
   try {
     localStorage.setItem(SEEN_KEY, version)
   } catch {
-    // Storage may be unavailable (private mode) — failing silently is fine.
   }
 }
 
-/** Compare "a.b.c" version strings. Returns 1 if a > b, -1 if a < b, else 0. */
 export function compareVersions(a: string, b: string): number {
   const pa = a.split('.').map((n) => parseInt(n, 10) || 0)
   const pb = b.split('.').map((n) => parseInt(n, 10) || 0)
@@ -670,11 +582,6 @@ export function compareVersions(a: string, b: string): number {
   return 0
 }
 
-/**
- * Releases the user hasn't acknowledged yet (newest first).
- * First run on a device shows only the latest release as a one-time highlight,
- * so brand-new users aren't buried in the full history.
- */
 export function unseenEntries(): ChangelogEntry[] {
   const seen = getSeenVersion()
   if (!seen) return CHANGELOG.slice(0, 1)

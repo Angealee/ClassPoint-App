@@ -7,16 +7,6 @@ import {
   type ReadStore,
 } from './unread'
 
-/**
- * Pure logic, no browser — the store is injected, which is the whole reason it
- * is a parameter.
- *
- * The load-bearing cases are the two that return -1 from `unreadDividerIndex`.
- * Every other rule here fails visibly; those two fail as a "New messages" line
- * floating at the top of a room with nothing above it, which reads as a bug in
- * the app rather than a bug in the rule.
- */
-
 function memStore(initial: Record<string, string> = {}): ReadStore {
   let data = { ...initial }
   return {
@@ -38,8 +28,6 @@ describe('markRead / getLastRead', () => {
   })
 
   it('never moves the pointer backwards', () => {
-    // Two tabs on the same room: the stale one must not resurrect a badge the
-    // student already cleared in the other.
     const s = memStore({ 'room-1': T('12:00') })
     markRead('room-1', T('09:00'), s)
     expect(getLastRead('room-1', s)).toBe(T('12:00'))
@@ -85,15 +73,10 @@ describe('unreadDividerIndex', () => {
   })
 
   it('returns -1 on a first visit, with no pointer at all', () => {
-    // "New messages" above the very first line of a room you have never opened
-    // is noise, not news.
     expect(unreadDividerIndex(msgs, null)).toBe(-1)
   })
 
   it('returns -1 when EVERY message is unseen', () => {
-    // The divider would sit at index 0 with nothing above it, which reads as a
-    // rendering bug. This is the case that is easy to get wrong by returning
-    // `findIndex` directly.
     expect(unreadDividerIndex(msgs, T('09:00'))).toBe(-1)
   })
 

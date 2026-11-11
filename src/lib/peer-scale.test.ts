@@ -10,15 +10,6 @@ import {
 } from './peer-scale'
 import type { PeerScaleOption } from './types'
 
-/**
- * These pin the client half of `cp_peer_scale_clean()` (migration 0050).
- *
- * The load-bearing one is `isOnScale`: a range check would accept 2 on a scale
- * of 1/3/5, and the whole point of a per-criterion custom scale is that the
- * gaps are real. If this test and the SQL ever disagree, the composer and the
- * submit RPC disagree about what a valid rating is.
- */
-
 const ok = (scale: PeerScaleOption[]) => scaleError(scale)
 
 describe('scaleError', () => {
@@ -142,12 +133,6 @@ describe('isOnScale', () => {
     expect(isOnScale(sparse, 3)).toBe(true)
   })
 
-  /**
-   * THE ONE THAT MATTERS. 2 lies between the ends and is still not a rating
-   * anyone can give. A range check would let it through here and the submit
-   * RPC would then reject the whole submission with a message the student
-   * cannot act on.
-   */
   it('rejects a value that merely lies between two options', () => {
     expect(isOnScale(sparse, 2)).toBe(false)
     expect(isOnScale(sparse, 4)).toBe(false)
@@ -163,26 +148,15 @@ describe('isOnScale', () => {
       { value: 0, label: 'No' },
       { value: 1, label: 'Yes' },
     ]
-    // Guards against anyone "simplifying" this to a truthiness check.
     expect(isOnScale(yesno, 0)).toBe(true)
   })
 })
 
-/**
- * The percent formula, mirroring `cp_peer_scores()` in migration 0051.
- *
- * Every expected value below is computed by hand rather than by calling the
- * function under test, which is the only way a mirror test is worth anything.
- */
 describe('percentOf', () => {
   const five: PeerScaleOption[] = SCALE_PRESETS[0].scale
   const yesno: PeerScaleOption[] = SCALE_PRESETS[2].scale
   const ten: PeerScaleOption[] = SCALE_PRESETS[1].scale
 
-  /**
-   * THE ONE THAT MATTERS. `avg / max` would answer 20 here, and 20% is a lie:
-   * on a 1-to-5 scale a straight 1 is the worst rating anyone can give.
-   */
   it('reads the bottom of a 1-to-5 scale as 0, not 20', () => {
     expect(percentOf(five, 1)).toBe(0)
   })
@@ -208,7 +182,6 @@ describe('percentOf', () => {
   })
 
   it('agrees with avg/max ONLY on a zero-based scale', () => {
-    // The coincidence that hides the bug: on 0/1 both formulas give 0 and 100.
     expect(percentOf(yesno, 0)).toBe(0)
     expect(percentOf(yesno, 0.5)).toBe(50)
   })
@@ -227,7 +200,6 @@ describe('percentOf', () => {
     expect(percentOf(five, null)).toBeNull()
     expect(percentOf([], 3)).toBeNull()
     expect(percentOf([{ value: 2, label: 'Only' }], 2)).toBeNull()
-    // No range: every rating is simultaneously the best and the worst.
     expect(
       percentOf(
         [
@@ -247,11 +219,6 @@ describe('roundTo', () => {
     expect(roundTo(3, 2)).toBe(3)
   })
 
-  /**
-   * The compounding peer2peer shipped: rounding each criterion to a whole
-   * number and then averaging drifts from averaging first. Pinned so nobody
-   * "simplifies" the unrounded carry out of the result screens.
-   */
   it('differs from averaging pre-rounded values', () => {
     const exact = [81.25, 62.5, 43.75]
     const avgOfExact = roundTo(exact.reduce((a, b) => a + b, 0) / 3, 1)
@@ -275,10 +242,6 @@ describe('describeOption', () => {
     expect(describeOption(ten, 7)).toBe('7')
   })
 
-  /**
-   * THE ONE THAT MATTERS. The review screen printed "0 · No" while the form's
-   * button said "No". A student never chose a 0.
-   */
   it('writes only the word for a two-option word scale', () => {
     expect(describeOption(yesno, 0)).toBe('No')
     expect(describeOption(yesno, 1)).toBe('Yes')

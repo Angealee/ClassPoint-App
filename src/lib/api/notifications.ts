@@ -3,14 +3,6 @@ import type {
   AppNotification,
 } from '@/lib/types'
 
-// ============================================================================
-// Notifications — the outbox-backed bell (migration 0017)
-// ============================================================================
-
-/**
- * A page of the student's notification history, newest first. Keyset-paginated:
- * pass the oldest row's `createdAt` as `before` to load the next page.
- */
 export async function listNotifications(
   studentId: string,
   opts?: { before?: string; limit?: number },
@@ -45,7 +37,6 @@ export async function listNotifications(
   }))
 }
 
-/** How many notifications the student hasn't read — drives the bell badge. */
 export async function getUnreadNotificationCount(studentId: string): Promise<number> {
   const { count, error } = await supabase
     .from('notifications')

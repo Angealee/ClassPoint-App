@@ -28,34 +28,6 @@ import { errorText } from '@/lib/errors'
 import { useInstructor } from './InstructorLayout'
 import { PeerShuffleSheet } from './PeerShuffleSheet'
 
-/**
- * Peer groups — Peer Evaluation, Phase 1 (migration 0049).
- *
- * Reusable teams inside a section. Useful on its own before any evaluation
- * exists, which is why it ships first: organising a class into teams is work
- * the instructor already does on paper.
- *
- * ── GROUP-FIRST, AND WHAT THAT COSTS ───────────────────────────────────────
- * The instructor's call: each group card opens a sheet of the section roster
- * with checkboxes, rather than a single roster list with a group picker per
- * row. The cost of that shape is that the same student can be ticked in two
- * different sheets, and the database's `unique (section_id, student_id)` would
- * reject the second save with an index name for an error message.
- *
- * So `set_peer_group_members` treats a tick as authoritative and MOVES the
- * student off whatever team they were on. That makes the save always succeed,
- * which in turn makes it the screen's job to show the move BEFORE it happens —
- * hence the "in <group>" chip on every already-placed row in the sheet, and the
- * summary line under the Save button. A silent move the instructor did not see
- * coming is the one failure mode this shape can produce.
- *
- * ── UNASSIGNED STUDENTS WARN, THEY NEVER BLOCK ─────────────────────────────
- * A count sits at the top and names them on tap. Nothing here refuses to
- * proceed because someone is unplaced — the same call `set_active_semester`
- * makes about students left behind at rollover, for the same reason: leaving
- * someone out is often deliberate, and a screen that argues about it is one the
- * instructor learns to work around.
- */
 export function PeerGroups({ embedded = false }: { embedded?: boolean } = {}) {
   const { sections, selectedSectionId, setSelectedSectionId } = useInstructor()
   const { toast } = useToast()
@@ -81,8 +53,6 @@ export function PeerGroups({ embedded = false }: { embedded?: boolean } = {}) {
     setLoading(true)
     setLoadError(null)
     try {
-      // In parallel: neither read depends on the other, and the builder cannot
-      // render a single card without both of them.
       const [g, r] = await Promise.all([getSectionGroups(sectionId), listRosterBasics(sectionId)])
       setGroups(g)
       setRoster(r)
@@ -97,13 +67,6 @@ export function PeerGroups({ embedded = false }: { embedded?: boolean } = {}) {
     void load()
   }, [load])
 
-  /**
-   * Which group each student is on, by id.
-   *
-   * Built once from the groups already on screen rather than asked of the
-   * server, so the member sheet's "in Team Beta" chips cannot disagree with the
-   * cards behind it.
-   */
   const groupOf = useMemo(() => {
     const map = new Map<string, PeerGroup>()
     for (const g of groups) for (const m of g.members) map.set(m.id, g)
@@ -132,9 +95,6 @@ export function PeerGroups({ embedded = false }: { embedded?: boolean } = {}) {
 
   return (
     <div className={embedded ? 'w-full' : 'mx-auto w-full max-w-2xl'}>
-      {/* Hidden when hosted inside PeerConsole, which has already titled the
-          screen. One heading per screen — the same `embedded` prop AwardHistory
-          and SessionHistory take for the same reason. */}
       {!embedded && (
         <PageHeader
           title="Peer groups"
@@ -180,8 +140,6 @@ export function PeerGroups({ embedded = false }: { embedded?: boolean } = {}) {
 
             <SectionLabel
               action={
-                // gap-2 between two text buttons, which carry no expanded hit
-                // area — the IconButton adjacency rule does not apply here.
                 <div className="flex shrink-0 items-center gap-2">
                   <Button
                     size="sm"
@@ -284,8 +242,6 @@ export function PeerGroups({ embedded = false }: { embedded?: boolean } = {}) {
         title={`Archive ${archiving?.name ?? 'this group'}?`}
         message="Its members go back to being unassigned, and the group stops appearing when you build an evaluation."
         detail={
-          // Named explicitly because "archive" reads as "delete" to most people,
-          // and the difference is the whole reason the row is kept.
           'Past evaluations that used this group keep their results. The name becomes free to use again.'
         }
         variant="danger"
@@ -298,13 +254,6 @@ export function PeerGroups({ embedded = false }: { embedded?: boolean } = {}) {
   )
 }
 
-/**
- * The warn-never-block banner.
- *
- * Collapsed to a count by default: on a 40-student section early in the term
- * this list IS the roster, and a screen that opens with forty names has buried
- * the groups it exists to show.
- */
 function UnassignedCard({
   people,
   open,
@@ -371,9 +320,6 @@ function GroupCard({
               : `${group.memberCount} member${group.memberCount === 1 ? '' : 's'}`}
           </p>
         </div>
-        {/* gap-2 is the adjacency rule, not a spacing preference: two 36px
-            icon buttons with expanded 44px hit areas overlap below it, and in
-            the overlap the later element in DOM order wins the tap. */}
         <div className="flex shrink-0 items-center gap-2">
           <IconButton
             label={`Rename ${group.name}`}
@@ -410,14 +356,6 @@ function GroupCard({
   )
 }
 
-/**
- * Create or rename. One sheet for both, because the only field is the name.
- *
- * The name arrives BLANK on create (the instructor's call). A pre-filled
- * "Group 1" is one un-edited default away from a section of teams nobody can
- * tell apart, and unlike a section name in the rollover wizard, this one is
- * typed once and renamed in a tap.
- */
 function GroupComposer({
   open,
   group,
@@ -435,8 +373,6 @@ function GroupComposer({
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
 
-  // Re-seeded whenever the sheet opens onto a different group, so a rename
-  // never starts from the last thing that was typed.
   useEffect(() => {
     if (open) setName(group?.name ?? '')
   }, [open, group])
@@ -458,8 +394,6 @@ function GroupComposer({
       }
       onSaved()
     } catch (e) {
-      // The duplicate-name case comes back from the RPC as a real sentence,
-      // so it is shown verbatim rather than replaced with a generic failure.
       toast(errorText(e, "Couldn't save that group."), 'error')
     } finally {
       setBusy(false)
@@ -489,14 +423,6 @@ function GroupComposer({
   )
 }
 
-/**
- * The member picker.
- *
- * Shows the WHOLE section, with each already-placed student wearing the group
- * they are currently on. Ticking one of those moves them here on save, and the
- * summary above the button says how many — because that move is silent at the
- * database level, and this sheet is the only place it can be seen coming.
- */
 function MemberSheet({
   group,
   roster,
@@ -518,8 +444,6 @@ function MemberSheet({
     if (group) setPicked(new Set(group.members.map((m) => m.id)))
   }, [group])
 
-  // Everyone ticked here who is currently on a DIFFERENT team. These are the
-  // students the save will move.
   const moving = useMemo(() => {
     if (!group) return []
     return roster.filter((p) => {

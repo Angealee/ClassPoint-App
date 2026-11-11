@@ -18,39 +18,6 @@ import type { Semester } from '@/lib/types'
 import { ArchivedFarewell } from './ArchivedFarewell'
 import { useStudentData } from './StudentData'
 
-/**
- * What an archived student gets instead of the app (0060).
- *
- * ── WHAT THEY USED TO GET ───────────────────────────────────────────────────
- * The whole app, working. `resolveRole` decides student-ness from the email
- * domain alone, `RequireRole` passes, `getMyStudent` returns their row because
- * `students_select` is `using (true)`, and `StudentData.load()` succeeds — so
- * an archived student saw a normal dashboard with a Scan button, and every
- * action they took failed with a raw Postgres exception string. The only
- * visible difference was that they had vanished from the leaderboard.
- *
- * Now: the instructor's send-off, then their final standing, then the board as
- * it stands today. Nothing else is reachable — no Shell, no nav, no scanning,
- * no chat, no profile editing.
- *
- * ── WHY NO RPC ──────────────────────────────────────────────────────────────
- * Every figure here comes from a grant that already existed:
- *   · `sections` and `semesters` are `select … to authenticated` (0003, 0027),
- *     which is how an archived student reads the name and message of a semester
- *     they are no longer in.
- *   · `get_semester_leaderboard` is granted to `authenticated` and deliberately
- *     INCLUDES archived students (0035) — they were on that board when it
- *     counted. It is the only authoritative source for their final figures.
- *   · their points, badges and attendance are already on StudentData.
- * So 0060 adds one column and no read path.
- *
- * ⚠ `me.semester_points` is NOT their final score. It is relative to the
- *   ACTIVE semester, and `set_active_semester` bulk-recomputes it for every
- *   student — archived ones included — the moment the next semester starts. So
- *   the recap reads its points and rank from `get_semester_leaderboard` for THE
- *   SEMESTER THEY FINISHED. Using the cached column would show every returning
- *   student a proud 0.
- */
 export function ArchivedScreen() {
   const { me, leaderboard, achievements, attendance } = useStudentData()
   const { signOut } = useAuth()
@@ -63,9 +30,6 @@ export function ArchivedScreen() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  // The farewell plays once per sign-in, ahead of everything else. It is held
-  // in state rather than keyed off the fetch so a slow connection cannot skip
-  // it — the message is the first thing they are owed.
   const [farewellDone, setFarewellDone] = useState(false)
   const [signOutOpen, setSignOutOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -75,8 +39,6 @@ export function ArchivedScreen() {
     setLoading(true)
     setLoadError(null)
     try {
-      // Unfiltered on purpose: StudentData only ever loads the ACTIVE
-      // semester's sections, and this student's section is in a finished one.
       const [sections, semesters] = await Promise.all([listSections(), listSemesters()])
       const mine = sections.find((s) => s.id === me.section_id) ?? null
       setSectionName(mine?.name ?? null)
@@ -102,14 +64,6 @@ export function ArchivedScreen() {
     void load()
   }, [load])
 
-  /**
-   * Their attendance in the semester they finished.
-   *
-   * Filtered by the semester's own stored dates rather than through term.ts:
-   * that calendar is configured for whichever semester is ACTIVE, and pointing
-   * it at a past one for this screen alone would leave it wrong for anything
-   * mounted afterwards.
-   */
   const rate = useMemo(() => {
     if (!semester || semester.terms.length === 0) return tally(attendance).rate
     const from = semester.terms[0].startsOn
@@ -126,8 +80,6 @@ export function ArchivedScreen() {
     [achievements],
   )
 
-  // The live board is read straight off the snapshot StudentData already holds,
-  // so this screen fires no leaderboard query of its own.
   const top = leaderboard.slice(0, 10)
   const silent = top.length === 0 || top.every((e) => e.points === 0)
 
@@ -167,18 +119,6 @@ export function ArchivedScreen() {
         </div>
       ) : (
         <>
-          {/* ── Their final standing ───────────────────────────────────────
-              On --color-plate, the same fixed dark surface as the home
-              scoreboard and YourRankCard, and for the same reason: this is the
-              one thing on the screen that is about THEM, so it reads as an
-              object rather than as another card.
-
-              ⚠ It carries its own `ring-1 ring-white/10` and must NEVER be
-                given Card's `elevation`. The plate does not flip with the
-                theme while `--lit` does — it is transparent in light mode — so
-                a lit edge here would render for dark-mode students and
-                silently vanish for light-mode ones. Pinned in
-                material.test.ts. */}
           <div className="mt-5 overflow-hidden rounded-2xl bg-gradient-to-br from-plate-2 to-plate shadow-lg shadow-black/25 ring-1 ring-white/10">
             <div className="relative p-5">
               <div
@@ -190,8 +130,6 @@ export function ArchivedScreen() {
               </p>
               <div className="relative mt-1 flex items-end justify-between gap-4">
                 <p className="min-w-0 font-display text-5xl font-bold leading-none text-white">
-                  {/* A student who never scored has no rank, and a bare "#0"
-                      would be a worse answer than saying so. */}
                   {finalRank !== null ? (
                     <span className="tabular-nums">#{finalRank}</span>
                   ) : (
@@ -223,9 +161,6 @@ export function ArchivedScreen() {
             </div>
           </Card>
 
-          {/* ── The board as it stands now ─────────────────────────────────
-              Read-only: no `onSelect`, so a row opens nothing, and no
-              confetti — this is not a board they are climbing any more. */}
           <SectionLabel className="mt-6">The board right now</SectionLabel>
           {silent ? (
             <SilentBoard

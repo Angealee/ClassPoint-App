@@ -1,26 +1,5 @@
 import { NEUTRAL_STATUSES, type AttendanceStatus, type MyAttendanceEntry } from '@/lib/types'
 
-/**
- * The one definition of a student's attendance figures.
- *
- * ── WHY THIS IS A MODULE AND NOT A HELPER IN ONE SCREEN ────────────────────
- * The show-up rate is the number the instructor's own screens flag students on,
- * and it was computed independently in three places — `AttendanceStats`,
- * `Attendance` and (as of Era 6.0 Phase 6) the Dashboard's summary card. Three
- * copies of a rule that produces an academic-facing figure is how they drift
- * apart, and a student comparing two screens has no way to know which is right.
- *
- * ── THE RULE ───────────────────────────────────────────────────────────────
- * `excused` and `irregular` are NEUTRAL: they leave the denominator entirely,
- * so a legitimate excuse can never drag the rate down. What counts is
- * present + late + absent; what "showed up" is present + late.
- *
- * That matches `get_section_attendance_stats` in migration 0031 and the
- * `NEUTRAL_STATUSES` rule in types.ts. If this ever needs to change, it has to
- * change in the SQL in the same commit, or the student's screen and the
- * instructor's workbook will disagree about the same class.
- */
-
 export interface AttendanceTally {
   present: number
   late: number
@@ -29,11 +8,9 @@ export interface AttendanceTally {
   irregular: number
   /** present + late + absent. The denominator. */
   counted: number
-  /** excused + irregular — real classes that don't count for or against you. */
   neutral: number
   /** Every record, neutral ones included. */
   total: number
-  /** present + late, as a whole percentage of `counted`. 0 when nothing counts. */
   rate: number
 }
 
@@ -68,22 +45,6 @@ export function tally(items: readonly MyAttendanceEntry[]): AttendanceTally {
   }
 }
 
-/**
- * The attendance rate as a whole percentage. 0 when no class counted yet.
- *
- * ⚠ The UI calls this the ATTENDANCE RATE (renamed 2026-11-08, the
- *   instructor's call: "show-up rate" read as slang on a screen students use
- *   to check whether they are failing). The function names here were left
- *   alone deliberately — renaming `rateOf` / `rateTone` / `showedUp` means
- *   touching five call sites and the comment that pins this file to
- *   `get_section_attendance_stats` (0031), for no user-visible gain. So the
- *   prose in this file still says "show-up"; the screens do not.
- *
- * ⚠ A caller showing this to a student must check `counted` first: a term with
- *   nothing counted yet gets 0 here, which reads as "you attended none of
- *   them" rather than "no classes yet". The Attendance summary card renders a
- *   dash in that case.
- */
 export function rateOf(items: readonly MyAttendanceEntry[]): number {
   const counted = items.filter((h) => counts(h.status)).length
   if (counted === 0) return 0
@@ -96,28 +57,12 @@ export function countedOf(items: readonly MyAttendanceEntry[]): number {
   return items.filter((h) => counts(h.status)).length
 }
 
-/**
- * The band a rate falls in, for colouring.
- *
- * 70% is the at-risk line the instructor's own risk overview uses (0034), so
- * the student sees the same threshold their instructor is looking at rather
- * than a friendlier one invented for the student side.
- */
 export function rateTone(rate: number): 'success' | 'warn' | 'danger' {
   if (rate >= 85) return 'success'
   if (rate >= 70) return 'warn'
   return 'danger'
 }
 
-/**
- * The same tally, split per subject (0030).
- *
- * Attendance is subject-scoped, so a perfect record in one class shouldn't be
- * averaged away by a rough one in another. Sessions predating subjects (0028)
- * group into their own bucket rather than being dropped — they happened. The
- * bucket is labelled "Earlier classes" rather than "Earlier" so it doesn't sit
- * in the list looking like a subject code next to "IT 32" and "Elective 1".
- */
 export function bySubject(
   items: readonly MyAttendanceEntry[],
 ): Array<{ key: string; label: string; counted: number; rate: number; absent: number }> {

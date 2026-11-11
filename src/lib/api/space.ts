@@ -9,10 +9,6 @@ import type {
   SpaceTimeout,
 } from '@/lib/types'
 
-// ============================================================================
-// Student Space — the gate (migration 0041)
-// ============================================================================
-
 interface AccessRow {
   state: string
   can_post: boolean
@@ -20,21 +16,11 @@ interface AccessRow {
   timeout_reason: string | null
 }
 
-/**
- * Who may be in Student Space, decided server-side.
- *
- * Degrades to LOCKED rather than throwing: this is fetched off the critical
- * path alongside achievements, and a student whose gate call fails should see
- * the app they had yesterday, not an error. Locked is also the safe direction —
- * it can only ever under-promise.
- */
 export async function getSpaceAccess(): Promise<SpaceAccess> {
   const rows = await rpc<AccessRow[]>('get_space_access')
   const r = rows?.[0]
   if (!r) return SPACE_ACCESS_UNKNOWN
   return {
-    // Anything the client does not recognise is treated as locked, so a server
-    // running ahead of this build cannot accidentally open a door.
     state: (['open', 'paused', 'locked'] as const).includes(r.state as SpaceState)
       ? (r.state as SpaceState)
       : 'locked',
@@ -44,8 +30,6 @@ export async function getSpaceAccess(): Promise<SpaceAccess> {
   }
 }
 
-// ── Instructor: /teach/space ────────────────────────────────────────────────
-
 interface AdminRow {
   flag_enabled: boolean
   section_id: string
@@ -54,12 +38,10 @@ interface AdminRow {
   student_count: number
 }
 
-/** The master switch's value on its own — survives a semester with no sections. */
 export async function getSpaceFlag(): Promise<boolean> {
   return !!(await rpc<boolean>('get_space_flag'))
 }
 
-/** Every section this semester with its beta membership and headcount. */
 export async function listSpaceSections(): Promise<SpaceAdminSection[]> {
   const rows = await rpc<AdminRow[]>('get_space_admin')
   return (rows ?? []).map((r) => ({
@@ -70,7 +52,6 @@ export async function listSpaceSections(): Promise<SpaceAdminSection[]> {
   }))
 }
 
-/** The kill switch. Off = every beta section sees the Paused screen. */
 export async function setSpaceFlag(enabled: boolean): Promise<boolean> {
   return !!(await rpc<boolean>('set_space_flag', { p_enabled: enabled }))
 }
@@ -83,8 +64,6 @@ export async function setSectionSpace(sectionId: string, enabled: boolean): Prom
   }))
 }
 
-// ── Instructor: timeouts ────────────────────────────────────────────────────
-
 interface TimeoutRow {
   student_id: string
   display_name: string
@@ -93,7 +72,6 @@ interface TimeoutRow {
   reason: string | null
 }
 
-/** Everyone currently muted. Lapsed rows are kept in the table but not listed. */
 export async function listSpaceTimeouts(): Promise<SpaceTimeout[]> {
   const rows = await rpc<TimeoutRow[]>('list_space_timeouts')
   return (rows ?? []).map((r) => ({
@@ -105,7 +83,6 @@ export async function listSpaceTimeouts(): Promise<SpaceTimeout[]> {
   }))
 }
 
-/** Mute a student. The RPC caps this at 90 days and writes an audit row. */
 export async function timeoutStudent(
   studentId: string,
   until: Date,
@@ -118,20 +95,10 @@ export async function timeoutStudent(
   })
 }
 
-/** Lift a mute early. Expires the rows rather than deleting them. */
 export async function clearSpaceTimeout(studentId: string): Promise<number> {
   return (await rpc<number>('clear_space_timeout', { p_student_id: studentId })) ?? 0
 }
 
-
-// ── Moderation (0044) ───────────────────────────────────────────────────────
-
-/**
- * Report something. Returns how many DISTINCT people have now reported it.
- *
- * The RPC dedupes per reporter, refuses a target the caller cannot see, and
- * auto-hides at 7 — so this is safe to call optimistically and safe to retry.
- */
 export async function reportContent(
   targetType: ReportTargetType,
   targetId: string,
@@ -148,7 +115,6 @@ export async function reportContent(
   )
 }
 
-/** Which of these have I already reported — so the UI can say so. */
 export async function myReportedIds(
   targetType: ReportTargetType,
   ids: string[],
@@ -179,7 +145,6 @@ interface QueueRow {
   is_deleted: boolean
 }
 
-/** The instructor's queue — one row per reported target, newest first. */
 export async function getReportQueue(): Promise<ReportQueueItem[]> {
   const rows = await rpc<QueueRow[]>('get_space_report_queue')
   return (rows ?? []).map((r) => ({
@@ -201,19 +166,10 @@ export async function getReportQueue(): Promise<ReportQueueItem[]> {
   }))
 }
 
-/** Drives the Requests badge, alongside pending redemptions and excuses. */
 export async function countOpenReports(): Promise<number> {
   return (await rpc<number>('count_open_reports')) ?? 0
 }
 
-/**
- * Close out every open report on a target.
- *
- * `restore` clears an auto-hide AND resets the report count, which is the
- * counterweight to hiding at 7 — a group can bury something they merely
- * disagree with, and this is the way back. Every reporter is told it was
- * reviewed, without the outcome.
- */
 export async function resolveReport(
   targetType: ReportTargetType,
   targetId: string,

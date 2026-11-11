@@ -2,12 +2,6 @@ import { cn } from '@/lib/cn'
 import { BADGE_MOTIFS } from './badgeMotifs'
 import type { AchievementCategory } from '@/lib/types'
 
-/**
- * Gradient + glow per category, mirroring `LevelUpBurst`'s
- * `bg-gradient-to-br from-gold-300 to-gold-500` badge treatment — every
- * category gets the same style of "illustrated" gradient frame, just a
- * different hue, so all 30 badges read as one consistent family.
- */
 const CATEGORY_STYLE: Record<AchievementCategory, { gradient: string; glow: string }> = {
   points: { gradient: 'from-gold-300 to-gold-500', glow: 'shadow-gold-500/40' },
   attendance: { gradient: 'from-emerald-300 to-emerald-600', glow: 'shadow-emerald-500/40' },
@@ -22,15 +16,12 @@ const SIZES = { sm: 'h-11 w-11', md: 'h-16 w-16', lg: 'h-24 w-24' } as const
 interface BadgeArtProps {
   code: string
   category: AchievementCategory
-  /** 'locked' = greyed silhouette; 'secret' = hidden "?"; 'unlocked' = full reveal. */
   state: 'locked' | 'unlocked' | 'secret'
-  /** Marks the badge as a title-grantor with a small sparkle accent. */
   isTitleGrantor?: boolean
   size?: keyof typeof SIZES
   className?: string
 }
 
-/** One illustrated achievement badge — the gradient frame + its motif. */
 export function BadgeArt({
   code,
   category,

@@ -19,17 +19,6 @@ import { sendTestPush } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { useStudentData } from './StudentData'
 
-/**
- * App settings, split out of Profile.
- *
- * Profile was doing two unrelated jobs: identity (photo, bio, badges, who
- * viewed you) and configuration (sound, vibration, push, PIN, sign out). At 673
- * lines the two halves competed, and the everyday question — "what do my badges
- * look like?" — was answered below seven controls a student touches once.
- *
- * Sign out lives at the bottom, alone, below everything else it could be
- * mistaken for.
- */
 export function Settings() {
   const { signOut, changePin } = useAuth()
   const { me } = useStudentData()
@@ -98,18 +87,10 @@ export function Settings() {
     const nextMuted = !vibeMuted
     setVibeMuted(nextMuted)
     setHapticsMuted(nextMuted)
-    if (!nextMuted) vibrateOnce() // confirm with a quick buzz when turning on
+    if (!nextMuted) vibrateOnce()
     toast(nextMuted ? 'Vibration off.' : 'Vibration on.', 'info')
   }
 
-  /**
-   * ⚠ Behind a ConfirmDialog since 2026-11-08, and it was an inconsistency
-   *   rather than a preference: the menu's Sign out has always confirmed
-   *   ("You'll need your username and PIN to get back in."), and this one —
-   *   sitting under seven other controls that all take effect instantly — did
-   *   not. Two paths to the same action, one of them a single tap, on a screen
-   *   students visit to toggle sounds.
-   */
   async function onSignOut() {
     setSigningOut(true)
     try {
@@ -131,8 +112,6 @@ export function Settings() {
   async function onChangePin(e: FormEvent) {
     e.preventDefault()
     setPinError(null)
-    // Checked here as well as in changePin() so the student sees the mismatch
-    // before we spend a round-trip re-authenticating them.
     if (newPin !== confirmPin) {
       setPinError("Those two PINs don't match.")
       return
@@ -203,8 +182,6 @@ export function Settings() {
             )}
           </div>
 
-          {/* Runs the real pipeline (outbox → edge function → your lock screen),
-              so it proves delivery rather than just the UI. */}
           {pushState === 'subscribed' && (
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
               <div className="min-w-0">
@@ -230,10 +207,6 @@ export function Settings() {
       <div>
         <SectionLabel>Account</SectionLabel>
         <div className="space-y-3">
-          {/* Change PIN (Phase F). Until now the only way to change a PIN was the
-              forgot-PIN flow, which needs a fresh token from the instructor — so
-              a student who simply wanted a better PIN, or who had shared theirs
-              with a classmate, had to ask for one. */}
           <button type="button" onClick={openPin} className="block w-full text-left">
             <Card interactive pad="roomy">
               <div className="flex items-center justify-between gap-3">
@@ -268,9 +241,6 @@ export function Settings() {
         </div>
       </div>
 
-      {/* Alone at the bottom, below everything it could be mistaken for.
-          `text-danger`, matching the menu's row: a muted Sign out under a
-          column of ink-coloured controls reads as disabled, not as careful. */}
       <Button
         variant="ghost"
         className="w-full text-danger"
@@ -338,14 +308,6 @@ export function Settings() {
   )
 }
 
-/**
- * Plain-language explanation of the current push permission state.
- *
- * The `unsupported` line names the iPhone fix specifically, because that is the
- * case a student actually hits: iOS only allows web push once the app has been
- * added to the Home Screen, and "not supported" without that sentence reads as
- * "this will never work".
- */
 function pushHint(state: PushState): string {
   switch (state) {
     case 'subscribed':

@@ -12,9 +12,7 @@ import { snap } from '@/lib/motion'
 import type { PointCategory } from '@/lib/types'
 
 const POINTS = [1, 2, 3, 4, 5]
-/** Largest magnitude a single award may carry — matches the point_events CHECK (0011). */
 const MAX_POINTS = 100
-/** Above this, a single-student deduction still asks for confirmation. */
 const BIG_PENALTY = 5
 
 type Mode = 'reward' | 'penalty'
@@ -25,29 +23,14 @@ const CATEGORIES: Array<{ value: PointCategory; label: string }> = [
 ]
 
 interface Props {
-  /** Students currently ticked in the roster. The bar hides when empty. */
   selectedIds: string[]
   onClear: () => void
-  /** Called after a successful award so the roster can refresh its totals. */
   onAwarded: (awardedIds: string[]) => void
 }
 
-/**
- * The award controls, docked above the roster.
- *
- * Awarding used to be its own tab; it now lives where the students are. The bulk
- * flow is the point of this component — tick several students, choose the amount
- * once, award them all — so sign, amount and category stay on the quick path and
- * only the custom amount and note hide behind "More".
- *
- * Positioned to sit ABOVE the mobile tab bar (Shell renders that fixed at
- * bottom-0), so navigation is never blocked while a selection is active.
- */
 export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
   const { toast } = useToast()
   const [mode, setMode] = useState<Mode>('reward')
-  // Magnitude (1+); the sign comes from `mode` at award time. null = invalid,
-  // which disables the action rather than silently guessing a number.
   const [points, setPoints] = useState<number | null>(1)
   const [custom, setCustom] = useState('')
   const [customError, setCustomError] = useState<string>()
@@ -62,7 +45,6 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
   const count = selectedIds.length
   const ready = points !== null && count > 0
 
-  /** Deductions are destructive: confirm any bulk one, or a large single one. */
   const needsConfirm = penalty && ready && (count > 1 || (points ?? 0) > BIG_PENALTY)
 
   const actionLabel = ready
@@ -98,14 +80,11 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
   function onCustomChange(raw: string) {
     setCustom(raw)
     if (raw.trim() === '') {
-      // Empty simply falls back to the chips; not an error worth shouting about.
       setCustomError(undefined)
       setPoints(null)
       return
     }
     const n = Number(raw)
-    // Reject rather than clamp — silently turning 500 into 100 is how a
-    // mis-typed award becomes a real one nobody notices.
     if (!Number.isInteger(n) || n < 1 || n > MAX_POINTS) {
       setCustomError(`Enter a whole number from 1 to ${MAX_POINTS}.`)
       setPoints(null)
@@ -128,15 +107,12 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
             transition={snap}
             className={cn(
               'fixed inset-x-0 z-30 mx-auto w-full max-w-2xl px-4',
-              // Clears the fixed mobile tab bar; on desktop the nav is a sidebar.
               'bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 md:px-8',
             )}
           >
             <div
               className={cn(
                 'theme-transition rounded-2xl border bg-card p-3 shadow-lg shadow-black/20',
-                // The whole bar turns red while deducting — the sign toggle alone
-                // was too quiet for an action that takes points away.
                 penalty ? 'border-danger-solid ring-1 ring-danger-solid/40' : 'border-line',
               )}
             >
@@ -164,7 +140,6 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
               </div>
 
               <div className="mt-2 flex items-center gap-2">
-                {/* Sign toggle — penalty forces category 'penalty' at award time. */}
                 <div className="flex shrink-0 overflow-hidden rounded-lg border border-line">
                   {(['reward', 'penalty'] as const).map((m) => (
                     <button
@@ -211,8 +186,6 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
                 </div>
               </div>
 
-              {/* Category stays on the quick path (it changes per award); hidden
-                  while deducting, where the category is always 'penalty'. */}
               {!penalty && (
                 <div className="mt-2 flex gap-1.5">
                   {CATEGORIES.map((c) => (

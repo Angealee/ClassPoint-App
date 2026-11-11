@@ -2,20 +2,6 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { TONE, type ToneName } from '@/lib/tone'
 
-/**
- * A single figure with its label — rank, streak, attended, show-up rate.
- *
- * ── SCOPE NOTE ─────────────────────────────────────────────────────────────
- * Phase 6 rebuilds the home screen around one composed hero, so this is
- * deliberately built to COMPOSE rather than to be a finished home-screen
- * widget: it renders a figure and a label and nothing else — no card, no
- * border, no fixed width. The hero can lay several out however it wants, and a
- * card-shaped variant belongs to whatever that design turns out to need.
- *
- * `tabular-nums` is not cosmetic here: these numbers update live (a rank
- * shifts, a streak ticks over), and proportional digits make the whole row
- * jitter sideways when a 1 becomes a 7.
- */
 export function Stat({
   value,
   label,
@@ -55,14 +41,6 @@ export function Stat({
           {value}
         </span>
       </span>
-      {/* ⚠ `max-w-full` IS WHAT MAKES `truncate` WORK HERE, and without it the
-          truncation silently did nothing. `items-center` sizes a flex child to
-          its CONTENT, not to the parent, so the span simply grew: measured at
-          375px with a long label it rendered 422px wide and ran 153px off the
-          left edge of the screen. Nothing looked broken only because `body`
-          carries `overflow-x: clip`, which cropped it without a scrollbar.
-          `min-w-0` on the parent is not enough — that lets a child shrink, and
-          this child was never being asked to. */}
       <span className="max-w-full truncate text-2xs font-medium uppercase tracking-wide text-muted">
         {label}
       </span>

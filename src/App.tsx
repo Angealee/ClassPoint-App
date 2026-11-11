@@ -12,11 +12,6 @@ import { AuthTransitionProvider } from '@/components/auth/AuthTransition'
 
 export default function App() {
   return (
-    // reducedMotion="user" honours the OS setting across EVERY framer-motion
-    // animation in the app. The CSS reset in styles/index.css only neutralises
-    // CSS transitions — JS-driven transforms bypass it entirely, and only 5 of
-    // the 26 files using motion called useReducedMotion themselves. This is the
-    // one-line fix for the other 21 (sheets, toasts, bursts, live roster rows).
     <MotionConfig reducedMotion="user">
       <ThemeProvider>
         <ToastProvider>

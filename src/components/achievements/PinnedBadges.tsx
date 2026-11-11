@@ -6,7 +6,6 @@ import { PlusIcon, XIcon } from '@/components/ui/icons'
 import type { AchievementState } from '@/lib/types'
 
 interface Props {
-  /** Full catalog merged with unlock state — used to render/pick pinned codes. */
   achievements: AchievementState[]
   pinnedCodes: string[]
   /** Shows add/remove controls + the picker sheet. */
@@ -15,8 +14,6 @@ interface Props {
   busy?: boolean
 }
 
-/** Up to 3 favorite unlocked badges, featured first — mirrors ProfileBanner's
- * add/remove pattern, but picks from already-unlocked achievements. */
 export function PinnedBadges({ achievements, pinnedCodes, editable, onChange, busy }: Props) {
   const [picking, setPicking] = useState(false)
   const byCode = new Map(achievements.map((a) => [a.code, a]))

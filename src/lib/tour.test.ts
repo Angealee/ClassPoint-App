@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { TOUR_OPENS, beginTour, endTour, opensKey, sessionKey, type TourStore } from './tour'
 
-/**
- * A Map-backed store. `session` is recreated per simulated app open, which is
- * exactly what closing and reopening the installed PWA does to sessionStorage;
- * `local` survives across them.
- */
 function store(): TourStore & { map: Map<string, string> } {
   const map = new Map<string, string>()
   return {
@@ -37,8 +32,6 @@ describe('which opens get the tour', () => {
   })
 
   it('cannot be skipped on open 1, and can on opens 2 and 3', () => {
-    // The instructor's rule, and the easy one to get backwards: a first-time
-    // student is the one person who must see it.
     const local = store()
     const skippable = [1, 2, 3].map((n) => ({
       n,
@@ -52,8 +45,6 @@ describe('which opens get the tour', () => {
   })
 
   it('does not stop early because the student finished it', () => {
-    // Replay from the start on each of the three — finishing open 1 must not
-    // end open 2.
     const local = store()
     const first = store()
     expect(beginTour(local, first, 'a', false).show).toBe(true)
@@ -64,8 +55,6 @@ describe('which opens get the tour', () => {
 
 describe('an open is a session, not a mount', () => {
   it('counts once however many times it is called in one session', () => {
-    // StrictMode runs a lazy initialiser twice, and a sign-out/sign-in remounts
-    // the layout. Counting mounts would spend all three plays in one sitting.
     const local = store()
     const session = store()
     for (let i = 0; i < 6; i += 1) beginTour(local, session, 'a', false)
@@ -94,7 +83,6 @@ describe('students do not share plays', () => {
     const local = store()
     expect(beginTour(local, store(), 'a', false).opens).toBe(1)
     expect(beginTour(local, store(), 'a', false).opens).toBe(2)
-    // A different student on the same device is on their FIRST open.
     const b = beginTour(local, store(), 'b', false)
     expect(b.opens).toBe(1)
     expect(b.skippable).toBe(false)
@@ -112,7 +100,6 @@ describe('existing students', () => {
   })
 
   it('ignores the legacy flag once a count exists', () => {
-    // A new student mid-tour must not be cut short because the old key is set.
     const local = store()
     beginTour(local, store(), 'a', false)
     expect(beginTour(local, store(), 'a', true).show).toBe(true)
@@ -121,8 +108,6 @@ describe('existing students', () => {
 
 describe('fail safe is "do not show"', () => {
   it('shows nothing when storage throws', () => {
-    // The opposite default shows it on EVERY open forever for anyone whose
-    // browser blocks storage — a tour you can never dismiss for good.
     expect(beginTour(throwing, throwing, 'a', false).show).toBe(false)
   })
 

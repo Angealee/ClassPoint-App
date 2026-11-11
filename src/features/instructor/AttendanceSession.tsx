@@ -34,7 +34,6 @@ import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import type { AttendanceRosterRow, AttendanceStatus, ClassSession } from '@/lib/types'
 
-/** Show the search/filter bar only once the roster is long enough to warrant it. */
 const SEARCH_THRESHOLD = 8
 
 /** Elapsed/countdown as h:mm:ss (e.g. "0:00:38", "1:23:45"). */
@@ -55,7 +54,6 @@ function scanTime(iso: string): string {
   })
 }
 
-/** Bare text colour per status — sourced from the shared status palette. */
 const STATUS_TEXT: Record<AttendanceStatus, string> = {
   present: STATUS_META.present.text,
   late: STATUS_META.late.text,
@@ -64,7 +62,6 @@ const STATUS_TEXT: Record<AttendanceStatus, string> = {
   irregular: STATUS_META.irregular.text,
 }
 
-/** The live class session: rotating QR + real-time check-in roster. */
 export function AttendanceSession({
   session,
   sectionName,
@@ -79,7 +76,6 @@ export function AttendanceSession({
   const [rotateIn, setRotateIn] = useState(QR_STEP_SECONDS)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [roster, setRoster] = useState<AttendanceRosterRow[]>([])
-  // Students the instructor checked in by hand this session (for the "manual" tag).
   const [manualIds, setManualIds] = useState<Set<string>>(new Set())
   const [pickerFor, setPickerFor] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -90,7 +86,6 @@ export function AttendanceSession({
   const [ending, setEnding] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkConfirm, setBulkConfirm] = useState<AttendanceStatus | null>(null)
-  // Play a soft chime + flash a row when a student scans in (instructor opt-in).
   const [soundOn, setSoundOn] = useState(() => {
     try {
       return localStorage.getItem('cp_attendance_chime') === '1'
@@ -104,18 +99,12 @@ export function AttendanceSession({
   }, [soundOn])
   // Rows to briefly highlight because a scan just landed.
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set())
-  // Stable roster display order (studentId[]) so a manual mark never re-sorts the
-  // list and yanks the instructor's scroll — only genuine scans float to the top.
   const [displayOrder, setDisplayOrder] = useState<string[]>([])
   const prevScannedRef = useRef<Set<string>>(new Set())
   const firstOrderRef = useRef(true)
 
   const startedMs = new Date(session.startedAt).getTime()
 
-  // Rotating QR: recompute the code whenever the time-window ticks over. The
-  // clock keeps ticking (for the elapsed timer), but once the Absent-after time
-  // passes we stop issuing codes and clear the QR — check-in is over, since any
-  // scan then would be Absent anyway.
   useEffect(() => {
     const secret = session.qrSecret
     if (!secret) return
@@ -167,9 +156,6 @@ export function AttendanceSession({
     void refresh()
   }, [refresh])
 
-  // Apply a single realtime change in place — no full refetch per check-in, so a
-  // 40-student rush stays smooth. DELETEs (a reset) only carry the primary key by
-  // default, so those fall back to a reconcile.
   const applyChange = useCallback(
     (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
       if (payload.eventType === 'DELETE') {
@@ -189,7 +175,7 @@ export function AttendanceSession({
       }
       setRoster((rs) => {
         if (!rs.some((r) => r.studentId === rec.student_id)) {
-          void refresh() // a student we don't have yet — reconcile the whole roster
+          void refresh()
           return rs
         }
         return rs.map((r) =>
@@ -208,15 +194,7 @@ export function AttendanceSession({
     [refresh],
   )
 
-  // Live roster — react as students check in. On (re)subscribe we reconcile with a
-  // full fetch, and a slow poll backstops a silently-dropped socket (phone sleep,
-  // network blip) so the count never stalls.
   useEffect(() => {
-    // uniqueChannel, NOT supabase.channel: a repeated topic returns the EXISTING
-    // channel, and `.on()` after subscribe() throws. This screen remounts often
-    // (live → review → back, StrictMode double-mount), and the failure mode is
-    // the worst one available — a live check-in roster that silently stops
-    // updating, masked by the 20s poll below.
     const channel = uniqueChannel(`attendance-${session.id}`)
       .on(
         'postgres_changes',
@@ -242,13 +220,7 @@ export function AttendanceSession({
   const present = roster.filter((r) => r.status === 'present').length
   const late = roster.filter((r) => r.status === 'late').length
 
-  // Maintain a stable display order + react to freshly-landed scans. A genuine QR
-  // scan floats to the top (and optionally flashes/chimes); an instructor's manual
-  // mark keeps its slot, so tapping a student far down never resets the scroll.
   useEffect(() => {
-    // Wait for the first real roster so a session *resume* seeds silently (no
-    // flash/chime for everyone who already scanned) rather than treating the
-    // empty initial state as "first".
     if (roster.length === 0) return
     const prevScanned = prevScannedRef.current
     const first = firstOrderRef.current
@@ -257,8 +229,6 @@ export function AttendanceSession({
       .filter((r) => r.scannedAt && !prevScanned.has(r.studentId) && !manualIds.has(r.studentId))
       .sort((a, b) => (b.scannedAt ?? '').localeCompare(a.scannedAt ?? ''))
       .map((r) => r.studentId)
-    // On the first load, seed the whole scanned group recent-first; after that,
-    // only the genuinely-new scans float up.
     const floated = first
       ? roster
           .filter((r) => r.scannedAt && !manualIds.has(r.studentId))
@@ -280,7 +250,6 @@ export function AttendanceSession({
       return order
     })
 
-    // Flash + chime only for scans that arrive after the first load.
     if (!first && newScans.length) {
       if (soundOnRef.current) playSound('point')
       setFlashIds((prev) => new Set([...prev, ...newScans]))
@@ -305,8 +274,6 @@ export function AttendanceSession({
         seen.add(id)
       }
     }
-    // Any roster rows the order effect hasn't placed yet (first seed, or a
-    // just-added student) fall in at the end so nobody is ever missing.
     for (const r of roster) if (!seen.has(r.studentId)) out.push(r)
     return out
   }, [displayOrder, byId, roster])
@@ -316,13 +283,9 @@ export function AttendanceSession({
     (r) => (!waitingOnly || !r.scannedAt) && (!q || r.fullName.toLowerCase().includes(q)),
   )
 
-  // What a scan (or a smart-default manual mark) earns right now, and the count
-  // down to the next status boundary.
   const elapsedMs = Math.max(0, nowMs - startedMs)
   const elapsedMin = elapsedMs / 60000
-  // Past the Absent-after mark, the QR stops and check-in is closed.
   const closed = elapsedMin >= session.absentAfterMin
-  // Leave fullscreen automatically once check-in closes (no QR left to present).
   useEffect(() => {
     if (closed) setPresenting(false)
   }, [closed])
@@ -384,8 +347,6 @@ export function AttendanceSession({
     }
   }
 
-  // Mark everyone still waiting at once (roll call, or auto-absent before ending).
-  // They're recorded as manual marks, so the roster order stays put.
   async function markAllWaiting(status: AttendanceStatus) {
     setBulkOpen(false)
     const ids = roster.filter((r) => !r.scannedAt).map((r) => r.studentId)
@@ -475,7 +436,6 @@ export function AttendanceSession({
         </div>
       </div>
 
-      {/* Rotating QR — or a closed state once the check-in window ends */}
       <Card elevation="raised" className="relative flex flex-col items-center gap-3 p-6">
         {closed ? (
           <div className="flex flex-col items-center gap-2 py-4 text-center">
@@ -547,7 +507,6 @@ export function AttendanceSession({
         ))}
       </div>
 
-      {/* Bulk action — mark everyone still waiting in one tap */}
       {waiting.length > 0 &&
         (bulkOpen ? (
           <div className="flex items-center gap-2 rounded-xl border border-line bg-card p-2">
@@ -581,7 +540,6 @@ export function AttendanceSession({
           </button>
         ))}
 
-      {/* Search + filter (only when the roster is long enough to need it) */}
       {roster.length > SEARCH_THRESHOLD && (
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
@@ -632,12 +590,6 @@ export function AttendanceSession({
             const isManual = manualIds.has(r.studentId)
             const flash = flashIds.has(r.studentId)
             return (
-              // No `layout` prop: it made framer-motion measure and FLIP EVERY
-              // row on EVERY render, and the elapsed-time clock re-renders this
-              // screen once a second — so a 40-student roster paid 40 layout
-              // measurements per second, on a phone, while it was also decoding
-              // camera frames or driving a projected QR. The list is sorted by
-              // name and never reorders, so the animation bought nothing.
               <div
                 key={r.studentId}
                 className={cn('transition-colors duration-700', flash && 'bg-success-solid/10')}
@@ -685,10 +637,6 @@ export function AttendanceSession({
                       transition={{ duration: 0.16 }}
                       className="overflow-hidden"
                     >
-                      {/* A fixed 3-up grid, not flex-wrap: five statuses (+
-                          Reset) land as tidy rows of three instead of a ragged
-                          4-then-1. The rule above separates it from the student
-                          row so the buttons don't crowd the name. */}
                       <StatusPicker
                         className="mx-3.5 mb-3 border-t border-line pt-3"
                         value={r.status}
@@ -743,7 +691,6 @@ export function AttendanceSession({
         </AnimatePresence>
       </StickyBar>
 
-      {/* Fullscreen "present" QR — scan from a projector / shared screen */}
       <AnimatePresence>
         {presenting && (
           <motion.div
@@ -783,7 +730,6 @@ export function AttendanceSession({
         )}
       </AnimatePresence>
 
-      {/* Bulk-mark confirm — this touches the whole waiting list at once. */}
       <ConfirmDialog
         open={!!bulkConfirm}
         title={`Mark ${waiting.length} waiting as ${bulkConfirm ? STATUS_META[bulkConfirm].label : ''}?`}

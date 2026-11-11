@@ -15,11 +15,6 @@ const FAIL_REASON: Partial<Record<OfflineScanOutcome, string>> = {
   invalid: "The code didn't check out.",
 }
 
-/**
- * The sync-status stack above attendance history: queued proofs waiting to
- * send, and the outcomes of ones that have. Resolved cards persist until the
- * student dismisses them — so the outcome is always seen on next open.
- */
 export function OfflineScanCards({
   entries,
   onChanged,

@@ -19,25 +19,6 @@ import type {
 } from '@/lib/types'
 import type { CSSProperties } from 'react'
 
-/**
- * The room panel — who is here, what is pinned, what has been shared.
- *
- * ONE component, TWO mounts: the desktop rail beside the thread and the sheet
- * behind the ⋯ button on a phone. That is deliberate — a parallel mobile copy
- * is how the two would drift, and this codebase has four separate cases of
- * exactly that (the points row reached four copies, the show-up rate five).
- *
- * ── EVERYTHING HERE IS DERIVED, NOT FETCHED ────────────────────────────────
- * Members come from the roster `ChatRoom` already loads for the XP rings and
- * mention resolution; shared links, code, search results and mentions are all
- * read out of the messages already on screen. Only pins have their own query,
- * because a pinned message is usually far above the loaded page.
- *
- * The consequence is worth stating plainly on screen rather than hiding: search
- * and Shared cover the loaded history, not the whole room. "Load older" widens
- * them, and the panel says so.
- */
-
 type Tab = 'people' | 'pinned' | 'shared' | 'mentions'
 
 const TABS: { value: Tab; label: string }[] = [
@@ -56,7 +37,6 @@ const LEVELS: { value: RoomNotifyLevel; label: string }[] = [
   { value: 'none', label: 'Off' },
 ]
 
-/** Below this, "Top of the room" would just be the room listed twice. */
 const TOP_MIN_MEMBERS = 8
 
 function excerpt(body: string | null, max = 90): string {
@@ -180,7 +160,6 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="px-2 py-6 text-center text-xs text-muted">{children}</p>
 }
 
-/** A circular icon over its own label — the reference's quick-action shape. */
 function RoundAction({
   label,
   icon,
@@ -232,34 +211,21 @@ export function RoomRail({
 }: {
   room: SpaceRoom | null
   audience: RoomAudience | null
-  /** Everyone with Space access — filtered to this room's members below. */
   people: SpacePerson[]
   /** The messages currently loaded in the thread. */
   messages: SpaceMessage[]
   pins: RoomPin[]
   myStudentId: string | null
   unreadCount: number
-  /**
-   * `rail` sits beside the thread, where the chat header already names the room
-   * — so it opens straight into the search box. `screen` is a destination of
-   * its own on a phone and brings the identity block the reference expects.
-   */
   variant?: 'rail' | 'screen'
-  /**
-   * Set when the roster fetch failed. It is rendered instead of the list —
-   * "Nobody else is in here yet" is a LIE when the truth is "that request did
-   * not come back", and it is told to the one person who could fix it.
-   */
   peopleError?: string | null
   onRetryPeople?: () => void
-  /** Undefined until it has loaded; the control is hidden until then. */
   level?: RoomNotifyLevel
   onSetLevel?: (level: RoomNotifyLevel) => void
   onJump: (messageId: string) => void
   onJumpToUnread: () => void
   onOpenPerson: (m: SpaceMessage) => void
   onUnpin?: (messageId: string) => void
-  /** Screen variant only — on the rail, Mute lives in the chat header. */
   onToggleMute?: () => void
 }) {
   const [tab, setTab] = useState<Tab>('people')
@@ -281,13 +247,6 @@ export function RoomRail({
     return people
   }, [audience, people])
 
-  /**
-   * Rank first (nulls last), then points — the leaderboard's own order.
-   *
-   * Shown only in a room big enough for the full list to be a scroll. Below
-   * that the top five ARE most of the room, and printing them twice in a row is
-   * the kind of redundancy that makes a panel feel like filler.
-   */
   const top = useMemo(
     () =>
       members.length <= TOP_MIN_MEMBERS
@@ -302,10 +261,6 @@ export function RoomRail({
     [members],
   )
 
-  /**
-   * Links and code blocks, newest first. Read straight out of the rendered
-   * bodies, so what is listed here is exactly what is drawn in the thread.
-   */
   const shared = useMemo(() => {
     const out: { id: string; kind: 'link' | 'code'; label: string; who: string; when: string }[] = []
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -377,9 +332,6 @@ export function RoomRail({
   return (
     <div className="space-y-3">
       {screen && (
-        // The identity block — avatar, name, and the two things you reach for
-        // most as round buttons. On the rail this would restate the chat header
-        // one line above it.
         <div className="flex flex-col items-center gap-2 pb-1 pt-3 text-center">
           <Avatar
             name={room?.name ?? 'Room'}
@@ -389,9 +341,6 @@ export function RoomRail({
           />
           <div className="min-w-0">
             <h3 className="truncate font-display text-lg font-bold">{room?.name ?? 'Room'}</h3>
-            {/* The SERVER's count, not the length of the list below it. They
-                disagree exactly when the roster fetch failed, and in that case
-                the number that is true is the one the room actually has. */}
             <p className="truncate text-xs text-muted">
               {room?.kind === 'dm'
                 ? 'Private · your instructor can review reported threads'
@@ -433,11 +382,6 @@ export function RoomRail({
         </button>
       )}
 
-      {/* A room SETTING, so it sits with search above the tabs rather than
-          inside one of them — and it is the same control in both variants, so
-          the rail and the phone panel cannot offer different options. The
-          round Mute button above is a shortcut into the same state, never a
-          second source of it. */}
       {level && onSetLevel && (
         <div>
           <p className="px-1 pb-1 text-2xs font-semibold uppercase tracking-wide text-muted">
@@ -464,7 +408,6 @@ export function RoomRail({
 
       {results ? (
         <div>
-          {/* Said out loud rather than hidden: this searches what is loaded. */}
           <p className="px-2 pb-1 text-2xs text-muted">
             {results.length === 0
               ? 'Nothing in the loaded messages.'

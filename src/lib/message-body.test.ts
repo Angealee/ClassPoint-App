@@ -15,8 +15,6 @@ describe('looksLikeArt', () => {
   })
 
   it('does NOT fire on an emoji wall', () => {
-    // The failure that would look like a bug nobody reports: a wall of emoji
-    // rendered in a scrollable monospace block.
     const wall = ('😂😅😊😎🥳🤩😍🥰😘🙂'.repeat(12) + '\n').repeat(4)
     expect(looksLikeArt(wall)).toBe(false)
   })
@@ -57,8 +55,6 @@ describe('parseMessageBody', () => {
   })
 
   it('treats an UNCLOSED fence as literal text', () => {
-    // Otherwise typing ``` mid-sentence silently swallows the rest of what you
-    // wrote, and you cannot see that it happened.
     const got = parseMessageBody('what does ``` even do')
     expect(got).toEqual([{ kind: 'text', content: 'what does ``` even do' }])
   })
@@ -98,8 +94,6 @@ describe('parseInline', () => {
   })
 
   it('NEVER links a javascript: or data: URL', () => {
-    // The matched text becomes an href, so a loose scheme would turn any
-    // message into a script the reader taps. This is the load-bearing one.
     for (const evil of ['javascript:alert(1)', 'data:text/html,<script>', 'file:///etc/passwd']) {
       expect(parseInline(`click ${evil}`).every((t) => t.kind === 'plain')).toBe(true)
     }
@@ -111,8 +105,6 @@ describe('parseInline', () => {
   })
 
   it('prefers the LONGER name at the same spot', () => {
-    // "@Maria Santos" must not render as a mention of "Maria" followed by the
-    // stray word "Santos" — the same trap mentions.ts fixed by consuming.
     const got = parseInline('hi @Maria Santos', NAMES)
     expect(got.find((t) => t.kind === 'mention')?.content).toBe('@Maria Santos')
   })

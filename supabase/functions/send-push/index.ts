@@ -1,27 +1,3 @@
-// ClassPoint · Edge Function · send-push
-// Delivers Web Push for rows in the `notifications` outbox (migration 0017).
-//
-// Invoked by Postgres (pg_net) with `{ "notification_ids": ["uuid", ...] }`.
-// This function is the ONLY component that transitions `push_status` — pg_net
-// gives the database no delivery feedback, so SQL never marks rows sent. The
-// pg_cron sweep re-dispatches anything still pending/failed (max 5 attempts).
-//
-// Reliability specifics:
-//   - `urgency: 'high'` + TTL on every push — the fix for Android deliveries
-//     that used to arrive minutes late (default urgency lets the OS batch
-//     pushes to save battery).
-//   - Rows already read in-app are marked 'skipped' (no late lock-screen buzz
-//     for something the student has seen).
-//   - 404/410 endpoints are pruned immediately; endpoints that keep failing
-//     for other reasons are pruned after 10 consecutive failures.
-//
-// ── One-time setup ──────────────────────────────────────────────────────────
-//  1. VAPID keys (already set): VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY /
-//     VAPID_SUBJECT in this function's secrets. The public key also lives in
-//     the web app's .env as VITE_VAPID_PUBLIC_KEY.
-//  2. Run migration 0017 FIRST, then deploy:
-//       supabase functions deploy send-push
-//     (Pushes queued between the two steps are swept within ~5 minutes.)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3.6.7'
@@ -45,8 +21,6 @@ interface SubscriptionRow {
   fail_count: number
 }
 
-// Same tags the in-app `showLocalNotification` uses, so a live-page
-// notification and the server push collapse instead of stacking.
 const TAG_BY_TYPE: Record<string, string> = {
   point: 'cp-points',
   deduct: 'cp-points',
@@ -75,11 +49,6 @@ function json(body: unknown, status = 200) {
   })
 }
 
-/**
- * The `role` claim of a bearer the API gateway has ALREADY signature-verified
- * (this function keeps verify_jwt ON). Reading the payload here is a role check,
- * not a trust decision — an unsigned or wrongly-signed token never gets this far.
- */
 function bearerRole(bearer: string): string | null {
   try {
     const segment = bearer.split('.')[1]
@@ -93,19 +62,6 @@ function bearerRole(bearer: string): string | null {
   }
 }
 
-/**
- * Only Postgres may fan out pushes.
- *
- * Before this check the gateway's verify_jwt was the ONLY gate — and ANY
- * signed-in student's token satisfies it, so a student could POST other
- * students' notification ids to force-dispatch them or burn their retry budget.
- * The real caller is `cp_push_dispatch` (0017) over pg_net, which sends the
- * service-role key read from Vault.
- *
- * Two accepted forms: an exact match on this function's own service key, or any
- * service-role JWT. The second is what keeps a rotated Vault secret from
- * silently killing every push if it wasn't copied into this function's env.
- */
 function isServiceCaller(req: Request): boolean {
   const bearer = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
   if (!bearer) return false
@@ -116,8 +72,6 @@ function isServiceCaller(req: Request): boolean {
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed.' }, 405)
   if (!isServiceCaller(req)) {
-    // Loud on purpose: if a Vault/key mismatch ever lands here, the function
-    // logs are where you'd diagnose "pushes stopped arriving".
     console.error('[send-push] rejected a caller without the service role.')
     return json({ ok: false, error: 'Forbidden.' }, 403)
   }
@@ -176,7 +130,6 @@ Deno.serve(async (req) => {
   let sent = 0
   let failed = 0
   let skipped = 0
-  // Per-endpoint outcome across all rows this call: prune > ok > fail.
   const endpointOutcome = new Map<string, 'ok' | 'fail' | 'prune'>()
 
   for (const note of notifications) {
@@ -192,7 +145,6 @@ Deno.serve(async (req) => {
 
     const subs = subsByStudent.get(note.student_id) ?? []
     if (subs.length === 0) {
-      // No device ever enabled push — terminal; the in-app bell still has it.
       skipped++
       await admin
         .from('notifications')
@@ -224,7 +176,6 @@ Deno.serve(async (req) => {
           // The browser dropped this subscription — prune it.
           endpointOutcome.set(sub.endpoint, 'prune')
         } else {
-          // 401/403 usually means a VAPID key mismatch — keep it diagnosable.
           console.error(
             `[send-push] delivery failed (status ${status ?? '?'}):`,
             (err as Error).message,

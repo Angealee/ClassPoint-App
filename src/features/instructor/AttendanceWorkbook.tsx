@@ -13,14 +13,6 @@ const TERMS: { key: TermKey; label: string }[] = [
   { key: 'finals', label: 'Finals' },
 ]
 
-/**
- * Per-term attendance export, one sheet per section (Phase G).
- *
- * Attendance only. The instructor's rule is that points are never converted
- * into a grade — they reach one solely through individually-approved
- * redemptions — so this workbook deliberately carries no points column and
- * computes no score. Raw counts plus the show-up rate the app already shows.
- */
 export function AttendanceWorkbook() {
   const { sections, semester } = useInstructor()
   const { toast } = useToast()

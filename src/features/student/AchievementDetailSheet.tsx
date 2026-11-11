@@ -21,7 +21,6 @@ const CATEGORY_LABEL: Record<AchievementCategory, string> = {
 
 type Tier = { label: string; cls: string }
 
-/** Rarity tiers (the user's pick): <10% Legendary, <30% Rare, else Common. */
 function tierFor(pct: number): Tier {
   if (pct < 10) return { label: '✦ Legendary', cls: 'bg-gold-400/15 text-warn' }
   if (pct < 30) return { label: 'Rare', cls: TONE.accent.chip }
@@ -48,7 +47,6 @@ function progressPct(a: AchievementState, progress: AchievementProgress | null):
   return Math.max(0, Math.min(100, (value / a.threshold) * 100))
 }
 
-/** The full story of one badge: art, rarity, unlock date, flavor, progress. */
 export function AchievementDetailSheet({
   achievement: a,
   progress,
@@ -63,7 +61,6 @@ export function AchievementDetailSheet({
   onClose: () => void
 }) {
   const unlocked = !!a?.unlockedAt
-  // Secret + locked = keep it a mystery (no name, description, or flavor).
   const hidden = !!a?.secret && !unlocked
 
   const r = a ? rarity?.get(a.code) : undefined
@@ -94,8 +91,6 @@ export function AchievementDetailSheet({
             </p>
           </div>
 
-          {/* Rarity — tier + % + count, all three (the user's pick). Hidden for
-              secret-locked so it can't leak how close the class is. */}
           {!hidden && tier && pctHolders != null && r && (
             <div className="flex flex-wrap items-center justify-center gap-2">
               <span className={cn('rounded-full px-2.5 py-1 text-xs font-bold', tier.cls)}>

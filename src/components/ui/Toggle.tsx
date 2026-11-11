@@ -1,17 +1,5 @@
 import { cn } from '@/lib/cn'
 
-/**
- * The pill-shaped on/off for a setting that takes a moment to apply.
- *
- * Not a native checkbox: it needs a `busy` state, because every switch it backs
- * is a server call (Student Space's kill switch and beta roster, the student
- * grades switch) and a switch that flips instantly and then snaps back on a
- * failure is a worse lie than one that waits.
- *
- * It lived inside InstructorSpace until a second screen needed it — the
- * fourth-copy rule applied at copy two. The `cp-tap-y` makes the hit region 44px
- * tall without changing the 28px the pill is drawn at (see index.css).
- */
 export function Toggle({
   on,
   busy,

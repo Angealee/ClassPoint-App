@@ -4,11 +4,6 @@ import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import type { PointEvent } from '@/lib/types'
 
-/**
- * "While you were away" recap — shown once on app open when the student received
- * points or penalties while the app was closed. Summarises the net change and
- * lists each missed award/penalty.
- */
 export function AwayRecap({ events, onClose }: { events: PointEvent[]; onClose: () => void }) {
   const open = events.length > 0
   const net = events.reduce((sum, e) => sum + e.points, 0)

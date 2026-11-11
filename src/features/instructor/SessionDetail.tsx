@@ -48,10 +48,6 @@ const sessionDate = (iso: string) =>
 const clockTime = (iso: string) =>
   new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 
-/**
- * One past session, in full: every student grouped by status, editable after
- * the fact (penalties reconcile automatically), exportable, deletable.
- */
 export function SessionDetail() {
   const { sessionId = '' } = useParams()
   const navigate = useNavigate()
@@ -124,11 +120,6 @@ export function SessionDetail() {
   )
   const unmarked = useMemo(() => rows.filter((r) => !r.status), [rows])
 
-  /**
-   * What changing this student's status will do to their points. Only
-   * meaningful once penalties are committed — before that, nothing has been
-   * deducted yet and the whole thing settles at finalise time.
-   */
   function penaltyEffect(row: AttendanceRosterRow, next: AttendanceStatus): string | null {
     if (!session?.penaltiesCommitted || !session.applyPenalties) return null
     const cost = (s: AttendanceStatus | null) =>
@@ -154,8 +145,6 @@ export function SessionDetail() {
       if (row.recordId) {
         await updateAttendanceStatus(row.recordId, status)
       } else {
-        // No record yet (end-of-class skipped them, or they joined the section
-        // later). Creating it goes through the same penalty reconciliation.
         await createAttendanceRecord(session.id, row.studentId, status)
         await load()
       }
@@ -168,7 +157,6 @@ export function SessionDetail() {
     }
   }
 
-  /** Remove a record entirely — back to "no record" (0031/Phase B). */
   async function removeRecord(row: AttendanceRosterRow) {
     if (!row.recordId) return
     setSaving(true)
@@ -185,7 +173,6 @@ export function SessionDetail() {
     }
   }
 
-  /** Re-tag (or untag) the session's subject — the fix for a mis-picked subject. */
   async function saveSubject(subjectId: string | null) {
     if (!session) return
     setSavingSubject(true)
@@ -312,9 +299,6 @@ export function SessionDetail() {
           </div>
         )}
 
-        {/* Subject — editable. A session started under the wrong subject (the
-            picker pre-fills from your last one) used to be permanent, silently
-            skewing per-subject rates and the 0030 achievement metrics. */}
         {sessionSubjects.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             {editingSubject ? (
@@ -480,9 +464,6 @@ export function SessionDetail() {
             No record ({unmarked.length})
           </p>
           <Rows>
-            {/* Tappable: a student with no record can now be given one. The
-                picker routes through set_attendance_status, so the points
-                ledger lands exactly as it would have during class. */}
             {unmarked.map((r) => (
               <button
                 key={r.studentId}
@@ -601,5 +582,4 @@ export function SessionDetail() {
     </div>
   )
 }
-
 

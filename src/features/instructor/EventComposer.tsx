@@ -28,16 +28,6 @@ import {
   type LoungeEventSummary,
 } from '@/lib/types'
 
-/**
- * Random Events, on /teach/space.
- *
- * ── THE PREVIEW IS THE RISKY PART ──────────────────────────────────────────
- * Before closing an answer-key event this screen shows who WOULD be paid, using
- * `pickWinners` from lib/lounge-answers.ts — a mirror of `cp_event_normalize()`
- * in 0045, pinned by a test. If the two ever drift, this preview becomes a lie
- * about real points. It is a preview only: the database decides.
- */
-
 const HOURS = [
   { label: 'No deadline', value: '' },
   { label: '15 minutes', value: '0.25' },

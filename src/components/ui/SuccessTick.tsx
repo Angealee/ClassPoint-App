@@ -2,18 +2,11 @@ import { useEffect } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { snap } from '@/lib/motion'
 
-/**
- * A brief centered check that confirms a consequential action landed (approve a
- * request, save your profile, finalise attendance). Auto-dismisses. Purely
- * decorative, so reduced-motion users simply never see it — the toast already
- * carries the real confirmation.
- */
 export function SuccessTick({ show, onDone }: { show: boolean; onDone: () => void }) {
   const reduce = useReducedMotion()
 
   useEffect(() => {
     if (!show) return
-    // Reduced motion: skip the flourish entirely, resolve immediately.
     const ms = reduce ? 0 : 950
     const t = setTimeout(onDone, ms)
     return () => clearTimeout(t)

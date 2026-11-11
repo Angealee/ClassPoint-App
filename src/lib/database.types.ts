@@ -1,53 +1,3 @@
-/**
- * Database schema types — HAND-WRITTEN, transcribed from supabase/migrations.
- *
- * ── REPLACE ME ───────────────────────────────────────────────────────────────
- * This file exists because generating types needs an authenticated CLI. Once you
- * can run it, throw this away and generate the real thing:
- *
- *   npx supabase login
- *   npx supabase gen types typescript --project-id cxfxstazlwjijozkglgx \
- *     > src/lib/database.types.ts
- *
- * The generated file is authoritative and cannot drift. This one can, so treat
- * any disagreement between it and a migration as THIS FILE being wrong.
- *
- * ── WHAT IT ACTUALLY BUYS (measured, 2026-08-14) ─────────────────────────────
- * Tested against supabase-js 2.108 with this hand-written schema:
- *
- *   ✅ WRITES are checked. An insert/upsert with a column that isn't in the
- *      table below is a compile error — this immediately caught a genuinely
- *      wrong `push_subscriptions` shape in THIS file.
- *   ✅ Mappers can take real row types instead of `Record<string, unknown>` +
- *      `as string` casts (see mapSection in api.ts for the pattern to copy).
- *   ❌ READS are NOT checked. `.from('nonexistent_table')` and
- *      `.select('bogus_column')` both compile clean. The select-string parser
- *      does not engage with a hand-written schema the way it does with a
- *      generated one.
- *
- * So this does NOT yet deliver "a query written before its migration ran fails
- * the build". Getting that requires the GENERATED types — which is the strongest
- * argument for running the CLI command above when you get a chance.
- *
- * ── PENDING MIGRATIONS ───────────────────────────────────────────────────────
- * A column or table marked `PENDING <nnnn>` is written in a migration that has
- * NOT been run against the live database yet. It's typed because the client
- * already queries it and the build must stay green — but until that migration
- * is pasted, a query touching it WILL 400 at runtime. Delete the annotation as
- * each one lands.
- *
- * Everything through 0032 is applied (2026-08-14), so those annotations are
- * gone. Currently pending: **0033** (student presence) and **0034** (instructor
- * ops). Neither adds a column this file types — both are functions plus a
- * publication add — so nothing here is marked for them; the failure mode is a
- * missing RPC at runtime, which these types don't catch anyway.
- *
- * ── SCOPE ────────────────────────────────────────────────────────────────────
- * Tables are typed precisely (that's where a missing column bites). RPC
- * signatures are deliberately permissive: there are ~40 of them, they change
- * with every migration, and hand-transcribing their argument shapes buys far
- * less than it costs. `gen types` will fill them in properly.
- */
 
 type Timestamp = string
 type UUID = string
@@ -78,7 +28,6 @@ export interface Database {
         section_id: UUID
         full_name: string
         display_name: string
-        /** 0059 — structured name fields. NULL for students created before 0059. */
         last_name: string | null
         first_name: string | null
         middle_name: string | null
@@ -116,7 +65,6 @@ export interface Database {
         id: UUID
         student_id: UUID
         points: number
-        /** 'event_attend' PENDING 0055 — silent global-event check-in award. */
         category: 'recitation' | 'activity' | 'penalty' | 'redeem' | 'event' | 'event_attend'
         note: string | null
         created_at: Timestamp
@@ -134,13 +82,9 @@ export interface Database {
         /** 0029 — the board ranks on this. */
         semester_points: number
         rank: number
-        /** PENDING 0037 — rank at the previous refresh; null on a first board. */
         previous_rank: number | null
-        /** PENDING 0037 — when the current "this rank or better" run began. */
         rank_since: Timestamp
-        /** PENDING 0038 — points cashed out this semester (the spend board). */
         spent_points: number
-        /** PENDING 0038 — place on the spend board; NULL means "hasn't spent". */
         spend_rank: number | null
       }>
 
@@ -167,7 +111,6 @@ export interface Database {
 
       class_session_secrets: Row<{ session_id: UUID; qr_secret: string }>
 
-      /** PENDING 0055 — global check-in events, isolated from class attendance. */
       event_sessions: Row<{
         id: UUID
         semester_id: UUID
@@ -180,10 +123,8 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /** PENDING 0055 — the event's rotating-QR secret (instructor-only). */
       event_session_secrets: Row<{ event_id: UUID; qr_secret: string }>
 
-      /** PENDING 0055 — one row per student per event; section stamped at scan. */
       event_attendance: Row<{
         id: UUID
         event_id: UUID
@@ -257,7 +198,6 @@ export interface Database {
         point_event_id: UUID | null
         /** 0062 — set when the request is a grade boost. */
         grade_item_id: UUID | null
-        /** 0062 — the bonus the student agreed to, snapshotted at request time. */
         grade_bonus: number | null
       }>
 
@@ -291,7 +231,6 @@ export interface Database {
         name: string
         starts_on: string
         is_active: boolean
-        /** 0060 — read by an archived student on their way out. Max 400 chars. */
         farewell_message: string | null
         created_at: Timestamp
       }>
@@ -325,7 +264,6 @@ export interface Database {
         points: number
         kind: 'quiz' | 'activity' | 'exam' | 'other'
         sort_order: number
-        /** Retired rather than deleted, so past redemptions still make sense. */
         archived_at: Timestamp | null
         created_at: Timestamp
       }>
@@ -338,12 +276,10 @@ export interface Database {
         auth: string
         user_agent: string | null
         created_at: Timestamp
-        /** 0017 — subscription health bookkeeping, written by send-push. */
         fail_count: number
         last_seen_at: Timestamp | null
       }>
 
-      /** 0023 — instructor-select only; written by triggers and archive RPCs. */
       audit_log: Row<{
         id: number
         at: Timestamp
@@ -356,21 +292,14 @@ export interface Database {
         row_data: unknown
       }>
 
-      /** 0043 — chat rooms. Section and global membership is DERIVED, not stored. */
       space_rooms: Row<{
         id: UUID
         kind: 'section' | 'global' | 'dm'
         section_id: UUID | null
         semester_id: UUID
-        /** Canonical sorted participant key, so a pair can only ever have one room. */
         dm_key: string | null
         slow_mode_seconds: number
         announce_only: boolean
-        /**
-         * The NEWEST pin, denormalised so `list_my_rooms` can return it without
-         * a join. The LIST lives in `space_pins` (0046) and is the thing to
-         * read; the pin RPCs are the only writers of both, so they cannot drift.
-         */
         pinned_message_id: UUID | null
         /** Trigger-maintained, so the room list is one query. */
         last_message_at: Timestamp | null
@@ -379,14 +308,12 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /** 0043 — DM membership only. `student_id` null = the instructor. */
       space_room_members: Row<{
         room_id: UUID
         student_id: UUID | null
         created_at: Timestamp
       }>
 
-      /** 0043 — chat messages. Soft-deleted; the row is the tombstone. */
       space_messages: Row<{
         id: UUID
         room_id: UUID
@@ -402,11 +329,6 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /**
-       * 0043 — reactions, stored as CODES not emoji (a variation selector
-       * would fail a CHECK against the glyph). `room_id` is denormalized so a
-       * realtime filter can be scoped to one room.
-       */
       space_message_reactions: Row<{
         message_id: UUID
         room_id: UUID
@@ -415,30 +337,19 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /** 0043 — resolved by the CLIENT when sending; validated server-side. */
       space_mentions: Row<{
         message_id: UUID
         student_id: UUID
       }>
 
-      /** 0043 — per-room mute. A table, not localStorage: push is server-side. */
       space_room_prefs: Row<{
         student_id: UUID
         room_id: UUID
         /** 0048 — 'all' | 'mentions' | 'none'. The only writable one. */
         level: string
-        /**
-         * GENERATED from `level` since 0048 (`level = 'none'`). Still returned
-         * by `list_my_rooms`, which is why the column kept its name — but it
-         * cannot be written, and nothing should try.
-         */
         muted: boolean
       }>
 
-      /**
-       * 0046 — several pinned messages per room, capped at 10 inside
-       * `pin_message`. `pinned_by` null = the instructor (0020's convention).
-       */
       space_pins: Row<{
         id: UUID
         room_id: UUID
@@ -447,10 +358,6 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /**
-       * 0044 — reports. No FK on `target_id`: it points into one of three
-       * tables, and a report must survive the thing it is about being deleted.
-       */
       space_reports: Row<{
         id: UUID
         target_type: 'post' | 'reply' | 'message'
@@ -464,12 +371,10 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /** 0042 — the Lounge feed. Select-only; every write goes through an RPC. */
       lounge_posts: Row<{
         id: UUID
         semester_id: UUID
         kind: 'text' | 'shoutout' | 'pulse'
-        /** Null = the instructor. On a pulse card, the student it is about. */
         author_student_id: UUID | null
         display_name: string
         avatar_url: string | null
@@ -488,14 +393,12 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /** 0042 — one row per (post, student). The PK is the "one W each" rule. */
       lounge_ws: Row<{
         post_id: UUID
         student_id: UUID
         created_at: Timestamp
       }>
 
-      /** 0042 — replies. Soft-deleted so a thread never loses its parent. */
       lounge_replies: Row<{
         id: UUID
         post_id: UUID
@@ -508,11 +411,6 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /**
-       * 0041 — feature flags. NO RLS policy at all: reachable only through the
-       * SECURITY DEFINER functions, like leaderboard_banned_words. Declared
-       * here for completeness; the client never selects from it.
-       */
       app_flags: Row<{
         key: string
         enabled: boolean
@@ -521,7 +419,6 @@ export interface Database {
         updated_by: UUID | null
       }>
 
-      /** 0041 — Student Space mutes. Own rows selectable; writes via RPC only. */
       space_timeouts: Row<{
         id: UUID
         student_id: UUID
@@ -543,11 +440,6 @@ export interface Database {
         detail: string | null
       }>
 
-      /**
-       * 0049 — peer groups. Instructor-select only; every write goes through a
-       * security-definer RPC, so there is no insert/update/delete policy for a
-       * stray `.from()` call to satisfy.
-       */
       peer_groups: Row<{
         id: UUID
         section_id: UUID
@@ -557,22 +449,12 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /**
-       * 0049 — membership. `section_id` is denormalised from the group so
-       * that `unique (section_id, student_id)` can express one group per student. A
-       * BEFORE trigger overwrites whatever is passed, so never rely on setting
-       * it from here.
-       */
       peer_group_members: Row<{
         group_id: UUID
         student_id: UUID
         section_id: UUID
         created_at: Timestamp
       }>
-      /**
-       * 0050 — one peer evaluation. Students in a targeted section may select
-       * it; every write goes through a security-definer RPC.
-       */
       peer_evaluations: Row<{
         id: UUID
         semester_id: UUID
@@ -587,19 +469,11 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /** 0050 — which sections an evaluation targets. Composite PK, so no dupes. */
       peer_evaluation_sections: Row<{
         evaluation_id: UUID
         section_id: UUID
       }>
 
-      /**
-       * 0050 — a question and its own rating scale.
-       *
-       * `scale` is `[{value:number,label:string}]`. The element shape is
-       * validated by `cp_peer_scale_clean()`, not by a CHECK — a CHECK cannot
-       * walk the array to prove the values ascend.
-       */
       peer_criteria: Row<{
         id: UUID
         evaluation_id: UUID
@@ -609,11 +483,6 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /**
-       * 0050 — one submission per student per evaluation, enforced by a unique
-       * constraint. `group_id` is a SNAPSHOT, so regrouping never rewrites
-       * history.
-       */
       peer_submissions: Row<{
         id: UUID
         evaluation_id: UUID
@@ -623,11 +492,6 @@ export interface Database {
         submitted_at: Timestamp
       }>
 
-      /**
-       * 0050 — ⚠ INSTRUCTOR-SELECT ONLY. A student never reads these, not even
-       * rows addressed to them: with the peer list in hand, differencing rows
-       * against the totals reconstructs who said what.
-       */
       peer_ratings: Row<{
         id: UUID
         submission_id: UUID
@@ -639,17 +503,11 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /**
-       * 0052 — the teams an evaluation is aimed at. NO ROWS means all groups in
-       * its sections, which is what every evaluation created before 0052 has.
-       * Instructor-select only.
-       */
       peer_evaluation_groups: Row<{
         evaluation_id: UUID
         group_id: UUID
       }>
 
-      /** 0050 — one comment per peer. Instructor-select only, same reason. */
       peer_comments: Row<{
         submission_id: UUID
         ratee_id: UUID
@@ -662,14 +520,6 @@ export interface Database {
         created_at: Timestamp
       }>
 
-      /**
-       * PENDING 0057 — the weights, per subject per term.
-       *
-       * Every weight is a PROPORTION (0.5000, never 50), and `numeric`, so it
-       * arrives over PostgREST as a STRING — api/grades.ts coerces each one.
-       * No arithmetic is done with these in SQL: grading.ts is the only place
-       * in the codebase that multiplies by a weight.
-       */
       grade_policies: Row<{
         subject_id: UUID
         term: 'prelim' | 'midterm' | 'finals'
@@ -678,14 +528,12 @@ export interface Database {
         recit_weight: number
         cs_weight: number
         exam_weight: number
-        /** This term's share of the final grade. The three must sum to 1. */
         final_weight: number
         transmute_base: number
         transmute_span: number
         updated_at: Timestamp
       }>
 
-      /** PENDING 0057 — one score column ("Quiz 1", out of 20). Per SECTION. */
       grade_items: Row<{
         id: UUID
         section_id: UUID
@@ -704,7 +552,6 @@ export interface Database {
         points_bonus: number | null
         /** 0063 — switched off even though its part is offered. */
         assist_off: boolean
-        /** 0063 — the class this column was held in (absent there = Absent here). */
         session_id: UUID | null
       }>
 
@@ -717,20 +564,12 @@ export interface Database {
         updated_at: Timestamp
       }>
 
-      /**
-       * 0063 — an Absent mark typed by hand. A cell is a mark OR this, never both
-       * (a trigger enforces it). Absence DERIVED from attendance has no row.
-       */
       grade_absences: Row<{
         item_id: UUID
         student_id: UUID
         created_at: Timestamp
       }>
 
-      /**
-       * 0062 — the receipt for a boost. Instructor-select only; writes go
-       * through the definer functions.
-       */
       grade_boosts: Row<{
         item_id: UUID
         student_id: UUID
@@ -742,13 +581,6 @@ export interface Database {
         applied_at: Timestamp
       }>
 
-      /**
-       * PENDING 0057 — one student's mark on one item.
-       *
-       * THE ABSENCE OF A ROW IS MEANINGFUL: it means "not marked yet", which is
-       * what lets the app show an honest in-progress figure beside the official
-       * blanks-count-as-zero one. A student who scored nothing gets score 0.
-       */
       grade_scores: Row<{
         item_id: UUID
         student_id: UUID
@@ -759,11 +591,6 @@ export interface Database {
 
     Views: Record<string, never>
 
-    /**
-     * Deliberately permissive — see SCOPE in the header. Typing ~40 RPC
-     * signatures by hand costs more than it returns when `gen types` will
-     * replace them wholesale.
-     */
     Functions: {
       [name: string]: {
         Args: Record<string, unknown>

@@ -23,14 +23,10 @@ import {
 import { spring } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
-// Instructor sign-in is unlinked (router.tsx). Inside an installed PWA there's
-// no address bar to type it into, so reveal it with a secret gesture: tap the
-// footer 5 times within 2 seconds.
 const INSTRUCTOR_PATH = '/macalesideauth'
 const SECRET_TAPS = 5
 const TAP_WINDOW_MS = 2000
 
-/** Header height, in px. The hero pads by exactly this to fill one screen. */
 const HEADER_H = 56
 
 const STEPS = [
@@ -51,7 +47,6 @@ const STEPS = [
   },
 ]
 
-/** What you get, deliberately NOT a restatement of the steps above. */
 const FEATURES = [
   {
     Icon: ScanIcon,
@@ -144,10 +139,6 @@ function LandingPage() {
           </div>
         </div>
 
-        {/* Scroll progress, styled as an XP rail rather than as generic chrome
-            — filling a gold bar is this product's own metaphor for progress,
-            so the page's own scroll uses it too. Bound to a MotionValue, so it
-            updates every frame without re-rendering anything. */}
         <motion.div
           aria-hidden
           style={{ scaleX: progress }}

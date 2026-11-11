@@ -1,19 +1,6 @@
 import type { SectionStudent } from '@/lib/types'
 import { getLevelProgress } from '@/lib/leveling'
 
-// `xlsx` (SheetJS) is heavy, so it's imported dynamically here — this whole
-// module is only pulled in when the instructor actually imports or exports,
-// keeping it out of the initial bundle.
-
-/**
- * Parse a roster file (.xlsx/.xls/.csv) into a list of student full names.
- *
- * Detection is forgiving:
- *  - If the first row contains a header cell matching /name|student/i, names are
- *    read from that column.
- *  - Otherwise the first column is treated as the names column.
- * Blank cells are skipped.
- */
 export async function parseRosterNames(file: File): Promise<string[]> {
   const XLSX = await import('xlsx')
   const buffer = await file.arrayBuffer()
@@ -35,10 +22,6 @@ export async function parseRosterNames(file: File): Promise<string[]> {
     .filter((name) => name.length > 0)
 }
 
-/**
- * Download the current section's roster as an .xlsx file: one row per student
- * with their public/private names, claim status, level, points, and token.
- */
 export async function exportRoster(
   sectionName: string,
   students: SectionStudent[],

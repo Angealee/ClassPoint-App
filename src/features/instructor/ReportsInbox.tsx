@@ -23,16 +23,6 @@ import {
   type ReportQueueItem,
 } from '@/lib/types'
 
-/**
- * The report queue — one item per reported TARGET, not per report.
- *
- * ⚠ A reported DM shows its reason and reporters but NOT its text. Reading it
- * means "Review thread", which calls `read_dm_thread()` and writes an audit
- * row. If this screen printed the body, every DM report would be a silent
- * break-glass and the promise on the student's DM screen would be false exactly
- * when it is most likely to be tested.
- */
-
 const REASON_LABEL = Object.fromEntries(REPORT_REASONS.map((r) => [r.value, r.label]))
 
 /** 1 hour · 1 day · 7 days, plus a custom box. */
@@ -261,7 +251,6 @@ export function ReportsInbox() {
               value={customHours}
               onChange={(e) => setCustomHours(e.target.value)}
               placeholder="Hours"
-              // text-base: below 16px iOS Safari zooms on focus and never zooms back.
               className="h-11 min-w-0 flex-1 rounded-xl border border-line bg-card px-3.5 text-base text-ink outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
             />
             <Button

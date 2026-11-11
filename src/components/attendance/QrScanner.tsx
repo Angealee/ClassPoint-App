@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { BoltIcon } from '@/components/ui/icons'
 
-/** Minimal shape of the parts of the native BarcodeDetector API we use. */
 interface NativeDetector {
   detect: (source: CanvasImageSource) => Promise<{ rawValue: string }[]>
 }
@@ -11,20 +10,11 @@ interface DetectorCtor {
   getSupportedFormats?: () => Promise<string[]>
 }
 
-/**
- * Live camera QR scanner. Prefers the browser's native BarcodeDetector (fast,
- * battery-friendly on Android/Chrome); falls back to the pure-JS `jsqr` decoder
- * so it also works on iOS Safari and desktop. Calls `onDetect` once with the raw
- * decoded string, then stops — the parent decides what to do next.
- */
 export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const detectedRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
-  // The camera takes a beat to open, and the black square gave no sign anything
-  // was happening — students tapped Scan twice thinking it had failed.
   const [starting, setStarting] = useState(true)
-  // Torch: only offered when the granted track actually reports the capability.
   const trackRef = useRef<MediaStreamTrack | null>(null)
   const [canTorch, setCanTorch] = useState(false)
   const [torchOn, setTorchOn] = useState(false)
@@ -95,9 +85,6 @@ export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
       await video.play().catch(() => {})
       setStarting(false)
 
-      // Torch is non-standard: it exists on Android Chrome and nowhere else
-      // right now, so it's feature-detected off the live track rather than
-      // sniffed from the user agent. A missing capability just hides the button.
       const track = stream.getVideoTracks()[0] ?? null
       trackRef.current = track
       try {
@@ -140,15 +127,11 @@ export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
     if (!track) return
     const next = !torchOn
     try {
-      // `torch` isn't in the standard MediaTrackConstraintSet type yet, and it
-      // overlaps the standard shape too little for a direct cast.
       await track.applyConstraints({
         advanced: [{ torch: next }],
       } as unknown as MediaTrackConstraints)
       setTorchOn(next)
     } catch {
-      // Some devices advertise torch and then refuse it. Drop the button rather
-      // than leave a control that does nothing.
       setCanTorch(false)
     }
   }
@@ -162,8 +145,6 @@ export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
   }
 
   return (
-    // Bigger than the old max-w-xs so the QR is easy to aim on a phone, still
-    // centred (mx-auto) and capped so it never overflows a narrow viewport.
     <div className="relative mx-auto aspect-square w-full max-w-[min(85vw,22rem)] overflow-hidden rounded-2xl bg-black">
       <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
       {/* Viewfinder frame + sweeping aim line */}

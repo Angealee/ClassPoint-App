@@ -1,16 +1,3 @@
-// ClassPoint · Edge Function · claim-token
-// Verifies a one-time claim token, creates the student's auth account
-// (synthetic email + PIN), and links it to their roster row.
-//
-// Runs with the service role (auto-provided as SUPABASE_SERVICE_ROLE_KEY),
-// so it can write across RLS. Never expose the service key to the client.
-//
-// ⚠ This function must have JWT verification turned OFF in the Supabase
-// dashboard — a student claiming their account is not logged in yet. That makes
-// it public, so since 0026 it is rate limited per IP and every attempt is
-// recorded in public.auth_events. See supabase/functions/_shared/security.ts.
-//
-// Deploy: supabase functions deploy claim-token
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
@@ -26,8 +13,6 @@ import {
 const STUDENT_DOMAIN = 'students.classpoint.app'
 const USERNAME_RE = /^[a-z][a-z0-9_]{2,19}$/
 
-// One message for "no such token" AND "already claimed". Distinct wording would
-// tell someone guessing tokens which of their guesses hit a real row.
 const BAD_TOKEN = 'That token is not valid or has already been used.'
 
 Deno.serve(async (req) => {
@@ -46,8 +31,6 @@ Deno.serve(async (req) => {
   const pin = String(payload.pin ?? '')
   const displayName = payload.display_name ? String(payload.display_name).trim() : null
 
-  // Shape checks first — a mistyped username is a typo, not an attack, so these
-  // never reach the token lookup and never count against the rate limit.
   if (!token) return json(req, { ok: false, error: 'Enter your token.' })
   if (!USERNAME_RE.test(username)) {
     return json(req, {
@@ -69,7 +52,6 @@ Deno.serve(async (req) => {
   const log = (success: boolean, detail: string, studentId?: string | null) =>
     logAuthEvent(admin, { kind: 'claim', success, ip, userAgent: ua, studentId, detail })
 
-  // 0. Rate limit before touching a token, so guessing costs nothing to serve.
   if (await tooManyAttempts(admin, ip)) {
     await log(false, 'rate_limited')
     return json(req, { ok: false, error: RATE_LIMIT_MESSAGE }, 429)
@@ -94,11 +76,6 @@ Deno.serve(async (req) => {
     return json(req, { ok: false, error: BAD_TOKEN })
   }
 
-  // 1b. An archived roster row can't be claimed — prevents a "ghost" account
-  // that could sign in while invisible everywhere. Restore first, then claim.
-  // This message stays specific on purpose: it is only reachable AFTER a valid,
-  // unclaimed token matched, so it tells an attacker nothing — and it tells a
-  // real student exactly what to do.
   const { data: studentRow, error: studentErr } = await admin
     .from('students')
     .select('archived_at')
@@ -116,7 +93,6 @@ Deno.serve(async (req) => {
     })
   }
 
-  // 2. Check username availability (the unique index is the real guard).
   const { data: taken } = await admin
     .from('student_secrets')
     .select('student_id')

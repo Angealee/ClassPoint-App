@@ -23,7 +23,6 @@ const CATEGORIES: { value: string; label: string }[] = [
   { value: 'penalty', label: 'Penalty' },
 ]
 
-/** `embedded` hides the page header when rendered inside the History tabs. */
 export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) {
   const { sections } = useInstructor()
   const { toast } = useToast()
@@ -63,11 +62,6 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
     }
   }, [filters])
 
-  /**
-   * Offset paging is fine here (keyset is not worth it): this list is the
-   * instructor's own recent activity, and a new award landing mid-scroll is
-   * an award they just made themselves.
-   */
   async function loadMore() {
     setLoadingMore(true)
     try {
@@ -109,9 +103,6 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
         </div>
       )}
 
-      {/* Filters. Changing either re-runs the query rather than filtering in
-          memory — the list is paged, so a client-side filter would only ever
-          search the rows already downloaded. */}
       <div className="flex gap-2">
         <Select
           value={sectionFilter}

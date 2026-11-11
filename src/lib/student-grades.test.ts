@@ -14,15 +14,6 @@ import {
 import { defaultPolicy, sumsFromScores, termGrade } from './grading'
 import type { GradePolicy, MyGradeItem, MyGradeSubject, TermKey } from './types'
 
-/**
- * A student's view of their own grades.
- *
- * The figures here are computed BY HAND from the instructor's policy (50/25/25
- * inside Class Standing, 60/40 against the exam, base 0.6 / span 0.4), not by
- * calling the function under test — a test that derives its expectation from the
- * implementation can only ever agree with it.
- */
-
 function it_(over: Partial<MyGradeItem> & { id: string }): MyGradeItem {
   return {
     term: 'prelim',
@@ -65,9 +56,6 @@ describe('summarizeTerm', () => {
   })
 
   it('matches the instructor’s So-far toggle on a part-marked term', () => {
-    // Hand-computed. PT 20/20 → 100. Quiz 5/10 → (0.5*0.4+0.6)*100 = 80.
-    // Recitation and Exam unmarked → the 60 minimum each.
-    // CS = 100*.5 + 80*.25 + 60*.25 = 85;  term = 85*.6 + 60*.4 = 75.
     const s = subject([
       it_({ id: 'pt', component: 'performance_task', maxScore: 20, score: 20 }),
       it_({ id: 'q', component: 'quiz', maxScore: 10, score: 5 }),
@@ -77,8 +65,6 @@ describe('summarizeTerm', () => {
     const t = summarizeTerm(s, 'prelim')
     expect(t.soFar).toBeCloseTo(75, 10)
 
-    // …and it IS the same number the instructor's sheet derives, from the same
-    // functions, so a student and the instructor can quote one figure.
     const sums = sumsFromScores(
       s.items.map((i) => ({ id: i.id, component: i.component, maxScore: i.maxScore, archivedAt: null })),
       new Map([
@@ -105,7 +91,6 @@ describe('summarizeTerm', () => {
     const s = subject([it_({ id: 'q', component: 'quiz', score: 0 })])
     const t = summarizeTerm(s, 'prelim')
     expect(t.marked).toBe(1)
-    // 0/10 → the 60 floor for the quiz component. A figure exists; it is not null.
     expect(t.soFar).not.toBeNull()
   })
 
@@ -152,7 +137,6 @@ describe('termsWithItems / latestSoFar', () => {
 
 describe('explainTerm', () => {
   it('turns "50% of 60%" into the shares a student can reason with', () => {
-    // 0.6 × 0.5 = 30, 0.6 × 0.25 = 15, 0.6 × 0.25 = 15, exam 40 — worked by hand.
     const e = explainTerm(subject([]), 'prelim')
     expect(e?.parts.map((p) => [p.component, p.sharePct])).toEqual([
       ['performance_task', 30],
@@ -194,8 +178,6 @@ describe('explainTerm', () => {
   })
 
   it('explains nothing when the weights are broken or missing', () => {
-    // The same rule that withholds the term figure: do not explain a number that
-    // is not being shown.
     const bad: GradePolicy = { ...defaultPolicy('s1', 'prelim'), ptWeight: 0.9 }
     expect(explainTerm(subject([], [bad]), 'prelim')).toBeNull()
     expect(explainTerm(subject([], []), 'prelim')).toBeNull()
@@ -276,20 +258,6 @@ describe('boostableCount', () => {
   })
 })
 
-/**
- * DECISION 15, ENFORCED STRUCTURALLY.
- *
- * "A student never sees the official figure" is the kind of rule that is broken
- * by nobody writing a one-word change: `termGrade(sums, policy, 'official')` in a
- * student screen typechecks, passes every other test, and puts a number on a
- * student's phone that counts unmarked work as a zero. So the student-facing
- * files are read as TEXT and must not reach for it — or for a final grade, which
- * needs the official view of every term.
- *
- * Source-text parsing with comments stripped, because these files DOCUMENT the
- * very thing they forbid (a naive substring check would fail on the prose
- * explaining why). Same technique, and same reason, as material.test.ts.
- */
 function code(file: string): string {
   return readFileSync(join(process.cwd(), file), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -311,15 +279,10 @@ describe('a student is never shown the official grade', () => {
   })
 
   it.each(STUDENT_FILES)('%s never computes a final grade', (file) => {
-    // finalGrade needs every term graded under the official rule — that IS the
-    // number this feature exists to withhold.
     expect(code(file)).not.toMatch(/\bfinalGrade\b/)
   })
 
   it('reads the student grades through the aggregating RPC, never a table', () => {
-    // 0057's rule: no student branch in RLS, so a student reads grades ONLY
-    // through get_my_grades. A direct .from() here would be a read that RLS
-    // refuses at best, and a second path to widen at worst.
     const src = readFileSync(join(process.cwd(), 'src/lib/api/grades.ts'), 'utf8')
     const start = src.indexOf('export async function getMyGrades')
     const end = src.indexOf('export async function requestGradeBoost')
@@ -338,9 +301,6 @@ describe('a student is never shown the official grade', () => {
 
 describe('Recitation from attendance (0063)', () => {
   it('uses the student’s attendance rate as-is, beside their marks', () => {
-    // Hand-computed. PT unmarked → 60. Quiz 10/10 → 100. Recitation 9 of 10
-    // classes → 90 (as-is: no floor, no transmutation). Exam unmarked → 60.
-    // CS = 60*.5 + 100*.25 + 90*.25 = 77.5;  term = 77.5*.6 + 60*.4 = 70.5.
     const s = subject([
       it_({ id: 'pt', component: 'performance_task', maxScore: 20, score: null }),
       it_({ id: 'q', component: 'quiz', maxScore: 10, score: 10 }),
@@ -391,7 +351,6 @@ describe('sortItems (Lowest first)', () => {
   })
 
   it('puts the weakest SHARE of the maximum first, not the lowest raw mark', () => {
-    // 30/50 = 60% is weaker than 15/20 = 75%, though 30 is the bigger number.
     const out = sortItems([q('strong', 15, 20), q('weak', 30, 50), q('mid', 9, 10)], 'lowest')
     expect(out.map((i) => i.id)).toEqual(['weak', 'strong', 'mid'])
   })

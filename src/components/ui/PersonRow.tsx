@@ -2,25 +2,6 @@ import type { ReactNode } from 'react'
 import { Avatar } from '@/components/ui/Avatar'
 import { cn } from '@/lib/cn'
 
-/**
- * Avatar · name · meta line · trailing slot.
- *
- * The most-repeated row in the app — roster, leaderboard, redemptions, excuses,
- * top spenders, profile visitors, archived students. Every one of them rebuilt
- * the same three-part flex with slightly different avatar sizes, truncation and
- * gaps, which is why a long name wraps on one screen and clips on another.
- *
- * ── WHY `trailing` IS A SLOT AND NOT PROPS ─────────────────────────────────
- * The right-hand side genuinely differs everywhere: a points figure, a rank, a
- * status Chip, two IconButtons, a checkbox. Modelling that as `points?` +
- * `rank?` + `status?` + `actions?` produces a component with eight optional
- * props where every screen uses two of them. A slot keeps the shared part
- * (layout, truncation, avatar) shared and leaves the varying part free.
- *
- * `onClick` makes the whole row a button. When it is set, `trailing` is
- * rendered OUTSIDE that button — otherwise the action buttons inside it would
- * be nested in a button, which is invalid HTML and swallows their clicks.
- */
 export function PersonRow({
   name,
   avatarUrl,

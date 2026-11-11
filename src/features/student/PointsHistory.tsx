@@ -17,32 +17,21 @@ import { useStudentData } from './StudentData'
 
 const PAGE = 40
 
-/** Display metadata per ledger category. Mirrors the Dashboard feed's colours. */
 const CATEGORY_META: Record<PointCategory, { label: string; dot: string; text: string }> = {
   recitation: { label: 'Recitation', dot: TONE.reward.dot, text: TONE.reward.text },
   activity: { label: 'Activities', dot: TONE.accent.dot, text: TONE.accent.text },
   penalty: { label: 'Penalties', dot: TONE.danger.dot, text: TONE.danger.text },
   redeem: { label: 'Spent', dot: TONE.neutral.dot, text: TONE.neutral.text },
-  // Gold, like recitations: an event payout is points you earned.
   event: { label: 'Events', dot: TONE.reward.dot, text: TONE.reward.text },
-  // 0055 — a global-event check-in award; earned points, so gold too.
   event_attend: { label: 'Event attendance', dot: TONE.reward.dot, text: TONE.reward.text },
 }
 
-/**
- * The full points ledger (Phase F).
- *
- * The Dashboard shows the most recent 20 and stops — there was no way to see
- * anything older, and no way to see the SHAPE of how you're doing. This screen
- * pages back through the whole semester and puts a per-week chart on top.
- */
 export function PointsHistory() {
   const { me } = useStudentData()
   const [events, setEvents] = useState<PointEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // False once a page comes back short — that's the end of the ledger.
   const [hasMore, setHasMore] = useState(true)
 
   const load = useCallback(async () => {
@@ -72,8 +61,6 @@ export function PointsHistory() {
       const last = events[events.length - 1]
       const cursor: EventCursor = { created_at: last.created_at, id: last.id }
       const next = await listStudentEvents(me.id, PAGE, cursor)
-      // Defensive de-dupe: a keyset cursor shouldn't repeat a row, but appending
-      // blind would render duplicate React keys if it ever did.
       setEvents((prev) => {
         const seen = new Set(prev.map((e) => e.id))
         return [...prev, ...next.filter((e) => !seen.has(e.id))]
@@ -112,13 +99,6 @@ export function PointsHistory() {
 
   const netTotal = useMemo(() => events.reduce((s, e) => s + e.points, 0), [events])
 
-  /**
-   * Declared once and rendered in all four branches.
-   *
-   * It used to be written out in full in each of them, which is three chances
-   * for the copy, the subtitle or the back fallback to drift apart depending on
-   * whether the screen happened to be loading, empty, failed or populated.
-   */
   const header = (
     <PageHeader
       title="Points history"
@@ -159,9 +139,6 @@ export function PointsHistory() {
       <div className="space-y-5">
         {header}
 
-        {/* Per-week bars. Height is scaled against the biggest week so the
-            shape reads even when the numbers are small — which they are early
-            in a semester. */}
         {weeks.length > 1 && <WeekChart weeks={weeks} />}
 
         {/* Where the points came from — and went. */}
@@ -197,7 +174,6 @@ export function PointsHistory() {
           </div>
         </Card>
 
-        {/* The ledger itself, grouped by class week. */}
         <div className="space-y-4">
           {groupByWeek(events, (e) => e.created_at).map((g) => (
             <div key={g.week}>
@@ -235,12 +211,6 @@ export function PointsHistory() {
   )
 }
 
-
-/**
- * Per-week net points. Bars grow from a shared baseline; negative weeks hang
- * below it, because a week that cost you points should LOOK different from a
- * week where you earned nothing.
- */
 function WeekChart({
   weeks,
 }: {
@@ -260,7 +230,6 @@ function WeekChart({
               <span className="text-2xs font-semibold tabular-nums text-muted">
                 {w.net > 0 ? `+${w.net}` : w.net !== 0 ? w.net : ''}
               </span>
-              {/* Fixed-height track so every bar shares a baseline. */}
               <div className="flex h-20 w-full flex-col justify-end">
                 <motion.div
                   initial={{ height: 0 }}
@@ -286,5 +255,4 @@ function WeekChart({
     </Card>
   )
 }
-
 

@@ -1,14 +1,3 @@
-/**
- * The per-term attendance workbook (Phase G).
- *
- * ATTENDANCE ONLY, and that is the instructor's explicit rule rather than a
- * limitation: points are NEVER turned into a grade. Points reach a grade only
- * through an individually-approved redemption, never through a formula — so
- * there is no points column here, and no computed score of any kind. Raw
- * numbers; the instructor applies their own arithmetic.
- *
- * xlsx is dynamically imported so it stays off the main bundle.
- */
 import { getTermAttendance } from '@/lib/api'
 import type { Section, TermKey } from '@/lib/types'
 
@@ -18,13 +7,6 @@ const TERM_LABEL: Record<TermKey, string> = {
   finals: 'Finals',
 }
 
-/**
- * One sheet per section for a single term.
- *
- * Sections are fetched sequentially on purpose: this runs against the same
- * instructor-gated RPC for every section, and firing a dozen at once buys a
- * second of wall-clock at the cost of a burst that can trip rate limits.
- */
 export async function exportTermWorkbook(
   sections: Section[],
   term: TermKey,
@@ -39,8 +21,6 @@ export async function exportTermWorkbook(
     try {
       rows = await getTermAttendance(section.id, term)
     } catch {
-      // A section whose semester has no dates for this term shouldn't kill the
-      // whole export — skip it and keep going.
       continue
     }
     if (rows.length === 0) continue

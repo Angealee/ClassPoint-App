@@ -1,23 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { collectRows, columnLabel, detectStructure, type ParsedSheet } from './grades-io'
 
-/**
- * Pins the spreadsheet reader against the instructor's real layout.
- *
- * The load-bearing test is **"a component with no marks yields null, not 0"**.
- * Importing a zero there would record every student as having scored nothing
- * in that component — which the official grade then counts, dragging a whole
- * class down with marks nobody ever gave. It is also the one failure that
- * looks completely ordinary on screen afterwards.
- *
- * The detection itself is only ever a SUGGESTION: one inserted column shifts
- * every range, so the importer shows what it found beside the real header text
- * and writes nothing until a person confirms it.
- */
-
-/** The shape of the instructor's Finals sheet, trimmed to three items each. */
 function instructorSheet(): ParsedSheet {
-  //            0    1(B name)  2  3  4 (C:E perf)  5  6  7 (F:H quiz)  8 (I exam)
   const rows: string[][] = [
     ['', '', 'Performance Tasks (50%)', '', '', 'Quizzes', '', '', 'EXAM'],
     ['', 'FULL NAME', '50', '', '', '100', '', '', '50'],
@@ -62,8 +46,6 @@ describe('detectStructure', () => {
   })
 
   it('leaves a component the sheet never mentions empty', () => {
-    // Recitation is absent here — it must come back unset rather than guessed
-    // onto whatever columns happen to be free.
     expect(s.components.recitation.range).toBeNull()
     expect(s.components.recitation.total).toBeNull()
   })
@@ -74,7 +56,6 @@ describe('collectRows', () => {
   const rows = collectRows(sheet, detectStructure(sheet))
 
   it('sums each component across its range', () => {
-    // 20 + 10 + 7.5 = 37.5, the value the instructor's own sheet carries.
     expect(rows[0].rawName).toBe('Dela Cruz, Juan')
     expect(rows[0].totals.performance_task).toBe(37.5)
     expect(rows[0].totals.quiz).toBe(97)
@@ -82,8 +63,6 @@ describe('collectRows', () => {
   })
 
   it('yields NULL for a component with no marks at all, never 0', () => {
-    // Maria has no performance tasks and no exam. Importing zeros would record
-    // marks nobody gave, and the official grade counts them.
     expect(rows[1].rawName).toBe('Santos, Maria')
     expect(rows[1].totals.performance_task).toBeNull()
     expect(rows[1].totals.exam).toBeNull()

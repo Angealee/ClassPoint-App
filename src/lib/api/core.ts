@@ -28,19 +28,15 @@ import type {
 } from '@/lib/types'
 import type { NameParts } from '@/lib/student-name'
 
-// ── Semesters, terms & subjects (0027) ───────────────────────────────────────
-
 const SEMESTER_COLS =
   'id, name, starts_on, is_active, farewell_message, semester_terms(term, starts_on, ends_on)'
 
-/** Six weeks per term: prelim weeks 1–6, midterm 7–12, finals 13–18. */
 const TERM_OFFSETS: Array<{ term: TermKey; from: number; to: number }> = [
   { term: 'prelim', from: 0, to: 41 },
   { term: 'midterm', from: 42, to: 83 },
   { term: 'finals', from: 84, to: 125 },
 ]
 
-/** Shift a 'YYYY-MM-DD' date by whole days, staying in local time. */
 function addDays(iso: string, days: number): string {
   const [y, m, d] = iso.split('-').map(Number)
   const dt = new Date(y ?? 2026, (m ?? 1) - 1, (d ?? 1) + days)
@@ -60,9 +56,6 @@ function mapSemester(row: Record<string, unknown>): Semester {
     name: row.name as string,
     startsOn: row.starts_on as string,
     isActive: !!row.is_active,
-    // `?? null` rather than a bare cast: a client running ahead of migration
-    // 0060 gets undefined here, and undefined would flow into the farewell
-    // screen as a message that is neither absent nor present.
     farewellMessage: (row.farewell_message as string | null) ?? null,
     terms,
   }
@@ -78,7 +71,6 @@ export async function getActiveSemester(): Promise<Semester | null> {
   return data ? mapSemester(data) : null
 }
 
-/** RESERVED: the rollover wizard (Era 5.0 Phase I) — no caller until then. */
 export async function listSemesters(): Promise<Semester[]> {
   const { data, error } = await supabase
     .from('semesters')
@@ -88,12 +80,6 @@ export async function listSemesters(): Promise<Semester[]> {
   return (data ?? []).map(mapSemester)
 }
 
-/**
- * Create a semester with its three terms pre-filled to the six-week defaults.
- * The instructor edits any of the six dates afterwards — holidays move things.
- *
- * RESERVED: the rollover wizard (Era 5.0 Phase I) — no caller until then.
- */
 export async function createSemester(name: string, startsOn: string): Promise<Semester> {
   const { data, error } = await supabase
     .from('semesters')
@@ -128,13 +114,11 @@ export async function createSemester(name: string, startsOn: string): Promise<Se
   }
 }
 
-/** RESERVED: the rollover wizard (Era 5.0 Phase I) — no caller until then. */
 export async function renameSemester(id: string, name: string): Promise<void> {
   const { error } = await supabase.from('semesters').update({ name: name.trim() }).eq('id', id)
   if (error) throw error
 }
 
-/** Move one term's boundaries. Week numbering still derives from the semester start. */
 export async function updateSemesterTerm(
   semesterId: string,
   term: TermKey,
@@ -149,17 +133,6 @@ export async function updateSemesterTerm(
   if (error) throw error
 }
 
-/**
- * Set (or clear) the send-off an archived student reads on their way out (0060).
- *
- * A direct update rather than an RPC: `semesters_write` is already gated on
- * `is_instructor()`, and the 400-character limit is a CHECK on the column, so
- * there is no rule here for a function to enforce.
- *
- * An empty string stores NULL, not '' — the column's CHECK refuses a blank
- * non-null value, and "the instructor cleared it" and "they never wrote one"
- * are the same state as far as the farewell screen is concerned.
- */
 export async function setSemesterFarewell(
   semesterId: string,
   message: string,
@@ -213,13 +186,11 @@ export async function updateSubject(id: string, code: string, name: string): Pro
   if (error) throw error
 }
 
-/** Sessions referencing the subject keep their rows — subject_id nulls out. */
 export async function deleteSubject(id: string): Promise<void> {
   const { error } = await supabase.from('subjects').delete().eq('id', id)
   if (error) throw error
 }
 
-/** Which subjects each section takes: { sectionId: subjectId[] }. */
 export async function listSectionSubjects(semesterId: string): Promise<Record<string, string[]>> {
   const { data, error } = await supabase
     .from('section_subjects')
@@ -234,7 +205,6 @@ export async function listSectionSubjects(semesterId: string): Promise<Record<st
   return map
 }
 
-/** Replace one section's subject assignments with exactly `subjectIds`. */
 export async function setSectionSubjects(
   sectionId: string,
   subjectIds: string[],
@@ -251,13 +221,6 @@ export async function setSectionSubjects(
   if (error) throw error
 }
 
-/**
- * Point src/lib/term.ts at the active semester's real dates. Memoized: every
- * screen that needs week/term labels can call this without re-fetching.
- *
- * Failure is deliberately swallowed — term.ts keeps its built-in fallback
- * calendar, so a week label degrading is never worth taking a screen down.
- */
 let termCalendarPromise: Promise<void> | null = null
 
 export function loadTermCalendar(force = false): Promise<void> {
@@ -273,19 +236,11 @@ export function loadTermCalendar(force = false): Promise<void> {
       })
     })
     .catch(() => {
-      // Clear the memo so the NEXT caller retries. Caching the rejected promise
-      // pinned the whole app to term.ts's fallback dates until a full reload —
-      // and the printable report would then quietly print wrong week dividers.
       termCalendarPromise = null
     })
   return termCalendarPromise
 }
 
-/**
- * Rows come back typed from the client now (see lib/database.types.ts), so
- * mappers take the real shape instead of `Record<string, unknown>` + casts.
- * That's what makes a wrong column name a compile error rather than a 400.
- */
 type SectionRow = Pick<
   Database['public']['Tables']['sections']['Row'],
   'id' | 'name' | 'semester_id'
@@ -299,12 +254,6 @@ function mapSection(row: SectionRow): Section {
   }
 }
 
-/**
- * Sections, newest-semester-aware. Pass a semesterId to scope the list — the
- * instructor area always does, so last semester's rosters don't pile up in every
- * picker. Omitting it returns every section across all semesters (the archive
- * views want that).
- */
 export async function listSections(semesterId?: string): Promise<Section[]> {
   let query = supabase.from('sections').select('id, name, semester_id').order('name')
   if (semesterId) query = query.eq('semester_id', semesterId)
@@ -330,8 +279,6 @@ export async function renameSection(id: string, name: string): Promise<void> {
 }
 
 export async function deleteSection(id: string): Promise<void> {
-  // Deliberately UNFILTERED: archived students still block deletion — the
-  // cascade would silently destroy their preserved records.
   const { count, error: countError } = await supabase
     .from('students')
     .select('id', { count: 'exact', head: true })
@@ -346,18 +293,6 @@ export async function deleteSection(id: string): Promise<void> {
   if (error) throw error
 }
 
-/**
- * The active roster of one section, and nothing else.
- *
- * Deliberately NOT `listStudents`: that one also fetches `student_secrets` to
- * merge every student's claim token into the row, which is right for the roster
- * screen that displays them and wrong everywhere else. A group builder has no
- * business pulling secrets over the wire — the same call `getSectionHeadcounts`
- * makes for the same reason.
- *
- * Sorted by roster name, which is the order the instructor reads a class list
- * in, not by display name.
- */
 export async function listRosterBasics(sectionId: string): Promise<RosterPerson[]> {
   const { data, error } = await supabase
     .from('students')
@@ -375,11 +310,6 @@ export async function listRosterBasics(sectionId: string): Promise<RosterPerson[
     .sort((a, b) => a.fullName.localeCompare(b.fullName))
 }
 
-/**
- * Total students per section INCLUDING archived. Gates section deletion in
- * ManageSections — a section holding only archived students must read as
- * non-empty there, even though rosters show it as empty.
- */
 export async function getSectionTotalCounts(): Promise<Record<string, number>> {
   const { data, error } = await supabase.from('students').select('section_id')
   if (error) throw error
@@ -396,14 +326,6 @@ export interface SectionStat {
   claimed: number
 }
 
-/**
- * Per-section roster stats (total students + how many have claimed).
- *
- * Pass the section ids you're rendering (SectionGrid does) — students AND their
- * secrets are then scoped to those sections instead of scanning every semester's
- * roster and shipping every claim token's row over the wire on the instructor's
- * home screen (0031 ride-along).
- */
 export async function getSectionStats(sectionIds?: string[]): Promise<Record<string, SectionStat>> {
   let studentQuery = supabase.from('students').select('id, section_id').is('archived_at', null)
   if (sectionIds && sectionIds.length > 0) studentQuery = studentQuery.in('section_id', sectionIds)
@@ -412,7 +334,6 @@ export async function getSectionStats(sectionIds?: string[]): Promise<Record<str
   const rows = students.data ?? []
   if (rows.length === 0) return {}
 
-  // Chunked so the .in() URL stays bounded no matter how large a roster grows.
   const ids = rows.map((r) => r.id as string)
   const claimedById = new Map<string, boolean>()
   const CHUNK = 150
@@ -435,7 +356,6 @@ export async function getSectionStats(sectionIds?: string[]): Promise<Record<str
   return stats
 }
 
-/** Students in a section: profiles merged with their secret/token info. */
 export async function listStudents(sectionId: string): Promise<SectionStudent[]> {
   const students = await supabase
     .from('students')
@@ -446,8 +366,6 @@ export async function listStudents(sectionId: string): Promise<SectionStudent[]>
     .is('archived_at', null)
   if (students.error) throw students.error
 
-  // Scoped to THIS roster (0031 ride-along) — the old unfiltered fetch shipped
-  // every semester's claim tokens over the wire on every roster open.
   const secrets = await supabase
     .from('student_secrets')
     .select('student_id, claim_token, username, claimed_at')
@@ -471,7 +389,6 @@ export async function listStudents(sectionId: string): Promise<SectionStudent[]>
     .sort((a, b) => a.full_name.localeCompare(b.full_name))
 }
 
-/** Add a student to a section; returns the generated one-time claim token. */
 export async function createStudent(
   sectionId: string,
   parts: NameParts,
@@ -503,10 +420,6 @@ export async function updateStudentName(
   })
 }
 
-/**
- * Bulk-add students to a section (e.g. from an Excel/CSV import) in one call.
- * Returns each created student with their fresh one-time claim token.
- */
 export async function createStudentsBulk(
   sectionId: string,
   fullNames: string[],
@@ -522,47 +435,20 @@ export async function createStudentsBulk(
   return rows.map((r) => ({ fullName: r.full_name, claimToken: r.claim_token }))
 }
 
-/**
- * Archive a student: hidden from rosters, leaderboard, attendance-taking and
- * analytics, but every record survives. Restorable any time. The server logs
- * the action (with a full row snapshot) and refreshes the frozen board.
- */
 export async function archiveStudent(studentId: string): Promise<void> {
   await rpc('archive_student', { p_student_id: studentId })
 }
 
-/** Bring an archived student back — they reappear everywhere immediately. */
 export async function restoreStudent(studentId: string): Promise<void> {
   const { error } = await supabase.rpc('restore_student', { p_student_id: studentId })
   if (error) throw error
 }
 
-/**
- * The only irreversible deletion left in the app. Server-enforced: refuses
- * unless the student is already archived, and audit-logs the full cascade
- * (their points, records, achievements) as recoverable JSON first.
- */
 export async function hardDeleteStudent(studentId: string): Promise<void> {
   const { error } = await supabase.rpc('hard_delete_student', { p_student_id: studentId })
   if (error) throw error
 }
 
-/** Archived students for a section, most recently archived first. */
-/**
- * Archived students — one section's, or every one of them.
- *
- * ⚠ `sectionId` BECAME OPTIONAL IN 0060, and the unfiltered call is the one
- *   that matters for a returning student. After a semester is closed, every
- *   archived student sits in a section of a FINISHED semester — a section that
- *   is not in the instructor's current section list at all — so the
- *   per-section drawer could not reach a single one of them. A roster scoped
- *   to this semester cannot answer a question about last semester.
- *
- * The section and semester names ride along so a cross-semester list is
- * legible: thirty archived names with no context is not a list anyone can act
- * on. They are read through `oneEmbed` because a many-to-one embed comes back
- * as an object at runtime while the generated types infer an array.
- */
 export async function listArchivedStudents(sectionId?: string): Promise<ArchivedStudent[]> {
   let query = supabase
     .from('students')
@@ -599,12 +485,6 @@ export async function listArchivedStudents(sectionId?: string): Promise<Archived
   })
 }
 
-/**
- * Instructor: issue a one-time, expiring reset code for a student who forgot
- * their PIN. The student redeems it on the /reset page (via the `reset-pin` Edge
- * Function). Only works once the student has claimed their account.
- * Returns the code to hand out + when it expires.
- */
 export async function resetStudentPin(
   studentId: string,
 ): Promise<{ token: string; expiresAt: string }> {
@@ -615,7 +495,6 @@ export async function resetStudentPin(
   return { token: data.reset_token, expiresAt: data.reset_expires_at }
 }
 
-/** Award the same points to one or more students in a single batch. */
 export async function awardPoints(args: {
   studentIds: string[]
   points: number
@@ -628,30 +507,17 @@ export async function awardPoints(args: {
     category: args.category,
     note: args.note?.trim() || null,
   }))
-  // Awarding usually happens right after unlocking the phone at the start of
-  // class — exactly when the access token is most likely to be mid-refresh.
-  // Only auth-layer rejections retry, so this cannot double-insert.
   await withAuthRetry(async () => {
     const { error } = await supabase.from('point_events').insert(rows)
     if (error) throw error
   })
 }
 
-
-/**
- * Recent point awards across all students (instructor review / undo).
- *
- * Excludes 'redeem' debits on purpose: those are owned by point_redemptions,
- * and deleting the event here would give the points back while the request
- * still reads "approved" — a desync with no way to notice. Spending is
- * reviewed and reversed from the Requests screen instead.
- */
 export interface AwardFilters {
   /** Only this section's students. Omit for every section. */
   sectionId?: string
   /** Only this ledger category. Omit for all of them. */
   category?: PointCategory
-  /** Skip this many rows — offset paging for the load-more button. */
   offset?: number
 }
 
@@ -659,9 +525,6 @@ export async function listRecentAwards(
   limit = 30,
   filters: AwardFilters = {},
 ): Promise<AwardRecord[]> {
-  // The embed must be !inner WHEN filtering on it. A plain embed applies the
-  // filter but keeps every parent row, nulling the students object instead of
-  // excluding it — the list would fill with rows reading 'Unknown'.
   const cols = filters.sectionId
     ? 'id, student_id, points, category, note, created_at, students!inner(full_name, section_id)'
     : 'id, student_id, points, category, note, created_at, students(full_name, section_id)'
@@ -688,17 +551,11 @@ export async function listRecentAwards(
   }))
 }
 
-/** Delete a single point event (instructor undo). Totals auto-recompute. */
 export async function deletePointEvent(id: string): Promise<void> {
   const { error } = await supabase.from('point_events').delete().eq('id', id)
   if (error) throw error
 }
 
-/**
- * The frozen leaderboard snapshot + when it was captured.
- * Refreshed twice daily (7:30 AM / 7:30 PM PHT) by a pg_cron job, so the
- * ranking only "settles" twice a day even though dashboards are live.
- */
 export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot> {
   const [snap, meta, avatars] = await Promise.all([
     supabase
@@ -708,8 +565,6 @@ export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot> {
       )
       .order('rank'),
     supabase.from('leaderboard_meta').select('captured_at').maybeSingle(),
-    // Avatars aren't part of the frozen ranking — merge the current ones in so a
-    // newly-set picture shows immediately without waiting for the next snapshot.
     supabase.from('students').select('id, avatar_url'),
   ])
   if (snap.error) throw snap.error
@@ -723,20 +578,14 @@ export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot> {
     points: (e.semester_points as number) ?? 0,
     rank: e.rank as number,
     avatar_url: avatarById.get(e.student_id as string) ?? null,
-    // Defaulted so a client running ahead of migration 0037 simply shows no
-    // arrow and no tenure, rather than rendering `undefined`.
     previous_rank: (e.previous_rank as number | null) ?? null,
     rank_since: (e.rank_since as string | null) ?? new Date().toISOString(),
-    // The spend board (0038) rides on this same fetch — one request feeds both
-    // boards, which is the whole reason spend lives in the snapshot rather than
-    // behind its own RPC.
     spent_points: (e.spent_points as number | null) ?? 0,
     spend_rank: (e.spend_rank as number | null) ?? null,
   }))
   return { entries, capturedAt: meta.data?.captured_at ?? null }
 }
 
-/** The signed-in student's own row, located by their auth user id. */
 export async function getMyStudent(userId: string): Promise<StudentSelf | null> {
   const { data, error } = await supabase
     .from('students')
@@ -747,17 +596,10 @@ export async function getMyStudent(userId: string): Promise<StudentSelf | null> 
     .maybeSingle()
   if (error) throw error
   if (!data) return null
-  // lifetime_points is the DB's career total; the app calls it all_time_points
-  // so nothing confuses it with the semester balance students actually see.
   const { lifetime_points, ...rest } = data as Record<string, unknown>
   return { ...rest, all_time_points: (lifetime_points as number) ?? 0 } as StudentSelf
 }
 
-/**
- * Student updates the public-facing fields on their own row in one write:
- * display name, bio, and interests. Empty bio/interests are stored as NULL.
- * (Column access is guarded by trg_guard_student_update; lengths by CHECKs.)
- */
 export async function updateProfileFields(
   studentId: string,
   fields: { display_name: string; bio: string | null; interests: string | null },
@@ -773,11 +615,6 @@ export async function updateProfileFields(
   if (error) throw error
 }
 
-/**
- * A classmate's public-safe profile for the leaderboard tap-preview: their
- * roster-public columns plus a few recent point events (via the SECURITY
- * DEFINER `public_point_events` RPC, since RLS hides other students' history).
- */
 export async function getPublicProfile(
   studentId: string,
   eventLimit = 5,
@@ -814,23 +651,13 @@ export async function getPublicProfile(
   }
 }
 
-/**
- * Upload a student's profile picture to the `avatars` bucket and save the public
- * URL on their row. The file must live under the user's own uid folder (Storage
- * RLS enforces this). Returns the new public URL.
- *
- * Size/type are validated in the UI; the bucket also caps at 5 MB server-side.
- */
 export async function updateAvatar(
   studentId: string,
   userId: string,
   original: File,
 ): Promise<string> {
-  // Downscale first: a phone photo is 3–8 MB and this renders at 40px. Fails
-  // soft — if the canvas path can't handle the file, the original goes up.
   const file = await downscaleImage(original, AVATAR_MAX_PX)
   const ext = (file.name.split('.').pop() || 'png').toLowerCase()
-  // Cache-busting filename so the CDN/browser always shows the latest upload.
   const path = `${userId}/avatar-${Date.now()}.${ext}`
   const { error: upErr } = await supabase.storage
     .from('avatars')
@@ -857,11 +684,6 @@ export async function removeAvatar(studentId: string): Promise<void> {
   if (error) throw error
 }
 
-/**
- * Upload one showcase banner photo to the shared `avatars` bucket (its RLS
- * already scopes writes to <auth.uid()>/…) and return the public URL. The caller
- * then persists the new banner_urls array via `setBannerUrls`.
- */
 export async function uploadBannerPhoto(userId: string, original: File): Promise<string> {
   const file = await downscaleImage(original, BANNER_MAX_PX)
   const ext = (file.name.split('.').pop() || 'png').toLowerCase()
@@ -873,13 +695,6 @@ export async function uploadBannerPhoto(userId: string, original: File): Promise
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl
 }
 
-/**
- * Upload the wide cover image for the top of the profile (0039).
- *
- * Same bucket, same downscale ceiling and same 5 MB client cap as the showcase
- * photos — a header is just a wider crop of the same kind of picture, and a
- * second size limit would be one more number to keep in sync.
- */
 export async function uploadHeaderPhoto(userId: string, original: File): Promise<string> {
   const file = await downscaleImage(original, BANNER_MAX_PX)
   const ext = (file.name.split('.').pop() || 'png').toLowerCase()
@@ -891,13 +706,6 @@ export async function uploadHeaderPhoto(userId: string, original: File): Promise
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl
 }
 
-/**
- * Set (or clear, with null) the student's profile header image.
- *
- * Both paths reset the focal point. A new cover is a different picture, and
- * inheriting the last one's position would drop it in at an angle chosen for a
- * photo that is no longer there.
- */
 export async function setHeaderUrl(studentId: string, url: string | null): Promise<void> {
   const { error } = await supabase
     .from('students')
@@ -908,8 +716,6 @@ export async function setHeaderUrl(studentId: string, url: string | null): Promi
 
 /** Save where the cover sits vertically, 0–100 (0040). */
 export async function setHeaderPos(studentId: string, pos: number): Promise<void> {
-  // Clamped here as well as by the CHECK: a drag that runs one frame past the
-  // edge should reposition the cover, not fail the write.
   const clamped = Math.max(0, Math.min(100, Math.round(pos)))
   const { error } = await supabase
     .from('students')
@@ -927,15 +733,11 @@ export async function setBannerUrls(studentId: string, urls: string[]): Promise<
   if (error) throw error
 }
 
-/** Record that the signed-in student viewed another student's profile. The DB
- * resolves the viewer from auth.uid() and ignores self-views / non-students. */
 export async function recordProfileView(viewedId: string): Promise<void> {
   const { error } = await supabase.rpc('record_profile_view', { p_viewed_id: viewedId })
   if (error) throw error
 }
 
-/** The signed-in student's own view stats + recent visitors. Only returns data
- * for your own profile (the RPC guards against reading anyone else's). */
 export async function getProfileViews(studentId: string): Promise<ProfileViews> {
   const { data, error } = await supabase
     .rpc('get_profile_views', { p_student_id: studentId, p_limit: 8 })
@@ -956,7 +758,6 @@ export async function getProfileViews(studentId: string): Promise<ProfileViews> 
   }
 }
 
-/** One student, for the instructor's record page (includes archive + claim state). */
 export async function getStudent(studentId: string): Promise<InstructorStudentDetail | null> {
   const [studentRes, secretRes] = await Promise.all([
     supabase
@@ -1001,17 +802,10 @@ export async function getStudent(studentId: string): Promise<InstructorStudentDe
   }
 }
 
-/**
- * Whole-section attendance register (rows = active-or-recorded students, cols =
- * sessions chronological). Backs the class-record matrix export.
- */
 export async function getSectionRegister(
   sectionId: string,
   subjectId?: string,
 ): Promise<SectionRegister> {
-  // `subjectId` keeps the export honest with the screen it came from: Class
-  // history's subject toggle used to scope every stat on screen and then hand
-  // you a register with both subjects fused into one grid.
   let sessionQuery = supabase
     .from('class_sessions')
     .select('id, topic, started_at, subjects(code)')
@@ -1042,8 +836,6 @@ export async function getSectionRegister(
 
   const statuses: Record<string, Record<string, AttendanceStatus>> = {}
   if (sessions.length > 0) {
-    // The register genuinely needs every cell, so this pages past the 1000-row
-    // cap instead of aggregating (0031). `id` is the unique order tiebreaker.
     const records = await fetchAllPages<{
       session_id: string
       student_id: string
@@ -1064,7 +856,6 @@ export async function getSectionRegister(
     }
   }
 
-  // Active students, plus archived ones who have any record (history stays whole).
   const students = roster
     .filter((s) => s.archived_at == null || statuses[s.id])
     .map((s) => ({ id: s.id, fullName: s.full_name }))
@@ -1073,10 +864,6 @@ export async function getSectionRegister(
   return { sessions, students, statuses }
 }
 
-/**
- * A page of the full "who viewed me" list (owner-only; empty for anyone else).
- * The strip uses getProfileViews; this backs the tap-through modal.
- */
 export async function getProfileVisitors(
   studentId: string,
   offset = 0,
@@ -1114,7 +901,6 @@ export async function getProfileVisitors(
   }
 }
 
-/** Holders-per-badge across the class — powers the rarity readout. */
 export async function getAchievementRarity(): Promise<Map<string, AchievementRarity>> {
   const { data, error } = await supabase.rpc('get_achievement_rarity')
   if (error) throw error
@@ -1130,7 +916,6 @@ export async function getAchievementRarity(): Promise<Map<string, AchievementRar
   return map
 }
 
-/** The student's current rank from the frozen snapshot, or null if not ranked. */
 export async function getMyRank(studentId: string): Promise<number | null> {
   const { data, error } = await supabase
     .from('leaderboard_snapshot')
@@ -1141,25 +926,11 @@ export async function getMyRank(studentId: string): Promise<number | null> {
   return data?.rank ?? null
 }
 
-/** Recent point events for a student (their feed / instructor review). */
-/** Cursor for `listStudentEvents` — the last row of the page you already have. */
 export interface EventCursor {
   created_at: string
   id: string
 }
 
-/**
- * A student's point ledger, newest first.
- *
- * Pass `before` (the last row of the page you're holding) to fetch the next
- * page. The cursor is KEYSET, not an offset: an offset would silently skip or
- * repeat a row whenever a new award landed mid-scroll, and awards land while
- * students are looking at this screen.
- *
- * The cursor is compound — `(created_at, id)` — because ordering on a timestamp
- * alone is not a total order. Two rows sharing a timestamp would make the page
- * boundary ambiguous, and one of them would vanish from the history.
- */
 export async function listStudentEvents(
   studentId: string,
   limit = 20,
@@ -1170,10 +941,6 @@ export async function listStudentEvents(
     .select('id, student_id, points, category, note, created_at')
     .eq('student_id', studentId)
   if (before) {
-    // Quoted: a timestamptz renders as `…T10:30:00.123+00:00`, and that `+` is
-    // the one character PostgREST's filter grammar would otherwise be free to
-    // read as something else. Quoting makes the value a literal whatever the
-    // encoder does with it.
     const at = `"${before.created_at}"`
     q = q.or(`created_at.lt.${at},and(created_at.eq.${at},id.lt.${before.id})`)
   }

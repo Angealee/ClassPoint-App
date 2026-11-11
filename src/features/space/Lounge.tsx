@@ -34,19 +34,6 @@ import type { LoungeEvent, LoungePost, LoungeQuota } from '@/lib/types'
 
 const PAGE = 20
 
-/**
- * `/app/space/lounge` — the feed.
- *
- * ── HOW NEW POSTS ARRIVE ───────────────────────────────────────────────────
- * They do NOT get spliced in under your thumb. A realtime INSERT only bumps a
- * counter, which surfaces as a "3 new posts" pill; the list itself changes
- * exactly when you ask it to, by tapping the pill or pulling to refresh. That
- * is the whole reason the subscription does not touch `posts` — content
- * shifting mid-read is how you tap the wrong post's W button.
- *
- * The subscription is PAGE-SCOPED via `uniqueChannel` and removed on unmount;
- * the durable `student-self-*` channel is untouched.
- */
 export function Lounge() {
   const { me, spaceAccess, sections } = useStudentData()
   const { toast } = useToast()
@@ -99,16 +86,12 @@ export function Lounge() {
     void load(mode)
   }, [mode, load])
 
-  // The roster for the shoutout picker — the student's own section, minus
-  // themselves. Loaded off the critical path: the feed must render without it.
   useEffect(() => {
     if (!me?.section_id) return
     let cancelled = false
     void listSpacePeople()
       .then((rows) => {
         if (cancelled) return
-        // You cannot shout yourself out; the RPC includes you because chat
-        // needs your own badges.
         setClassmates(rows.filter((r) => r.id !== me?.id))
       })
       .catch(() => {
@@ -119,8 +102,6 @@ export function Lounge() {
     }
   }, [me?.section_id, me?.id])
 
-  // Page-scoped realtime. INSERT only bumps the pill; UPDATE patches a card in
-  // place (a W or a reply count), which cannot move anything.
   const seenRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     const channel = uniqueChannel('lounge')
@@ -131,8 +112,6 @@ export function Lounge() {
           const row = payload.new as { id?: string; author_student_id?: string | null }
           if (!row?.id || seenRef.current.has(row.id)) return
           seenRef.current.add(row.id)
-          // Your own post is already on screen — announcing it back would read
-          // as someone else having posted.
           if (row.author_student_id && row.author_student_id === me?.id) return
           setPendingNew((n) => n + 1)
         },
@@ -149,11 +128,6 @@ export function Lounge() {
               p.id === id
                 ? {
                     ...p,
-                    // Only the counters are trusted from the payload. `i_gave_w`
-                    // and `can_delete` are computed PER VIEWER by the RPC and do
-                    // not exist on the raw row — spreading it blind would wipe
-                    // them, the same trap StudentData documents for
-                    // lifetime_points.
                     wCount: (row.w_count as number) ?? p.wCount,
                     replyCount: (row.reply_count as number) ?? p.replyCount,
                     hiddenAt: (row.hidden_at as string | null) ?? null,
@@ -195,8 +169,6 @@ export function Lounge() {
     setPosting(true)
     try {
       await postToLounge(body)
-      // No optimistic insert — refetching keeps `i_gave_w` and `can_delete`
-      // authoritative, and the post is at the top anyway.
       await load(mode)
       return true
     } catch (e) {
@@ -299,7 +271,6 @@ export function Lounge() {
         ]}
       />
 
-      {/* The pill. Nothing above it moves until this is tapped. */}
       {pendingNew > 0 && (
         <button
           type="button"

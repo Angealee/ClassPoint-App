@@ -35,44 +35,12 @@ interface Draft {
   comments: Comments
 }
 
-/**
- * Long enough for the card that is closing to finish collapsing, so the scroll
- * lands on where the next card ends up rather than where it was mid-animation.
- * Matches PeerCard's 0.22s height transition, plus a frame.
- */
 const SCROLL_AFTER_MS = 260
 
-/**
- * The draft key carries the STUDENT ID as well as the evaluation.
- *
- * A shared phone must never hand one student another's half-finished opinion of
- * their classmates. Same precedent as `cp_seen_level_${studentId}_${semesterId}`,
- * and it matters more here than it did there.
- */
 function draftKey(studentId: string, evaluationId: string): string {
   return `cp_peer_draft_${studentId}_${evaluationId}_v1`
 }
 
-/**
- * The evaluation form.
- *
- * ── DRAFTS LIVE IN localStorage AND NOWHERE ELSE (decision 6) ──────────────
- * No draft table, which has one consequence worth stating plainly: the
- * instructor cannot see partial progress. The completion view answers
- * "submitted or not", never "60% done". That is the trade for never keeping a
- * server-side copy of an unsent judgement about a classmate. The "Saved on this
- * device" line is what tells the student that closing the app is safe.
- *
- * ── MOVING THROUGH THE CLASS ───────────────────────────────────────────────
- * Avatar chips at the top show who is done and jump to anyone. Each finished
- * card ends with "Next: Maria" under its comment box, and the bottom button is
- * never a dead grey "Rate 2 more": until everyone is rated it takes you to the
- * next classmate still waiting, by name.
- *
- * ── SUBMISSION IS FINAL (the instructor's call) ────────────────────────────
- * So the last step is a review of every answer, and its Submit still opens the
- * confirmation. The database will not let anyone take a submission back.
- */
 export function PeerEvaluationForm() {
   const { evaluationId = '' } = useParams()
   const navigate = useNavigate()
@@ -91,8 +59,6 @@ export function PeerEvaluationForm() {
   const [busy, setBusy] = useState(false)
 
   const studentId = me?.id ?? ''
-  // A ref as well, so the save effect below does not have to list it and
-  // re-run whenever the provider hands out a new object.
   const restored = useRef(false)
   const scrollTimer = useRef<number | null>(null)
 
@@ -119,7 +85,6 @@ export function PeerEvaluationForm() {
     [],
   )
 
-  // Restore the draft once, after both the form and the student id are known.
   useEffect(() => {
     if (restored.current || !form || !studentId) return
     restored.current = true
@@ -132,14 +97,9 @@ export function PeerEvaluationForm() {
         setComments(d.comments ?? {})
       }
     } catch {
-      // A corrupt or unreadable draft is not worth a message. Starting empty is
-      // exactly what the student would get anyway, and localStorage throws
-      // outright in some private-browsing modes.
     }
   }, [form, studentId, evaluationId])
 
-  // Save on every change. Cheap, and the alternative is deciding when a student
-  // is "done typing" moments before their phone is locked.
   const [savedOk, setSavedOk] = useState(true)
   useEffect(() => {
     if (!restored.current || !studentId) return
@@ -147,8 +107,6 @@ export function PeerEvaluationForm() {
       localStorage.setItem(draftKey(studentId, evaluationId), JSON.stringify({ scores, comments }))
       setSavedOk(true)
     } catch {
-      // Quota or a blocked store. No toast on every keystroke — but the saved
-      // line must stop claiming something that is not true.
       setSavedOk(false)
     }
   }, [scores, comments, studentId, evaluationId])
@@ -183,13 +141,6 @@ export function PeerEvaluationForm() {
     setScores((prev) => ({ ...prev, [rateeId]: { ...(prev[rateeId] ?? {}), [criterionId]: value } }))
   }
 
-  /**
-   * Open one classmate's card and bring it into view.
-   *
-   * The scroll waits for the previous card to finish collapsing. Scrolling
-   * straight away aims at where the next card is mid-animation, and it then
-   * slides up out of view as the card above it shrinks.
-   */
   function openPeer(peerId: string) {
     setReviewing(false)
     setOpenId(peerId)
@@ -201,7 +152,6 @@ export function PeerEvaluationForm() {
     }, SCROLL_AFTER_MS)
   }
 
-  /** The next classmate still waiting after `fromId`, wrapping round. */
   function nextUnfinished(fromId: string | null) {
     if (!form) return null
     const peers = form.peers
@@ -221,9 +171,6 @@ export function PeerEvaluationForm() {
       for (const p of form.peers) {
         for (const c of form.criteria) {
           const v = scores[p.id]?.[c.id]
-          // Building the payload from the peer and criteria lists rather than
-          // from whatever is in state is what keeps a stale draft from sending
-          // a criterion that no longer exists.
           if (v === undefined) continue
           ratings.push({ ratee_id: p.id, criterion_id: c.id, score: v })
         }
@@ -236,14 +183,10 @@ export function PeerEvaluationForm() {
       try {
         localStorage.removeItem(draftKey(studentId, evaluationId))
       } catch {
-        // Nothing to do. The draft is now stale but harmless: the form is
-        // locked from here on and will never read it again.
       }
       toast('Submitted. Thanks for being honest.', 'success')
       navigate('/app/peer', { replace: true })
     } catch (e) {
-      // The RPC's rejections are real sentences ("Rate every peer before
-      // submitting"), so they are shown as-is.
       toast(errorText(e, "Couldn't submit that."), 'error')
       setConfirm(false)
     } finally {
@@ -264,7 +207,6 @@ export function PeerEvaluationForm() {
   const firstWaiting = nextUnfinished(null)
   const allDone = totals.total > 0 && totals.done === totals.total
 
-  // The bottom button always does something. Its label says what.
   const primary = longComment
     ? {
         label: `Shorten your comment for ${longComment.displayName}`,
@@ -332,8 +274,6 @@ export function PeerEvaluationForm() {
               </div>
 
               {!locked && (
-                // Its own horizontal scroller, so a big group can never push
-                // the page sideways.
                 <div
                   className="mt-3 flex gap-3 overflow-x-auto px-1 pb-1"
                   role="group"
@@ -422,9 +362,6 @@ export function PeerEvaluationForm() {
                             },
                           }
                     }
-                    // One card open at a time. With six peers and four criteria
-                    // each, all of them open is a screen nobody can find their
-                    // place in.
                     onToggle={() => setOpenId((cur) => (cur === p.id ? null : p.id))}
                     onScore={(cid, v) => setScore(p.id, cid, v)}
                     onComment={(body) => setComments((prev) => ({ ...prev, [p.id]: body }))}
@@ -459,7 +396,6 @@ export function PeerEvaluationForm() {
         open={confirm}
         title="Send these answers?"
         message={`You are rating ${totals.total} classmate${totals.total === 1 ? '' : 's'}. Your name is never shown to them.`}
-        // The one thing they cannot find out afterwards, said before it happens.
         detail="This cannot be changed or taken back once it is sent."
         confirmLabel="Submit"
         busy={busy}

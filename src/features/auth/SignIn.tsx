@@ -30,8 +30,6 @@ export function SignIn() {
   const usernameRef = useRef<HTMLInputElement>(null)
   const pinRef = useRef<HTMLInputElement>(null)
 
-  // Land the cursor in the first EMPTY field: a returning student whose
-  // username is remembered starts on the PIN, everyone else on the username.
   useEffect(() => {
     ;(remembered ? pinRef : usernameRef).current?.focus()
   }, [remembered])
@@ -67,8 +65,6 @@ export function SignIn() {
     <AuthShell
       title="Welcome!"
       subtitle="Log in to your account to access your progress."
-      // The claim stub is the ONLY route to /claim on this screen, and it is
-      // deliberately not repeated in the footer — see ClaimDoor's own note.
       below={<ClaimDoor />}
     >
       <motion.form

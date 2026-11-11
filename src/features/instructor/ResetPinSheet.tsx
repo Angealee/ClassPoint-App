@@ -6,10 +6,6 @@ import { useToast } from '@/components/ui/Toast'
 import { CopyIcon } from '@/components/ui/icons'
 import { resetStudentPin } from '@/lib/api'
 
-/**
- * Issue a one-time PIN-reset code for a student. Self-contained (manages its
- * own token + copy) so any instructor screen can drop it in.
- */
 export function ResetPinSheet({
   student,
   open,

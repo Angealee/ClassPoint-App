@@ -18,27 +18,6 @@ import { useInstructor } from './InstructorLayout'
 import { timeAgo } from '@/lib/time'
 import type { ArchivedStudent } from '@/lib/types'
 
-/**
- * The archive drawer: restore students, or — behind a two-step confirmation
- * ending in a typed-name challenge — delete them forever. This is the only
- * place permanent deletion exists in the whole app.
- *
- * ── TWO MOUNTS, ONE COMPONENT (0060) ───────────────────────────────────────
- * With `sectionId` it is the per-section drawer off the roster, as before.
- * WITHOUT it, it is the whole archive across every semester — which is the
- * only way to reach a student archived by closing a semester, because their
- * section belongs to a semester that is no longer in the instructor's list.
- *
- * ── RESTORING NEEDS A DESTINATION, AND THAT IS NOT COSMETIC ─────────────────
- * `restoreStudent` (0023) only clears `archived_at`, leaving the student in the
- * section they had when they left. After a rollover that is a FINISHED
- * semester's section, and `scan_attendance`'s active-semester guard then
- * refuses them — so they looked restored and could not attend a class, with
- * nothing failing at restore time. In the cross-semester view, restore
- * therefore asks which section they are rejoining and calls
- * `restoreStudentInto`. The per-section drawer keeps the one-tap restore: there
- * the destination is not in question, it is the section you are looking at.
- */
 export function ArchivedStudentsSheet({
   sectionId,
   open,
@@ -49,7 +28,6 @@ export function ArchivedStudentsSheet({
   sectionId?: string
   open: boolean
   onClose: () => void
-  /** Fired after a restore or hard delete so the roster can refresh. */
   onChanged: () => void
 }) {
   const { toast } = useToast()
@@ -57,10 +35,8 @@ export function ArchivedStudentsSheet({
   const [rows, setRows] = useState<ArchivedStudent[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
-  // Who we are placing, and where. Null = nobody is being placed.
   const [placing, setPlacing] = useState<ArchivedStudent | null>(null)
   const [target, setTarget] = useState('')
-  // Two-step deletion: step 1 explains the damage, step 2 demands the name.
   const [deleteTarget, setDeleteTarget] = useState<ArchivedStudent | null>(null)
   const [deleteStep, setDeleteStep] = useState<1 | 2>(1)
   const [deleting, setDeleting] = useState(false)
@@ -78,7 +54,6 @@ export function ArchivedStudentsSheet({
     }
   }, [open, sectionId, toast])
 
-  /** The per-section drawer: the destination is the section you are in. */
   async function onRestore(s: ArchivedStudent) {
     setBusyId(s.id)
     try {
@@ -93,7 +68,6 @@ export function ArchivedStudentsSheet({
     }
   }
 
-  /** The cross-semester view: un-archive AND place, in one transaction. */
   async function onRestoreInto() {
     if (!placing || !target) return
     setBusyId(placing.id)
@@ -137,11 +111,6 @@ export function ArchivedStudentsSheet({
             : 'Everyone archived, across every semester. Restoring asks which section they are rejoining — a student put back into a finished semester cannot attend a class.'}
         </p>
 
-        {/* ⚠ The placement form replaces the list IN PLACE rather than opening
-            a second overlay. Sheet is portalled and focus-trapped, so a Sheet
-            inside a Sheet stacks two competing traps — which is exactly why
-            AppLayout closes the mobile menu before opening the sign-out
-            dialog. One surface, two states. */}
         {placing ? (
           <div>
             <p className="text-sm">
@@ -210,13 +179,8 @@ export function ArchivedStudentsSheet({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{s.fullName}</p>
                   <p className="truncate text-xs text-muted">
-                    {/* Built from parts and joined once: concatenating " · "
-                        fragments leaves a doubled separator whenever a middle
-                        piece is absent, and both names are nullable here. */}
                     {[
                       `${s.lifetimePoints} pts`,
-                      // Only in the cross-semester view — in the per-section
-                      // drawer the section is the screen you are on.
                       sectionId ? null : s.sectionName,
                       sectionId ? null : s.semesterName,
                       `archived ${timeAgo(s.archivedAt)}`,
@@ -256,7 +220,6 @@ export function ArchivedStudentsSheet({
         )}
       </Sheet>
 
-      {/* Step 1 — spell out exactly what dies with the record. */}
       <ConfirmDialog
         open={!!deleteTarget && deleteStep === 1}
         title="Delete forever?"
@@ -273,7 +236,6 @@ export function ArchivedStudentsSheet({
         onClose={() => setDeleteTarget(null)}
       />
 
-      {/* Step 2 — the typed-name point of no return. */}
       <ConfirmDialog
         open={!!deleteTarget && deleteStep === 2}
         title="Point of no return"

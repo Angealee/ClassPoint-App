@@ -16,7 +16,6 @@ const row = (
 describe('classSummary', () => {
   it('averages each student once', () => {
     const s = classSummary([
-      // Whole-number inputs so the expected mean is exact in floating point.
       row(80, [['a', 80, 4]]),
       row(40, [['a', 40, 3]]),
     ])
@@ -24,10 +23,6 @@ describe('classSummary', () => {
     expect(s.criteria).toEqual([{ id: 'a', label: 'A', scaleMax: 5, pct: 60, avg: 3.5 }])
   })
 
-  /**
-   * THE ONE THAT MATTERS. A student nobody rated has a null average. Counting
-   * them as zero would drag the class figure down for a gap in the data.
-   */
   it('leaves unrated students out of every average, but counts them in the total', () => {
     const s = classSummary([
       row(90, [['a', 90, 4.6]]),
@@ -38,10 +33,6 @@ describe('classSummary', () => {
     expect(s.totalCount).toBe(2)
   })
 
-  /**
-   * Pooling every rating would weight a student rated by five people above one
-   * rated by three. Rater count must not change a student's weight.
-   */
   it('does not weight a student by how many people rated them', () => {
     const s = classSummary([row(100, [['a', 100, 5]], 5), row(0, [['a', 0, 1]], 3)])
     expect(s.overallPct).toBe(50)
@@ -68,7 +59,6 @@ describe('byTeam', () => {
       row(60, [['a', 60, 3.4]], 3, 'Group 2'),
     ]
     const teams = byTeam(rows)
-    // Numeric-aware, so Group 10 follows Group 2 rather than preceding it.
     expect(teams.map((t) => t.team)).toEqual(['Group 2', 'Group 10', 'No team'])
     expect(teams[0].rows.map((r) => r.overallPct)).toEqual([30, 60])
     expect(teams[0].pct).toBe(45)

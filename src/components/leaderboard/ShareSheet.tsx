@@ -9,13 +9,6 @@ import { CARD_H, CARD_W, ShareCard, type ShareVariant } from './ShareCard'
 import { biggestClimber } from './RankSignals'
 import type { LeaderboardEntry } from '@/lib/types'
 
-/**
- * Preview width inside the sheet; the card itself stays 1080×1920.
- *
- * Narrower than it was, because a 9:16 card previews more than twice as tall as
- * the old 4:5 one — at the previous 260 the preview alone was 462px, which does
- * not leave room for the format picker and the buttons on a phone.
- */
 const PREVIEW_W = 190
 const SCALE = PREVIEW_W / CARD_W
 
@@ -30,20 +23,6 @@ interface ShareSheetProps {
   capturedAt?: string | null
 }
 
-/**
- * Preview the leaderboard as an image, pick a style, then share or save it.
- *
- * Capture pitfalls handled here:
- *  • Fonts — wait for document.fonts.ready, or the export renders in a fallback
- *    face and the whole thing looks off-brand.
- *  • Avatars — decode every <img> before capturing; an undecoded remote image
- *    exports as a blank square.
- *  • Transform — the *wrapper* is scaled for the preview, never the captured
- *    node, so the clone renders at full 1080×1350 instead of a 260px thumbnail.
- *  • iOS — navigator.share must run inside the tap's transient activation
- *    window. Capture is fast (the card is already mounted), but if the OS still
- *    rejects it we fall back to a download rather than failing silently.
- */
 export function ShareSheet({
   open,
   onClose,
@@ -59,13 +38,8 @@ export function ShareSheet({
   const [variant, setVariant] = useState<ShareVariant>('podium')
   const [busy, setBusy] = useState(false)
 
-  // `entries` is the FULL ranked list for this view, which is what the climber
-  // must be computed from — the biggest climber is usually someone still
-  // working their way up, not one of the ten on the card.
   const climber = useMemo(() => biggestClimber(entries), [entries])
 
-  // Warm the capture library while the user is still looking at the preview, so
-  // the tap itself stays inside iOS's activation window.
   useEffect(() => {
     if (open) void import('modern-screenshot')
   }, [open])
@@ -87,10 +61,6 @@ export function ShareSheet({
       ),
     )
 
-    // JPEG, not PNG. A 1080×1920 dark gradient as PNG is several megabytes —
-    // which matters when a student sends it over mobile data, and some share
-    // targets recompress a large file anyway (so you get JPEG quality at PNG
-    // size). 0.92 is visually lossless on faces and avatars.
     return domToBlob(node, {
       width: CARD_W,
       height: CARD_H,
@@ -129,8 +99,6 @@ export function ShareSheet({
             setBusy(false)
             return
           }
-          // Anything else (NotAllowedError from a lapsed activation window,
-          // unsupported target) → fall through to a plain download.
         }
       }
       download(blob, filename)
@@ -158,14 +126,12 @@ export function ShareSheet({
           ]}
         />
 
-        {/* Live preview — exactly what gets exported, just scaled down. */}
         {hasEntries ? (
           <div className="flex justify-center">
             <div
               className="overflow-hidden rounded-2xl ring-1 ring-line"
               style={{ width: PREVIEW_W, height: Math.round(CARD_H * SCALE) }}
             >
-              {/* The transform lives HERE, not on the captured node. */}
               <div
                 style={{
                   width: CARD_W,

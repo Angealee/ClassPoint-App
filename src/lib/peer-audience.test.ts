@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveGroupTargets, type SectionGroupState } from './peer-audience'
 
-/**
- * Pins who an evaluation reaches. Every failure here is silent in the app: the
- * composer opens the evaluation either way, and only the wrong students get the
- * notification.
- */
-
 const ready = (...ids: string[]): SectionGroupState => ({
   status: 'ready',
   groups: ids.map((id) => ({ id })),
@@ -25,12 +19,6 @@ describe('resolveGroupTargets', () => {
     expect(r).toEqual({ narrowed: false, groupIds: null, error: null })
   })
 
-  /**
-   * THE DEFAULT. Nothing unticked must send NO list, so the server keeps its
-   * "all groups" meaning — including for a group created after opening. Sending
-   * the full list instead would look identical today and quietly exclude that
-   * later group.
-   */
   it('sends no list when every group is left ticked', () => {
     const r = resolveGroupTargets({
       scope: 'group',
@@ -62,11 +50,6 @@ describe('resolveGroupTargets', () => {
     expect(r).toEqual({ narrowed: true, groupIds: ['a1', 'a3'], error: null })
   })
 
-  /**
-   * Narrowing in one section fixes the list for ALL sections, so the other
-   * section's groups must be listed explicitly. Leaving them out would drop an
-   * entire section the instructor never touched.
-   */
   it('keeps every group of an untouched section when narrowing another', () => {
     const r = resolveGroupTargets({
       scope: 'group',
@@ -88,10 +71,6 @@ describe('resolveGroupTargets', () => {
     expect(r).toEqual({ narrowed: false, groupIds: null, error: null })
   })
 
-  /**
-   * An empty list would reach the server as "all groups" — the opposite of
-   * clearing every box. So it is refused here, never sent.
-   */
   it('refuses when every group has been unticked', () => {
     const r = resolveGroupTargets({
       scope: 'group',
@@ -103,10 +82,6 @@ describe('resolveGroupTargets', () => {
     expect(r.groupIds).toBeNull()
   })
 
-  /**
-   * Narrowed while another ticked section's groups are unknown: sending the
-   * list now would silently exclude that whole section.
-   */
   it('refuses a narrowed list while a ticked section is still loading', () => {
     const r = resolveGroupTargets({
       scope: 'group',

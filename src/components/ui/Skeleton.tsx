@@ -2,13 +2,6 @@ import { Rows } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import type { CSSProperties } from 'react'
 
-/**
- * A single shimmering placeholder block.
- *
- * `style` exists for the one case a class cannot cover: the live-class and
- * event QR placeholders are sized from a measured viewport value, so their
- * dimensions are only known at runtime.
- */
 export function Skeleton({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
     <span style={style} className={cn('relative block overflow-hidden rounded-lg bg-card-2', className)}>
@@ -17,7 +10,6 @@ export function Skeleton({ className, style }: { className?: string; style?: CSS
   )
 }
 
-/** A card of placeholder rows (avatar + two lines) for roster/leaderboard lists. */
 export function ListSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <Rows>

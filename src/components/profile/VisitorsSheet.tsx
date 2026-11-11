@@ -10,10 +10,6 @@ import type { ProfileVisitorRow } from '@/lib/types'
 
 const PAGE = 20
 
-/**
- * The full, paginated "who viewed me" list. Owner-only (the RPC returns empty
- * for anyone else). Header shows the grand totals; rows show name + when.
- */
 export function VisitorsSheet({
   studentId,
   totalViews,
@@ -22,12 +18,9 @@ export function VisitorsSheet({
   onOpenViewer,
 }: {
   studentId: string
-  /** Total view *count* (repeat views included) — from the strip's summary. */
   totalViews: number
   open: boolean
   onClose: () => void
-  /** Tap a visitor → open their profile. The owner (Profile) holds the preview
-   *  sheet, so this just hands the row back (avoids a component→feature cycle). */
   onOpenViewer?: (row: ProfileVisitorRow) => void
 }) {
   const [rows, setRows] = useState<ProfileVisitorRow[]>([])

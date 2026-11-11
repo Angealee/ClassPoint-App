@@ -10,19 +10,6 @@ import { countdownTo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import { MAX_POST_LENGTH, type LoungeEvent, type LoungeEventAnswer } from '@/lib/types'
 
-/**
- * The Random Event, pinned above the Lounge feed.
- *
- * ── WHAT A STUDENT CAN SEE WHILE IT IS OPEN ────────────────────────────────
- * The question, the prize, how many people have answered, and their OWN
- * answer. Not one word of anyone else's — that is enforced twice server-side
- * (an RLS policy and the RPC), because the first correct answer being visible
- * is what would make auto-award pay the fastest copier rather than the fastest
- * thinker.
- *
- * Editing your answer while it is open is allowed on purpose: nobody can see
- * it, so there is nothing to game, and refusing an edit punishes a typo.
- */
 export function EventCard({
   event,
   canAnswer,
@@ -38,8 +25,6 @@ export function EventCard({
   const [busy, setBusy] = useState(false)
   const [left, setLeft] = useState<string | null>(null)
 
-  // Live countdown. One interval, cleared on unmount — the deadline is the
-  // whole reason an event feels like a race.
   useEffect(() => {
     if (!event.closesAt) {
       setLeft(null)
@@ -115,7 +100,6 @@ export function EventCard({
             }}
             rows={2}
             placeholder="Your answer…"
-            // text-base: below 16px iOS Safari zooms on focus and never zooms back.
             className={cn(
               'w-full resize-none rounded-xl border bg-card px-3.5 py-2.5 text-base text-ink',
               'placeholder:text-muted/70 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30',

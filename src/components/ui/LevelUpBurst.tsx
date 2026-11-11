@@ -3,17 +3,8 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { StarIcon } from '@/components/ui/icons'
 import { ConfettiBurst } from '@/components/leaderboard/ConfettiBurst'
 
-/**
- * Ignore taps for this long after the screen appears.
- *
- * NOT an auto-dismiss — there is none any more. These celebrations fire while
- * the student's finger is already on the glass (they just tapped something, or
- * they're mid-scroll), and without a short guard the tap already in flight
- * dismisses the moment before it has drawn a single frame.
- */
 const TAP_GUARD_MS = 700
 
-/** Deterministic ring of particles so the burst looks even, not random. */
 const PARTICLES = Array.from({ length: 18 }, (_, i) => {
   const angle = (i / 18) * Math.PI * 2
   const dist = 120 + (i % 3) * 30
@@ -23,29 +14,9 @@ const PARTICLES = Array.from({ length: 18 }, (_, i) => {
 /** Light rays fanning out behind the medallion. */
 const RAYS = Array.from({ length: 12 }, (_, i) => (i / 12) * 360)
 
-/**
- * The level-up celebration.
- *
- * ── IT NO LONGER DISMISSES ITSELF ──────────────────────────────────────────
- * It used to say "Tap to continue" and then vanish after 3.6s regardless — the
- * copy promised control the screen didn't give, and a student whose phone was
- * in a pocket, or who was mid-scroll, simply missed the moment. Now the only
- * way out is a tap, so levelling up is something you acknowledge rather than
- * something that flashes past.
- *
- * ── MOTION IS LAYERED, AND ALL OF IT IS OPT-OUT ────────────────────────────
- * Confetti, rays, a slam with squash, a shine sweep, a counting number, an XP
- * rail that fills and empties, a flash and a shake. `<MotionConfig
- * reducedMotion="user">` in App.tsx neutralises the framer-motion layers for
- * anyone who asks, and `reduced` additionally drops the shake and the flash
- * outright — a shaking screen is the effect most associated with motion
- * sickness, so it is not enough to merely shorten it.
- */
 export function LevelUpBurst({ level, onDone }: { level: number | null; onDone: () => void }) {
   const reduced = useReducedMotion() ?? false
   const [armed, setArmed] = useState(false)
-  // Counts from the previous level so the number visibly ticks over. A single
-  // level-up is always exactly one step, so this needs no extra data.
   const [shown, setShown] = useState(level ?? 1)
 
   useEffect(() => {
@@ -73,8 +44,6 @@ export function LevelUpBurst({ level, onDone }: { level: number | null; onDone: 
           role="alertdialog"
           aria-label={`Level up! You reached level ${level}. Tap to continue.`}
         >
-          {/* Impact flash — one frame of white, gone before it registers as a
-              colour. Dropped entirely under reduced motion. */}
           {!reduced && (
             <motion.div
               className="pointer-events-none absolute inset-0 bg-white"
@@ -86,8 +55,6 @@ export function LevelUpBurst({ level, onDone }: { level: number | null; onDone: 
 
           <ConfettiBurst />
 
-          {/* The shake wraps everything so the whole composition moves as one
-              object, rather than the badge sliding against its own backdrop. */}
           <motion.div
             className="relative flex flex-col items-center"
             animate={reduced ? undefined : { x: [0, -7, 6, -4, 3, 0], y: [0, 4, -3, 2, 0] }}
@@ -129,7 +96,6 @@ export function LevelUpBurst({ level, onDone }: { level: number | null; onDone: 
               ))}
             </div>
 
-            {/* Medallion: drops fast, overshoots, squashes on impact, settles. */}
             <motion.div
               initial={{ y: -160, scale: 0.5, rotate: -14, opacity: 0 }}
               animate={{
@@ -173,8 +139,6 @@ export function LevelUpBurst({ level, onDone }: { level: number | null; onDone: 
               Lv {shown}
             </motion.p>
 
-            {/* The XP rail fills to full, flashes, and empties into the new
-                level — the mechanic behind the number, not just its result. */}
             <div className="mt-5 h-2 w-52 overflow-hidden rounded-full bg-white/15">
               <motion.div
                 className="h-full rounded-full bg-gradient-to-r from-gold-500 via-gold-300 to-gold-500"

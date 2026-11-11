@@ -8,16 +8,6 @@ import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import type { LoungePost } from '@/lib/types'
 
-/**
- * One card in the Lounge — text, shoutout or Class Pulse.
- *
- * ONE component for all three kinds rather than three components, on the
- * precedent that cost this codebase real bugs: the points row existed four
- * times and drifted, so the same event rendered in two different colours
- * depending which screen you opened. The kinds differ by a header strip and a
- * tint, never by a second copy of the body, the W button or the timestamp.
- */
-
 /** The line above the body that says what KIND of card this is. */
 function KindHeader({ post }: { post: LoungePost }) {
   if (post.kind === 'pulse') {
@@ -43,13 +33,11 @@ export function PostCard({
   onDelete,
   onReport,
   wDisabled,
-  /** Renders the body in full and drops the tap-through — the detail screen. */
   detail = false,
 }: {
   post: LoungePost
   onToggleW: (post: LoungePost) => void
   onDelete?: (post: LoungePost) => void
-  /** Omitted for your own posts — reporting yourself is not a thing. */
   onReport?: (post: LoungePost) => void
   wDisabled?: boolean
   detail?: boolean
@@ -58,9 +46,6 @@ export function PostCard({
   const hidden = post.hiddenAt !== null && post.body === null
   const isPulse = post.kind === 'pulse'
 
-  // Long posts fold rather than pushing everything below them off screen. The
-  // threshold is characters, not lines: line count depends on the viewport and
-  // would fold inconsistently between a phone and the desktop sidebar layout.
   const foldable = !detail && !hidden && (post.body?.length ?? 0) > 280
   const body = foldable && !expanded ? `${post.body!.slice(0, 260).trimEnd()}…` : post.body
 
@@ -82,8 +67,6 @@ export function PostCard({
         />
 
         <div className="min-w-0 flex-1">
-          {/* Identity line. `min-w-0 truncate` on the name is what stops a long
-              display name pushing the timestamp out of the card. */}
           <div className="flex items-center gap-2">
             <span className="min-w-0 truncate text-sm font-semibold">{post.displayName}</span>
             <span className="shrink-0 text-2xs text-muted">{timeAgo(post.createdAt)}</span>
@@ -129,9 +112,6 @@ export function PostCard({
           )}
 
           <div className="mt-3 flex items-center gap-3">
-            {/* Pulse cards ARE W-able — a level-up is exactly the thing you
-                want to applaud. The RPC still refuses your own post, which for
-                a pulse means the student it is about. */}
             <WButton
               count={post.wCount}
               given={post.iGaveW}
@@ -139,8 +119,6 @@ export function PostCard({
               onToggle={() => onToggleW(post)}
             />
 
-            {/* Replies are a COUNT that navigates (the user's call) — the feed
-                stays scannable and every card is the same height. */}
             {detail ? null : (
               <Link
                 to={`/app/space/post/${post.id}`}

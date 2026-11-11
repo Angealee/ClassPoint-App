@@ -13,8 +13,6 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
-/** Stash written by the early-capture script in index.html (see there). It grabs
- * `beforeinstallprompt` before React mounts, so a fast fire is never missed. */
 interface InstallStash {
   event: BeforeInstallPromptEvent | null
   installed: boolean
@@ -29,9 +27,7 @@ interface PwaInstallValue {
   /** Coarse state for rendering an install affordance. */
   state: InstallState
   isIos: boolean
-  /** True inside a webview that can't install (Messenger, Facebook, IG, …). */
   isInApp: boolean
-  /** Fire the native prompt (only meaningful when state === 'installable'). */
   promptInstall: () => Promise<'accepted' | 'dismissed' | 'unavailable'>
 }
 
@@ -48,13 +44,9 @@ function isStandalone(): boolean {
 function isIosDevice(): boolean {
   const ua = navigator.userAgent
   if (/iphone|ipad|ipod/i.test(ua)) return true
-  // iPadOS 13+ reports a desktop-Mac UA; sniff it out via touch support so iPads
-  // still get the Add-to-Home-Screen path instead of falling through to nothing.
   return /Macintosh/.test(ua) && navigator.maxTouchPoints > 1
 }
 
-/** Common in-app browsers where PWA install is impossible (students often open
- * links inside these). */
 function isInAppBrowser(): boolean {
   const ua = navigator.userAgent || ''
   return /FBAN|FBAV|FB_IAB|Instagram|Messenger|Line\/|MicroMessenger|Twitter|TikTok|Snapchat|Pinterest|LinkedInApp|GSA\//i.test(
@@ -71,7 +63,6 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const isInApp = useMemo(() => isInAppBrowser(), [])
 
   useEffect(() => {
-    // Pick up an event the early-capture script grabbed before we mounted.
     const stash = getStash()
     if (stash?.event) setDeferred(stash.event)
     if (stash?.installed) setInstalled(true)
@@ -80,7 +71,6 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       e.preventDefault()
       setDeferred(e as BeforeInstallPromptEvent)
     }
-    // Dispatched by the early-capture script when a later event arrives.
     const onInstallable = () => {
       const ev = getStash()?.event
       if (ev) setDeferred(ev)

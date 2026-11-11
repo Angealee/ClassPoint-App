@@ -25,7 +25,6 @@ import type { AttendanceAnalytics, SessionSummary, StudentAttendanceStat } from 
 
 type SortKey = 'name' | 'rate' | 'absent'
 
-/** Students at/below this rate, or at/above this many absences, get flagged. */
 const AT_RISK_RATE = 0.7
 const AT_RISK_ABSENCES = 3
 
@@ -34,18 +33,10 @@ const shortDate = (iso: string) =>
 
 const pct = (rate: number | null) => (rate === null ? '—' : `${Math.round(rate * 100)}%`)
 
-/**
- * Colour for a 0–1 show-up rate, via the shared band in lib/attendance.
- *
- * This file used to carry its own copy: same 85/70 thresholds, but taking a
- * 0–1 rate, returning a class string, and using reward-gold in the middle band
- * where every other rate in the app uses warn.
- */
 function rateClass(rate: number | null): string {
   return rate === null ? 'text-muted' : TONE[rateTone(rate * 100)].text
 }
 
-/** The whole term at a glance: every session, plus who's actually showing up. */
 export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}) {
   const { sections, selectedSectionId, setSelectedSectionId, subjectsForSection } = useInstructor()
   const { toast } = useToast()
@@ -56,7 +47,6 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
   const [loading, setLoading] = useState(true)
   const [sort, setSort] = useState<SortKey>('rate')
   const [tagging, setTagging] = useState<string>()
-  // '' = both subjects combined. Scopes the analytics below, not the session list.
   const [subjectFilter, setSubjectFilter] = useState('')
 
   const sectionName = sections.find((s) => s.id === selectedSectionId)?.name ?? ''
@@ -99,7 +89,6 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
 
   const weeks = useMemo(() => groupByWeek(sessions, (s) => s.startedAt), [sessions])
 
-  /** Class-wide show-up rate per week — the trend sparkline's data. */
   const trend = useMemo(() => {
     const byWeek = new Map<number, { attended: number; counted: number }>()
     for (const s of sessions) {
@@ -119,7 +108,6 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
     const list = [...(analytics?.students ?? [])]
     if (sort === 'name') return list.sort((a, b) => a.fullName.localeCompare(b.fullName))
     if (sort === 'absent') return list.sort((a, b) => b.absent - a.absent)
-    // Rate ascending — the students who need attention float to the top.
     return list.sort((a, b) => (a.rate ?? 2) - (b.rate ?? 2))
   }, [analytics, sort])
 
@@ -131,7 +119,6 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
     [analytics],
   )
 
-  /** The subject the screen is currently scoped to, or null for "both". */
   const activeSubjectCode =
     sectionSubjects.find((s) => s.id === subjectFilter)?.code ?? null
 
@@ -144,12 +131,9 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  /** The traditional class-record grid: students × sessions, P/L/A/E/I cells. */
   async function onExportRegister() {
     if (!selectedSectionId) return
     try {
-      // Scoped to the same subject as the stats above it — the export used to
-      // contradict the screen it came from.
       await exportSectionRegister(
         sectionName,
         await getSectionRegister(selectedSectionId, subjectFilter || undefined),
@@ -191,8 +175,6 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
         </Select>
       </div>
 
-      {/* Scopes the stats below to one subject — a roster that meets you twice a
-          week under two labels has two separate attendance stories. */}
       {sectionSubjects.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {[{ id: '', code: 'Both subjects' }, ...sectionSubjects].map((s) => {
@@ -376,8 +358,6 @@ export function SessionHistory({ embedded = false }: { embedded?: boolean } = {}
                           </div>
                           <SessionTally s={s} />
                         </button>
-                        {/* Sessions that predate subjects (0028). Tagging them
-                            here is what makes per-subject attendance complete. */}
                         {!s.subjectId && sectionSubjects.length > 0 && (
                           <div className="flex flex-wrap items-center gap-2 px-3.5 pb-3">
                             <span className="text-xs text-muted">Tag as</span>
@@ -439,19 +419,9 @@ function SessionTally({ s }: { s: SessionSummary }) {
   )
 }
 
-/** Tallest a bar can be, in px. The track is explicitly this tall. */
 const TRACK_H = 72
-/** A 0% week still shows a visible stub, so "we measured zero" reads as data. */
 const MIN_BAR_H = 3
 
-/**
- * Inline bar chart of weekly show-up rate. Hand-drawn with divs — a chart
- * library would cost more bundle than this whole page.
- *
- * Bar heights are in px, not %: a percentage height only resolves against a
- * parent with a *definite* height, and a flex track sized by `flex-1` inside an
- * auto-height column isn't definite — the bars silently collapse to nothing.
- */
 function TrendBars({ data }: { data: Array<{ week: number; rate: number | null }> }) {
   return (
     <div className="flex items-end gap-2">

@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cellDisplay, resolveCommit, writeFor, type CellState } from './grade-cell'
 
-/**
- * The Absent mark (0063), cell by cell.
- *
- * Every case below is a way a cell can be saved wrongly without anything looking
- * broken, which is why this is pure and pinned.
- */
-
 const blank: CellState = { value: null, absent: null }
 const marked = (v: number): CellState => ({ value: v, absent: null })
 const typedA: CellState = { value: null, absent: 'manual' }
@@ -45,7 +38,6 @@ describe('resolveCommit — typing A', () => {
 
   it('does NOT write when the cell already reads A — tabbing over it saves nothing', () => {
     expect(resolveCommit({ value: null, absent: true }, typedA).kind).toBe('none')
-    // The derived case is the one that matters: it must not become a manual row.
     const out = resolveCommit({ value: null, absent: true }, derivedA)
     expect(out).toEqual({ kind: 'none', display: 'A' })
   })
@@ -72,9 +64,6 @@ describe('resolveCommit — typing a mark', () => {
   })
 
   it('keeps a DERIVED absence when a mark is typed over it', () => {
-    // The column is tied to a class they missed. The mark is the instructor's
-    // call (a make-up, say) but the absence is a fact about the class — it still
-    // blocks a points assist, so it must survive.
     const out = resolveCommit({ value: 9, absent: false }, derivedA)
     expect(out).toMatchObject({ kind: 'change', next: { value: 9, absent: 'auto' } })
   })
@@ -101,8 +90,6 @@ describe('resolveCommit — clearing', () => {
   })
 
   it('cannot clear a DERIVED A — it puts the A back', () => {
-    // Erasing it would make the cell look blank while attendance still says
-    // absent, and the student would be refused an assist for no visible reason.
     expect(resolveCommit({ value: null }, derivedA)).toEqual({ kind: 'none', display: 'A' })
   })
 

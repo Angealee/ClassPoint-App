@@ -1,9 +1,7 @@
 import { createContext, useContext, useMemo, useRef, type ReactNode } from 'react'
 import { useMotionValueEvent, useScroll, type MotionValue } from 'framer-motion'
 
-
 interface LandingScroll {
-  /** Current scroll direction. Read at animation time, never rendered. */
   direction: { current: 'up' | 'down' }
   /** Absolute scroll offset in px. */
   scrollY: MotionValue<number>

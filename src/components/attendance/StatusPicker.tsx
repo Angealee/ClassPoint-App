@@ -3,40 +3,8 @@ import { cn } from '@/lib/cn'
 import { STATUS_META } from '@/components/attendance/StatusChip'
 import type { AttendanceStatus } from '@/lib/types'
 
-/**
- * Setting a student's attendance status — one component, three densities.
- *
- * ── WHY IT WAS THREE COMPONENTS ────────────────────────────────────────────
- * The identical task had three separate implementations, each with its own copy
- * of the status ORDER and its own idea of what "selected" looks like:
- *
- *   live session   a 3-up grid of labelled buttons, plus Reset
- *   review         a row of five 32px squares showing P / L / A / E / I
- *   session detail a bottom sheet listing each status with its points effect
- *
- * The densities are genuinely different and worth keeping — five labels beside
- * a name is too wide for the review roster, and the live screen is used under
- * time pressure where initials are the wrong thing to decode. What was NOT
- * worth keeping was three copies of the order, the colours and the selected
- * state, which is how they drifted apart in the first place.
- *
- * ── THE VARIANTS ───────────────────────────────────────────────────────────
- *  grid     labelled buttons, 3-up. The live-class screen.
- *  compact  single letters in squares, for a dense roster row.
- *  list     full-width rows with a dot and an optional consequence line. This
- *           one is a DECISION surface, not a quick toggle: it changes an
- *           already-committed record, so it explains what that will do first.
- *
- * All five statuses are markable everywhere, deliberately — mark what you know
- * the moment you know it, rather than remembering to fix it in review later.
- */
-
 const ORDER: AttendanceStatus[] = ['present', 'late', 'absent', 'excused', 'irregular']
 
-/**
- * Excused and Irregular both start with a letter already taken by another
- * status, so they get their own initials rather than colliding.
- */
 function initial(s: AttendanceStatus): string {
   if (s === 'excused') return 'E'
   if (s === 'irregular') return 'I'
@@ -56,9 +24,7 @@ export function StatusPicker({
   value: AttendanceStatus | null
   onPick: (status: AttendanceStatus) => void
   variant?: 'grid' | 'compact' | 'list'
-  /** Ringed as "this is what the clock says they'd get" on the live screen. */
   suggested?: AttendanceStatus | null
-  /** `list` only: a line explaining what picking this status will do. */
   describe?: (status: AttendanceStatus) => ReactNode
   disabled?: boolean
   /** `grid` only: shows a Reset button once a status is set. */
@@ -124,8 +90,6 @@ export function StatusPicker({
     )
   }
 
-  // grid — a fixed 3-up, not flex-wrap: five statuses (+ Reset) land as tidy
-  // rows of three instead of a ragged four-then-one.
   return (
     <div className={cn('grid grid-cols-3 gap-2', className)}>
       {ORDER.map((s) => {

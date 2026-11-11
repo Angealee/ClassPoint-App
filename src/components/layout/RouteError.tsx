@@ -1,12 +1,5 @@
 import { useRouteError } from 'react-router-dom'
 
-/**
- * Friendly route-level error screen (replaces React Router's default crash
- * page). Deliberately imports nothing heavy: its most common real-world
- * trigger is a stale lazy chunk 404ing right after a deploy — a state where
- * fancy shared components may themselves fail to load, and where Reload is
- * the actual fix.
- */
 export function RouteError() {
   const error = useRouteError()
   const message =

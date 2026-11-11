@@ -19,18 +19,6 @@ import { PeerGroups } from './PeerGroups'
 
 type PeerTab = 'evaluations' | 'groups'
 
-/**
- * The instructor's peer evaluation console.
- *
- * Two tabs in the `/teach/redemptions` style, mirrored to `?tab=` so a deep
- * link and the browser's back button both work. Groups is the same screen
- * Phase 1 shipped, hosted here rather than duplicated — it was reachable at
- * `/teach/peer` on its own for one phase and this is where it always belonged.
- *
- * This is deliberately NOT a fifth bottom tab. Four is the stated limit, and
- * `/teach/redemptions`, `/teach/ops` and `/teach/space` all reach their screens
- * from the Shell's `actions` slot or a card.
- */
 export function PeerConsole() {
   const [searchParams, setSearchParams] = useSearchParams()
   const initial: PeerTab = searchParams.get('tab') === 'groups' ? 'groups' : 'evaluations'
@@ -90,11 +78,6 @@ function EvaluationList() {
     void load()
   }, [load])
 
-  /**
-   * `?duplicate=<id>` arrives from an evaluation's own screen. It is a ONE-SHOT
-   * and is stripped once read — unlike the attendance review param, losing it
-   * costs nothing, because no data exists yet: the composer simply isn't open.
-   */
   const duplicateId = searchParams.get('duplicate')
   useEffect(() => {
     if (!duplicateId) return
@@ -118,8 +101,6 @@ function EvaluationList() {
     return () => {
       cancelled = true
     }
-    // searchParams deliberately omitted: stripping the param changes it, and
-    // re-running on that change would be a loop with nothing to do.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [duplicateId])
 
@@ -168,8 +149,6 @@ function EvaluationList() {
 
 function EvaluationCard({ item }: { item: PeerEvaluationListItem }) {
   const open = item.status === 'open'
-  // Guarded, because a group-scoped evaluation where nobody has been placed on
-  // a team expects zero — and Meter would divide by it.
   const expected = Math.max(1, item.expectedCount)
 
   return (

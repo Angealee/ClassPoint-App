@@ -36,7 +36,6 @@ function errorText(e: unknown, fallback: string): string {
   return m && m.length <= 160 ? m : fallback
 }
 
-/** Absence excuses — slip-holders sorted first (the excuse-on-sight queue). */
 export function ExcusesInbox() {
   const { sections } = useInstructor()
   const { toast } = useToast()
@@ -67,8 +66,6 @@ export function ExcusesInbox() {
     void load()
   }, [load])
 
-  // Live: a new request, or a student flipping "I have my slip", re-sorts the
-  // queue in front of you. Page-scoped channel via uniqueChannel.
   useEffect(() => {
     const channel = uniqueChannel('excuses-inbox')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'absence_excuses' }, () =>
@@ -84,7 +81,6 @@ export function ExcusesInbox() {
     () =>
       all
         .filter((r) => r.status === 'pending')
-        // Slip-holders first (ready to excuse on sight), then oldest-first.
         .sort((a, b) => {
           if (a.hasSlip !== b.hasSlip) return a.hasSlip ? -1 : 1
           return a.requestedAt.localeCompare(b.requestedAt)

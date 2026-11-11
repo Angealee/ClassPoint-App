@@ -13,17 +13,6 @@ import { useInstructor } from './InstructorLayout'
 const TITLE_MAX = 80
 const BODY_MAX = 300
 
-/**
- * Announcement composer (Phase G).
- *
- * The only feature in the app that pushes to every student at once, and a push
- * cannot be recalled — so the confirm dialog states the real recipient COUNT
- * rather than a vague "all students", and the count comes from the roster the
- * screen already holds rather than from a guess.
- *
- * It goes through the same `notifications` outbox as everything else, so the
- * bell history, retry sweep and delivery need no special cases.
- */
 export function Broadcast({ counts }: { counts: Record<string, number> }) {
   const { sections } = useInstructor()
   const { toast } = useToast()
@@ -35,9 +24,6 @@ export function Broadcast({ counts }: { counts: Record<string, number> }) {
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  // Summed over THIS SEMESTER's sections only, never over every key in
-  // `counts` — the headcount map is global, while send_broadcast targets the
-  // active semester. Summing the map would promise a number it won't reach.
   const allRecipients = useMemo(
     () => sections.reduce((sum, s) => sum + (counts[s.id] ?? 0), 0),
     [sections, counts],
@@ -61,8 +47,6 @@ export function Broadcast({ counts }: { counts: Record<string, number> }) {
         body: body.trim(),
         sectionId: target || null,
       })
-      // Report what the SERVER actually reached, not what we predicted — if the
-      // two ever disagree, the number that matters is the one that sent.
       toast(`Sent to ${n} student${n === 1 ? '' : 's'}.`, 'success')
       setTitle('')
       setBody('')

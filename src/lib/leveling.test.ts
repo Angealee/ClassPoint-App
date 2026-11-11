@@ -1,17 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getLevelProgress, requirementForLevel } from './leveling'
 
-/**
- * The level ladder, pinned.
- *
- * These numbers MIRROR `cp_level()` in migration 0002 — if the two disagree, a
- * student's level flickers depending on which side computed it. Any change to
- * the curve updates these expectations in the SAME commit as the migration,
- * never separately.
- *
- * A rebalance to 10/×1.35 was proposed with real data and DECLINED by the
- * instructor (2026-08-14) — see the note in leveling.ts.
- */
 describe('requirementForLevel', () => {
   it('starts at 50 and compounds by 1.5, rounded', () => {
     expect(requirementForLevel(1)).toBe(50)
@@ -27,12 +16,9 @@ describe('requirementForLevel', () => {
   })
 
   it('is stable across repeated calls (the cache must not drift)', () => {
-    // requirementCache is module-level mutable state — compounding on a stale
-    // entry would silently shift the whole ladder.
     const first = requirementForLevel(8)
     const second = requirementForLevel(8)
     expect(second).toBe(first)
-    // Reaching further and coming back must not change earlier rungs.
     requirementForLevel(20)
     expect(requirementForLevel(8)).toBe(first)
     expect(requirementForLevel(1)).toBe(50)
@@ -63,7 +49,6 @@ describe('getLevelProgress', () => {
   })
 
   it('walks the cumulative ladder correctly', () => {
-    // Cumulative thresholds: L2 at 50, L3 at 125, L4 at 238, L5 at 408.
     expect(getLevelProgress(124).level).toBe(2)
     expect(getLevelProgress(125).level).toBe(3)
     expect(getLevelProgress(237).level).toBe(3)
@@ -88,8 +73,6 @@ describe('getLevelProgress', () => {
   })
 
   it('terminates for a very large total', () => {
-    // Requirements grow, so the walk always ends — this guards an accidental
-    // change that could make it loop forever on a big number.
     const p = getLevelProgress(1_000_000)
     expect(p.level).toBeGreaterThan(10)
     expect(Number.isFinite(p.level)).toBe(true)

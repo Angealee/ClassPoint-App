@@ -4,27 +4,14 @@ import { BadgeArt } from './BadgeArt'
 import { StarIcon } from '@/components/ui/icons'
 import type { Achievement } from '@/lib/types'
 
-/**
- * Taps are ignored for this long — this is NOT an auto-dismiss.
- *
- * The screen used to say 'Tap to continue' and then vanish after 4.2s anyway,
- * which promised control it did not give and let the moment pass a student who
- * had their phone in a pocket. It now waits for a tap, with a short guard so
- * the tap already in flight when it appears cannot skip it instantly. Matches
- * LevelUpBurst exactly, so the two celebrations behave the same way.
- */
 const TAP_GUARD_MS = 700
 
-// Same deterministic particle ring as LevelUpBurst, for a consistent feel
-// across every celebratory moment in the app.
 const PARTICLES = Array.from({ length: 14 }, (_, i) => {
   const angle = (i / 14) * Math.PI * 2
   const dist = 120 + (i % 3) * 26
   return { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, delay: (i % 5) * 0.02 }
 })
 
-/** Celebratory full-screen burst shown when an achievement unlocks — structurally
- * mirrors LevelUpBurst, themed with the achievement's own illustrated badge. */
 export function AchievementUnlockBurst({
   achievement,
   onDone,

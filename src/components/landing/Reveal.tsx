@@ -34,19 +34,12 @@ export function Reveal({
       initial="hiddenBelow"
       animate={controls}
       transition={{ ...spring, delay }}
-      // A small negative margin so the entrance starts just before the block
-      // reaches the edge and is finishing as it becomes properly visible,
-      // rather than beginning from nothing once it is already on screen.
       viewport={{ margin: '-40px' }}
       onViewportEnter={() => {
-        // Jump to the correct side FIRST, then travel to rest. `set` is
-        // instantaneous and happens off-screen, so it is never seen.
         controls.set(direction.current === 'up' ? 'hiddenAbove' : 'hiddenBelow')
         void controls.start('show')
       }}
       onViewportLeave={() => {
-        // Leave through the edge it is actually heading for: travelling down,
-        // the block exits via the top.
         void controls.start(direction.current === 'down' ? 'hiddenAbove' : 'hiddenBelow', ease)
       }}
       className={className}

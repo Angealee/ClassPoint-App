@@ -20,11 +20,8 @@ import { StudentProfilePreview } from './StudentProfilePreview'
 
 const TOP_N = 10
 const GLOBAL = 'global'
-/** Sentinel value for the picker's archive entry — never a real section id. */
 const PAST = '__past__'
 
-// The share card + its capture path are only needed once someone actually taps
-// Share, so they stay out of the leaderboard's own chunk.
 const ShareSheet = lazy(() =>
   import('@/components/leaderboard/ShareSheet').then((m) => ({ default: m.ShareSheet })),
 )
@@ -34,43 +31,21 @@ export function Leaderboard() {
   const [selected, setSelected] = useState<LeaderboardEntry | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
   const [pastOpen, setPastOpen] = useState(false)
-  // Sticky once opened, so the sheet keeps its close animation instead of
-  // being yanked out of the tree the moment it's dismissed.
   const [shareMounted, setShareMounted] = useState(false)
-  // Which board to show: the global ranking or a single section's. The snapshot
-  // already carries every student + section, so a section view is just a filter
-  // over `leaderboard` — no extra query.
   const [view, setView] = useState<string>(GLOBAL)
 
   const isGlobal = view === GLOBAL
 
-  // Entries for the chosen view, kept in the snapshot's rank order.
   const ranked = useMemo(
     () => (isGlobal ? leaderboard : leaderboard.filter((e) => e.section_id === view)),
     [leaderboard, view, isGlobal],
   )
 
   const top = ranked.slice(0, TOP_N)
-  /**
-   * Nobody has scored yet — show the board, but show nothing ON it (0060).
-   *
-   * `leaderboard_snapshot` has no `semester_id`; it ranks EVERY non-archived
-   * student by `semester_points` (0038), and `set_active_semester` resets that
-   * column for everyone. So the first morning of a new semester the board is
-   * forty students tied at zero, alphabetical, wearing place numbers — which
-   * reads as a real ranking and is not one.
-   *
-   * A CLIENT-side rule on purpose: the alternative is teaching the snapshot or
-   * the RPC about emptiness, which would be a second definition of "is this
-   * board live" to keep in sync with this one.
-   */
   const silent = top.length === 0 || top.every((e) => e.points === 0)
   const meIdx = me ? ranked.findIndex((e) => e.student_id === me.id) : -1
   const meEntry = meIdx >= 0 ? ranked[meIdx] : null
 
-  /** Open a commenter's profile. Look them up in the FULL snapshot (not just the
-   *  filtered view) so a sender from another section still resolves; fall back
-   *  to a minimal target for anyone unranked. */
   function openCommenter(c: LeaderboardComment) {
     if (!c.studentId) return
     const entry = leaderboard.find((e) => e.student_id === c.studentId)
@@ -83,49 +58,15 @@ export function Leaderboard() {
         avatar_url: c.avatarUrl,
         spent_points: 0,
         spend_rank: null,
-        // Unranked: no movement to report and no run to time, which is exactly
-        // what makes both rank signals render nothing for this target.
         previous_rank: null,
         rank_since: new Date().toISOString(),
         rank: 0,
       },
     )
   }
-  // Position within the current view: in the global view this is the snapshot
-  // rank; in a section view it's the place within that section.
   const myPos = meIdx + 1
-  /**
-   * Rank movement had TWO sources that could disagree on the same screen: the
-   * database's `previous_rank` (0037, server-computed, the same number the board
-   * rows show) and this component's own localStorage tracker.
-   *
-   * The database wins wherever it can answer — that is the global view, where
-   * `myPos` IS the snapshot rank. It is authoritative, survives a new device,
-   * and cannot contradict the arrow on the student's own row above it.
-   *
-   * The local tracker stays for the two cases the database genuinely cannot
-   * answer: a SECTION view, where rows are renumbered by position within the
-   * section and no per-section previous rank exists, and a client running ahead
-   * of migration 0037, where `previous_rank` is null for everyone.
-   */
   const localDelta = useRankDelta(me?.id, view, capturedAt, meEntry ? myPos : null)
 
-  /**
-   * Where you would sit if you had never spent — "climb or cash out", as a
-   * number rather than a warning (0038).
-   *
-   * Holds everyone else CONSTANT: it re-places you on the board as it actually
-   * stands, using the points you'd still have. A "nobody had spent"
-   * counterfactual would be a different and far less useful claim.
-   *
-   * Computed inside `ranked`, not the global snapshot, so it is in the same
-   * frame as `myPos` — on a section view both numbers count section rows.
-   * Ties break on display_name, exactly as `refresh_leaderboard_snapshot`
-   * does, so this can't be off by one against the board it describes.
-   *
-   * Null when there is nothing to say — nothing spent, or spending cost no
-   * places — following the same discipline as RankDelta and RankTenure.
-   */
   const shadowRank = useMemo(() => {
     if (!meEntry || meEntry.spent_points <= 0) return null
     const would = meEntry.points + meEntry.spent_points
@@ -150,19 +91,10 @@ export function Leaderboard() {
   return (
     <PullToRefresh onRefresh={refresh}>
       <div className="space-y-4">
-      {/* Header: title + settle caption + Share on row one, the scope picker
-          full width on row two, the board switcher on row three.
-          The scope CHIP is still gone — it said the same thing as the picker
-          below it. What changed in 2026-11-08 is that the picker stopped
-          sharing row one: squeezing a section name into 136px beside two other
-          controls is what "do not squish it for space" was about, and a row is
-          cheaper than an unreadable control. */}
       <div className="space-y-2.5">
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <h1 className="truncate font-display text-xl font-bold leading-tight">Leaderboard</h1>
-            {/* The settle countdown reads as a caption under the title now
-                rather than as one more pill competing on its own row. */}
             <div className="mt-0.5">
               <SnapshotChip capturedAt={capturedAt} />
             </div>
@@ -180,22 +112,9 @@ export function Leaderboard() {
           )}
         </div>
 
-        {/* ⚠ THE PICKER GETS ITS OWN FULL-WIDTH ROW (2026-11-08).
-            It used to sit in the title row at `wrapperClassName="max-w-34"` —
-            a hard 136px cap, inside which the chevron's own `pr-10` leaves
-            about 96px for a section name, so anything past "BSIT 2A" was
-            truncated. `h-9! text-sm!` was shrinking it further against the
-            app's own 44px control height, and the `!` suffixes only existed to
-            beat the old plain-join `cn()`.
-            All three of those are gone: full width, the primitive's real
-            height, and a section name you can read. "Do not squish it for
-            space." */}
         <Select
           value={view}
           onChange={(e) => {
-            // "Past semesters" is an ACTION, not a view — open the sheet and
-            // leave `view` alone, so the controlled select snaps back to the
-            // board you were actually looking at.
             if (e.target.value === PAST) {
               setPastOpen(true)
               return
@@ -211,11 +130,6 @@ export function Leaderboard() {
               {s.id === me?.section_id ? ' (mine)' : ''}
             </option>
           ))}
-          {/* Past boards (0035) lives here now. I argued the opposite when it
-              was built — that folding a second axis into this picker makes
-              both harder to read — and that was right while it was the only
-              other control. With a switcher needing the row, an archive is
-              the thing that should cost the least. */}
           <optgroup label="Archive">
             <option value={PAST}>Past semesters…</option>
           </optgroup>
@@ -227,9 +141,6 @@ export function Leaderboard() {
       {loading ? (
         <ListSkeleton rows={8} />
       ) : (
-        /* CommentsOverlay wraps the silent board too, deliberately: the
-           composer is the useful half, and day one of a semester is exactly
-           when a class has something to say to each other. */
         <CommentsOverlay studentId={me?.id} onOpenProfile={openCommenter}>
           {silent ? (
             <SilentBoard
@@ -245,10 +156,6 @@ export function Leaderboard() {
               meId={me?.id}
               sectionName={sectionName}
               showSection={isGlobal}
-              // Global view only: rows are renumbered by section position in a
-              // filtered view, and previous_rank/rank_since describe the whole
-              // board — mixing them would put a movement arrow on a row that
-              // didn't move on screen.
               rankSignals={isGlobal}
               onSelect={(entry) => setSelected(entry)}
             />
@@ -256,9 +163,6 @@ export function Leaderboard() {
         </CommentsOverlay>
       )}
 
-      {/* Your standing — pinned at the bottom so the board leads, not your row.
-          Hidden while the board is silent: "#1" out of a field of zeroes is a
-          number, not a standing. */}
       {!loading && !silent && meEntry && (
         <YourRankCard
           entry={meEntry}
@@ -300,7 +204,6 @@ export function Leaderboard() {
   )
 }
 
-/** The viewer's own standing, pinned at the bottom of the board. Tap to open. */
 function YourRankCard({
   entry,
   position,
@@ -314,7 +217,6 @@ function YourRankCard({
   position: number
   delta: number | null
   toNext: { pts: number; pos: number } | null
-  /** Where you'd sit if you hadn't spent (0038); null when there's nothing to say. */
   shadowRank: number | null
   sectionLabel: string
   onClick: () => void
@@ -327,15 +229,10 @@ function YourRankCard({
       aria-label="View your profile"
       className={cn(
         'block w-full overflow-hidden rounded-2xl text-left transition-transform active:scale-[0.99]',
-        // The same plate as the home scoreboard, and for the same reason: this
-        // is the one thing on the board that is about YOU, so it should read as
-        // an object rather than as another row. It also makes the two screens
-        // feel like one app.
         'bg-gradient-to-br from-plate-2 to-plate shadow-lg shadow-black/25 ring-1 ring-white/10',
       )}
     >
       <div className="relative p-4">
-        {/* Gold bloom behind the rank, echoing the home hero. */}
         <div
           aria-hidden
           className="pointer-events-none absolute -left-8 -top-12 h-36 w-36 rounded-full bg-gold-400/12 blur-3xl"
@@ -350,8 +247,6 @@ function YourRankCard({
               <span className="tabular-nums">#{position}</span>
               <RankDeltaValue delta={delta} verbose />
             </p>
-            {/* The cost of cashing out, stated where the rank is — the other
-                half of a sentence the shop only ever told as a warning. */}
             {shadowRank !== null && (
               <p className="mt-1.5 text-2xs text-white/55">
                 You&rsquo;d be <span className="font-semibold text-white/80">#{shadowRank}</span> if
@@ -370,8 +265,6 @@ function YourRankCard({
           </div>
         </div>
 
-        {/* The gap is the bridge between the two figures above — what it would
-            take to move. Same idea as the home screen's next milestone. */}
         <div className="relative mt-4 flex items-center gap-3 border-t border-white/10 pt-3">
           <Avatar
             name={entry.display_name}
@@ -397,12 +290,6 @@ function YourRankCard({
   )
 }
 
-/**
- * How the viewer moved since the *previous* settle, for the current view.
- * Tracks per (student, view) in localStorage: when the snapshot's captured_at
- * advances we compute (old position − new position) — positive means climbed —
- * and remember it until the next settle so the arrow is stable between visits.
- */
 function useRankDelta(
   studentId: string | undefined,
   view: string,

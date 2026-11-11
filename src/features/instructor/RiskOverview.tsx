@@ -9,15 +9,6 @@ import { errorText } from '@/lib/errors'
 import { cn } from '@/lib/cn'
 import type { AbsenceRisk } from '@/lib/types'
 
-/**
- * Who needs attention, across every section at once (Phase G).
- *
- * Ranked by what you can still DO about it: `actionable` counts absences still
- * inside the 7-day excuse window, so the top of this list is the set of
- * students an admission slip can still help today. A show-up-rate ranking would
- * put the unreachable cases first and make the list something to feel bad about
- * rather than act on.
- */
 export function RiskOverview() {
   const navigate = useNavigate()
   const [rows, setRows] = useState<AbsenceRisk[]>([])
@@ -30,8 +21,6 @@ export function RiskOverview() {
     setError(null)
     try {
       const data = await getAbsenceRisk()
-      // Actionable first (something can still be done), then by how many
-      // absences have piled up, then most recent.
       data.sort(
         (a, b) =>
           b.actionable - a.actionable ||

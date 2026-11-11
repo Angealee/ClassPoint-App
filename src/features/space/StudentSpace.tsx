@@ -11,20 +11,6 @@ import { isRoomUnread } from '@/lib/unread'
 import { countdownTo } from '@/lib/time'
 import type { LoungeEvent, LoungePost, SpaceRoom } from '@/lib/types'
 
-/**
- * `/app/space` — one route, three states.
- *
- * The ROUTE is mounted in every state on purpose. A student who types the URL,
- * follows a stale push notification, or lands here from a deep link after
- * losing access gets an explanation instead of a blank screen or a redirect
- * they cannot interpret. The nav row links in every state for the same reason
- * (see the note in lib/space-gate.ts).
- *
- * Which state a student is in is never decided here — `cp_space_state()` in
- * 0041 decides, and this file renders the answer.
- */
-
-/** When a mute lifts, in the student's own timezone. Everyone here is in Manila. */
 function untilLabel(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return 'soon'
@@ -47,7 +33,6 @@ function SpaceHeader({ state }: { state: 'open' | 'paused' | 'locked' }) {
   )
 }
 
-/** What's being built — shown in both the locked and open states for now. */
 function WhatsComing() {
   return (
     <Card pad="roomy">
@@ -91,20 +76,10 @@ function LockedView() {
   )
 }
 
-/**
- * In the beta, but the kill switch is off.
- *
- * Says "paused", never "coming soon": this student was in here yesterday, and
- * telling them it has not launched yet reads as a bug — which is exactly the
- * message traffic the switch is meant to prevent.
- */
 function PausedView() {
   return (
     <div className="space-y-4">
       <SpaceHeader state="paused" />
-      {/* Shown here but NOT on the locked screen: a paused student IS a beta
-          member and the disclaimer still applies to them. A student who was
-          never let in has no beta to be warned about. */}
       <BetaBanner />
 
       <Card pad="roomy">
@@ -124,17 +99,6 @@ function PausedView() {
   )
 }
 
-/**
- * The hub.
- *
- * It used to be two identical cards with a chevron — a menu that told you
- * nothing you could not read off the nav. It now answers the question you
- * actually open it with: IS ANYTHING HAPPENING?
- *
- * Three reads, all OFF the critical path and each failing soft: an open event,
- * the newest Lounge post, and your rooms. A failed read costs a preview line,
- * never the screen — the cards still route.
- */
 function OpenView() {
   const { spaceAccess } = useStudentData()
   const muted = isMuted(spaceAccess)
@@ -163,8 +127,6 @@ function OpenView() {
     return () => clearInterval(t)
   }, [event?.closesAt])
 
-  // An arrow, not a bare reference: `isRoomUnread`'s optional second argument
-  // is a store, and `.filter` would hand it the index.
   const unreadRooms = (rooms ?? []).filter((r) => isRoomUnread(r))
   const newest = (rooms ?? []).find((r) => r.lastMessageAt)
 
@@ -185,8 +147,6 @@ function OpenView() {
         </Card>
       )}
 
-      {/* An open event outranks everything: it is the only thing here with a
-          deadline, and the only one that pays points. */}
       {event && (
         <Link to="/app/space/lounge" className="block">
           <Card
@@ -232,7 +192,6 @@ function OpenView() {
             <AstronautArt variant="lounge" size="md" />
             <div className="min-w-0 flex-1">
               <p className="font-display text-lg font-bold">Student Lounge</p>
-              {/* The newest post, not a description of what a Lounge is. */}
               {latest?.body ? (
                 <p className="truncate text-sm text-muted">
                   <span className="font-semibold text-ink">{latest.displayName}:</span>{' '}

@@ -23,32 +23,6 @@ import {
 import { COMPONENT_LABEL } from '@/lib/grading'
 import { MAX_PENDING_REDEMPTIONS } from '@/lib/types'
 
-/**
- * The student's grade columns, as somewhere to spend points.
- *
- * ── AUTOMATIC, AND THE STUDENT CHOOSES THE AMOUNT (0064) ───────────────────
- * Nothing is set up by the instructor: every column is open the moment the
- * student's mark is in. 1 point = 1 mark, they pick how many (from 1 up to the
- * marks still missing to the maximum, and no more than their balance), and the
- * gain is capped so a mark can never pass the maximum. Still approved by hand.
- *
- * ── THIS IS THE ONE PLACE POINTS ARE USED ON A COLUMN ──────────────────────
- * The Grades screen only LINKS here (a banner, and a small link on each
- * boostable row, deep-linking with `?column=<id>`). Before this the confirm
- * dialog lived on Grades, so spending was split across two screens and the
- * warning and the rules existed twice. They exist once now.
- *
- * ── ACTIONABLE FIRST ───────────────────────────────────────────────────────
- * Most columns are not boostable (unmarked, already full, not offered). The
- * boostable ones are the screen; everything else is one collapsed list that
- * says WHY, so a student who cannot find the quiz they care about learns that it
- * is unmarked rather than wondering whether the app lost it.
- *
- * The data is StudentData's `grades` — the same slice the Grades screen and the
- * Home card read — so this fires no grade query of its own. Everything shown is
- * a PREVIEW of what `request_grade_boost` accepts (see `grade-boost.ts`); the
- * server is the authority and re-checks all of it.
- */
 export function GradeColumns({
   available,
   tooMany,
@@ -57,11 +31,8 @@ export function GradeColumns({
 }: {
   /** Points not already promised to a waiting request. */
   available: number
-  /** The student already has the maximum number of requests waiting. */
   tooMany: boolean
-  /** A column to bring into view and mark — from `?column=` on the link. */
   highlightId: string | null
-  /** Called after a request goes through, so the parent can re-read its list. */
   onRequested: () => void
 }) {
   const { me, grades, gradesLoading, gradesError, reloadGrades, semesterEnded } = useStudentData()
@@ -71,15 +42,12 @@ export function GradeColumns({
   const { actionable, other } = useMemo(() => boostColumns(subjects), [subjects])
 
   const [otherOpen, setOtherOpen] = useState(false)
-  // The column the student is confirming, and how many points they chose for it.
   const [target, setTarget] = useState<{
     column: BoostColumn<AvailableBoost>
     points: number
   } | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  // A deep link to a column that is NOT actionable has to open the collapsed
-  // list, or the highlight would point at something nobody can see.
   const highlightInOther = highlightId !== null && other.some((c) => c.item.id === highlightId)
   const showOther = otherOpen || highlightInOther
 
@@ -105,7 +73,6 @@ export function GradeColumns({
       onRequested()
     } catch (e) {
       toast(errorText(e, 'Could not send that request. Try again.'), 'error')
-      // The column may have changed under us (a new mark, a retired column).
       setTarget(null)
       void reloadGrades()
     } finally {
@@ -234,8 +201,6 @@ export function GradeColumns({
             </>
           ) : null
         }
-        // The warning IS the validation: this trades leaderboard standing for
-        // marks, and only the instructor can reverse it.
         detail={
           target
             ? `If approved, your total drops to ${Math.max(0, (me?.semester_points ?? 0) - target.points)} — your level and leaderboard rank drop with it, and you climb the spend board. You can’t undo it yourself.`
@@ -250,7 +215,6 @@ export function GradeColumns({
   )
 }
 
-/** Boostable columns, grouped by subject and term in the grid's own order. */
 function ActionableList({
   columns,
   available,
@@ -268,8 +232,6 @@ function ActionableList({
   register: (id: string) => (el: HTMLElement | null) => void
   onPick: (c: BoostColumn<AvailableBoost>, points: number) => void
 }) {
-  // One heading per subject + term. The columns arrive already ordered, so a
-  // heading is just "the group changed".
   const groups: Array<{ key: string; title: string; items: Array<BoostColumn<AvailableBoost>> }> = []
   for (const c of columns) {
     const key = `${c.subject.subjectId}:${c.item.term}`
@@ -325,18 +287,11 @@ function BoostCard({
 }) {
   const { item, state } = column
 
-  // The most they can use: the marks still missing (rounded up to a whole point,
-  // capped at 50 — `state.maxPoints`), and never more than they have free.
   const limit = Math.max(0, Math.min(state.maxPoints, available))
   const [points, setPoints] = useState(limit)
-  // A typed value is held as text so a half-typed number is not fought; it is
-  // clamped when they leave the field or press a step.
   const [draft, setDraft] = useState<string | null>(null)
 
   const clamp = (n: number) => Math.max(1, Math.min(limit, Math.round(n) || 1))
-  // If their balance or the mark moves under us (a refresh after a request),
-  // keep the choice inside the new range rather than offering what the server
-  // would refuse.
   const chosen = limit === 0 ? 0 : Math.min(Math.max(points, 1), limit)
   const gain = pointsGain(chosen, state.score, item.maxScore)
   const reachesFull = chosen > 0 && state.score + gain >= item.maxScore
@@ -353,8 +308,6 @@ function BoostCard({
       pad="tight"
       className={cn(
         'space-y-3',
-        // The column the student came from. A ring rather than a fill, so it
-        // reads as "this one" without changing the card's own colours.
         highlighted && 'ring-2 ring-[var(--color-ring)]',
       )}
     >
@@ -375,9 +328,6 @@ function BoostCard({
         {reachesFull && <span className="block text-xs text-muted">That’s full marks.</span>}
       </p>
 
-      {/* How many points. 1 point = 1 mark; the most you can pick is what takes you
-          to the maximum, so a mark can never pass it. Steppers are real 44px
-          targets, and the number is editable for a quick jump. */}
       <div
         role="group"
         aria-label={`Points to use on ${item.name}`}
@@ -426,7 +376,6 @@ function BoostCard({
         </p>
       )}
 
-      {/* Filled when the student can act NOW, outline when they cannot. */}
       <Button
         className="w-full"
         variant={blocked ? 'outline' : 'primary'}

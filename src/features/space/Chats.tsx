@@ -22,30 +22,6 @@ import { joinTypingChannel } from '@/lib/typing-channel'
 import { cn } from '@/lib/cn'
 import type { SpaceRoom } from '@/lib/types'
 
-/**
- * `/app/space/chats` — every room you are in, as cards with live presence.
- *
- * ── WHAT "PRESENCE" MEANS HERE, EXACTLY ────────────────────────────────────
- * Two different facts, and they are deliberately not blurred together:
- *
- *   TYPING — real presence, live. Each room's typing broadcast is subscribed
- *   from this screen, so "Maria is typing…" appears on the card before you
- *   open the room. This is only possible because typing moved to a SHARED
- *   topic (lib/typing-channel.ts); on the old per-subscription topic nobody
- *   could hear anybody.
- *
- *   RECENT — the room had a message in the last 10 minutes. That is message
- *   recency, NOT "people are online", and this app has no way to know the
- *   latter. So it is drawn as a quiet ring on the room's glyph and named
- *   honestly in the label, rather than as a green "online" dot that would be
- *   claiming something untrue.
- *
- * The unread dot is still computed ENTIRELY on this device: `isRoomUnread`
- * compares `last_message_at` against a localStorage pointer. Nothing about
- * what you have read is ever sent, which is what makes "no seen feature" a
- * property of the system rather than a promise. See lib/unread.ts.
- */
-
 /** A message this recently counts as the room being warm. */
 const RECENT_MS = 10 * 60 * 1000
 
@@ -103,8 +79,6 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
     void load()
   }, [load])
 
-  // A stable key, so the effect below does not resubscribe on every refetch of
-  // the same rooms — the same stable-id rule the realtime channels follow.
   const roomIds = useMemo(() => rooms.map((r) => r.id).join(','), [rooms])
 
   useEffect(() => {
@@ -118,8 +92,6 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
     return () => handles.forEach((h) => h.leave())
   }, [roomIds])
 
-  // Re-render once a second while anyone is typing, so a stale name clears on
-  // time rather than when the next broadcast happens to arrive.
   const anyTyping = Object.values(typers).some((t) => t.length > 0)
   useEffect(() => {
     if (!anyTyping) return
@@ -130,8 +102,6 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
   useEffect(() => {
     if (!pickerOpen || people.length > 0) return
     void listSpacePeople()
-      // The picker is for messaging SOMEONE ELSE. The RPC includes the caller
-      // because chat needs their own badges; here they are filtered out.
       .then((rows) => setPeople(rows.filter((r) => r.id !== myStudentId)))
       .catch(() => {
         /* the picker stays empty */
@@ -152,8 +122,6 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
     }
   }
 
-  // The instructor mounts this too; "message your instructor" would then be
-  // an invitation to DM themselves.
   const isStudentView = basePath.startsWith('/app')
 
   const groups = rooms.filter((r) => r.kind !== 'dm')
@@ -181,10 +149,6 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
             className={cn('h-12 w-12', room.kind !== 'dm' && 'rounded-2xl')}
             textClassName="text-sm"
           />
-          {/* A DOT at the corner, not a ring around the whole glyph: the ring
-              fought the unread card's own accent border, and two coloured
-              outlines on one 48px avatar is noise. The dot is the position
-              every messaging app already uses for this. */}
           {warm && (
             <span
               aria-label="Active in the last 10 minutes"
@@ -210,8 +174,6 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
             )}
           </div>
 
-          {/* Typing WINS over the last message: it is the newer fact, and it is
-              the one that makes the list feel alive. */}
           {typing ? (
             <p className="flex items-center gap-1.5 truncate text-xs font-medium text-accent">
               <TypingDots />
@@ -242,8 +204,6 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
           {room.lastMessageAt && (
             <span className="text-2xs text-muted">{timeAgo(room.lastMessageAt)}</span>
           )}
-          {/* Muted rooms still show a dot: mute is about notifications, not
-              about pretending nothing happened. */}
           {unread && (
             <span className="h-2.5 w-2.5 rounded-full bg-accent-solid" aria-label="Unread" />
           )}
@@ -303,9 +263,6 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
             )}
           </div>
 
-          {/* Messaging the instructor is its own row, not buried in the people
-              picker — it is the one conversation a muted student can still
-              start, and it should never be hard to find. */}
           {isStudentView && (
             <Card interactive pad="roomy" onClick={() => void openDm(null)} className="cursor-pointer">
               <div className="flex items-center gap-3">

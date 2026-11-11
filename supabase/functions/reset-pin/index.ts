@@ -1,16 +1,3 @@
-// ClassPoint · Edge Function · reset-pin
-// Verifies a one-time PIN reset code (issued by the instructor via
-// reset_student_pin) and sets the student's new PIN, i.e. their auth password.
-//
-// Runs with the service role (auto-provided as SUPABASE_SERVICE_ROLE_KEY) so it
-// can update the auth user across RLS. Never expose the service key to the client.
-//
-// ⚠ Like claim-token, this function must have JWT verification turned OFF in the
-// Supabase dashboard — a student resetting a forgotten PIN is not logged in.
-// That makes it public, so since 0026 it is rate limited per IP and every
-// attempt is recorded in public.auth_events. See ../_shared/security.ts.
-//
-// Deploy: supabase functions deploy reset-pin
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
@@ -23,8 +10,6 @@ import {
   userAgent,
 } from '../_shared/security.ts'
 
-// One message for "no such code" AND "expired" — distinct wording would confirm
-// to someone guessing codes which of their guesses matched a real row.
 const BAD_CODE = 'That reset code is not valid or has expired. Ask your instructor for a new one.'
 
 Deno.serve(async (req) => {
@@ -41,8 +26,6 @@ Deno.serve(async (req) => {
   const token = String(payload.token ?? '').trim().toUpperCase()
   const pin = String(payload.pin ?? '')
 
-  // Shape checks first — these never reach the code lookup, so a student
-  // fumbling their new PIN never counts against the rate limit.
   if (!token) return json(req, { ok: false, error: 'Enter your reset code.' })
   if (pin.length < 6) return json(req, { ok: false, error: 'PIN must be at least 6 characters.' })
 
@@ -57,7 +40,6 @@ Deno.serve(async (req) => {
   const log = (success: boolean, detail: string, studentId?: string | null) =>
     logAuthEvent(admin, { kind: 'pin_reset', success, ip, userAgent: ua, studentId, detail })
 
-  // 0. Rate limit before touching a code, so guessing costs nothing to serve.
   if (await tooManyAttempts(admin, ip)) {
     await log(false, 'rate_limited')
     return json(req, { ok: false, error: RATE_LIMIT_MESSAGE }, 429)
@@ -82,8 +64,6 @@ Deno.serve(async (req) => {
     return json(req, { ok: false, error: BAD_CODE })
   }
 
-  // 2. Locate the linked auth account. Both messages below are only reachable
-  // AFTER a valid, unexpired code matched, so they leak nothing to a guesser.
   const { data: student, error: studentErr } = await admin
     .from('students')
     .select('user_id')

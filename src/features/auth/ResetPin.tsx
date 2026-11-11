@@ -14,9 +14,6 @@ import { listVariants, rowVariants } from '@/lib/motion'
 
 export function ResetPin() {
   const { resetPin } = useAuth()
-  // Client-side speed bump over the server's per-IP limit. Only SERVER
-  // rejections count — a local typo caught by validate() below is not an
-  // attempt at anything.
   const lock = useLockout('cp_reset_pin', { threshold: 5, baseMs: 60_000 })
   const transition = useAuthTransition()
   const { capsOn, capsProps } = useCapsLock()
@@ -77,8 +74,6 @@ export function ResetPin() {
         </>
       }
     >
-      {/* Same two-group split as Claim, for the same reason: the code is handed
-          to you, the PIN is chosen by you. */}
       <motion.form
         onSubmit={onSubmit}
         className="space-y-6"
@@ -133,8 +128,6 @@ export function ResetPin() {
           />
         </motion.section>
 
-        {/* Was rendered under "Confirm new PIN", so a complaint about the RESET
-            CODE appeared at the opposite end of the form from the code box. */}
         {error && (
           <motion.p
             variants={rowVariants}

@@ -12,21 +12,6 @@ import { errorText } from '@/lib/errors'
 import { countdownTo } from '@/lib/time'
 import type { PeerEvaluationSummary } from '@/lib/types'
 
-/**
- * The student's peer evaluation list.
- *
- * ── THERE IS NO LOCKED SCREEN ──────────────────────────────────────────────
- * Unlike Student Space there is no beta roster: a student is eligible exactly
- * when an evaluation targets their section. So a student with nothing assigned
- * sees an empty state, never a "you don't have access" wall — which would be a
- * lie, since they will have access the moment the instructor creates one.
- *
- * The list fetches for itself and does NOT go through `StudentData`. That
- * provider is 1101 lines consumed by every student screen; peer evaluation has
- * no live surface and nothing else needs its data, so adding it there would
- * make every dashboard open pay for a feature used a few times a term. Same
- * call the Lounge made.
- */
 export function PeerEvaluations() {
   const [items, setItems] = useState<PeerEvaluationSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -104,13 +89,6 @@ export function PeerEvaluations() {
   )
 }
 
-/**
- * One evaluation.
- *
- * The chip answers "what, if anything, do I do about this" in one word, and the
- * four states are genuinely different: an unplaced student is NOT behind on
- * anything, so they get a neutral explanation rather than an alarm.
- */
 function EvalRow({ item }: { item: PeerEvaluationSummary }) {
   const closed = item.status === 'closed'
   const submitted = item.submittedAt !== null
@@ -128,14 +106,8 @@ function EvalRow({ item }: { item: PeerEvaluationSummary }) {
           ? { label: 'Missed', tone: 'danger' as const }
           : { label: 'To do', tone: 'accent' as const }
 
-  // Whether tapping it does anything. A closed one you never answered has
-  // nothing behind it, and a card that opens onto a dead end is worse than one
-  // that plainly does not open.
   const openable = released || (!unplaced && (!closed || submitted))
 
-  // Released results are the destination once they exist, even for a student
-  // who never submitted: their classmates still rated them, and that feedback
-  // is the thing they came to read.
   const to = released ? `/app/peer/${item.id}/results` : `/app/peer/${item.id}`
 
   const body = (

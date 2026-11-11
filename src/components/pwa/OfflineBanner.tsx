@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { glide } from '@/lib/motion'
 
-/** A small pill at the top of the screen while the device is offline. */
 export function OfflineBanner() {
   const [online, setOnline] = useState(() => navigator.onLine)
 

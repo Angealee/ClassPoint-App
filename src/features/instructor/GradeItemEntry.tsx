@@ -17,28 +17,13 @@ import { cellDisplay, resolveCommit, type AbsentSource, type CellState } from '@
 import { type CellEdit } from './GradeGrid'
 import type { GradeAttendance, GradeItem, GradePolicy, GradeView, RosterPerson } from '@/lib/types'
 
-/**
- * Entering marks on a phone: one column at a time, down the roster.
- *
- * The grid is the right shape on a desktop and the wrong one here — a name plus
- * twenty columns cannot be read two columns at a time. This is the same data
- * and the same commit path, turned ninety degrees: pick the quiz you have just
- * marked, then type one number per student.
- *
- * It is mounted INSTEAD of the grid, never alongside it (see GradeSheet): two
- * editors would mean two inputs per cell, and the keyboard navigation and the
- * failed-cell flagging both assume one.
- */
-
 interface GradeItemEntryProps {
   students: RosterPerson[]
   items: GradeItem[]
   scores: Map<string, number>
   /** cellKey → why a cell reads Absent (0063). */
   absences: Map<string, AbsentSource>
-  /** studentId → attendance counts; Recitation is computed from them (0063). */
   attendance: Map<string, GradeAttendance>
-  /** For the term figure under each name — the same policy and view the grid uses. */
   policy: GradePolicy
   view: GradeView
   failed: Set<string>
@@ -59,15 +44,9 @@ export function GradeItemEntry({
   const [itemId, setItemId] = useState<string>(() => items[0]?.id ?? '')
   const item = items.find((i) => i.id === itemId) ?? items[0]
 
-  // Seeded per item: switching columns re-reads the parent's map, which is
-  // always current because every commit writes through to it.
   const [values, setValues] = useState<Map<string, CellState>>(new Map())
   const [badCell, setBadCell] = useState<{ studentId: string; reason: string } | null>(null)
 
-  // The roster's inputs, by row. Enter walks to the next one through this map
-  // rather than `document.getElementById('entry-N')`: that was a convention in a
-  // global namespace (any other element with the same id would have taken the
-  // walk) and a lookup that has to search the whole document on every Enter.
   const inputs = useRef(new Map<number, HTMLInputElement>())
 
   const current = useMemo(() => {
@@ -92,16 +71,6 @@ export function GradeItemEntry({
     [current],
   )
 
-  /**
-   * Each student's TERM figure, so you can see what the mark you are typing does
-   * to them without leaving the phone for the desktop grid.
-   *
-   * No arithmetic of its own: `sumsFromScores` and `termGrade` are the very
-   * functions the grid's rows call, so the two screens cannot disagree about a
-   * grade. A mark typed in THIS session lives in `values` (keyed like cellKey),
-   * everything else in `scores`; a cleared mark is `null` and drops out of the
-   * denominator exactly as it does on the grid.
-   */
   const termFigures = useMemo(() => {
     const out = new Map<string, number | null>()
     for (const s of students) {
@@ -135,7 +104,6 @@ export function GradeItemEntry({
     }
 
     setBadCell(null)
-    // The same rule the desktop grid uses (lib/grade-cell.ts): a mark, A, or a clear.
     const outcome = resolveCommit(parsed, before)
     el.value = outcome.display
     if (outcome.kind === 'none') return
@@ -210,8 +178,6 @@ export function GradeItemEntry({
                   else inputs.current.delete(index)
                 }}
                 type="text"
-                // The decimal pad, because numbers are what this is for. It has no
-                // letters, so Absent is the A button beside it, not a typed key.
                 inputMode="decimal"
                 defaultValue={cellDisplay(cell)}
                 aria-label={`${item.name} for ${student.fullName}${isA ? ', absent' : ''}`}
@@ -229,9 +195,6 @@ export function GradeItemEntry({
                   !isBad && failed.has(cellKey(item.id, student.id)) && 'border-danger',
                 )}
               />
-              {/* Absent. A toggle: it marks the student absent, or takes a TYPED A
-                  back off. An A that comes from attendance can't be toggled here
-                  (it is about the class) and the button says so. */}
               <button
                 type="button"
                 aria-pressed={isA}

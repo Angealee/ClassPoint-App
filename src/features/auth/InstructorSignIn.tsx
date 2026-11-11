@@ -38,7 +38,6 @@ export function InstructorSignIn() {
     <AuthShell
       title="Instructor sign in"
       subtitle="Manage sections, students, and points."
-      // The tile was hand-rolled in this file's body before the shell owned one.
       icon={<ShieldIcon className="h-6 w-6" />}
       footer={
         <Link to="/signin" className="text-muted hover:text-ink">

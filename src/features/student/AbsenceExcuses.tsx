@@ -31,13 +31,6 @@ function withinWindow(startedAt: string): boolean {
   return Date.now() - new Date(startedAt).getTime() <= EXCUSE_DEADLINE_DAYS * DAY_MS
 }
 
-/**
- * How long is left to file — the one fact that decides whether a row is still
- * worth acting on.
- *
- * Rounds UP on the remaining fraction of a day, so a window with 20 hours left
- * reads "1 day left" rather than "0 days left" while it is still genuinely open.
- */
 function deadlineLabel(startedAt: string): string {
   const msLeft = EXCUSE_DEADLINE_DAYS * DAY_MS - (Date.now() - new Date(startedAt).getTime())
   if (msLeft <= 0) return 'Window closed'
@@ -50,11 +43,6 @@ function errorText(e: unknown, fallback: string): string {
   return m && m.length <= 160 ? m : fallback
 }
 
-/**
- * The student's absence-excuse surface: the DCT-CCS how-to card plus each
- * actionable absence with its request/track controls. Self-contained so the
- * Attendance page just drops it in above the history.
- */
 export function AbsenceExcuses({
   studentId,
   history,
@@ -62,7 +50,6 @@ export function AbsenceExcuses({
 }: {
   studentId: string
   history: MyAttendanceEntry[]
-  /** Called after an approval so the parent can reload attendance (status flips). */
   onChanged: () => void
 }) {
   const { toast } = useToast()
@@ -86,7 +73,6 @@ export function AbsenceExcuses({
     load()
   }, [load])
 
-  // A decision (approve/reject) lands live while the page is open.
   useEffect(() => {
     const channel = uniqueChannel(`my-excuses-${studentId}`)
       .on(
@@ -118,9 +104,6 @@ export function AbsenceExcuses({
     return map
   }, [excuses])
 
-  // Actionable = an absence that's either still requestable, or has an excuse
-  // in flight/decided the student should see. Approved ones flip to 'excused'
-  // and drop out of the absent history entirely.
   const actionable = useMemo(
     () =>
       history.filter(
@@ -179,13 +162,6 @@ export function AbsenceExcuses({
 
   return (
     <div className="space-y-3">
-      {/* The DCT-CCS how-to, collapsed.
-          This used to be a permanently-open card: four numbered steps plus a
-          paragraph, occupying most of a phone screen above the absences it was
-          explaining. It's reference material, not an alert — so it's one line
-          now, and the steps open in a sheet at the moment someone wants them.
-          The old per-student dismissal is gone with it; a single line needs no
-          escape hatch. */}
       <button
         type="button"
         onClick={() => setGuideOpen(true)}
@@ -236,10 +212,6 @@ export function AbsenceExcuses({
                     <p className="truncate text-sm font-semibold">
                       {h.topic || sessionDate(h.startedAt)}
                     </p>
-                    {/* The second line used to repeat the date whenever a
-                        session had no topic — "Aug 15" above "Aug 15". It now
-                        carries the deadline, which is the thing that decides
-                        whether this row is still worth acting on. */}
                     <p className="text-sm text-muted">
                       {h.topic ? `${sessionDate(h.startedAt)} · ` : ''}
                       {deadlineLabel(h.startedAt)}

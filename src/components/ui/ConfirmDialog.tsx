@@ -9,42 +9,18 @@ interface ConfirmDialogProps {
   title: string
   /** What is about to happen, in plain words. */
   message: ReactNode
-  /** Optional consequence line, e.g. "This also reverses 4 committed penalties." */
   detail?: ReactNode
   confirmLabel: string
   cancelLabel?: string
-  /** `danger` for destructive/irreversible actions (red warning styling). */
   variant?: 'danger' | 'default'
-  /** Disables both buttons and shows a spinner while the action runs. */
   busy?: boolean
-  /**
-   * Typed-name challenge for truly irreversible actions: the confirm button
-   * stays disabled until the user types this exact text. The friction is the
-   * feature — a double-tap habit cannot blow through it.
-   */
   challengeText?: string
-  /**
-   * Reports what is typed into the challenge box.
-   *
-   * For callers whose SERVER re-checks the typed text, so it can be sent along
-   * with the request rather than trusting that the button was enabled. A
-   * separate prop rather than an argument to `onConfirm`, because thirteen
-   * existing callers pass a bare function there and would start receiving a
-   * string they never asked for.
-   */
   onChallengeChange?: (value: string) => void
-  /** Optional input rendered above the buttons (e.g. a decision note). */
   children?: ReactNode
   onConfirm: () => void
   onClose: () => void
 }
 
-/**
- * Confirmation gate for risky actions, built on the standard bottom Sheet.
- * Every destructive or hard-to-undo action in the app goes through this —
- * quick single-student taps during a live attendance session are the one
- * deliberate exception (they're easily re-scannable and speed matters there).
- */
 export function ConfirmDialog({
   open,
   title,

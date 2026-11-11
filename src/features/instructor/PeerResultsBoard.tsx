@@ -35,37 +35,6 @@ import type { PeerCompletionRow, PeerEvaluationListItem, PeerResultRow } from '@
 type Confirming = 'close' | 'reopen' | 'release' | null
 type BoardTab = 'results' | 'completion'
 
-/**
- * One evaluation: who has submitted, and the controls that end it.
- *
- * ── TWO VIEWS, AND WHICH ONE OPENS DEPENDS ON THE STATE ────────────────────
- * Results are LIVE as soon as anyone submits (the instructor's call,
- * 2026-09-14) — `get_peer_results` is instructor-gated and never cared about
- * status, so only this screen was holding them back. While it is open,
- * Completion stays the default tab because that is the list you chase, and the
- * Results tab says plainly that its numbers are still moving. Once it closes,
- * Results opens by default. Release to STUDENTS still requires closing, so
- * nothing a student sees can move. Aggregation happens in SQL: a section-wide
- * evaluation is thousands of rating rows and PostgREST truncates at 1000
- * silently.
- *
- * ── DELETE LIVES AT THE BOTTOM, AND ONLY HERE ─────────────────────────────
- * A Danger zone card below everything else (the instructor's call), so the
- * submissions about to be destroyed are on screen above the button, and never
- * on the console list where one look-alike card is a tap away from another.
- * The server allows it only when CLOSED and NOT RELEASED and checks the typed
- * title itself; the button explains whichever rule is blocking it rather than
- * disappearing.
- *
- * The results fetch sits in its OWN try, the 0034 SectionGrid precedent. Its
- * RPC ships in 0051, so before that migration is applied only this tab is
- * missing rather than the whole screen.
- *
- * ── THREE STATES, NOT TWO ──────────────────────────────────────────────────
- * `applicable` is false for a student with nobody to rate — in a group-scoped
- * evaluation, someone who is on no team. They are NOT outstanding, and listing
- * them as missing sends the instructor chasing someone with nothing to do.
- */
 export function PeerResultsBoard() {
   const { evaluationId = '' } = useParams()
   const { toast } = useToast()
@@ -83,8 +52,6 @@ export function PeerResultsBoard() {
   const navigate = useNavigate()
   const [deleting, setDeleting] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
-  // What was actually TYPED, sent to the server so it can compare it itself.
-  // Never substitute the stored title: that would make the check unable to fail.
   const [typedTitle, setTypedTitle] = useState('')
   const [view, setView] = useState<'lowest' | 'team'>('lowest')
   const [query, setQuery] = useState('')
@@ -93,9 +60,6 @@ export function PeerResultsBoard() {
     setLoading(true)
     setLoadError(null)
     try {
-      // In parallel. `list_peer_evaluations` is the only thing that carries the
-      // title and status, and there is no per-evaluation read that would answer
-      // both without a second RPC nothing else would use.
       const [all, completion] = await Promise.all([
         listPeerEvaluations(),
         getPeerCompletion(evaluationId),
@@ -104,20 +68,10 @@ export function PeerResultsBoard() {
       setMeta(found)
       setRows(completion)
 
-      // Results are a SEPARATE try, the 0034 SectionGrid precedent: this RPC
-      // ships in 0051, so until that migration is applied the call throws and
-      // only the Results tab is missing. Folding it into the fetch above would
-      // take the completion view down with it.
-      //
-      // Fetched whenever anyone has submitted, open or closed. With nobody
-      // submitted every row would read "Not rated", which is the completion
-      // view restated with less information.
       if (found && found.submittedCount > 0) {
         try {
           const r = await getPeerResults(evaluationId)
           setResults(r)
-          // Only a closed evaluation opens on Results. While it is open the
-          // outstanding list is what needs doing.
           if (found.status === 'closed') setTab('results')
         } catch {
           setResults([])
@@ -149,16 +103,12 @@ export function PeerResultsBoard() {
     try {
       if (confirming === 'close') {
         const changed = await closePeerEvaluation(meta.id)
-        // The cron may have beaten the tap by seconds. Saying "closed" either
-        // way is honest; saying "you closed it" when you did not is not.
         toast(changed ? 'Closed.' : 'It was already closed.', 'success')
       } else if (confirming === 'reopen') {
         await reopenPeerEvaluation(meta.id)
         toast('Reopened. Set a new deadline if you want one.', 'success')
       } else if (confirming === 'release') {
         const n = await releasePeerResults(meta.id)
-        // Report what the SERVER reached, not what we predicted. Zero means it
-        // was already released, which is worth saying plainly.
         toast(
           n === 0
             ? 'Results were already released.'
@@ -194,8 +144,6 @@ export function PeerResultsBoard() {
   async function hideComment(submissionId: string, rateeId: string, hidden: boolean) {
     try {
       await setPeerCommentHidden(submissionId, rateeId, hidden)
-      // Patch in place rather than refetching: the instructor is mid-read on an
-      // expanded card, and a reload collapses everything they had open.
       setResults((prev) =>
         prev.map((r) =>
           r.studentId !== rateeId
@@ -228,12 +176,8 @@ export function PeerResultsBoard() {
         'success',
       )
       setDeleting(false)
-      // Replace, not push: Back must not return to a screen for something that
-      // no longer exists.
       navigate('/teach/peer', { replace: true })
     } catch (e) {
-      // The server's refusals are real sentences ("Close the evaluation before
-      // deleting it", "The title you typed does not match"), shown verbatim.
       toast(errorText(e, "Couldn't delete that evaluation."), 'error')
       setDeleting(false)
     } finally {
@@ -264,13 +208,9 @@ export function PeerResultsBoard() {
   const open = meta.status === 'open'
   const released = meta.resultsReleasedAt !== null
   const expected = Math.max(1, meta.expectedCount)
-  // Mirrors the server's rule. The server decides; this only explains it.
   const canDelete = !open && !released
   const showResults = results.length > 0 && meta.submittedCount > 0
 
-  // Computed from the rows already on screen, so the summary can never disagree
-  // with the cards beneath it. The summary always covers the whole class; the
-  // search narrows only the list.
   const summary = classSummary(results)
   const needle = query.trim().toLowerCase()
   const shown = needle
@@ -281,8 +221,6 @@ export function PeerResultsBoard() {
       )
     : results
   const hasTeams = results.some((r) => r.groupName)
-  // Flagged AND still hidden: the ones waiting on a decision. A flagged comment
-  // you restored has had its decision, and leaves this queue.
   const flaggedWaiting = results.flatMap((r) =>
     r.comments.filter((c) => c.flagged && c.hiddenAt !== null).map((c) => ({ row: r, comment: c })),
   )
@@ -300,8 +238,6 @@ export function PeerResultsBoard() {
             <Chip tone={open ? 'accent' : 'neutral'} size="sm">
               {open ? 'Open' : 'Closed'}
             </Chip>
-            {/* Opens the composer pre-filled on the console. Nothing is created
-                until Open is pressed there, so this is safe to tap. */}
             <Button
               size="sm"
               variant="outline"
@@ -323,9 +259,6 @@ export function PeerResultsBoard() {
           </div>
           <Meter value={meta.submittedCount} max={expected} />
           <p className="mt-2 text-xs text-muted">
-            {/* Stated rather than left to be inferred: with no draft table this
-                is the ONLY progress signal that exists, and an instructor who
-                expects a percentage will otherwise read the bar as one. */}
             Drafts stay on each student's own device, so this counts finished
             submissions only. There is no partial progress to show.
           </p>
@@ -410,9 +343,6 @@ export function PeerResultsBoard() {
               </Button>
             </div>
             <p className="mt-2 text-xs text-muted">
-              {/* Said here rather than discovered later: an instructor who
-                  expects the comments in the sheet will otherwise mail it
-                  believing the words travelled with it. */}
               The workbook holds scores only. Comments stay in the app.
             </p>
           </Card>
@@ -443,8 +373,6 @@ export function PeerResultsBoard() {
             )}
 
             {flaggedWaiting.length > 0 && (
-              // First on the board, because these are the only rows that need a
-              // decision before release. Auto-hidden at submit (0054).
               <Card className="border-warn/30 bg-warn-solid/8">
                 <p className="text-sm font-semibold text-warn">
                   {flaggedWaiting.length} flagged comment{flaggedWaiting.length === 1 ? '' : 's'}{' '}

@@ -1,13 +1,5 @@
 import type { ReactElement, SVGProps } from 'react'
 
-/**
- * One small illustrated motif per achievement code — the art inside a badge's
- * frame (see `BadgeArt.tsx`). Self-contained `<svg>` components in the same
- * style as `components/ui/icons.tsx`, just specific to achievements rather
- * than general nav/UI chrome, so they live in their own file. Filled (not
- * just stroked) so they read as bolder "badge" art at small sizes.
- */
-
 const base = { viewBox: '0 0 24 24', fill: 'currentColor' }
 
 function Footprints(props: SVGProps<SVGSVGElement>) {
@@ -281,8 +273,6 @@ function TrophyCrown(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-/* ── Per-term badges (0036) ─────────────────────────────────────────────── */
-
 /** A term's page with a star on it — "a standout six weeks". */
 function CalendarStar(props: SVGProps<SVGSVGElement>) {
   return (
@@ -335,8 +325,6 @@ function AlarmClock(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
-
-/* ── Motifs for four 0021 badges that never got one (they rendered blank) ── */
 
 /** A receipt — your first approved redemption. */
 function Receipt(props: SVGProps<SVGSVGElement>) {
@@ -409,8 +397,6 @@ export const BADGE_MOTIFS: Record<string, (props: SVGProps<SVGSVGElement>) => Re
   team_player: PuzzlePiece,
   class_mvp: TrophyCrown,
 
-  // 0021's four — these were seeded without motifs and rendered as blank
-  // gradient frames in the trophy case until now.
   big_spender: Receipt,
   high_roller: Dice,
   town_crier: Megaphone,

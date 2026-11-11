@@ -16,18 +16,6 @@ import { cn } from '@/lib/cn'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useStudentData } from './StudentData'
 
-
-/**
- * The detailed attendance read.
- *
- * Split from the Attendance tab on purpose: that screen is for DOING things —
- * scan, resolve an absence, check a recent mark. This one answers "how am I
- * actually going?", which needs cuts the tab has no room for.
- *
- * Reads attendance from StudentData rather than fetching its own, so arriving
- * from the Dashboard teaser is instant and an instructor's correction reaches
- * both surfaces from the one subscription.
- */
 export function AttendanceStats() {
   const navigate = useNavigate()
   const { attendance, attendanceLoading, achievementProgress } = useStudentData()
@@ -57,13 +45,6 @@ export function AttendanceStats() {
     [attendance],
   )
 
-  /**
-   * Punctuality, from check-in time against when class actually started.
-   *
-   * Only rows with a `scannedAt` count: a record the instructor marked by hand
-   * has no check-in moment, and averaging it in as "0 minutes" would invent a
-   * punctuality the student never demonstrated.
-   */
   const punctuality = useMemo(() => {
     const scanned = attendance.filter((h) => h.scannedAt && counts(h.status))
     if (scanned.length === 0) return null
@@ -71,7 +52,6 @@ export function AttendanceStats() {
       Math.max(0, (new Date(h.scannedAt as string).getTime() - new Date(h.startedAt).getTime()) / 60000),
     )
     const avg = mins.reduce((a, b) => a + b, 0) / mins.length
-    // "On the dot" = inside the first two minutes, matching the early-streak rule.
     return {
       avg: Math.round(avg * 10) / 10,
       onTheDot: mins.filter((m) => m <= 2).length,
@@ -87,7 +67,6 @@ export function AttendanceStats() {
 
   return (
     <div className="space-y-5">
-      {/* Arriving here from the Attendance tab now returns there, not to Home. */}
       <PageHeader
         title="Attendance stats"
         subtitle="How your semester is actually going."
@@ -114,9 +93,6 @@ export function AttendanceStats() {
               Attendance rate across {counted(attendance)} classes
               {streak !== null && streak > 0 && ` · ${streak} in a row`}
             </p>
-            {/* Moved here from the Attendance tab, where it sat as a loose line
-                under the summary with nothing to relate it to. This is the
-                screen that explains the rate, so the exclusion belongs here. */}
             {neutral > 0 && (
               <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
                 {excused > 0 && `${excused} excused`}
@@ -127,9 +103,6 @@ export function AttendanceStats() {
             )}
           </Card>
 
-          {/* Per subject (0030). Attendance is subject-scoped, so a perfect
-              record in one class shouldn't be averaged away by a rough one in
-              another. Only worth showing once there IS more than one. */}
           {subjects.length > 1 && (
             <div>
               <SectionLabel>By subject</SectionLabel>

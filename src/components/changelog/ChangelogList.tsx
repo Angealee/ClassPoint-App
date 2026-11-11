@@ -1,10 +1,5 @@
 import type { ChangelogEntry } from '@/lib/changelog'
 
-/**
- * Renders a list of changelog entries — shared by the auto "What's new" sheet
- * (unseen entries) and the "What's new" button in Profile (the full history).
- * Text is sized up for readability so updates actually get noticed.
- */
 export function ChangelogList({ entries }: { entries: ChangelogEntry[] }) {
   return (
     <div className="space-y-6">

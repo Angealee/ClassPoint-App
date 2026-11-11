@@ -37,12 +37,6 @@ import { SemesterEndedBanner } from './SemesterEndedBanner'
 import { StreakFlame } from './StreakFlame'
 import type { MyAttendanceEntry, ScanResult } from '@/lib/types'
 
-/**
- * What the summary card is scoped to: one term, or the whole semester.
- *
- * `'all'` rather than `null` so it can be a `SegmentedControl` value — that
- * primitive is a real radiogroup and every option needs a string.
- */
 type TermScope = TermName | 'all'
 
 const entryDate = (iso: string) =>
@@ -58,12 +52,6 @@ function errorText(e: unknown): string {
   return 'Could not record your attendance — scan the current QR and try again.'
 }
 
-/**
- * Did the scan fail because we couldn't reach the server (vs. the server
- * actively rejecting the payload)? A transport failure = keep the queued proof;
- * a server rejection = drop it. supabase-js surfaces network failures as a
- * TypeError ("Failed to fetch") with no HTTP status/code.
- */
 function isOffline(e: unknown): boolean {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
   if (e instanceof TypeError) return true
@@ -85,8 +73,6 @@ export function Attendance() {
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<ScanResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // Set when a scan couldn't reach the server — shows the optimistic "saved,
-  // will sync" pane instead of an error.
   const [savedOffline, setSavedOffline] = useState<string | null>(null)
   const [queue, setQueue] = useState<OfflineScanEntry[]>([])
   const [loadError, setLoadError] = useState(false)
@@ -101,8 +87,6 @@ export function Attendance() {
     try {
       setHistory(await listMyAttendance(me.id))
     } catch {
-      // A failed fetch used to leave history empty, so the screen said "No
-      // classes yet" — telling a student their whole record didn't exist.
       setLoadError(true)
     } finally {
       setLoading(false)
@@ -111,8 +95,6 @@ export function Attendance() {
 
   useEffect(() => {
     void load()
-    // Flush any queued offline scans the moment this page opens, then reflect
-    // their resolved state; refresh history if something recorded.
     void syncOfflineScans().then((changed) => {
       refreshQueue()
       if (changed) void load()
@@ -120,17 +102,10 @@ export function Attendance() {
     refreshQueue()
   }, [load, refreshQueue])
 
-  // An instructor correcting a status (or committing penalties) now reaches this
-  // screen live — attendance_records has been in the realtime publication since
-  // 0014, but nothing was listening until Phase B.
   useEffect(() => {
     if (attendanceTick > 0) void load()
   }, [attendanceTick, load])
 
-  // Arriving from the Dashboard's live-class banner (`?scan=1`): open the
-  // scanner straight away rather than making the student find the button on a
-  // screen they were pushed to. The param is stripped so a back-navigation or a
-  // refresh doesn't re-open it.
   useEffect(() => {
     if (searchParams.get('scan') === null) return
     setSearchParams((p) => {
@@ -174,9 +149,6 @@ export function Attendance() {
         return
       }
 
-      // Capture-first: persist the proof BEFORE the network call, so a crash or
-      // a dead connection can never lose it. Removed again only if the server
-      // accepts (or explicitly rejects) it right now.
       const entry = enqueueScan({
         sessionId: parsed.sessionId,
         windowIndex: parsed.windowIndex,
@@ -186,18 +158,16 @@ export function Attendance() {
       setSubmitting(true)
       try {
         const res = await scanAttendance(parsed.sessionId, parsed.windowIndex, parsed.code)
-        dismissScan(entry.id) // the online path handled it — no queue entry needed
+        dismissScan(entry.id)
         setResult(res)
         vibrate(res.status === 'present' ? 'point' : 'deduct')
-        void syncMyAchievements() // may unlock Checked In / On Time / streaks
+        void syncMyAchievements()
       } catch (e) {
         if (isOffline(e)) {
           // Keep the queued proof; reassure the student it's saved.
           setSavedOffline(new Date(entry.capturedAt).toLocaleTimeString())
           vibrate('point')
         } else {
-          // The server actively refused THIS payload (expired/wrong section/
-          // ended) — queuing it for later would just re-fail. Drop it.
           dismissScan(entry.id)
           setError(errorText(e))
         }
@@ -209,38 +179,16 @@ export function Attendance() {
     [syncMyAchievements, refreshQueue],
   )
 
-  /**
-   * Which slice of the semester the summary card is reporting on.
-   *
-   * `all` is the default, so a student who never touches the control sees
-   * exactly what this card has always shown.
-   */
   const [scope, setScope] = useState<TermScope>('all')
 
-  /**
-   * Only the terms that actually exist AND have classes in them.
-   *
-   * `termRanges()` reads the instructor's stored dates (0027) — this is its
-   * first real caller; until now it was exercised only by its own test. The
-   * `has` filter matters at the start of a semester: offering Midterm and
-   * Finals tabs in week two gives a student two ways to be told "nothing yet",
-   * and three empty tabs is a worse answer than one.
-   */
   const scopeOptions = useMemo(() => {
     const seen = new Set(history.map((h) => termOf(h.startedAt)).filter(Boolean))
     const terms = termRanges()
       .filter((r) => seen.has(r.term))
       .map((r) => ({ value: r.term as TermScope, label: termLabel(r.term) }))
-    // One term's worth of classes makes the picker a label, not a choice.
     return terms.length > 1 ? [{ value: 'all' as TermScope, label: 'Overall' }, ...terms] : []
   }, [history])
 
-  /**
-   * The card's rows. THE WHOLE CARD follows the scope — counts and rate alike
-   * (the instructor's call): the card is one answer to "how was my Midterm?",
-   * and three lifetime counts above a per-term percentage would be two scopes
-   * stacked in one box.
-   */
   const scoped = useMemo(
     () => (scope === 'all' ? history : history.filter((h) => termOf(h.startedAt) === scope)),
     [history, scope],
@@ -248,29 +196,20 @@ export function Attendance() {
   const stats = useMemo(() => tally(scoped), [scoped])
 
   return (
-    // Pull-to-refresh: this is the screen where a student most wants to force a
-    // re-check ("did my check-in actually land?").
     <PullToRefresh onRefresh={load}>
     <div className="space-y-5">
       <ScreenTitle title="Attendance" subtitle="Scan your instructor’s QR to record your attendance." />
 
-      {/* Read-only, because their semester is over (0035). */}
       <SemesterEndedBanner />
 
-      {/* Class is running right now (0033). Renders nothing when it isn't, and
-          opens the scanner in place — this screen already owns that sheet. */}
       <LiveClassBanner onScan={openScan} />
 
-      {/* Hidden once the semester has ended: scan_attendance refuses these
-          check-ins server-side (0035), so offering the button would only walk
-          the student into a camera and then an error. */}
       {!semesterEnded && (
         <Button size="lg" className="w-full" onClick={openScan}>
           <ScanIcon className="h-5 w-5" /> Scan attendance
         </Button>
       )}
 
-      {/* Offline check-ins waiting to sync / their outcomes. */}
       <OfflineScanCards
         entries={queue}
         onChanged={() => {
@@ -279,24 +218,10 @@ export function Attendance() {
         }}
       />
 
-      {/* The streak, permanently visible (Phase F) — it used to disappear the
-          moment its badge unlocked. */}
       {history.length > 0 && <StreakFlame />}
 
-      {/* Summary — ONE card, counts first.
-          The show-up rate used to open this screen as a large brand-red number,
-          which meant the first thing a struggling student saw was their worst
-          figure. It's still here (it's the number that matters for a grade) but
-          as a calm footer line: the counts are what you act on. */}
       {history.length > 0 && (
         <Card elevation="raised" className="p-0">
-          {/* Which term. QUIET, not accent: the primary action on this screen
-              is the Scan button above, and a second filled strip in the same
-              column reads as a competing control — the exact misreading
-              `tone="quiet"` was added for on the grade sheet.
-              Rendered only when there is more than one term to choose between
-              (see `scopeOptions`), so it does not appear in week two offering
-              two ways to see nothing. */}
           {scopeOptions.length > 0 && (
             <div className="border-b border-line p-3">
               <SegmentedControl
@@ -325,9 +250,6 @@ export function Attendance() {
               </div>
             ))}
           </div>
-          {/* The permanent entry point to the detailed stats screen. Deliberately
-             here rather than on the Dashboard: this row IS the summary the stats
-             screen expands on, and a link here survives any home-screen rebuild. */}
           <button
             type="button"
             onClick={() => navigate('/app/attendance/stats')}
@@ -341,11 +263,6 @@ export function Attendance() {
                   TONE[rateTone(stats.rate)].text,
                 )}
               >
-                {/* A term with nothing counted yet has no rate, and `rateOf`
-                    answers 0 there — which on this screen reads as "you
-                    attended none of them". A dash is the honest answer, and
-                    it matches what the grade sheet does for an unmarked
-                    component. */}
                 {stats.counted === 0 ? <span className="text-muted/50">—</span> : `${stats.rate}%`}
               </span>
               <span className="text-sm font-semibold text-accent">Stats ›</span>
@@ -354,8 +271,6 @@ export function Attendance() {
         </Card>
       )}
 
-
-      {/* Absence-excuse flow (DCT-CCS admission slip) — sits above history. */}
       {!loading && me && (
         <AbsenceExcuses studentId={me.id} history={history} onChanged={load} />
       )}
@@ -373,10 +288,6 @@ export function Attendance() {
       ) : history.length === 0 ? (
         <EmptyState>No classes yet. When your instructor starts a class, scan the QR to record your attendance.</EmptyState>
       ) : (
-        /* Grouped by term (0027 dates, now configured for the student area
-           too). The changelog promised this; until Phase F the history was one
-           undifferentiated list, so a student couldn't tell which absences fell
-           in the term being graded. */
         <div className="space-y-4">
           {groupByTerm(history, (h) => h.startedAt).map((g) => (
             <div key={g.label}>
@@ -391,11 +302,6 @@ export function Attendance() {
                         {h.topic || entryDate(h.startedAt) || 'Class'}
                       </p>
                       <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-muted">
-                        {/* Built from parts and joined once. Concatenating
-                            "x · " fragments left a doubled separator whenever a
-                            middle piece was absent — and the date piece is
-                            absent for every session without a topic, because
-                            the title above already IS the date. */}
                         {[
                           h.subjectCode,
                           h.topic ? entryDate(h.startedAt) : null,
@@ -419,18 +325,8 @@ export function Attendance() {
         </div>
       )}
 
-      {/* Global event check-ins (0055) — a SEPARATE section, kept out of the
-          term groups and the show-up rate above (an event is never class
-          attendance). Renders nothing when the student has no events. */}
       {me && <StudentEventHistory studentId={me.id} />}
 
-      {/* Scan sheet.
-          `variant="screen"`, not the default bottom sheet: a camera belongs in
-          the middle of the screen, and a sheet that rises from the bottom edge
-          put the viewfinder in the bottom third, right above the button that
-          opened it. The screen variant brings its own sticky back bar, which is
-          why ScanStage needs no footer here. Additive, so the other ~21 sheets
-          in the app are untouched. */}
       <Sheet open={scanOpen} onClose={closeScan} variant="screen" title="Scan attendance">
         {submitting ? (
           <div className="flex flex-col items-center gap-3 py-10 text-sm text-muted">

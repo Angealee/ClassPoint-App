@@ -54,7 +54,6 @@ const STATUS_META: Record<RedemptionStatus, { label: string; cls: string }> = {
   approved: { label: 'Approved', cls: TONE.success.chip },
   rejected: { label: 'Declined', cls: TONE.danger.chip },
   cancelled: { label: 'Cancelled', cls: TONE.neutral.chip },
-  // 0062 — an approved grade boost the instructor undid. The points came back.
   reversed: { label: 'Reversed', cls: TONE.neutral.chip },
 }
 
@@ -63,10 +62,8 @@ function errorText(e: unknown, fallback: string): string {
   return m && m.length <= 160 ? m : fallback
 }
 
-/** Put your class points toward a grade — request, instructor decides. */
 export function UsePoints() {
   const navigate = useNavigate()
-  // ?column=<id> — the grade column the student came from on /app/grades.
   const [params] = useSearchParams()
   const highlightId = params.get('column')
   const { me, refresh } = useStudentData()
@@ -92,8 +89,6 @@ export function UsePoints() {
     try {
       setHistory(await listMyRedemptions(studentId))
     } catch {
-      // Without this flag a failed load looked exactly like "you've never spent
-      // points" — same empty state, no way to tell or retry.
       setLoadError(true)
     } finally {
       setLoading(false)
@@ -104,18 +99,12 @@ export function UsePoints() {
     void load()
   }, [load])
 
-  // The price list. Non-fatal: an empty catalog just means the shop doesn't
-  // render and the free-form path is the only way in — which is the pre-0032
-  // behaviour, and exactly what a brand-new install looks like.
   useEffect(() => {
     listCatalogItems()
       .then(setCatalog)
       .catch(() => setCatalog([]))
   }, [])
 
-  // Page-scoped channel: a decision lands live while this screen is open.
-  // Subscribed on mount, removed on unmount — the durable student-self channel
-  // in StudentData stays untouched.
   useEffect(() => {
     if (!studentId) return
     const channel = uniqueChannel(`redemptions-${studentId}`)
@@ -138,8 +127,6 @@ export function UsePoints() {
     }
   }, [studentId, load, refresh])
 
-  // Spendable = THIS SEMESTER's points (0029), matching what the
-  // request/decide RPCs validate against.
   const balance = me?.semester_points ?? 0
   const pending = useMemo(() => history.filter((r) => r.status === 'pending'), [history])
   const decided = useMemo(() => history.filter((r) => r.status !== 'pending'), [history])
@@ -149,7 +136,6 @@ export function UsePoints() {
     [history],
   )
 
-  /** Points already promised to waiting requests can't be spent twice. */
   const available = Math.max(0, balance - pendingPoints)
   const gaugePct = spent + balance > 0 ? (spent / (spent + balance)) * 100 : 0
 
@@ -197,9 +183,6 @@ export function UsePoints() {
         subtitle="Choose where your points go."
         fallback="/app"
         actions={
-          // The permanent entry to the full ledger. It belongs on the points
-          // surface rather than the Dashboard — this is where someone asking
-          // "where did my points go?" already is, and it survives a home rebuild.
           <button
             type="button"
             onClick={() => navigate('/app/history')}
@@ -219,9 +202,6 @@ export function UsePoints() {
               value={available}
               className="font-display text-3xl font-bold tabular-nums"
             />
-            {/* Without this line "available" looks like a different quantity
-                from the points on every other screen. Showing the subtraction
-                makes it the same number minus something the student asked for. */}
             {pendingPoints > 0 && (
               <p className="mt-0.5 text-2xs tabular-nums text-muted">
                 {balance} this semester − {pendingPoints} awaiting a decision
@@ -237,7 +217,6 @@ export function UsePoints() {
           </div>
         </div>
 
-        {/* The "spent" counterpart to the XP bar — fills as points are used. */}
         <div className="mt-3">
           <div
             className="relative h-3 w-full overflow-hidden rounded-full bg-card-2 ring-1 ring-line"
@@ -259,8 +238,6 @@ export function UsePoints() {
               ? 'Nothing spent yet — your points are all still on the board.'
               : `You've cashed in ${spent} of the ${spent + balance} points you've earned.`}
           </p>
-          {/* The board this figure ranks you on (0038), placed beside the
-              number itself rather than in a menu somewhere. */}
           <Link
             to="/app/spenders"
             className="mt-2 inline-flex items-center rounded-full bg-accent-solid/12 px-2.5 py-1 text-xs font-semibold text-accent"
@@ -277,10 +254,6 @@ export function UsePoints() {
         )}
       </Card>
 
-      {/* THE MAIN SCREEN: the student's own grade columns, and where their points
-          can go. Boostable ones first; the rest one collapsed list that says why.
-          Spending a boost is requested HERE and nowhere else — /app/grades only
-          links in. */}
       <GradeColumns
         available={available}
         tooMany={tooMany}
@@ -288,12 +261,8 @@ export function UsePoints() {
         onRequested={() => void load()}
       />
 
-      {/* Everything below is for what is NOT one of your grade columns: the
-          instructor's price list, and a free-form request. Unchanged on the server. */}
       <SectionLabel>Something else</SectionLabel>
 
-      {/* The shop (0032). Without a price list a student has no way to know what
-          10 points is worth — this is the whole point of the catalog. */}
       {catalog.length > 0 && (
         <div>
           <p className="mb-2 px-1 text-xs text-muted">What you can get</p>
@@ -316,7 +285,7 @@ export function UsePoints() {
                     'rounded-2xl border p-3 text-left transition-colors',
                     affordable
                       ? 'border-line bg-card hover:border-gold-400 hover:bg-card-2'
-                      : // Shown, not hidden: the reward you can't afford yet is
+                      :
                         // the reason to keep earning.
                         'border-dashed border-line bg-card opacity-60',
                   )}
@@ -354,9 +323,6 @@ export function UsePoints() {
           </div>
         </div>
 
-        {/* The cost, stated where the choice is made rather than above a shop
-            the student is still browsing. The full wording is repeated in the
-            ConfirmDialog, which is the last point they can back out. */}
         <div className="flex gap-3 rounded-xl bg-danger-solid/8 p-3">
           <span className="mt-0.5 shrink-0 text-danger">
             <WarningIcon className="h-4.5 w-4.5" />
@@ -527,11 +493,6 @@ export function UsePoints() {
             approves it.
           </>
         }
-        // Both sides of the trade. The warning half is unchanged; what was
-        // missing is that spending is also the ONLY way onto the other board,
-        // which is what makes this a choice rather than just a cost. No figure
-        // for the spend side: nothing is spent until the instructor approves,
-        // and that board only settles twice a day.
         detail={`If approved, your total drops to ${Math.max(0, balance - points)} — your level and leaderboard rank drop with it, and you climb the spend board.`}
         confirmLabel="Send request"
         busy={submitting}

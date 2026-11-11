@@ -39,8 +39,6 @@ const LoungePostDetail = lazy(() =>
 const StudentSpace = lazy(() =>
   import('@/features/space/StudentSpace').then((m) => ({ default: m.StudentSpace })),
 )
-// The instructor reuses the student chat screens verbatim — only the base
-// path differs. One implementation means the two can never drift.
 const InstructorChats = lazy(() =>
   import('@/features/space/Chats').then((m) => ({
     default: () => <m.Chats basePath="/teach/space" />,
@@ -225,12 +223,7 @@ export const router = createBrowserRouter([
           { path: 'ops', element: <Ops /> },
           { path: 'peer', element: <PeerConsole /> },
           { path: 'peer/:evaluationId', element: <PeerResultsBoard /> },
-          // Not a screen: it resolves to the last scope you were on and
-          // redirects. The scope MUST stay in the path — see routes-shape.ts.
           { path: 'grades', element: <GradesEntry /> },
-          // The scope is in the PATH, not a query string: Shell only sees
-          // `pathname`, so this is what lets routeWidth give the grid the
-          // whole width. It also makes one grade sheet a real deep link.
           { path: 'grades/:sectionId/:subjectId/:term', element: <GradeSheet /> },
           { path: 'space', element: <InstructorSpace /> },
           { path: 'space/chats', element: <InstructorChats /> },
@@ -251,8 +244,6 @@ export const router = createBrowserRouter([
         element: withSplash(<StudentReport />),
         errorElement: <RouteError />,
       },
-      // Both print routes sit OUTSIDE InstructorLayout — no Shell, no tabs —
-      // so each loads the term calendar itself (the StudentReport precedent).
       {
         path: 'grades/:sectionId/:subjectId/print',
         element: withSplash(<GradesPrint />),

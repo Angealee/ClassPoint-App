@@ -3,7 +3,6 @@ import { cn } from '@/lib/cn'
 import { timeAgo } from '@/lib/time'
 import type { AchievementProgress, AchievementState } from '@/lib/types'
 
-/** How a metric's raw value reads as short progress text ("7/10", "#42"). */
 function progressLabel(a: AchievementState, progress: AchievementProgress | null): string | null {
   if (!a.metric || a.threshold == null) return null
   const value = progress?.[a.metric] ?? null
@@ -19,7 +18,6 @@ function progressPct(a: AchievementState, progress: AchievementProgress | null):
   return Math.max(0, Math.min(100, (value / a.threshold) * 100))
 }
 
-/** One achievement tile — badge + name + description, progress, or "???". */
 export function AchievementCard({
   achievement: a,
   progress,

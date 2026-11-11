@@ -60,7 +60,6 @@ function errorText(e: unknown, fallback: string): string {
   return m && m.length <= 160 ? m : fallback
 }
 
-/** Students asking to spend points on a grade — approve or decline. */
 export function Redemptions() {
   const { sections } = useInstructor()
   const { toast } = useToast()
@@ -75,11 +74,7 @@ export function Redemptions() {
   const [busy, setBusy] = useState(false)
   const [tick, setTick] = useState(false)
   const [tab, setTab] = useState<RequestsTab>('points')
-  // An approved grade boost the instructor is about to undo (0062).
   const [reversing, setReversing] = useState<RedemptionRequest | null>(null)
-  // EVERY approved boost (not just the recent ones) and its receipt, so any of
-  // them can be reversed. Own state, own fetch, own try/catch: before 0062 there
-  // is no such column, and that must cost this list and nothing else.
   const [boosts, setBoosts] = useState<RedemptionRequest[]>([])
   const [receipts, setReceipts] = useState<Map<string, GradeBoost>>(() => new Map())
 
@@ -100,9 +95,6 @@ export function Redemptions() {
       setLoading(false)
     }
 
-    // Separate from the inbox above, deliberately. The inbox shows the newest 100
-    // requests and "Recent decisions" the newest 30 of those, so a boost approved
-    // a month ago was out of reach of Reverse. This asks for every approved boost.
     try {
       const applied = await listRedemptions({ status: 'approved', gradeLinked: true, limit: 500 })
       const itemIds = [...new Set(applied.map((r) => r.gradeItemId as string))]
@@ -119,7 +111,6 @@ export function Redemptions() {
     void load()
   }, [load])
 
-  // Page-scoped: new requests appear without a refresh. Removed on unmount.
   useEffect(() => {
     const channel = uniqueChannel('redemptions-inbox')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'point_redemptions' }, () => {
@@ -178,8 +169,6 @@ export function Redemptions() {
 
   return (
     <div className="space-y-5 pb-4">
-      {/* Reached from the header ticket icon, so no tab lights up — by design.
-          The missing back affordance was the bug. */}
       <PageHeader
         title="Requests"
         subtitle={
@@ -192,7 +181,6 @@ export function Redemptions() {
         fallback="/teach"
       />
 
-      {/* Tabs — one inbox, two request types, plus the price list behind them. */}
       <SegmentedControl
         label="Request type"
         value={tab}
@@ -283,9 +271,6 @@ export function Redemptions() {
             )}
           </div>
 
-          {/* Every boost that is currently applied. Reversal used to be reachable
-              only from the newest 30 decisions, so an older boost could not be
-              undone from the app at all. */}
           {boosts.length > 0 && (
             <BoostsApplied boosts={boosts} receipts={receipts} onReverse={setReversing} />
           )}
@@ -294,9 +279,6 @@ export function Redemptions() {
           {spenders.length > 0 && (
             <Card className="p-5">
               <p className="font-display font-bold">Top spenders</p>
-              {/* Same figures, same order, same settle as the board students
-                  see — this card and /app/spenders read one row each from
-                  `leaderboard_snapshot`. */}
               <p className="mb-3 text-xs text-muted">
                 This semester, from the board students see.
               </p>
@@ -335,9 +317,6 @@ export function Redemptions() {
                         {r.decidedAt ? ` · ${timeAgo(r.decidedAt)}` : ''}
                       </p>
                     </div>
-                    {/* The one place a boost can be undone. Only an APPROVED one
-                        has anything to undo: pending is declined instead, and a
-                        reversed one is already back. */}
                     {r.status === 'approved' && r.gradeItemId && (
                       <Button size="sm" variant="outline" onClick={() => setReversing(r)}>
                         Reverse
@@ -454,22 +433,8 @@ export function Redemptions() {
   )
 }
 
-/** Rows shown before "Show all" — the list is for finding one, not for reading. */
 const BOOSTS_PREVIEW = 8
 
-/**
- * Every grade boost that is currently applied, newest first, each with Reverse.
- *
- * Collapsed by default: most weeks you never need it, and a list that grows all
- * semester should not push the inbox you came here for down the page. The
- * name filter appears once there are enough rows to need one.
- *
- * The mark change comes from the RECEIPT (`17 → 20`), not from the request: the
- * request only knows the bonus the student agreed to, and the receipt knows what
- * was actually written after the cap. A boost whose receipt could not be read
- * still lists, without the arrow — Reverse works off the item and the student,
- * not the receipt.
- */
 function BoostsApplied({
   boosts,
   receipts,
@@ -563,16 +528,6 @@ function BoostsApplied({
   )
 }
 
-/**
- * What approving a grade boost will do, stated as the mark it changes.
- *
- * The student's mark is read FRESH when the inbox loads (see
- * `attachGradeContext`), not remembered from the request: it can be entered,
- * retyped or cleared between asking and deciding, and an approve screen is only
- * honest if it shows what approval will do today. The server re-checks all of
- * this itself — these two warnings exist so the instructor hears about a doomed
- * approval before pressing the button rather than after.
- */
 function BoostDetail({ r }: { r: RedemptionRequest }) {
   const g = r.grade
   if (!g) return null

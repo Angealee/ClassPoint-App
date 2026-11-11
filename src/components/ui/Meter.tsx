@@ -1,17 +1,6 @@
 import { cn } from '@/lib/cn'
 import { TONE, type ToneName } from '@/lib/tone'
 
-/**
- * A plain proportion bar — show-up rate, badge progress, a term's attendance.
- *
- * NOT a replacement for `XpBar`, which is deliberately different: that one is
- * the gold hero bar with a spring animation and a shimmer, and it earns its
- * weight because it is the screen's focal point. This one is a hairline track
- * with no motion, for the places that need a proportion read at a glance in a
- * list of ten others.
- *
- * Carries the progressbar ARIA that the hand-rolled track/fill divs did not.
- */
 export function Meter({
   value,
   max = 100,

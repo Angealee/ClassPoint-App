@@ -9,40 +9,12 @@ import { Aurora } from '@/components/landing/Aurora'
 interface AuthShellProps {
   title: string
   subtitle?: string
-  /**
-   * Optional glyph for the tile above the title — `<ShieldIcon className="h-6 w-6" />`.
-   *
-   * The shell owns the tile so the four auth screens cannot each invent one;
-   * InstructorSignIn hand-rolled exactly this block before. Sign in passes
-   * NOTHING on purpose: it is the default door, so its heading should be the
-   * loudest thing on the page and the claim stub the only decorated element.
-   */
   icon?: ReactNode
   children: ReactNode
-  /**
-   * Rendered between the card and the footer, OUTSIDE the card.
-   *
-   * Exists for the claim stub: it is a second door, not a form field, and
-   * sitting inside the card that holds the form would say it was one.
-   */
   below?: ReactNode
   footer?: ReactNode
 }
 
-/**
- * Centred layout shared by all four auth screens.
- *
- * ── WHY THE AURORA IS HERE ──────────────────────────────────────────────────
- * It is the landing page's own background, reused rather than re-invented, so
- * the screen a student lands on and the screen they sign in on belong to one
- * world. It is `pointer-events-none`, animates only transform/opacity on the
- * compositor, and the global reduced-motion block switches it off.
- *
- * It is hosted by a FULL-WIDTH root with `overflow-hidden`, not by the max-w-md
- * column: the blurs are 416px and 480px across and would be cropped to the
- * reading column otherwise. `overflow-hidden` is safe here only because nothing
- * in the auth area is `sticky` — elsewhere in the app that would break it.
- */
 export function AuthShell({ title, subtitle, icon, children, below, footer }: AuthShellProps) {
   return (
     <div className="relative min-h-[100dvh] overflow-hidden">

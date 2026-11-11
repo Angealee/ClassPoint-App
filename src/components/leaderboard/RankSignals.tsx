@@ -4,40 +4,16 @@ import type { LeaderboardEntry } from '@/lib/types'
 
 const DAY_MS = 86_400_000
 
-/**
- * How many whole days a student has held their current run (0037).
- *
- * A "run" is holding this rank OR BETTER — climbing keeps it alive, only
- * dropping resets it. Floored, so it reads 0 until a full day has passed rather
- * than claiming "1 day" twenty minutes in.
- */
 export function daysHeld(rankSince: string): number {
   const ms = Date.now() - new Date(rankSince).getTime()
   return ms <= 0 ? 0 : Math.floor(ms / DAY_MS)
 }
 
-/**
- * How far a student moved since the last refresh. Positive is a climb, because
- * rank 9 → 4 is an improvement of five places even though the number went down.
- * Null when there's nothing to compare against yet.
- */
 export function rankDelta(entry: LeaderboardEntry): number | null {
   if (entry.previous_rank === null) return null
   return entry.previous_rank - entry.rank
 }
 
-/**
- * Who climbed the most places since the last settle.
- *
- * The database has stored `previous_rank` since 0037 and nothing ever surfaced
- * it beyond a per-row arrow. This is the most story-worthy thing a leaderboard
- * produces, and it is the reason a student outside the top three has to care
- * about the board at all.
- *
- * Pass the FULL ranked list, not the top ten: the biggest climber is usually
- * someone still working their way up. Returns null when nobody moved, which is
- * the normal state between settles.
- */
 export function biggestClimber(
   entries: readonly LeaderboardEntry[],
 ): { name: string; places: number } | null {
@@ -50,13 +26,6 @@ export function biggestClimber(
   return best
 }
 
-/**
- * "▲ 3" / "▼ 2" — movement since the previous board.
- *
- * Renders nothing when a student is new to the board or hasn't moved: an
- * unbroken column of grey dashes is noise, and "no change" is the default a
- * reader already assumes.
- */
 export function RankDelta({
   entry,
   className,
@@ -67,15 +36,6 @@ export function RankDelta({
   return <RankDeltaValue delta={rankDelta(entry)} className={className} />
 }
 
-/**
- * The same signal from a raw number, for the ONE place that wants the verbose
- * form: the viewer's own pinned standing card.
- *
- * That card is a single row, not a column, so "new" and "— same" are useful
- * there — they answer a question the reader is actively asking. On the board
- * itself the same words would be forty rows of noise, which is why the entry
- * form above still renders nothing when there is nothing to say.
- */
 export function RankDeltaValue({
   delta,
   verbose = false,
@@ -109,13 +69,6 @@ export function RankDeltaValue({
   )
 }
 
-/**
- * Days holding this rank or better, marked with a flame.
- *
- * Hidden below one full day: on a board that settles twice daily, almost
- * everyone would otherwise carry a meaningless "0d". The flame only animates
- * once the run is genuinely long, so a wall of moving pills never appears.
- */
 export function RankTenure({
   entry,
   className,
@@ -142,8 +95,6 @@ export function RankTenure({
         aria-hidden
         className={cn(
           'h-3.5 w-3.5 shrink-0',
-          // Only a genuinely long run flickers. Every row animating at once
-          // turns the board into a wall of movement and stops meaning anything.
           hot ? 'cp-flame' : 'opacity-70',
         )}
       />

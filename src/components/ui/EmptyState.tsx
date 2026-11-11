@@ -3,20 +3,6 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 
-/**
- * "There's nothing here yet."
- *
- * Every one of the 23 `p-8` Cards in the app was one of these. They came in two
- * shapes that had drifted apart: a bare `p-8 text-center text-sm text-muted`
- * with a sentence in it, and a `flex flex-col items-center gap-2 p-8
- * text-center` with an icon above the sentence — same idea, two spellings, and
- * nowhere consistent to put an action.
- *
- * The sentence is `children` rather than a `title` prop because that is how the
- * call sites already read, and because most of these sentences interpolate
- * something ("No students in {sectionName} yet"). As a string prop each of
- * those would have needed a fragment wrapper.
- */
 export function EmptyState({
   icon,
   children,
@@ -28,20 +14,9 @@ export function EmptyState({
   icon?: ReactNode
   /** The sentence a student actually reads. */
   children: ReactNode
-  /** Optional second line — the next step, not a restatement of the first. */
   description?: ReactNode
   /** Usually a <Button>. Rendered below the text. */
   action?: ReactNode
-  /**
-   * Drop the Card and the p-8, for an empty list INSIDE something that is
-   * already a surface: a Sheet body, a picker, a search dropdown.
-   *
-   * This is the variant whose absence left 11 hand-rolled empties in the tree,
-   * every one of them in exactly that position, and no two agreeing on padding
-   * (p-4, py-6, px-4 py-6, p-6, py-8). A full p-8 Card nested inside a Sheet is
-   * a box inside a box, so each call site quietly opted out instead. Mirrors
-   * ErrorState's `inline`, which already existed for the same reason.
-   */
   compact?: boolean
   className?: string
 }) {
@@ -69,23 +44,6 @@ export function EmptyState({
   )
 }
 
-/**
- * "That didn't load." — the sibling of EmptyState, and the one the audit nearly
- * missed: 23 files hand-rolled a retry affordance in at least four shapes.
- *
- * An empty list and a failed fetch are NOT the same thing, and conflating them
- * is the bug this exists to prevent — a student whose connection dropped was
- * once told they had no attendance record at all. That is why `onRetry` is the
- * point of the component rather than an extra.
- *
- * `detail` is the reassurance line, and it matters more than it looks: the gap
- * between "Couldn't load your attendance" and "your record is safe — this is
- * just the connection" is the gap between a panicked message to the instructor
- * and a shrug.
- *
- * `inline` renders a compact row instead of a card, for use inside a Card that
- * already exists (RiskOverview, PastSemesterBoard).
- */
 export function ErrorState({
   children,
   detail,

@@ -7,11 +7,8 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { CheckIcon, PlusIcon, TrashIcon } from '@/components/ui/icons'
 import { useInstructor } from './InstructorLayout'
-// Total counts (incl. archived) on purpose: a section holding only archived
-// students must still read as non-empty here, or its delete would nuke them.
 import { createSection, deleteSection, getSectionTotalCounts, renameSection } from '@/lib/api'
 
-/** Instructor tool to add / rename / delete sections (delete blocked if not empty). */
 export function ManageSections({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { sections, refreshSections, semester } = useInstructor()
   const { toast } = useToast()
@@ -172,7 +169,6 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
       </p>
     </Sheet>
 
-    {/* Rendered as a sibling of the parent Sheet so the overlay stacks above it. */}
     <ConfirmDialog
       open={!!deleteTarget}
       title="Delete this section?"

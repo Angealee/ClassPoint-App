@@ -1,18 +1,5 @@
 import { cn } from '@/lib/cn'
 
-/**
- * The tab strip used to switch between views of one screen (History's
- * Points/Attendance, Requests' Points/Excuses/Rewards, ShareSheet's formats).
- *
- * Built as a real radiogroup rather than a row of buttons: without
- * `role="radiogroup"` and `aria-checked` a screen reader hears three unrelated
- * buttons and cannot tell which view is active — which is exactly what the
- * hand-rolled versions did.
- *
- * Columns come from the option count, so a two-tab and a three-tab strip stay
- * visually consistent instead of one being `grid-cols-2` and the other a flex
- * row that happens to look similar.
- */
 export function SegmentedControl<T extends string>({
   value,
   onChange,
@@ -28,15 +15,6 @@ export function SegmentedControl<T extends string>({
   className?: string
   /** Accessible name for the group, e.g. "History view". */
   label?: string
-  /**
-   * `accent` is the filled default and stays the primary control.
-   *
-   * `quiet` exists for a SECOND strip beside a first one: two filled accent
-   * strips in one row read as a single control with two active items, which is
-   * exactly how the grade sheet's term tabs and its So far / Official toggle
-   * were being misread. Quiet keeps the shape and the radiogroup semantics and
-   * drops the fill, so red only ever marks the primary choice.
-   */
   tone?: 'accent' | 'quiet'
   size?: 'sm' | 'md'
 }) {

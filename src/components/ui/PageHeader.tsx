@@ -4,28 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeftIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 
-/**
- * Standard screen header: back affordance, title, optional subtitle and a
- * trailing slot.
- *
- * Replaces five near-identical private implementations (`PointsHistory`'s
- * `Header`, `AttendanceStats`, `Achievements`, and the instructor `BackLink`s in
- * `SessionDetail` / `StudentRecord` / `ManageSemesters`) that had drifted into
- * three different glyphs and three different back destinations.
- *
- * ── WHY NOT PLAIN `navigate(-1)` ───────────────────────────────────────────
- * This is an installed PWA. Students arrive from push notifications, from
- * `/scan` deep links, and from a cold app launch — in all of those cases the
- * history stack has no previous entry inside the app, so `navigate(-1)` either
- * does nothing or throws them out to whatever was in the tab before.
- *
- * So: go back only when there is genuinely somewhere to go back TO, otherwise
- * land on a sensible screen. `history.state.idx` is react-router's own index
- * into the session history — 0 means this is the first entry.
- *
- * This is also the fix for `Achievements`, which hard-coded `/app/profile` and
- * therefore sent you to a screen you had never visited if you arrived from Home.
- */
 export function PageHeader({
   title,
   subtitle,
@@ -42,11 +20,6 @@ export function PageHeader({
   /** Optional trailing content (a button, a chip). */
   actions?: ReactNode
   backLabel?: string
-  /**
-   * Override the back action — for a header that switches an IN-COMPONENT view
-   * (no route change), where `navigate` would be wrong. `fallback` is ignored
-   * when this is set.
-   */
   onBack?: () => void
   className?: string
 }) {

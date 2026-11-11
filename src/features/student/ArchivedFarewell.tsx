@@ -2,63 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Logo } from '@/components/ui/Logo'
 
-/**
- * Ignore the first tap for this long.
- *
- * ⚠ LOAD-BEARING, and the same lesson LevelUpBurst records. This screen appears
- *   immediately after the student has tapped "Sign in" — the finger is already
- *   on the glass and the tap in flight would dismiss the moment before it drew
- *   a single frame. Without the guard the farewell would be invisible to
- *   exactly the people it is for.
- */
 const TAP_GUARD_MS = 700
 
-/**
- * The send-off an archived student reads on their way out (0060).
- *
- * ── WHY IT IS A FULL-SCREEN LAYER AND NOT A SHEET ───────────────────────────
- * A Sheet is something you dismiss to get at what is behind it. There is
- * nothing behind this: the student's semester is over, and the screen it
- * reveals is a read-only recap. It is the first thing they see, so it owns the
- * whole viewport.
- *
- * ── IT NEVER GOES AWAY ON ITS OWN ──────────────────────────────────────────
- * It used to run for a clamped reading time and then fade out by itself. The
- * instructor's call (2026-11-11): the message stays until the student taps or
- * presses a key. A send-off that leaves while someone is still reading it is
- * worse than one that waits, and there is nobody it is in the way of — the
- * screen behind it is a read-only recap. So there is no end timer at all; the
- * only timer left is the tap guard below, and `onDone` fires from a tap or a key.
- *
- * It fades IN (opacity only) and then holds. Reduced motion neutralises the
- * fade-in and the layer simply appears, which is the same end state.
- *
- * ── Z-INDEX ─────────────────────────────────────────────────────────────────
- * z-[90]: above Sheet (40) and the celebration bursts (50), below
- * AuthTransitionOverlay (100) — which is correct, because the sign-in
- * transition is still fading out over the top of this when it first mounts.
- *
- * Everything animated here is opacity and transform, so it runs on the
- * compositor, and `<MotionConfig reducedMotion="user">` in App.tsx neutralises
- * the movement app-wide.
- */
 export function ArchivedFarewell({
   semesterName,
   message,
   onDone,
 }: {
   semesterName: string | null
-  /** The instructor's words, or null — then the name and one line carry it. */
   message: string | null
   onDone: () => void
 }) {
   const [armed, setArmed] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
-  // Latest-ref so the timer effect depends on nothing that changes: an inline
-  // arrow `onDone` from the parent is a new identity every render, and an
-  // effect keyed on it would restart the clock on every parent re-render (the
-  // Sheet focus-trap bug, which cost 21 sheets their keystrokes).
   const doneRef = useRef(onDone)
   useEffect(() => {
     doneRef.current = onDone
@@ -69,8 +26,6 @@ export function ArchivedFarewell({
     return () => clearTimeout(guard)
   }, [])
 
-  // Focus the layer so Enter, Space or Escape can dismiss it without a pointer
-  // (a modal dialog that cannot be closed from the keyboard is a trap).
   useEffect(() => {
     rootRef.current?.focus()
   }, [])
@@ -115,9 +70,6 @@ export function ArchivedFarewell({
       )}
 
       <motion.p
-        // Reads as a letter rather than a notification: display face, generous
-        // line height, capped at a comfortable measure instead of running the
-        // full width of a phone.
         className="max-w-sm font-display text-xl font-bold leading-relaxed text-ink [overflow-wrap:break-word]"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

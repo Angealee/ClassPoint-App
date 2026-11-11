@@ -11,19 +11,6 @@ import { cn } from '@/lib/cn'
 import { timeAgo } from '@/lib/time'
 import type { PeerResultRow } from '@/lib/types'
 
-/**
- * One student on the instructor's results board.
- *
- * Collapsed: name, overall percent, rater count. Open: the per-criterion
- * breakdown and every comment WITH its author's name. The instructor always
- * sees who said what — that is the other half of the promise made to the person
- * being rated, and it is what makes a cruel comment actionable rather than just
- * upsetting.
- *
- * One card per student rather than a table (the instructor's call): you judge
- * one person at a time, and a 40-by-4 grid needs its own horizontal scroller at
- * 375px where most of this app is used.
- */
 export function PeerResultCard({
   row,
   onToggleComment,
@@ -63,8 +50,6 @@ export function PeerResultCard({
             </span>
           </span>
         ) : (
-          // A data gap, not a low score, so it wears a neutral chip rather than
-          // a zero that would be averaged and compared.
           <Chip tone="neutral" size="sm">
             Not rated
           </Chip>
@@ -106,9 +91,6 @@ export function PeerResultCard({
               </div>
 
               <p className="text-xs text-muted">
-                {/* Labelled raw, and captioned when the criteria use different
-                    scales — averaging a 1-to-5 and a 0/1 gives a number with no
-                    unit, and it must not be mistaken for a mark. */}
                 Raw average {row.overallRaw}
                 {!row.sameScale && ' (across different scales)'}
               </p>
@@ -126,8 +108,6 @@ export function PeerResultCard({
                       <p className="whitespace-pre-wrap text-sm">{c.body}</p>
                       <div className="mt-2 flex items-center justify-between gap-3">
                         <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
-                          {/* A permanent mark: a comment you restored keeps it,
-                              so "flagged and let through" stays visible. */}
                           {c.flagged && (
                             <Chip tone="warn" size="sm">
                               Flagged

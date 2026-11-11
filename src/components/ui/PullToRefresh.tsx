@@ -5,14 +5,6 @@ const THRESHOLD = 70 // px pulled before a refresh fires
 const MAX = 120 // px the indicator can travel
 const RESIST = 0.5 // drag resistance (half-speed)
 
-/**
- * Mobile pull-to-refresh. Wraps page content; when the user drags down while
- * already scrolled to the very top, it reveals a spinner and calls `onRefresh`.
- *
- * Deliberately conservative: it only ever engages at scrollY ≤ 0 and only calls
- * preventDefault while actively pulling down from the top, so normal scrolling
- * is never affected. No-op without touch.
- */
 export function PullToRefresh({
   onRefresh,
   children,

@@ -1,31 +1,9 @@
-/**
- * ClassPoint leveling math.
- *
- * Rules (confirmed with the instructor):
- *  - EXP is the student's points for the CURRENT semester (0029).
- *  - Clearing level 1 -> 2 requires 50 EXP.
- *  - Each subsequent level requires 1.5x the previous requirement, rounded.
- *  - Leftover EXP overflows naturally into the next level.
- *
- * ⚠ `cp_level()` in migration 0002 MIRRORS these two constants. Change one and
- * you must change the other in the SAME commit, or a student sees one level on
- * the dashboard and a different one in their achievement progress.
- *
- * A rebalance was proposed and DECLINED (2026-08-14). For the record, since the
- * data is easy to re-derive and someone will wonder: measured halfway through
- * the first semester across 208 active students, the median had 22 points, p90
- * had 40 and the top student 65 — against thresholds of 50 for Level 2 and 125
- * for Level 3. The instructor reviewed those numbers and the exact point bands
- * and chose to keep this curve as-is. Don't "fix" it without asking.
- */
 
 const BASE_REQUIREMENT = 50
 const GROWTH = 1.5
 
-// Requirements compound with rounding, so they must be computed sequentially.
 const requirementCache: number[] = [BASE_REQUIREMENT] // index 0 => requirement to clear level 1
 
-/** EXP required to advance FROM `level` to `level + 1` (level is 1-based). */
 export function requirementForLevel(level: number): number {
   const index = Math.max(1, Math.floor(level)) - 1
   for (let i = requirementCache.length; i <= index; i++) {
@@ -49,12 +27,10 @@ export interface LevelProgress {
   progressPct: number
 }
 
-/** Convert a lifetime point total into level + in-level progress. */
 export function getLevelProgress(totalExp: number): LevelProgress {
   let level = 1
   let remaining = Math.max(0, Math.floor(totalExp))
 
-  // Walk the ladder; requirements grow each level so this always terminates.
   while (remaining >= requirementForLevel(level)) {
     remaining -= requirementForLevel(level)
     level++

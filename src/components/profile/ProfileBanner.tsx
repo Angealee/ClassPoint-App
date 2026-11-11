@@ -10,10 +10,6 @@ interface Props {
   busy?: boolean
 }
 
-/**
- * A student's showcase photos — up to 3, shown as a triptych. Read-only on a
- * classmate's preview; editable (add/remove) on your own Profile tab.
- */
 export function ProfileBanner({ urls, editable, onAdd, onRemove, busy }: Props) {
   if (!editable && urls.length === 0) return null
 

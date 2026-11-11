@@ -21,12 +21,6 @@ import type {
   UnlockedAchievement,
 } from '@/lib/types'
 
-// ============================================================================
-// Attendance — QR class sessions (migration 0014)
-// ============================================================================
-
-/** Shape of a raw class_sessions row (snake_case) as read from the DB. */
-
 interface SessionRow {
   id: string
   section_id: string
@@ -70,7 +64,6 @@ function mapSession(r: SessionRow, qrSecret?: string): ClassSession {
   }
 }
 
-/** Instructor-only: read the rotating-QR secret for a session (RLS-gated). */
 async function getSessionSecret(sessionId: string): Promise<string | undefined> {
   const { data, error } = await supabase
     .from('class_session_secrets')
@@ -81,17 +74,6 @@ async function getSessionSecret(sessionId: string): Promise<string | undefined> 
   return data?.qr_secret ?? undefined
 }
 
-
-/**
- * Start (or resume) a class session for a section. Returns the session with its
- * rotating-QR secret so the instructor's browser can render the live QR code.
- *
- * Resilient by design: the RPC's INSERT commits server-side before it returns, so
- * even if we can't read its id back — a stale deployed function whose OUT columns
- * are named differently, or a transient auth blip on the follow-up read — we fall
- * back to the section's now-active session. That's why a manual reload always
- * "fixed" a failed Start: it just resumed the session the RPC had already created.
- */
 export async function startClassSession(config: SessionConfig): Promise<ClassSession> {
   return withAuthRetry(async () => {
     const { data, error } = await supabase
@@ -108,7 +90,6 @@ export async function startClassSession(config: SessionConfig): Promise<ClassSes
       .maybeSingle<Record<string, string>>()
     if (error) throw error
 
-    // Tolerate either column naming (out_session_id / session_id / id).
     const sessionId = data?.out_session_id ?? data?.session_id ?? data?.id
     const secret = data?.out_qr_secret ?? data?.qr_secret
     if (sessionId) {
@@ -122,14 +103,12 @@ export async function startClassSession(config: SessionConfig): Promise<ClassSes
       }
     }
 
-    // Couldn't read the id back — resume the session the RPC just created/resumed.
     const active = await getActiveSession(config.sectionId)
     if (active) return active
     throw new Error('Could not start the class. Try again.')
   })
 }
 
-/** One session by id (no QR secret). Used to re-open a session for finalising. */
 export async function getSession(id: string): Promise<ClassSession | null> {
   const { data, error } = await supabase
     .from('class_sessions')
@@ -140,7 +119,6 @@ export async function getSession(id: string): Promise<ClassSession | null> {
   return data ? mapSession(data) : null
 }
 
-/** The section's currently-active session (with its QR secret), or null. */
 export async function getActiveSession(sectionId: string): Promise<ClassSession | null> {
   const { data, error } = await supabase
     .from('class_sessions')
@@ -154,18 +132,6 @@ export async function getActiveSession(sectionId: string): Promise<ClassSession 
   return mapSession(data, secret)
 }
 
-/**
- * The section's active session as a STUDENT sees it (0033).
- *
- * Deliberately not `getActiveSession`: that one also reads
- * `class_session_secrets` for the rotating QR, which RLS hides from students —
- * so it would fire a guaranteed-empty query on every student app open. A
- * student never needs the secret; they scan the code off the projector.
- *
- * `class_sessions` is readable by any authenticated user (0014) and joined the
- * realtime publication in 0033, which is what lets the live banner appear the
- * moment the instructor starts class.
- */
 export async function getActiveSessionForStudent(
   sectionId: string,
 ): Promise<ClassSession | null> {
@@ -179,12 +145,6 @@ export async function getActiveSessionForStudent(
   return data ? mapSession(data) : null
 }
 
-/**
- * This student's own status in one session, or null if they have no record yet
- * (0033). Used by the live-class banner to stop saying "Scan now" at someone
- * who already scanned — a whole section seeing a stale prompt every class is
- * exactly the kind of small lie that teaches people to ignore banners.
- */
 export async function getMySessionStatus(
   sessionId: string,
   studentId: string,
@@ -199,7 +159,6 @@ export async function getMySessionStatus(
   return data?.status ?? null
 }
 
-/** A zeroed tally — one counter per status, plus roster total + late-sync count. */
 function emptyTally(): Record<AttendanceStatus, number> & { total: number; syncedLate: number } {
   return { present: 0, late: 0, absent: 0, excused: 0, irregular: 0, total: 0, syncedLate: 0 }
 }
@@ -215,9 +174,6 @@ export async function listSessions(sectionId: string): Promise<SessionSummary[]>
   const rows = sessions ?? []
   if (rows.length === 0) return []
 
-  // Tallied in SQL (0031): the old `.in(session_ids)` record fetch hit
-  // PostgREST's silent 1000-row cap around week 12 of a two-subject semester,
-  // making late sessions read "0 present". One row per session, never grows.
   const { data: tallies, error: recErr } = await supabase.rpc('get_section_session_tallies', {
     p_section_id: sectionId,
   })
@@ -262,11 +218,6 @@ export async function listSessions(sectionId: string): Promise<SessionSummary[]>
   })
 }
 
-/**
- * The roster for one session: every student in the section merged with their
- * attendance record (status / scan time), if any. Powers the live roster and the
- * end-of-class review.
- */
 export async function listSessionAttendance(
   sessionId: string,
   sectionId: string,
@@ -300,21 +251,10 @@ export async function listSessionAttendance(
         syncedLate: (rec?.synced_late as boolean) ?? false,
       }
     })
-    // History stays truthful, live rosters stay clean: an archived student
-    // appears only when they actually have a record in this session.
     .filter((r) => !r.archived || r.recordId !== null)
     .sort((a, b) => a.fullName.localeCompare(b.fullName))
 }
 
-/**
- * Change a student's status — the ONE path for it (review step, session detail,
- * any post-hoc edit).
- *
- * Goes through the RPC rather than a direct update because the RPC reconciles
- * the points ledger: if the session's penalties were already committed, it
- * removes the old penalty event and writes the one the new status deserves.
- * A direct `.update({ status })` would silently leave a stale −5 behind.
- */
 export async function updateAttendanceStatus(
   recordId: string,
   status: AttendanceStatus,
@@ -322,11 +262,6 @@ export async function updateAttendanceStatus(
   await rpc('set_attendance_status', { p_record_id: recordId, p_status: status })
 }
 
-/**
- * Delete one attendance record (reset a check-in). Removes the linked penalty
- * event first, so resetting a committed record gives the points back instead of
- * orphaning the deduction.
- */
 export async function deleteAttendanceRecord(recordId: string): Promise<void> {
   const { error } = await supabase.rpc('delete_attendance_record', {
     p_record_id: recordId,
@@ -334,15 +269,6 @@ export async function deleteAttendanceRecord(recordId: string): Promise<void> {
   if (error) throw error
 }
 
-/**
- * Instructor manually checks a student in during a live class — for students
- * with no internet to scan. Upserts the record (overriding a prior scan if any)
- * and stamps scanned_at so they count as checked in. RLS lets the instructor
- * write attendance_records directly, so no RPC is needed.
- *
- * LIVE SESSIONS ONLY: penalties aren't committed yet, so there's nothing to
- * reconcile. For any edit after finalising, use updateAttendanceStatus().
- */
 export async function markAttendanceManually(
   sessionId: string,
   studentId: string,
@@ -360,22 +286,6 @@ export async function markAttendanceManually(
   if (error) throw error
 }
 
-/**
- * Create a missing attendance record on a session that already happened.
- *
- * Needed when `end_class_session`'s `on conflict do nothing` skipped someone, or
- * a student joined the section after the class ran — until now their register
- * cell stayed blank forever with no in-app way to fill it.
- *
- * Two steps ON PURPOSE. The row is inserted as 'excused', the one status that
- * can never carry a penalty, and the real status is then applied through
- * `set_attendance_status` — the single path that reconciles the points ledger
- * (0018/0024). Inserting the final status directly would record the attendance
- * but silently skip the deduction every other student in that session took.
- *
- * If the second step fails, the student is left visibly 'excused' rather than in
- * a half-written state, and the instructor can simply pick again.
- */
 export async function createAttendanceRecord(
   sessionId: string,
   studentId: string,
@@ -392,8 +302,6 @@ export async function createAttendanceRecord(
   }
 }
 
-/** Mark many students at once (e.g. "mark all waiting" present/absent). Upserts
- * one row per student, stamping scanned_at so they all count as checked in. */
 export async function markAttendanceBulk(
   sessionId: string,
   entries: { studentId: string; status: AttendanceStatus }[],
@@ -412,8 +320,6 @@ export async function markAttendanceBulk(
   if (error) throw error
 }
 
-/** Undo a check-in (manual or scanned) — removes the record so the student is
- * "waiting" again. Used by the live roster's reset action. */
 export async function resetAttendance(sessionId: string, studentId: string): Promise<void> {
   const { error } = await supabase
     .from('attendance_records')
@@ -423,26 +329,10 @@ export async function resetAttendance(sessionId: string, studentId: string): Pro
   if (error) throw error
 }
 
-/**
- * Section-wide attendance analytics for the history page: each student's
- * per-status counts + show-up rate, and the penalty damage across all sessions.
- *
- * The rate excludes excused/irregular from the denominator — those sessions
- * don't count for that student at all, so they can't drag a rate down.
- */
-/**
- * Section-wide attendance stats. Pass `subjectId` to scope them to one subject
- * (0030) — a roster that meets you under two labels has two different attendance
- * stories, and averaging them hides the one that needs attention.
- */
 export async function getAttendanceAnalytics(
   sectionId: string,
   subjectId?: string,
 ): Promise<AttendanceAnalytics> {
-  // Aggregated in SQL (0031). The old three-query client version fetched every
-  // attendance record `.in(session_ids)` — silently truncated at PostgREST's
-  // 1000-row cap around week 12 — plus a full penalty-event scan. One row per
-  // active student now, penalties folded in via the penalty_event_id join.
   const { data, error } = await supabase.rpc('get_section_attendance_stats', {
     p_section_id: sectionId,
     p_subject_id: subjectId ?? null,
@@ -484,14 +374,6 @@ export async function getAttendanceAnalytics(
   return { students, penaltyPoints, penalizedStudents }
 }
 
-/** Edit a session's saved topic (instructor tweak from the history sheet). */
-/**
- * Re-tag a session's subject (0028). Direct update under instructor RLS, same
- * shape as updateSessionTopic — the picker only ever offers subjects assigned to
- * that session's section, so there's no server-side validation to duplicate.
- *
- * Pass null to untag. This is how sessions that predate subjects get sorted out.
- */
 export async function updateSessionSubject(
   sessionId: string,
   subjectId: string | null,
@@ -511,12 +393,6 @@ export async function updateSessionTopic(sessionId: string, topic: string): Prom
   if (error) throw error
 }
 
-/**
- * Delete a session outright (instructor testing tool). Reverses any committed
- * penalties first — deletes the point_events the session created so the
- * leaderboard recomputes cleanly — then removes the session, which cascades its
- * attendance_records and QR secret.
- */
 export async function deleteSession(sessionId: string): Promise<void> {
   const { data: recs, error: recErr } = await supabase
     .from('attendance_records')
@@ -541,7 +417,6 @@ export async function endClassSession(sessionId: string): Promise<void> {
   await rpc('end_class_session', { p_session_id: sessionId })
 }
 
-/** Finalise a session — writes the late/absent penalties into point_events. */
 export async function commitAttendancePenalties(
   sessionId: string,
 ): Promise<{ applied: number; deducted: number }> {
@@ -555,7 +430,6 @@ export async function commitAttendancePenalties(
   return { applied: data.applied, deducted: data.deducted }
 }
 
-/** Toggle whether a session's penalties will be deducted (used before commit). */
 export async function setSessionApplyPenalties(
   sessionId: string,
   apply: boolean,
@@ -567,7 +441,6 @@ export async function setSessionApplyPenalties(
   if (error) throw error
 }
 
-/** Student check-in: validate the scanned rotating code and log attendance. */
 export async function scanAttendance(
   sessionId: string,
   windowIndex: number,
@@ -584,10 +457,6 @@ export async function scanAttendance(
   return { status: data.status, already: data.already, topic: data.topic, markedAt: data.marked_at }
 }
 
-/**
- * Submit a captured-offline scan proof. Returns a structured outcome (never
- * throws for classifiable rejections) so the queue can decide keep/resolve/fail.
- */
 export async function submitOfflineScan(
   sessionId: string,
   windowIndex: number,
@@ -629,8 +498,6 @@ export async function listMyAttendance(studentId: string): Promise<MyAttendanceE
       subjects: { code: string } | { code: string }[] | null
     } | null
   }
-  // Grows across semesters and feeds the PRINTABLE report — pages past the
-  // 1000-row cap (0031). `id` breaks created_at ties for stable pagination.
   const data = await fetchAllPages<Row>((from, to) =>
     supabase
       .from('attendance_records')
@@ -658,11 +525,6 @@ export async function listMyAttendance(studentId: string): Promise<MyAttendanceE
   }))
 }
 
-// ============================================================================
-// Global events (0055) — cross-section check-in, ISOLATED from class attendance
-// (its own tables + RPCs; scan_attendance and class_sessions are never touched).
-// ============================================================================
-
 interface EventRow {
   id: string
   name: string
@@ -686,7 +548,6 @@ function mapEvent(r: EventRow, qrSecret?: string): EventSession {
   }
 }
 
-/** Instructor-only: read the rotating-QR secret for an event (RLS-gated). */
 async function getEventSecret(eventId: string): Promise<string | undefined> {
   const { data, error } = await supabase
     .from('event_session_secrets')
@@ -697,12 +558,6 @@ async function getEventSecret(eventId: string): Promise<string | undefined> {
   return data?.qr_secret ?? undefined
 }
 
-/**
- * Start (or resume) the global event, returning it with its QR secret so the
- * instructor's browser can render the rotating code. Resilient like
- * startClassSession: if the id can't be read back we resume the active event
- * (the RPC's INSERT already committed).
- */
 export async function startEventSession(name: string, points: number): Promise<EventSession> {
   return withAuthRetry(async () => {
     const { data, error } = await supabase
@@ -732,10 +587,6 @@ export async function endEventSession(eventId: string): Promise<void> {
   await rpc('end_event_session', { p_event_id: eventId })
 }
 
-/**
- * The running event WITH its QR secret, for the instructor monitor (resume after
- * a reload). Newest-active, so a past semester's stuck event can't collide.
- */
 export async function getActiveEventForInstructor(): Promise<EventSession | null> {
   const { data, error } = await supabase
     .from('event_sessions')
@@ -750,10 +601,6 @@ export async function getActiveEventForInstructor(): Promise<EventSession | null
   return mapEvent(data, secret)
 }
 
-/**
- * The running event as a STUDENT sees it — public fields only, no secret (they
- * scan the code the instructor projects). Drives the "Event is starting" banner.
- */
 export async function getActiveEvent(): Promise<EventSession | null> {
   const { data, error } = await supabase
     .from('event_sessions')
@@ -766,7 +613,6 @@ export async function getActiveEvent(): Promise<EventSession | null> {
   return data ? mapEvent(data) : null
 }
 
-/** Has this student already checked in to the event? (banner / scan screen). */
 export async function getMyEventStatus(eventId: string, studentId: string): Promise<boolean> {
   const { data, error } = await supabase
     .from('event_attendance')
@@ -778,7 +624,6 @@ export async function getMyEventStatus(eventId: string, studentId: string): Prom
   return !!data
 }
 
-/** Student check-in to a global event: validate the rotating code, award once. */
 export async function scanEventAttendance(
   eventId: string,
   windowIndex: number,
@@ -796,7 +641,6 @@ export async function scanEventAttendance(
   }
 }
 
-/** Instructor: manually add a student who couldn't scan (dead battery / no phone). */
 export async function markEventAttendance(
   eventId: string,
   studentId: string,
@@ -811,7 +655,6 @@ export async function markEventAttendance(
   return { already: data.already, points: data.points }
 }
 
-/** Instructor live-monitor stats: total + per-section counts (polled, not realtime). */
 export async function getEventStats(eventId: string): Promise<EventStats> {
   const { data, error } = await supabase
     .rpc('get_event_stats', { p_event_id: eventId })
@@ -830,11 +673,6 @@ export async function getEventStats(eventId: string): Promise<EventStats> {
   }
 }
 
-/**
- * Recent events (active + ended), newest first — for the console's "Recent
- * events" list, so a finished event can be reopened read-only to review who
- * attended. No secret (review is read-only; there is no QR to render).
- */
 export async function listRecentEvents(limit = 20): Promise<EventSession[]> {
   const { data, error } = await supabase
     .from('event_sessions')
@@ -845,20 +683,6 @@ export async function listRecentEvents(limit = 20): Promise<EventSession[]> {
   return ((data ?? []) as EventRow[]).map((r) => mapEvent(r))
 }
 
-/**
- * Everyone who checked in to an event (newest first) — the instructor's live
- * monitor list and the read-only review of a finished event.
- *
- * Goes through `get_event_attendees` (0066), a SECURITY DEFINER RPC that reads
- * the SAME rows get_event_stats counts, under the same RLS bypass — so the list
- * can never show fewer than the number (the 2026-09-21 "2 checked in, 1 shows"
- * bug, where a definer count disagreed with an RLS'd embed select). `limit` caps
- * it for the live monitor/feed; the review omits it for the full roster.
- *
- * Falls back to the pre-0066 embed select if the RPC isn't in the database yet,
- * so the list keeps working during the paste window (it just carries the old
- * discrepancy until 0066 lands).
- */
 export async function getEventAttendees(eventId: string, limit?: number): Promise<EventAttendee[]> {
   const { data, error } = await supabase.rpc('get_event_attendees', {
     p_event_id: eventId,
@@ -884,7 +708,6 @@ export async function getEventAttendees(eventId: string, limit?: number): Promis
       points: Number(r.points) || 0,
     }))
   }
-  // RPC missing (pre-0066) → the old embed select. Any other error rethrows.
   const code = (error as { code?: string }).code ?? ''
   if (!code.startsWith('PGRST2') && code !== '42883') throw error
   type EmbedRow = {
@@ -931,8 +754,6 @@ export async function getMyEventHistory(studentId: string): Promise<EventHistory
     .eq('student_id', studentId)
     .order('scanned_at', { ascending: false })
   if (error) throw error
-  // Cast through `unknown`: the hand-written schema types embeds as
-  // SelectQueryError (Relationships: []), the same reason other embeds cast.
   return ((data ?? []) as unknown as Row[]).map((r) => ({
     eventId: r.event_id,
     name: oneEmbed<{ name: string }>(r.event_sessions)?.name ?? 'Event',
@@ -973,7 +794,6 @@ function mapAchievement(r: AchievementRow): Achievement {
   }
 }
 
-/** The full 30-achievement catalog (locked + unlocked; no per-student state). */
 export async function listAchievements(): Promise<Achievement[]> {
   const { data, error } = await supabase
     .from('achievements')
@@ -983,7 +803,6 @@ export async function listAchievements(): Promise<Achievement[]> {
   return ((data ?? []) as AchievementRow[]).map(mapAchievement)
 }
 
-/** The catalog merged with one student's unlock timestamps (null = still locked). */
 export async function getMyAchievements(studentId: string): Promise<AchievementState[]> {
   const [catalog, unlocked] = await Promise.all([
     supabase.from('achievements').select(ACHIEVEMENT_COLS).order('sort_order'),
@@ -1003,7 +822,6 @@ export async function getMyAchievements(studentId: string): Promise<AchievementS
   }))
 }
 
-/** The raw numbers behind locked achievements' "7/10"-style progress bars. */
 export async function getAchievementProgress(studentId: string): Promise<AchievementProgress> {
   const { data, error } = await supabase
     .rpc('get_achievement_progress', { p_student_id: studentId })
@@ -1024,10 +842,6 @@ export async function getAchievementProgress(studentId: string): Promise<Achieve
     banner_count: data.banner_count,
     points_spent: data.points_spent,
     redemptions_approved: data.redemptions_approved,
-    // Per-term metrics (0036). Defaulted to null rather than read straight
-    // through: if the client is ever ahead of the database, an older
-    // get_achievement_progress simply omits these columns, and `undefined`
-    // would slip past a `Record<_, number | null>` into the progress bars.
     term_points: data.term_points ?? null,
     term_recitations: data.term_recitations ?? null,
     term_early_streak: data.term_early_streak ?? null,
@@ -1036,12 +850,6 @@ export async function getAchievementProgress(studentId: string): Promise<Achieve
   }
 }
 
-/**
- * Re-evaluate a student's auto-computed achievements against their current
- * stats. Safe to call often — the RPC re-derives everything server-side and is
- * idempotent (already-unlocked achievements are skipped). Returns only the
- * ones newly unlocked by this call, so the caller can trigger a celebration.
- */
 export async function syncAchievements(studentId: string): Promise<UnlockedAchievement[]> {
   const { data, error } = await supabase.rpc('sync_achievements', { p_student_id: studentId })
   if (error) throw error
@@ -1050,7 +858,6 @@ export async function syncAchievements(studentId: string): Promise<UnlockedAchie
   )
 }
 
-/** Equip (or clear, with null) a display title. Must be one the student has unlocked. */
 export async function setDisplayTitle(studentId: string, title: string | null): Promise<void> {
   const { error } = await supabase
     .from('students')
@@ -1059,7 +866,6 @@ export async function setDisplayTitle(studentId: string, title: string | null): 
   if (error) throw error
 }
 
-/** Choose up to 3 unlocked achievements to feature first on the profile. */
 export async function setPinnedAchievements(studentId: string, codes: string[]): Promise<void> {
   const { error } = await supabase
     .from('students')
@@ -1068,7 +874,6 @@ export async function setPinnedAchievements(studentId: string, codes: string[]):
   if (error) throw error
 }
 
-/** Instructor-only: manually award one of the 'recognition' achievements. */
 export async function grantAchievement(studentId: string, code: string): Promise<void> {
   const { error } = await supabase.rpc('grant_achievement', {
     p_student_id: studentId,

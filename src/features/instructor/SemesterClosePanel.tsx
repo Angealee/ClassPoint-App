@@ -21,27 +21,6 @@ import type { Semester, SemesterCloseRow } from '@/lib/types'
 /** Mirrors semesters_farewell_message_check. */
 const MESSAGE_MAX = 400
 
-/**
- * Closing a semester: the send-off, then the archive.
- *
- * ── WHY THIS IS NOT IN THE ROLLOVER WIZARD ──────────────────────────────────
- * Closing last semester and building the next are two jobs, and the wizard is
- * resumable precisely because it commits as you go — a destructive bulk archive
- * does not belong on that path. More practically: the wizard's step 3 archives
- * the UNTICKED students of the ONE section currently selected in its `From`
- * dropdown, so closing a semester through it meant repeating a confirm dialog
- * once per section and hoping you had not missed one.
- *
- * ── WHY IT HAS ITS OWN SEMESTER PICKER ──────────────────────────────────────
- * The obvious shape is "close the semester this screen is about", i.e. the
- * active one. But the instructor may well activate the new semester FIRST and
- * only then think to archive the old batch — and at that moment the semester
- * they want is no longer `useInstructor().semester`, so a panel scoped to the
- * active semester could not reach it at all. The picker costs one control and
- * works in either order.
- *
- * It defaults to the active semester, which is the common case.
- */
 export function SemesterClosePanel() {
   const { toast } = useToast()
 
@@ -66,7 +45,6 @@ export function SemesterClosePanel() {
       setSemesters(list)
       setPick((current) => current || (list.find((s) => s.isActive)?.id ?? list[0]?.id ?? ''))
     } catch {
-      // Soft: the rest of the Semesters screen still works without this panel.
       toast('Could not load semesters.', 'error')
     } finally {
       setLoading(false)
@@ -82,9 +60,6 @@ export function SemesterClosePanel() {
     [semesters, pick],
   )
 
-  // Re-seed the editor whenever the chosen semester changes, and DISCARD the
-  // close preview with it: a list of names that belongs to a different semester
-  // is the one thing on this panel that could cause real harm.
   useEffect(() => {
     setDraft(semester?.farewellMessage ?? '')
     setRows(null)
@@ -174,7 +149,6 @@ export function SemesterClosePanel() {
             ))}
           </Select>
 
-          {/* ── The send-off ──────────────────────────────────────────────── */}
           <div className="mt-4 rounded-xl border border-line p-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -199,9 +173,6 @@ export function SemesterClosePanel() {
             />
 
             <div className="mt-2 flex gap-2">
-              {/* The real component, not a mock-up: there is exactly one
-                  definition of what the student sees, so this cannot drift
-                  from it. */}
               <Button
                 size="sm"
                 variant="outline"
@@ -222,7 +193,6 @@ export function SemesterClosePanel() {
             </div>
           </div>
 
-          {/* ── The archive ───────────────────────────────────────────────── */}
           <div className="mt-4 rounded-xl border border-danger/40 bg-danger-solid/5 p-3">
             <p className="font-display text-sm font-bold text-danger">Archive everyone</p>
             <p className="mt-0.5 text-xs text-muted">
@@ -254,9 +224,6 @@ export function SemesterClosePanel() {
                   <span className="font-display font-bold">{sectionCount}</span> section
                   {sectionCount === 1 ? '' : 's'}.
                 </p>
-                {/* Behind a disclosure: 200 names is not a thing to scroll past
-                    on the way to a button, but a count you cannot check is a
-                    count you learn to tap through. */}
                 <details className="mt-2">
                   <summary className="cursor-pointer list-none text-xs font-semibold text-muted">
                     See the names
@@ -284,7 +251,6 @@ export function SemesterClosePanel() {
         </>
       )}
 
-      {/* The typed-name challenge, same as hard-delete and activation. */}
       <ConfirmDialog
         open={confirmOpen}
         title="Archive everyone in this semester?"
@@ -310,12 +276,6 @@ export function SemesterClosePanel() {
         onClose={() => setConfirmOpen(false)}
       />
 
-      {/* ── The other half: students coming BACK ───────────────────────────
-          Here rather than on the roster, because the roster's own archive
-          drawer is scoped to ONE section and every semester-closed student is
-          in a section that is no longer in this semester's list. Returning
-          students are a rollover concern, so the control lives with the
-          rollover. No sectionId = the whole archive. */}
       <button
         type="button"
         onClick={() => setArchiveOpen(true)}

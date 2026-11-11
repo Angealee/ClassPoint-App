@@ -4,18 +4,6 @@ import { motion, useReducedMotion } from 'framer-motion'
 /** Gold + brand confetti, with a few white motes for sparkle. */
 const COLORS = ['#ffba1f', '#ffcd4a', '#f29e0a', '#e11d2a', '#ffffff']
 
-/**
- * A one-shot confetti burst that rains from the top-centre of its (relative)
- * parent. Pieces fan out and fall, then fade. No-ops under reduced-motion.
- * The parent controls lifetime (mount it, then unmount after ~2s).
- */
-/**
- * Scatter the pieces. Lives OUTSIDE the component on purpose: randomness is
- * impure, and calling it while rendering is exactly what the react-hooks purity
- * rule exists to flag. Drawn once per mount through a lazy state initialiser —
- * which is what the old memo effectively did, since the parent mounts a fresh
- * burst each time and `count` is never changed on a live one.
- */
 function makePieces(count: number) {
   return Array.from({ length: count }, (_, i) => ({
     id: i,

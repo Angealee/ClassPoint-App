@@ -6,19 +6,6 @@ import { TableScroller } from '@/components/ui/TableScroller'
 import { finalGradeFor } from '@/lib/grade-impact'
 import type { GradePolicy, GradeSumsRow, TermKey } from '@/lib/types'
 
-/**
- * The final computed grade: Prelim·0.30 + Midterm·0.30 + Finals·0.40.
- *
- * This is the number the whole feature exists to produce, and the one place the
- * app says plainly when it CANNOT produce it. The spreadsheet quietly reports
- * 68.508 for a student with a 99.64 prelim and a 96.54 finals because the
- * Midterms column is empty; here that row reads "—" with the missing term
- * named, because a number that looks like a grade is worse than no number.
- *
- * Reads the aggregate RPC rather than raw cells: three terms of a section is
- * ~2,400 score rows, past PostgREST's silent 1000-row cap.
- */
-
 const TERMS: TermKey[] = ['prelim', 'midterm', 'finals']
 const TERM_LABEL: Record<TermKey, string> = {
   prelim: 'Prelim',
@@ -57,8 +44,6 @@ export function OverallTable({ rows, policies }: OverallTableProps) {
           const row = studentRows.find((r) => r.term === term)
           const grade = policy && row ? termGrade(row.sums, policy, 'official') : null
           terms[term] = grade
-          // Only a term that CARRIES weight can be missing in a way that
-          // matters — one weighted at 0% is deliberately not part of the grade.
           if (grade === null && (policy?.finalWeight ?? 0) > 0) missing.push(term)
         }
         return {

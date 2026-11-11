@@ -2,9 +2,7 @@ import { useEffect } from 'react'
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'framer-motion'
 
 interface AnimatedNumberProps {
-  /** The target value. Rolls from its previous value to this on change. */
   value: number
-  /** Optional prefix/suffix rendered as plain text around the number (e.g. "#", "%"). */
   prefix?: string
   suffix?: string
   className?: string
@@ -12,11 +10,6 @@ interface AnimatedNumberProps {
   duration?: number
 }
 
-/**
- * A number that rolls up/down to its new value instead of snapping. Uses a
- * MotionValue so only a text node updates each frame — no React re-render per
- * tick. Reduced-motion users get the final value immediately.
- */
 export function AnimatedNumber({
   value,
   prefix,

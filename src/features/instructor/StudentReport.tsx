@@ -21,11 +21,6 @@ const STATUS_LABEL: Record<string, string> = {
   irregular: 'Irregular',
 }
 
-/**
- * A formal, printable attendance record. A DEDICATED route OUTSIDE the app
- * shell so there's no nav/theme to fight: hardcoded light styles (dark mode
- * can't leak), a screen-only toolbar, and the browser's own print → paper/PDF.
- */
 export function StudentReport() {
   const { studentId = '' } = useParams()
   const navigate = useNavigate()
@@ -33,15 +28,10 @@ export function StudentReport() {
   const [allAttendance, setAllAttendance] = useState<MyAttendanceEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
-  // '' = every subject in one register. Chosen on the screen-only toolbar, so a
-  // printed record can be scoped to the subject a department actually asked for.
   const [subjectFilter, setSubjectFilter] = useState('')
 
   useEffect(() => {
     let cancelled = false
-    // This route sits OUTSIDE InstructorLayout (see router.tsx), so nothing has
-    // configured the term calendar for us — load it before rendering week
-    // dividers, or the report prints against term.ts's fallback dates.
     Promise.all([loadTermCalendar(), getStudent(studentId), listMyAttendance(studentId)])
       .then(([, s, att]) => {
         if (cancelled) return
@@ -50,8 +40,6 @@ export function StudentReport() {
         setAllAttendance([...att].sort((a, b) => a.startedAt.localeCompare(b.startedAt)))
       })
       .catch(() => {
-        // This document goes on PAPER. A swallowed failure printed a report
-        // with no student and fallback term dates, with nothing saying so.
         if (!cancelled) setLoadFailed(true)
       })
       .finally(() => !cancelled && setLoading(false))
@@ -60,7 +48,6 @@ export function StudentReport() {
     }
   }, [studentId])
 
-  /** Subjects this student actually has sessions in, for the toolbar picker. */
   const subjects = useMemo(() => {
     const seen = new Map<string, string>()
     for (const a of allAttendance) {
@@ -88,7 +75,6 @@ export function StudentReport() {
   }, [attendance])
 
   const weeks = useMemo(() => {
-    // groupByWeek is newest-first; reverse for oldest-first paper order.
     return [...groupByWeek(attendance, (a) => a.startedAt)].reverse()
   }, [attendance])
 
@@ -112,7 +98,6 @@ export function StudentReport() {
 
   return (
     <>
-      {/* Screen-only toolbar (hidden when printing). */}
       <div className="report-toolbar">
         <button type="button" onClick={() => navigate(-1)} className="report-btn report-btn-ghost">
           ← Back
@@ -143,7 +128,6 @@ export function StudentReport() {
         </div>
       </div>
 
-      {/* Hardcoded light styles — theme-independent, print-safe. */}
       <style>{`
         .report-toolbar {
           display: flex; justify-content: space-between; gap: 8px;
@@ -181,7 +165,6 @@ export function StudentReport() {
       `}</style>
 
       <div className="report-page">
-        {/* Header — "Attendance Record — {Section}" (per the chosen title). */}
         <div style={{ borderBottom: '2px solid #111', paddingBottom: 12, marginBottom: 16 }}>
           <h1>
             Attendance Record — {student.sectionName}
@@ -242,8 +225,6 @@ export function StudentReport() {
                 <thead>
                   <tr>
                     <th style={{ width: 90 }}>Date</th>
-                    {/* Only when the register mixes subjects — a single-subject
-                        print already says which one in the heading. */}
                     {!subjectFilter && subjects.length > 1 && <th style={{ width: 90 }}>Subject</th>}
                     <th>Topic</th>
                     <th style={{ width: 90 }}>Status</th>

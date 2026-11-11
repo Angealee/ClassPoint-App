@@ -1,17 +1,9 @@
 import { fetchFullBackup } from '@/lib/api'
 import { getLevelProgress } from '@/lib/leveling'
 
-// Like attendance-io/roster-io, `xlsx` is heavy and dynamic-imported so this
-// module costs nothing until the instructor actually taps "Backup all".
-
 const dt = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString() : '')
 const d = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString() : '')
 
-/**
- * Download EVERYTHING as one dated workbook — the off-site half of the backup
- * story (the nightly in-database snapshots are the other half). Five sheets:
- * Roster, Points ledger, Attendance, Sessions, Redemptions.
- */
 export async function exportAllData(): Promise<void> {
   const [XLSX, data] = await Promise.all([import('xlsx'), fetchFullBackup()])
 

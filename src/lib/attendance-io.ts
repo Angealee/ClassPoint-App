@@ -1,8 +1,5 @@
 import type { AttendanceRosterRow, SectionRegister, StudentAttendanceStat } from '@/lib/types'
 
-// `xlsx` (SheetJS) is heavy, so — like roster-io.ts — it's imported dynamically
-// and this module is only pulled in when the instructor actually exports.
-
 const STATUS_LABEL: Record<string, string> = {
   present: 'Present',
   late: 'Late',
@@ -11,10 +8,6 @@ const STATUS_LABEL: Record<string, string> = {
   irregular: 'Irregular',
 }
 
-/**
- * Download one class session's attendance as an .xlsx: a row per student with
- * their status and check-in time.
- */
 export async function exportSessionAttendance(
   sectionName: string,
   sessionLabel: string,
@@ -36,15 +29,9 @@ export async function exportSessionAttendance(
   XLSX.writeFile(wb, `classpoint-attendance-${safeSection}-${safeLabel}-${stamp}.xlsx`)
 }
 
-/**
- * Download the whole-term summary: a row per student with their per-status
- * totals and show-up rate. Excused/irregular are reported but excluded from
- * the rate, matching how the app computes it everywhere else.
- */
 export async function exportAttendanceSummary(
   sectionName: string,
   stats: StudentAttendanceStat[],
-  /** Present when the screen was filtered to one subject — tags the filename. */
   subjectCode?: string | null,
 ): Promise<void> {
   const XLSX = await import('xlsx')
@@ -64,7 +51,6 @@ export async function exportAttendanceSummary(
   XLSX.writeFile(wb, fileName('attendance-summary', sectionName, subjectCode))
 }
 
-/** One-letter status codes for the register matrix (blank = no record). */
 const STATUS_LETTER: Record<string, string> = {
   present: 'P',
   late: 'L',
@@ -73,15 +59,9 @@ const STATUS_LETTER: Record<string, string> = {
   irregular: 'I',
 }
 
-/**
- * The traditional class-record matrix: a row per student, a column per session
- * (dated), cells P/L/A/E/I, plus per-student totals + rate. Two header rows
- * (dates, then topics) via aoa_to_sheet.
- */
 export async function exportSectionRegister(
   sectionName: string,
   register: SectionRegister,
-  /** Present when the screen was filtered to one subject — tags the filename. */
   subjectCode?: string | null,
 ): Promise<void> {
   const XLSX = await import('xlsx')
@@ -105,15 +85,12 @@ export async function exportSectionRegister(
       if (st === 'present') p++
       if (st === 'late') l++
       if (st === 'absent') a++
-      // Neutral (excused/irregular) excluded from the rate, as everywhere.
       if (st === 'present' || st === 'late' || st === 'absent') counted++
     }
     row.push(p, l, a, counted ? `${Math.round(((p + l) / counted) * 100)}%` : '—')
     return row
   })
 
-  // Subject row only when the grid actually mixes them — a single-subject
-  // register already says which one in its filename.
   const mixed = new Set(sessions.map((s) => s.subjectCode ?? '')).size > 1
   const subjectRow = mixed
     ? [['', ...sessions.map((s) => s.subjectCode ?? '—'), '', '', '', '']]
@@ -125,17 +102,6 @@ export async function exportSectionRegister(
   XLSX.writeFile(wb, fileName('register', sectionName, subjectCode))
 }
 
-/**
- * `classpoint-<kind>-<section>[-<subject>]-<date>.xlsx`.
- *
- * The subject segment matters: exporting both subjects of one section on the
- * same day used to produce two identically-named files, so the second silently
- * replaced the first in Downloads.
- *
- * Shared with `export-grades.ts` rather than copied — this encodes a collision
- * rule, and this codebase has already merged the same rule back together four
- * separate times after it was duplicated.
- */
 export function fileName(kind: string, sectionName: string, subjectCode?: string | null): string {
   const safe = (v: string) => v.replace(/[^\w-]+/g, '_')
   const parts = [

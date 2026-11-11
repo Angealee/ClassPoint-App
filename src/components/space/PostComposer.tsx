@@ -10,25 +10,6 @@ import { XIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { MAX_POST_LENGTH, type LoungeQuota } from '@/lib/types'
 
-/**
- * The one composer, for both a plain post and a shoutout.
- *
- * A shoutout is the same box with a person attached (the user's call), so there
- * is one thing to learn rather than two flows that drift apart.
- *
- * ── THE FOUR GUARDS ────────────────────────────────────────────────────────
- *   1. Live counter + remaining allowance, so the limit is never a surprise
- *      server error after you have written 600 characters.
- *   2. Auto-growing textarea — at 600 characters a fixed box is a letterbox.
- *   3. Warn before leaving with unsent text.
- *   4. Ctrl/Cmd+Enter to send; plain Enter stays a newline, because posts are
- *      multi-line by decision.
- *
- * The DUPLICATE guard is the fifth and it is deliberately NOT here: it lives in
- * the RPC, because the case it protects against is a retry the client believes
- * failed.
- */
-
 export interface ClassmateOption {
   id: string
   displayName: string
@@ -60,8 +41,6 @@ export function PostComposer({
   const overLimit = body.length > MAX_POST_LENGTH
   const canSend = body.trim().length > 0 && !overLimit && !busy && left > 0
 
-  // Auto-grow. Reset to `auto` first or the box can only ever get taller —
-  // scrollHeight of an already-tall element never shrinks on its own.
   useEffect(() => {
     const el = areaRef.current
     if (!el) return
@@ -69,8 +48,6 @@ export function PostComposer({
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`
   }, [body])
 
-  // Guard 3. `beforeunload` covers a reload or a closed tab; in-app navigation
-  // is covered by the dialog on the picker/clear controls below.
   useEffect(() => {
     if (body.trim().length === 0) return
     const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault()
@@ -83,9 +60,6 @@ export function PostComposer({
     const ok = isShoutout
       ? await onShoutout(target.id, body.trim())
       : await onPost(body.trim())
-    // Only clear on success: a failed send must not eat what was typed. This is
-    // the same reason the RPC owns the duplicate guard — the client cannot
-    // safely assume anything about a request it did not see answered.
     if (ok) {
       setBody('')
       setTarget(null)
@@ -147,8 +121,6 @@ export function PostComposer({
               : "What's up?"
         }
         disabled={left === 0}
-        // text-base, always: below 16px iOS Safari zooms the viewport on focus
-        // and never zooms back.
         className={cn(
           'w-full resize-none overflow-y-auto rounded-xl border bg-card px-3.5 py-2.5 text-base text-ink',
           'placeholder:text-muted/70 transition-colors',
@@ -168,7 +140,6 @@ export function PostComposer({
           {isShoutout ? 'Change' : 'Shout out'}
         </button>
 
-        {/* Guard 1. Both figures, so neither limit is a surprise. */}
         <span
           className={cn(
             'min-w-0 flex-1 truncate text-2xs',

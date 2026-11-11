@@ -72,17 +72,13 @@ interface StudentDataValue {
   /** When the frozen leaderboard was captured (ISO), or null. */
   capturedAt: string | null
   events: PointEvent[]
-  /** Points/penalties received while the app was closed — drives the recap modal. */
   awayEvents: PointEvent[]
   /** Dismiss the "while you were away" recap. */
   clearAwayRecap: () => void
-  /** True while the realtime channel is connected — scores update live. */
   live: boolean
-  /** Official (snapshot) rank — settles twice daily. Null if not ranked yet. */
   rank: number | null
   sectionName: (id: string) => string
   refresh: () => Promise<void>
-  /** Save the public profile fields (display name + optional bio/interests). */
   saveProfile: (fields: {
     displayName: string
     bio: string
@@ -105,129 +101,49 @@ interface StudentDataValue {
   /** The level to celebrate with the burst, or null. */
   levelUp: number | null
   clearLevelUp: () => void
-  /** The full catalog merged with the signed-in student's unlock state. */
   achievements: AchievementState[]
   achievementsLoading: boolean
-  /** True when the trophy case failed to load — drives its retry card. */
   achievementsError: boolean
   /** Re-fetch the trophy case after a failure. */
   retryAchievements: () => void
-  /**
-   * Bumps whenever one of this student's attendance records changes (an
-   * instructor correction, a committed penalty). The Attendance screen watches
-   * it and refetches — it owns its own history list, so this is a signal, not
-   * the data.
-   */
   attendanceTick: number
-  /**
-   * The student's section's currently-running class, or null (0033). Drives the
-   * live banner on the Dashboard and Attendance screens; kept live by a
-   * `class_sessions` subscription on the durable channel, so it appears the
-   * moment the instructor starts class and clears when they end it.
-   */
   liveSession: ClassSession | null
-  /**
-   * This student's status in `liveSession`, or null if they haven't been marked
-   * yet. Lets the banner say "You're in" instead of prompting someone who has
-   * already scanned.
-   */
   liveStatus: AttendanceStatus | null
-  /**
-   * The GLOBAL check-in event running right now, or null (0055). Cross-section,
-   * so unlike `liveSession` it isn't keyed on the student's section — a single
-   * `event_sessions` subscription on the durable channel drives it for everyone.
-   */
   liveEvent: EventSession | null
   /** Whether this student has already checked in to `liveEvent`. */
   liveEventChecked: boolean
-  /** Called by the event scan screen after a successful check-in (optimistic). */
   noteEventCheckedIn: () => void
-  /**
-   * True when this student's section belongs to a semester that has ENDED
-   * (0035). Their account, points, badges and history all still open — nothing
-   * can change, and `scan_attendance` refuses their check-ins server-side.
-   *
-   * Detected without an extra query: `sections` is already scoped to the active
-   * semester, so a section_id missing from it means the semester moved on.
-   */
   semesterEnded: boolean
-  /**
-   * The student's own attendance history, loaded off the critical path (like
-   * achievements) and refreshed whenever attendanceTick bumps.
-   *
-   * Shared by the Dashboard teaser and the detailed stats screen so neither
-   * has to re-query. The Attendance screen deliberately keeps its own fetch:
-   * it owns a loadError/retry state this provider has no business carrying.
-   */
   attendance: MyAttendanceEntry[]
   attendanceLoading: boolean
-  /**
-   * The student's own marks (0062), loaded off the critical path like
-   * achievements and attendance. Shared by the Home card and the Grades screen,
-   * which fire no query of their own.
-   *
-   * `null` until the first answer. `enabled: false` is an ANSWER (the
-   * instructor has grades switched off), not an error — `gradesError` is the
-   * failure. The Home card renders nothing for either; the Grades screen says
-   * which.
-   */
   grades: MyGrades | null
   gradesLoading: boolean
   gradesError: boolean
-  /** Re-read the marks — pull-to-refresh, and after a boost request. */
   reloadGrades: () => Promise<void>
   /** Raw metric values behind locked achievements' progress bars. */
   achievementProgress: AchievementProgress | null
-  /** The achievement to celebrate with the unlock burst right now, or null. */
   unlockedAchievement: Achievement | null
-  /** Dismiss the current celebration and advance to the next queued one, if any. */
   clearUnlockedAchievement: () => void
-  /** Re-check the signed-in student's achievements against their current stats. */
   syncMyAchievements: () => Promise<void>
-  /** True when the student has newly-unlocked badges they haven't viewed yet. */
   hasUnseenAchievements: boolean
-  /** Mark all currently-unlocked achievements as seen (clears the nudge dot). */
   markAchievementsSeen: () => void
-  /** Equip (or clear, with null) a display title — must be one already unlocked. */
   setDisplayTitle: (title: string | null) => Promise<{ error?: string }>
-  /** Choose up to 3 unlocked achievements to feature on the profile. */
   setPinnedAchievements: (codes: string[]) => Promise<{ error?: string }>
   /** Unread notifications — drives the bell badge. */
   unreadCount: number
-  /** Mark every notification read (bell sheet open); clears the badge. */
   markAllRead: () => Promise<void>
-  /**
-   * Whether Student Space is open to this student (0041), decided server-side.
-   *
-   * Lives here rather than in a Space-only provider because the ACCOUNT MENU
-   * reads it, and the menu renders outside the /app/space subtree. Everything
-   * else about Student Space — posts, rooms, unread counts — belongs to its own
-   * provider, so a chat message never re-renders the Dashboard.
-   */
   spaceAccess: SpaceAccess
 }
 
 const StudentDataContext = createContext<StudentDataValue | undefined>(undefined)
 
-/**
- * How long the tab must be hidden before coming back counts as "might have
- * missed something". Under this, realtime has almost certainly kept up and a
- * refetch is pure waste.
- */
 const STALE_AFTER_MS = 2 * 60 * 1000
 
-// Level and rank baselines are SEMESTER-scoped (0029): points reset each
-// semester, so a baseline carried over from the last one would silently suppress
-// every level-up celebration until the student climbed past their old peak.
 const seenLevelKey = (studentId: string, semesterId: string) =>
   `cp_seen_level_${studentId}_${semesterId}`
 const seenRankKey = (studentId: string, semesterId: string) =>
   `cp_seen_rank_${studentId}_${semesterId}`
-// Timestamp through which the student has already seen their point events; events
-// newer than this on the next open are recapped in the "while you were away" modal.
 const seenEventsKey = (studentId: string) => `cp_events_seen_until_${studentId}`
-// Codes of the achievements the student has already looked at (in the trophy
-// case). Anything unlocked but not in here drives the "new badge" nudge dot.
 const seenAchKey = (studentId: string) => `cp_seen_achievements_${studentId}`
 
 export function StudentDataProvider({ children }: { children: ReactNode }) {
@@ -246,23 +162,17 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const [achievements, setAchievements] = useState<AchievementState[]>([])
   const [achievementsLoading, setAchievementsLoading] = useState(true)
   const [achievementsError, setAchievementsError] = useState(false)
-  // Increments whenever one of this student's attendance records changes.
   const [attendanceTick, setAttendanceTick] = useState(0)
-  // The section's running class, if any (0033), and our own status in it.
   const [liveSession, setLiveSession] = useState<ClassSession | null>(null)
   const [liveStatus, setLiveStatus] = useState<AttendanceStatus | null>(null)
-  // The GLOBAL check-in event, if any (0055), and whether we've checked in.
   const [liveEvent, setLiveEvent] = useState<EventSession | null>(null)
   const [liveEventChecked, setLiveEventChecked] = useState(false)
-  // Attendance history, shared by the Dashboard teaser and the stats screen.
   const [attendance, setAttendance] = useState<MyAttendanceEntry[]>([])
   const [attendanceLoading, setAttendanceLoading] = useState(true)
-  // The student's own marks (0062) — off the critical path, like the above.
   const [grades, setGrades] = useState<MyGrades | null>(null)
   const [gradesLoading, setGradesLoading] = useState(true)
   const [gradesError, setGradesError] = useState(false)
   const [achievementProgress, setAchievementProgress] = useState<AchievementProgress | null>(null)
-  // Achievements queued to celebrate, shown one at a time (oldest first).
   const [unlockQueue, setUnlockQueue] = useState<Achievement[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [spaceAccess, setSpaceAccess] = useState<SpaceAccess>(SPACE_ACCESS_UNKNOWN)
@@ -270,34 +180,20 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   // Tracks the level/rank we last reflected, to detect changes.
   const levelRef = useRef<number | null>(null)
   const rankRef = useRef<number | null>(null)
-  // Active semester id, read from callbacks that must not re-create on load.
-  // Empty until the first load resolves — the storage keys tolerate that.
   const semesterIdRef = useRef('')
-  // Holds the RUNNING load so overlapping callers await it instead of getting
-  // an instant no-op (see load() — pull-to-refresh depends on this).
   const inFlightRef = useRef<Promise<void> | null>(null)
-  // The away-recap is computed once per app open, not on every visibility refresh.
   const recapCheckedRef = useRef(false)
-  // True once the realtime channel has subscribed at least once — a *second*
-  // SUBSCRIBED means we reconnected and may have missed awards while away.
   const subscribedOnceRef = useRef(false)
-  // Latest achievements list, readable from callbacks without re-subscribing
-  // effects (mirrors the loadRef pattern below).
   const achievementsRef = useRef<AchievementState[]>([])
   useEffect(() => {
     achievementsRef.current = achievements
   }, [achievements])
-  // Codes already queued/celebrated this session — a sync's own return value
-  // and the realtime echo of that same insert both try to celebrate the same
-  // unlock, so this dedupes whichever arrives first.
   const celebratedRef = useRef<Set<string>>(new Set())
 
-  // Unlock audio playback on the first user gesture (browsers require this).
   useEffect(() => {
     initSound()
   }, [])
 
-  /** Compare a new point total against the last-seen level and celebrate if up. */
   const considerLevelUp = useCallback((studentId: string, totalPoints: number) => {
     const level = getLevelProgress(totalPoints).level
     const stored = Number(localStorage.getItem(seenLevelKey(studentId, semesterIdRef.current)) ?? '')
@@ -320,7 +216,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(seenLevelKey(studentId, semesterIdRef.current), String(level))
   }, [])
 
-  /** Compare a new rank against the last-seen one and announce any change. */
   const considerRankChange = useCallback(
     (studentId: string, newRank: number | null) => {
       if (newRank == null) return
@@ -349,12 +244,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     [toast],
   )
 
-  /** Refresh the achievement catalog + this student's unlock state/progress. */
-  /**
-   * Attendance history. Failures leave the last-known list in place and just
-   * stop the spinner: the teaser and stats screen both degrade to showing
-   * nothing rather than claiming a student has no record.
-   */
   const loadAttendance = useCallback(async (studentId: string) => {
     try {
       setAttendance(await listMyAttendance(studentId))
@@ -365,13 +254,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  /**
-   * The student's own marks. A failure is REMEMBERED, not hidden: the Grades
-   * screen must be able to tell "your instructor has not opened grades"
-   * (`enabled: false`) from "we could not reach the server", because the first
-   * is a sentence and the second is a retry button. The last good answer stays
-   * in place meanwhile, so a flaky connection does not blank a screen of marks.
-   */
   const loadGrades = useCallback(async () => {
     setGradesError(false)
     try {
@@ -393,21 +275,16 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       setAchievements(list)
       setAchievementProgress(progress)
     } catch {
-      // Surfaced, not swallowed: an empty catalog hides the filter chips, so
-      // the screen used to show "try a different filter" with no filters and
-      // no way back short of reloading the app.
       setAchievementsError(true)
     }
   }, [])
 
-  /** Retry the trophy case after a failed load (drives its error card). */
   const retryAchievements = useCallback(() => {
     if (!me?.id) return
     setAchievementsLoading(true)
     void loadAchievements(me.id).finally(() => setAchievementsLoading(false))
   }, [me?.id, loadAchievements])
 
-  /** Queue a celebration for one newly-unlocked achievement, once per code. */
   const celebrate = useCallback((a: Achievement) => {
     if (celebratedRef.current.has(a.code)) return
     celebratedRef.current.add(a.code)
@@ -424,9 +301,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  /** Re-evaluate this student's auto-computed achievements against current
-   * stats. Safe to call often — the RPC is idempotent and only ever reports
-   * genuinely new unlocks, which get queued for the celebration burst. */
   const runAchievementSync = useCallback(
     async (studentId: string) => {
       try {
@@ -449,40 +323,16 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     [celebrate, loadAchievements],
   )
 
-  /**
-   * Keyed on `user.id`, NEVER the user OBJECT — the same rule the realtime
-   * channels follow, and for the same reason.
-   *
-   * Supabase fires TOKEN_REFRESHED whenever a backgrounded tab comes back, and
-   * AuthProvider sets a fresh session object for it. Depending on `user` made
-   * that a new reference, which rebuilt `load`, which re-ran the mount effect
-   * below — so every single tab switch flashed the full-screen skeleton and
-   * re-issued nine queries. The user has not changed; only their access token
-   * has.
-   */
   const userId = user?.id
   const load = useCallback(async () => {
     if (!userId) return
-    // Return the RUNNING load rather than resolving instantly: pull-to-refresh
-    // awaits this, and an undefined return snapped the spinner back with
-    // nothing having happened whenever a visibility refresh was already in
-    // flight — which is exactly when the student pulls.
     if (inFlightRef.current) return inFlightRef.current
     const run = (async () => {
     setError(false)
     try {
-      // The semester resolves first because the section list is scoped to it:
-      // an unscoped list fills the leaderboard's view picker with every past
-      // semester's sections, each of which renders an empty board.
       const semester = await getActiveSemester().catch(() => null)
       if (semester) {
         semesterIdRef.current = semester.id
-        // Configure the term calendar for the WHOLE student area (Phase F).
-        // InstructorLayout has always done this for /teach, but nothing did it
-        // for /app — so every student-side week number and term label silently
-        // used term.ts's hardcoded fallback dates. That happens to match this
-        // semester, which is exactly why it would have gone unnoticed until the
-        // instructor moved a term date around a holiday.
         configureTermCalendar({
           semesterId: semester.id,
           semesterName: semester.name,
@@ -502,8 +352,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       const myEvents = mine ? await listStudentEvents(mine.id) : []
       setEvents(myEvents)
       if (mine) {
-        // Once per app open: recap any points/penalties earned while it was
-        // closed (events newer than the last timestamp the student saw).
         if (!recapCheckedRef.current) {
           recapCheckedRef.current = true
           try {
@@ -512,7 +360,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
               const away = myEvents.filter((e) => new Date(e.created_at) > new Date(until))
               if (away.length > 0) setAwayEvents(away)
             }
-            // First run (no stored value) just establishes the baseline — no recap.
             localStorage.setItem(seenEventsKey(mine.id), new Date().toISOString())
           } catch {
             /* storage unavailable — skip the recap */
@@ -521,20 +368,11 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         considerLevelUp(mine.id, mine.semester_points)
         const myRank = snap.entries.find((e) => e.student_id === mine.id)?.rank ?? null
         considerRankChange(mine.id, myRank)
-        // Bell badge — independent of the main load; failures just keep the
-        // last-known count.
         void getUnreadNotificationCount(mine.id).then(setUnreadCount).catch(() => {})
-        // Off the critical path like achievements: the gate failing must not
-        // stop the dashboard rendering, and getSpaceAccess already degrades to
-        // locked rather than throwing.
         void getSpaceAccess().then(setSpaceAccess).catch(() => {})
-        // Is class running right now? Independent of the main load — a failure
-        // just leaves the banner hidden, never blocks the dashboard.
         void getActiveSessionForStudent(mine.section_id)
           .then(setLiveSession)
           .catch(() => {})
-        // Is a GLOBAL event running right now (0055)? Cross-section, off the
-        // critical path — a failure just leaves the banner hidden.
         void getActiveEvent()
           .then((ev) => {
             setLiveEvent(ev)
@@ -542,8 +380,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
             else setLiveEventChecked(false)
           })
           .catch(() => {})
-        // Independent of the main load — achievements populate the trophy
-        // case as soon as they're ready without delaying the dashboard.
         void loadAchievements(mine.id).finally(() => setAchievementsLoading(false))
         void loadAttendance(mine.id)
         void loadGrades()
@@ -559,34 +395,20 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     return run
   }, [userId, considerLevelUp, considerRankChange, loadAchievements, loadAttendance, loadGrades, runAchievementSync])
 
-  // Always call the freshest `load` from listeners/callbacks without making the
-  // realtime channel re-subscribe when `load`'s identity changes.
   const loadRef = useRef(load)
   useEffect(() => {
     loadRef.current = load
   }, [load])
 
-  // First load only shows the skeleton once per signed-in student. `load` is
-  // now stable across token refreshes, so this fires on sign-in and not again.
   useEffect(() => {
     setLoading(true)
     load().finally(() => setLoading(false))
   }, [load])
 
-  // Live updates for the signed-in student's own dashboard.
-  //
-  // IMPORTANT: depend on the *stable* student id, never the whole `me` object.
-  // Each realtime UPDATE calls setMe, so depending on `me` would tear down and
-  // re-subscribe the same channel topic on every award — the async removeChannel
-  // collides with the new subscribe and the channel dies, so only a full page
-  // refresh would show new points. Keying on the id keeps one durable channel.
   const studentId = me?.id
-  // Also stable (a string, not an object) — it only changes if the instructor
-  // actually moves this student to another section, which SHOULD re-subscribe.
   const sectionId = me?.section_id
   useEffect(() => {
     if (!studentId) return
-    // Heal a rotated/missing push subscription for this device on each open.
     void syncPushSubscription(studentId)
     subscribedOnceRef.current = false
     const channel = supabase
@@ -595,9 +417,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'students', filter: `id=eq.${studentId}` },
         (payload) => {
-          // The payload is the RAW db row, where lifetime_points is the career
-          // total the app models as all_time_points. Translate rather than
-          // spreading it blind, or the "all-time" figure would never update.
           const { lifetime_points, ...rest } = payload.new as Record<string, unknown>
           setMe((m) =>
             m
@@ -615,12 +434,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
           }
         },
       )
-      // Attendance corrections. attendance_records has been in the realtime
-      // publication since 0014 and the student can read their own rows, but
-      // nothing subscribed — so an instructor fixing a wrong "absent" stayed
-      // invisible until the screen remounted. Bumped through `attendanceTick`
-      // so the Attendance screen can refetch without this provider owning its
-      // history list.
       .on(
         'postgres_changes',
         {
@@ -631,15 +444,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         },
         () => setAttendanceTick((n) => n + 1),
       )
-      // Live class awareness (0033). `class_sessions` joined the realtime
-      // publication in that migration; before it, a student could only learn
-      // class had started by being in the room.
-      //
-      // Any event re-reads the active session rather than patching state from
-      // the payload: the payload is the raw row with no `subjects` join, so the
-      // banner would lose its subject name, and an UPDATE that sets ended_at
-      // has to clear the banner. One small query on an event that fires twice a
-      // day is the cheaper correctness.
       .on(
         'postgres_changes',
         {
@@ -655,11 +459,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
             .catch(() => {})
         },
       )
-      // Global event awareness (0055). `event_sessions` is in the realtime
-      // publication; UNfiltered because an event is cross-section — every
-      // student watches the one table. Events start/end rarely, so the traffic
-      // is negligible, and we re-read rather than patch (an UPDATE that sets
-      // ended_at must clear the banner).
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'event_sessions' },
@@ -688,7 +487,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
           const ev = payload.new as PointEvent
           setEvents((prev) => {
             if (prev.some((e) => e.id === ev.id)) return prev
-            // Announce only genuinely new awards (realtime fires post-subscribe).
             const positive = ev.points >= 0
             const amount = positive ? `+${ev.points}` : String(ev.points)
             if (document.visibilityState === 'visible') {
@@ -699,7 +497,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
                 positive ? 'success' : 'error',
               )
             } else {
-              // App backgrounded but alive — surface an OS notification instead.
               void showLocalNotification({
                 title: positive ? `${amount} points 🎉` : `${amount} points`,
                 body: ev.note?.trim() || (positive ? 'Nice work — keep it up!' : 'Points deducted.'),
@@ -708,7 +505,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
             }
             return [ev, ...prev]
           })
-          // Seen live — advance the recap baseline so it isn't shown next open.
           try {
             localStorage.setItem(seenEventsKey(studentId), new Date().toISOString())
           } catch {
@@ -716,7 +512,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
           }
         },
       )
-      // The frozen leaderboard is rewritten twice daily; catch our own new rank.
       .on(
         'postgres_changes',
         {
@@ -730,9 +525,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
           if (typeof row.rank === 'number') considerRankChange(studentId, row.rank)
         },
       )
-      // Every queued notification bumps the bell badge live. The row is
-      // history; the point/achievement listeners above stay the live surface
-      // (toast/sound), so no announcement here — just the count.
       .on(
         'postgres_changes',
         {
@@ -743,12 +535,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         },
         () => setUnreadCount((c) => c + 1),
       )
-      // A boost request being decided, reversed or filed (0062). A student has
-      // NO select on `grade_scores`, so a typed mark is invisible to realtime —
-      // marks refresh on open, on a return after two minutes away, and on
-      // pull-to-refresh. A request's status, though, lives on `point_redemptions`
-      // (already published, and readable by its owner), and a decision changes
-      // the column's state, so that is the one event worth re-reading for.
       .on(
         'postgres_changes',
         {
@@ -759,9 +545,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         },
         () => void loadGrades(),
       )
-      // Catches instructor-granted achievements live (self-triggered unlocks
-      // already celebrate synchronously from syncAchievements' own return
-      // value — `celebrate()` dedupes so this never double-fires for those).
       .on(
         'postgres_changes',
         {
@@ -780,8 +563,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       .subscribe((status) => {
         setLive(status === 'SUBSCRIBED')
         if (status === 'SUBSCRIBED') {
-          // A *second* SUBSCRIBED means we reconnected — postgres_changes does
-          // not replay missed rows, so resync to catch awards earned while away.
           if (subscribedOnceRef.current) void loadRef.current()
           subscribedOnceRef.current = true
         }
@@ -805,26 +586,11 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     loadGrades,
   ])
 
-  /**
-   * Re-read attendance whenever one of this student's records changes.
-   *
-   * `attendanceTick` already fires on the durable channel for exactly this —
-   * an instructor correcting a wrong 'absent' now reaches the Dashboard teaser
-   * and the stats screen live, not just the Attendance tab.
-   */
   useEffect(() => {
     if (!studentId || attendanceTick === 0) return
     void loadAttendance(studentId)
   }, [studentId, attendanceTick, loadAttendance])
 
-  /**
-   * Keep the banner's "already checked in" state honest.
-   *
-   * Re-runs on `attendanceTick` because the student's own scan is what flips
-   * this, and a scan arrives as an attendance_records change on the durable
-   * channel above — so the banner switches from "Scan now" to "You're in"
-   * without anyone navigating anywhere.
-   */
   const liveSessionId = liveSession?.id
   useEffect(() => {
     if (!liveSessionId || !studentId) {
@@ -842,14 +608,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     }
   }, [liveSessionId, studentId, attendanceTick])
 
-  /**
-   * Returning to the tab: refetch only after a REAL absence.
-   *
-   * Realtime keeps this data current while the tab is merely backgrounded, so
-   * refetching on every visibility flip meant nine queries and a full re-render
-   * every time a student glanced at another app and came back. Browsers only
-   * suspend the socket after a while, so a short trip away needs nothing.
-   */
   useEffect(() => {
     const hiddenSince = { at: 0 }
     const onVisible = () => {
@@ -865,9 +623,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
-  // Offline attendance queue: flush on app start (once signed in) and whenever
-  // the network returns. This single durable mount owns those triggers; the
-  // Attendance page also flushes on its own mount for immediate feedback.
   useEffect(() => {
     if (!studentId) return
     void syncOfflineScans()
@@ -880,8 +635,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     ? leaderboard.find((e) => e.student_id === me.id)?.rank ?? null
     : null
 
-  // Guarded on `sections.length > 0`: mid-load the list is empty, and without
-  // the guard every student would flash "this semester has ended" on open.
   const semesterEnded =
     !!me && sections.length > 0 && !sections.some((s) => s.id === me.section_id)
 
@@ -950,13 +703,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     }
   }, [me])
 
-  /**
-   * Set the profile cover image (0039).
-   *
-   * Same 5 MB ceiling as the avatar and the showcase photos — deliberately the
-   * SAME constant, not a second number: the storage bucket also caps at 5 MB
-   * server-side, so a different client limit would only ever disagree with it.
-   */
   const saveHeader = useCallback(
     async (file: File) => {
       if (!me || !user) return { error: 'Still loading — try again in a moment.' }
@@ -974,11 +720,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     [me, user, MAX_AVATAR_BYTES],
   )
 
-  /**
-   * Save where the cover sits (0040). OPTIMISTIC: the drag already moved the
-   * image under the finger, so waiting on the server would only make it jump
-   * back and then forward again. Reverts on failure.
-   */
   const saveHeaderPos = useCallback(
     async (pos: number) => {
       if (!me) return { error: 'Still loading — try again in a moment.' }
@@ -1045,13 +786,8 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   const clearLevelUp = useCallback(() => setLevelUp(null), [])
   const clearAwayRecap = useCallback(() => setAwayEvents([]), [])
-  // The event scan screen flips this the moment a check-in succeeds, so the
-  // banner switches to "You're in" without waiting on a refetch (event_attendance
-  // isn't in realtime — see the migration).
   const noteEventCheckedIn = useCallback(() => setLiveEventChecked(true), [])
 
-  // "New badge" nudge: any unlocked achievement whose code the student hasn't
-  // viewed in the trophy case yet. `achSeenBump` forces a recompute after marking.
   const [achSeenBump, setAchSeenBump] = useState(0)
   const hasUnseenAchievements = useMemo(() => {
     if (!me) return false
@@ -1076,8 +812,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     setAchSeenBump((v) => v + 1)
   }, [me, achievements])
 
-  /** Exposed for other student pages (e.g. after scanning attendance, or
-   * after viewing a classmate's profile) to opportunistically re-check. */
   const syncMyAchievements = useCallback(async () => {
     if (!me) return
     await runAchievementSync(me.id)
@@ -1111,14 +845,12 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     [me],
   )
 
-  // Celebrate the queued achievements one at a time — dismissing pops the
-  // front of the queue rather than clearing everything at once.
   const unlockedAchievement = unlockQueue[0] ?? null
   const clearUnlockedAchievement = useCallback(() => setUnlockQueue((q) => q.slice(1)), [])
 
   /** Bell sheet opened — everything up to now counts as read. */
   const markAllRead = useCallback(async () => {
-    setUnreadCount(0) // optimistic; a failure just re-counts on the next load
+    setUnreadCount(0)
     try {
       await markNotificationsRead()
     } catch {
@@ -1126,12 +858,6 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  /**
-   * Memoized: without this the provider handed every consumer a NEW object on
-   * every render, so a single realtime point event re-rendered every student
-   * screen — and this provider holds a dozen pieces of state, several of them
-   * updated by subscriptions.
-   */
   const value = useMemo<StudentDataValue>(
     () => ({
       loading,
@@ -1203,12 +929,6 @@ export function useStudentData(): StudentDataValue {
   return ctx
 }
 
-/**
- * Like {@link useStudentData}, but returns `undefined` instead of throwing when
- * rendered outside a `StudentDataProvider`. For components shared across both the
- * student and instructor areas — e.g. the profile-preview sheet, which the
- * instructor's Rank tab reuses with no student context around it.
- */
 export function useStudentDataOptional(): StudentDataValue | undefined {
   return useContext(StudentDataContext)
 }

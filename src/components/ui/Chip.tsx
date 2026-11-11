@@ -2,18 +2,6 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { TONE, type ToneName } from '@/lib/tone'
 
-/**
- * A small status pill.
- *
- * The visual recipe (`rounded-full px-2.5 py-1 text-xs font-semibold` plus a
- * tinted background and matching foreground) was re-typed inline throughout the
- * app, and its colours were the same four-line table copied into four files —
- * see the note in lib/tone.ts.
- *
- * Colour comes from the ROLE, never from a caller-supplied class: that is what
- * keeps "rejected" and "an active nav item" from drifting back into the same
- * red. Pass `tone`, not `className="bg-…"`.
- */
 export function Chip({
   tone = 'neutral',
   size = 'md',
@@ -23,7 +11,6 @@ export function Chip({
 }: {
   tone?: ToneName
   size?: 'sm' | 'md'
-  /** Leading dot in the role colour — for legends and dense status lists. */
   dot?: boolean
   children: ReactNode
   className?: string

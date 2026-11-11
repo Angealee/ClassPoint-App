@@ -28,16 +28,11 @@ import {
 import { useInstructor } from './InstructorLayout'
 
 interface DraftCriterion {
-  /** Client-side only, so React keys survive a reorder. Never sent. */
   key: string
   label: string
   scale: PeerScaleOption[]
 }
 
-/**
- * One section's groups, fetched the first time that section is ticked. The
- * lib's shape widened to the full group, which the picker needs for names.
- */
 interface SectionGroups extends SectionGroupState {
   groups: PeerGroup[]
 }
@@ -48,23 +43,6 @@ function newCriterion(): DraftCriterion {
   return { key: `c${seq}`, label: '', scale: SCALE_PRESETS[0].scale }
 }
 
-/**
- * Create an evaluation.
- *
- * ── CREATE IS OPEN IS NOTIFY ───────────────────────────────────────────────
- * There is no draft state: criteria and sections arrive with the evaluation in
- * one RPC, so there is never a window where a student can open one and find it
- * empty. That also means creating it pushes a notification, and a push cannot
- * be recalled — hence the ConfirmDialog, and hence it names the sections rather
- * than saying "your students".
- *
- * ── EDITING IS DELIBERATELY NOT HERE ───────────────────────────────────────
- * `update_peer_evaluation` locks criteria and scope the moment anyone submits,
- * and the title/instructions/deadline that stay editable are edited from the
- * evaluation's own screen where the submission count is visible. A composer
- * that sometimes refuses half its own fields is a worse explanation of that
- * rule than the screen that shows why.
- */
 export function PeerComposer({
   open,
   template = null,
@@ -72,11 +50,6 @@ export function PeerComposer({
   onCreated,
 }: {
   open: boolean
-  /**
-   * Pre-fill from an existing evaluation (Duplicate). Nothing is created until
-   * Open is pressed, so there is no server-side draft to clean up if the
-   * instructor backs out.
-   */
   template?: PeerEvaluationTemplate | null
   onClose: () => void
   onCreated: (id: string) => void
@@ -94,49 +67,26 @@ export function PeerComposer({
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  /**
-   * Groups per ticked section, and the ones the instructor UNticked.
-   *
-   * The inverse set is deliberate. Groups appear pre-ticked (the instructor's
-   * call), so storing what was REMOVED means a section whose groups arrive a
-   * moment later is ticked by default with no effect to reconcile it — and
-   * "nothing unticked" is exactly the signal to send no group list at all.
-   */
   const [groupsBySection, setGroupsBySection] = useState<Record<string, SectionGroups>>({})
   const [unpicked, setUnpicked] = useState<Set<string>>(new Set())
   const requested = useRef<Set<string>>(new Set())
-  /**
-   * A duplicated evaluation's picked groups, applied to each section the FIRST
-   * time its groups load. Stored as ticked ids, converted into the composer's
-   * UNticked set against the real list — so a group archived since the
-   * original simply is not there, rather than being silently re-included.
-   */
   const templateGroups = useRef<Set<string>>(new Set())
   const templateApplied = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     if (!open) return
-    // Groups can change between opens (the Groups tab is one tap away), so a
-    // reopened composer fetches them fresh rather than trusting the last copy.
     requested.current = new Set()
     templateApplied.current = new Set()
     templateGroups.current = new Set(template?.groupIds ?? [])
     setGroupsBySection({})
     setUnpicked(new Set())
-    // The deadline is never copied: the original's is almost always past.
     setDeadline('')
 
     if (template) {
-      // A subject from a past semester is not offered this semester; leaving it
-      // blank asks for a real choice rather than filing under a dead subject.
       setSubjectId(subjects.some((s) => s.id === template.subjectId) ? template.subjectId : '')
-      // Room for the suffix inside the 80-character limit, so the copy never
-      // opens already over it.
       setTitle(`${template.title.slice(0, PEER_TITLE_MAX - 7)} (copy)`)
       setInstructions(template.instructions)
       setScope(template.scope)
-      // Sections that no longer take the subject are pruned by the eligibility
-      // effect below, exactly as if the instructor had changed subject.
       setPicked(new Set(template.sectionIds))
       setCriteria(
         template.criteria.length > 0
@@ -153,20 +103,11 @@ export function PeerComposer({
     }
   }, [open, subjects, template])
 
-  /**
-   * Only sections that actually take the chosen subject.
-   *
-   * The RPC refuses the others anyway, so offering them would be an error
-   * message where a shorter list would do.
-   */
   const eligible = useMemo(
     () => sections.filter((s) => (sectionSubjects[s.id] ?? []).includes(subjectId)),
     [sections, sectionSubjects, subjectId],
   )
 
-  // Picking a different subject can strip a section's eligibility, and a
-  // silently-still-ticked invisible section is how you send an evaluation to a
-  // class you did not mean to.
   useEffect(() => {
     setPicked((prev) => {
       const ok = new Set(eligible.map((s) => s.id))
@@ -196,8 +137,6 @@ export function PeerComposer({
       const groups = await getSectionGroups(sectionId)
       setGroupsBySection((prev) => ({ ...prev, [sectionId]: { status: 'ready', groups } }))
 
-      // Once per section, and only for a duplicate that was narrowed. An empty
-      // template list means "all groups", which needs nothing unticked.
       if (templateGroups.current.size > 0 && !templateApplied.current.has(sectionId)) {
         templateApplied.current.add(sectionId)
         const keep = templateGroups.current
@@ -212,9 +151,6 @@ export function PeerComposer({
     }
   }, [])
 
-  // Fetched lazily, the first time a section is ticked while scope is groups.
-  // A ref rather than state tracks what was asked for, so a tick that re-renders
-  // before the answer lands does not fire the same request twice.
   useEffect(() => {
     if (!open || scope !== 'group') return
     for (const id of picked) {
@@ -229,11 +165,6 @@ export function PeerComposer({
     [eligible, picked],
   )
 
-  /**
-   * What the evaluation will actually be aimed at. The rule lives in
-   * `lib/peer-audience.ts` and is pinned by its test, because getting it wrong
-   * sends an evaluation to the wrong students with nothing on screen to show it.
-   */
   const targets = useMemo(
     () =>
       resolveGroupTargets({
@@ -246,7 +177,6 @@ export function PeerComposer({
   )
   const groupError = targets.error
 
-  // The chosen groups as full objects, for the confirm dialog's wording.
   const chosenGroups = useMemo(() => {
     const ids = new Set(targets.groupIds ?? [])
     return pickedSectionIds.flatMap((id) =>
@@ -287,8 +217,6 @@ export function PeerComposer({
 
   const pickedNames = eligible.filter((s) => picked.has(s.id)).map((s) => s.name)
 
-  // Two sections can each have a "Team Alpha", so the section is named beside
-  // the group whenever more than one section is in play.
   const groupLabel = (g: PeerGroup) => {
     if (pickedSectionIds.length < 2) return g.name
     const owner = pickedSectionIds.find((id) =>
@@ -312,9 +240,6 @@ export function PeerComposer({
           label: c.label.trim(),
           scale: normalizeScale(c.scale),
         })),
-        // datetime-local gives a string with no zone. `new Date()` reads it in
-        // the device's zone, which is Manila for the one person using this
-        // screen, and toISOString then sends a real instant.
         closesAt: deadline ? new Date(deadline).toISOString() : null,
       })
       toast('Evaluation opened.', 'success')
@@ -330,11 +255,6 @@ export function PeerComposer({
 
   return (
     <>
-      {/* Full screen rather than a bottom sheet (the instructor's call): subject,
-          title, instructions, scope, sections with their groups, criteria with
-          their scales and a deadline is a long form, and a half-height sheet
-          made it a scroller inside a scroller. The screen variant draws no title,
-          so the heading lives in the content. */}
       <Sheet
         open={open}
         onClose={onClose}
@@ -518,16 +438,6 @@ export function PeerComposer({
   )
 }
 
-/**
- * The groups inside one ticked section (0052).
- *
- * Every group starts ticked, so leaving this alone aims the evaluation at the
- * whole section's teams exactly as before. Unticking narrows it, and the members
- * of an unticked group never see the evaluation at all (the instructor's call).
- *
- * The member count is shown because a group of one has nobody to rate: ticking
- * it reaches that student with a form that can only say so.
- */
 function GroupPicker({
   state,
   unpicked,
@@ -568,7 +478,6 @@ function GroupPicker({
     <div className="pb-2.5 pl-7.5">
       <div className="mb-1 flex items-center justify-between gap-3">
         <span className="text-xs text-muted">Groups taking part</span>
-        {/* The fast path for "just one team out of eight": clear, then tick it. */}
         <button
           type="button"
           onClick={() => onSetAll(!allTicked)}
@@ -603,13 +512,6 @@ function GroupPicker({
   )
 }
 
-/**
- * One criterion: a label, a preset picker, and the rows the preset filled in.
- *
- * The presets are not a separate concept — picking one just fills the editor,
- * and every row stays editable afterwards. So the database knows nothing about
- * presets and adding one costs a line in `peer-scale.ts`.
- */
 function CriterionEditor({
   criterion,
   canRemove,
@@ -623,9 +525,6 @@ function CriterionEditor({
 }) {
   const [custom, setCustom] = useState(false)
 
-  // Which preset, if any, this scale currently matches. Compared by value so a
-  // scale that was edited back to a preset's exact shape stops reading as
-  // custom.
   const presetKey = useMemo(() => {
     const found = SCALE_PRESETS.find(
       (p) => JSON.stringify(p.scale) === JSON.stringify(criterion.scale),
@@ -742,8 +641,6 @@ function CriterionEditor({
                 ...criterion,
                 scale: [
                   ...criterion.scale,
-                  // One above the current top, which is the only value that
-                  // cannot break the ascending rule the moment it appears.
                   {
                     value: (criterion.scale[criterion.scale.length - 1]?.value ?? 0) + 1,
                     label: '',

@@ -71,8 +71,6 @@ function FilterChip({
   )
 }
 
-/** The full "trophy case": every achievement, grouped by category, plus the
- * title-equip picker for whichever ones the student has unlocked. */
 export function Achievements() {
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -97,8 +95,6 @@ export function Achievements() {
     markAchievementsSeen()
   }, [markAchievementsSeen])
 
-  // Rarity is class-wide, so fetch it once for the whole page and share it
-  // across every detail sheet.
   useEffect(() => {
     getAchievementRarity().then(setRarity).catch(() => {})
   }, [])
@@ -135,8 +131,6 @@ export function Achievements() {
 
   return (
     <div className="space-y-4 pb-4">
-      {/* Back is history-aware: arriving from Home used to dump you on Profile,
-          a screen you had never visited. Profile stays the cold-start fallback. */}
       <PageHeader
         title="Achievements"
         subtitle={`${unlockedCount} / ${achievements.length} unlocked`}
@@ -180,7 +174,6 @@ export function Achievements() {
         </Card>
       )}
 
-      {/* Filters — narrow a 30-badge list by category and unlock status. */}
       {!achievementsLoading && achievements.length > 0 && (
         <div className="space-y-2">
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
@@ -206,9 +199,6 @@ export function Achievements() {
       {achievementsLoading ? (
         <Skeleton className="h-64 rounded-2xl" />
       ) : achievementsError ? (
-        /* Without this the failed load left an empty catalog, which hid the
-           filters above and then said "try a different filter" — with no
-           filters on screen and no way out but reloading the app. */
         <ErrorState
           onRetry={retryAchievements}
           detail="Nothing is lost — this is just the connection."

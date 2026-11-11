@@ -1,19 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-/**
- * The offline attendance queue — the only thing standing between a student with
- * no signal and a lost check-in.
- *
- * `submitOfflineScan` is mocked so the state machine can be driven directly:
- * server outcomes vs transport failures behave very differently, and only one
- * of them is allowed to keep the proof queued for a later retry.
- */
 const submitOfflineScan = vi.fn()
 vi.mock('@/lib/api', () => ({
   submitOfflineScan: (...args: unknown[]) => submitOfflineScan(...args),
 }))
 
-/** A minimal localStorage good enough for the module under test. */
 function installStorage() {
   const map = new Map<string, string>()
   vi.stubGlobal('localStorage', {
@@ -34,8 +25,6 @@ beforeEach(async () => {
     randomUUID: () => `id-${Math.random().toString(36).slice(2)}`,
   })
   submitOfflineScan.mockReset()
-  // Fresh module per test: the queue keeps module-level state (memory fallback,
-  // the `syncing` reentrancy guard) that must not leak between cases.
   vi.resetModules()
   mod = await import('./offline-scans')
 })
@@ -78,8 +67,6 @@ describe('enqueue', () => {
     mod.enqueue({ sessionId: 's1', windowIndex: 10, code: 'a' })
     submitOfflineScan.mockResolvedValue({ outcome: 'recorded', status: 'present', topic: null })
     await mod.syncOfflineScans()
-    // A second scan of the same class creates a NEW queued entry rather than
-    // reopening the resolved one.
     mod.enqueue({ sessionId: 's1', windowIndex: 12, code: 'b' })
     const queue = mod.loadQueue()
     expect(queue).toHaveLength(2)
@@ -132,8 +119,6 @@ describe('syncOfflineScans', () => {
   )
 
   it('KEEPS the proof queued when the network fails', async () => {
-    // The single most important behaviour here: a transport error must never
-    // discard a capture, or the student silently loses their attendance.
     mod.enqueue({ sessionId: 's1', windowIndex: 10, code: 'abc' })
     submitOfflineScan.mockRejectedValue(new Error('Failed to fetch'))
 
@@ -149,7 +134,6 @@ describe('syncOfflineScans', () => {
     submitOfflineScan.mockRejectedValue(new Error('offline'))
 
     await mod.syncOfflineScans()
-    // One attempt, then break — the device is offline, the rest would fail too.
     expect(submitOfflineScan).toHaveBeenCalledTimes(1)
     expect(mod.loadQueue().every((e) => e.state === 'queued')).toBe(true)
   })
@@ -173,7 +157,7 @@ describe('syncOfflineScans', () => {
   it('ignores an entry dismissed mid-flight', async () => {
     const entry = mod.enqueue({ sessionId: 's1', windowIndex: 10, code: 'abc' })
     submitOfflineScan.mockImplementation(async () => {
-      mod.dismiss(entry.id) // the student taps away while the request is open
+      mod.dismiss(entry.id)
       return { outcome: 'recorded', status: 'present', topic: null }
     })
     await mod.syncOfflineScans()

@@ -1,15 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { RedemptionKind, RewardCatalogItem } from '@/lib/types'
 
-/**
- * The rewards catalog (0032) — the instructor's price list.
- *
- * Writes go through plain instructor RLS rather than an RPC: there's no
- * cross-row invariant to protect here, unlike the redemption flow whose balance
- * checks genuinely need locking. A catalog tap only pre-fills
- * `request_point_redemption`, so that logic is untouched.
- */
-
 const COLS = 'id, label, points, kind, sort_order, archived_at'
 
 interface CatalogRow {
@@ -32,12 +23,6 @@ function mapItem(r: CatalogRow): RewardCatalogItem {
   }
 }
 
-/**
- * The live menu, cheapest first.
- *
- * Students only ever see unarchived rows (RLS enforces that too); pass
- * `includeArchived` from the instructor's manage screen to show retired items.
- */
 export async function listCatalogItems(includeArchived = false): Promise<RewardCatalogItem[]> {
   let query = supabase.from('reward_catalog_items').select(COLS)
   if (!includeArchived) query = query.is('archived_at', null)
@@ -57,7 +42,6 @@ export async function createCatalogItem(input: {
       label: input.label.trim(),
       points: input.points,
       kind: input.kind,
-      // New items sort after existing ones by price; the instructor can reorder.
       sort_order: input.points,
     })
     .select(COLS)
@@ -81,10 +65,6 @@ export async function updateCatalogItem(
   if (error) throw error
 }
 
-/**
- * Retire (or un-retire) an item. Never a hard delete: students' past
- * redemptions were requested against this label and should keep making sense.
- */
 export async function setCatalogItemArchived(id: string, archived: boolean): Promise<void> {
   const { error } = await supabase
     .from('reward_catalog_items')

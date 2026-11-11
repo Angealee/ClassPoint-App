@@ -7,15 +7,6 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   error?: string
 }
 
-/**
- * Multi-line text input. Mirrors `Input`'s API exactly (label / hint / error,
- * generated id, `aria-invalid`) so the two are interchangeable in a form.
- *
- * There was no primitive for this: all three textareas in the app hand-rolled
- * their own border, focus ring and error handling, and two of them were on
- * `text-sm` — 14px, which makes iOS Safari zoom the viewport on focus and never
- * zoom back. `text-base` here is that fix, structurally.
- */
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
   { label, hint, error, className, id, rows = 3, ...props },
   ref,

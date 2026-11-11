@@ -2,18 +2,6 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { tap } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
-/**
- * The scarce reaction. Three at a time, and un-giving one refunds it.
- *
- * A drawn letter rather than an icon: the reaction is called "a W", so the
- * glyph IS the word and there is nothing to decode. Gold when given, because
- * gold is already this app's colour for good things — points, XP, badges — and
- * a second "good" colour would dilute it.
- *
- * The count sits outside the tinted pill so a post at 0 does not render an
- * empty-looking badge, and `tabular-nums` keeps the button from reflowing as
- * the number changes under a spring.
- */
 export function WButton({
   count,
   given,
@@ -44,8 +32,6 @@ export function WButton({
       )}
     >
       <motion.span
-        // Springs once per state flip, so giving a W feels like an action
-        // rather than a checkbox. Keyed on `given` so it replays both ways.
         key={String(given)}
         initial={reduce ? false : { scale: 0.6 }}
         animate={{ scale: 1 }}

@@ -1,11 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { cn } from '@/lib/cn'
 
-/**
- * Renders a QR code onto a canvas. The `qrcode` library is heavy-ish, so it's
- * dynamically imported (its own chunk) and only loaded when a QR is actually
- * shown. Always drawn dark-on-white for reliable scanning in either theme.
- */
 export function QrCode({
   value,
   size = 240,

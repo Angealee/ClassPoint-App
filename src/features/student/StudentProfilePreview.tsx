@@ -17,7 +17,6 @@ import { cn } from '@/lib/cn'
 import type { AchievementState, PublicProfile } from '@/lib/types'
 import { useStudentDataOptional } from './StudentData'
 
-/** The minimum a caller already knows so the header renders instantly. */
 export interface PreviewTarget {
   student_id: string
   display_name: string
@@ -36,22 +35,12 @@ interface Props {
   sectionLabel: string
 }
 
-/**
- * Tap-to-open preview of any classmate's public profile, launched from a
- * leaderboard row. The header (name, avatar, points, rank) shows immediately
- * from data the leaderboard already has; the bio, interests, "member since",
- * and recent point history are loaded lazily from `getPublicProfile`.
- */
 export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabel }: Props) {
-  // Optional: this sheet is shared with the instructor's Rank tab, which has no
-  // StudentDataProvider around it. Fall back gracefully when the context is absent.
   const studentCtx = useStudentDataOptional()
   const syncMyAchievements = studentCtx?.syncMyAchievements
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
-  // Achievement catalog for rendering the viewed student's pinned badges. From
-  // student context when available; otherwise fetched directly (instructor view).
   const [fallbackCatalog, setFallbackCatalog] = useState<AchievementState[]>([])
   const catalog = studentCtx?.achievements ?? fallbackCatalog
 
@@ -71,8 +60,6 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
     }
   }, [open, studentId])
 
-  // No student context (instructor view) → load the static catalog once so the
-  // viewed student's pinned badges still render.
   useEffect(() => {
     if (studentCtx || !open) return
     let active = true
@@ -84,8 +71,6 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
     }
   }, [studentCtx, open])
 
-  // Count a profile view — but never your own (the RPC also guards this) — then
-  // re-check the viewer's own achievements (only meaningful in student context).
   useEffect(() => {
     if (!open || !studentId || isMe) return
     void recordProfileView(studentId)
@@ -93,7 +78,6 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
       .catch(() => {})
   }, [open, studentId, isMe, syncMyAchievements])
 
-  // Prefer the live total once loaded (more current than the frozen snapshot).
   const points = profile?.semester_points ?? target?.points ?? 0
   const progress = getLevelProgress(points)
   const tags = parseInterests(profile?.interests)
@@ -102,50 +86,15 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
     <Sheet open={open} onClose={onClose}>
       {target && (
         <div className="space-y-4">
-          {/*
-            Cover image (0039), INSET rather than bled to the sheet's edges.
-
-            The first version cancelled the scroll area's `px-5` with `-mx-5`,
-            and that is what was cutting things off in the preview: the Sheet's
-            body is `overflow-y-auto`, and per spec when one overflow axis is
-            not `visible` the other computes to `auto` — so the bleed pushed
-            content outside a scroller that then clipped it, taking the avatar's
-            ring and the right-hand edge with it. A rounded inset cover needs no
-            bleed and so cannot clip.
-
-            Read-only here, and it honours the focal point its owner chose on
-            their own Profile (0040). Same component on both screens, so the
-            cover cannot end up framed differently depending on who is looking.
-          */}
           <div className="relative">
             <CoverPhoto
               url={profile?.header_url ?? null}
               pos={profile?.header_pos ?? 50}
               className="h-28 rounded-2xl"
             />
-            {/* Scrim so the avatar and name stay readable over any photo. */}
             <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-t from-canvas/85 via-canvas/25 to-transparent" />
           </div>
 
-          {/*
-            Header. The rank USED to sit detached at the top-right — where it
-            was the first thing to be cut off on a narrow phone, and where it
-            duplicated the Rank stat tile a few lines below. Removing it fixes
-            the crop and the duplication at once; the tile is the one that
-            stays, because it sits with the other two figures it belongs with.
-          */}
-          {/*
-            Same structure as Profile's identity block, and for the same
-            reasons: the avatar is ABSOLUTELY positioned so its overlap doesn't
-            depend on the text's height, and the text is indented past it so it
-            can never sit inside the cover's box — where a `relative` cover
-            paints over a static sibling.
-
-            `left-5` (20px) is measured against this cover's own `rounded-2xl`
-            radius (16px), so the avatar clears the corner curve rather than
-            squaring it off. Profile's cover is square-cornered and needs no
-            such inset — which is exactly why the number is not shared.
-          */}
           <div className="relative z-[1] pt-3">
             <div className="absolute -top-9 left-5 z-[1]">
               <Avatar
@@ -165,9 +114,6 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
                   {profile.display_title}
                 </p>
               )}
-              {/* Joined rather than interpolated: a caller that has no section
-                  name to give (the chat, where a Global room spans sections)
-                  would otherwise render a stranded "· Level 3". */}
               <p className="truncate text-sm text-muted">
                 {[sectionLabel, `Level ${progress.level}`].filter(Boolean).join(' · ')}
               </p>
@@ -176,9 +122,6 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
 
           {/* Level / XP */}
           <div>
-            {/* `min-w-0` + `truncate` on the LEFT and `shrink-0` on the right:
-                without them the right-hand figure was the one that got cut, and
-                "62 to n…" is the half a student actually wants. */}
             <div className="mb-1.5 flex items-center justify-between gap-3 text-xs text-muted">
               <span className="min-w-0 truncate">
                 {progress.expIntoLevel} / {progress.expForLevel} XP
@@ -301,13 +244,6 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
   )
 }
 
-/**
- * An icon tile wrapping the shared Stat.
- *
- * The tile shell (surface, icon chip) is this screen's own; the figure and its
- * label come from the primitive. `tone` is now a role: gold for the reward
- * figures, accent for level and rank — identity, not a warning.
- */
 function StatTile({
   icon,
   label,
@@ -320,10 +256,6 @@ function StatTile({
   tone: 'reward' | 'accent'
 }) {
   return (
-    // `min-w-0` is the fix for the crop in the bug report: a grid item defaults
-    // to `min-width: auto`, so it refuses to shrink below its content and a wide
-    // figure pushes the whole three-up row out of the sheet instead of the row
-    // adapting. With it, the tiles narrow and the numbers stay inside.
     <div className="min-w-0 rounded-xl bg-card-2 p-3">
       <div
         className={cn(

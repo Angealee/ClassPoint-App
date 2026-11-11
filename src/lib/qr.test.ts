@@ -9,19 +9,6 @@ import {
   secondsUntilRotate,
 } from './qr'
 
-/**
- * The attendance QR is the app's one piece of real cryptography, and it has to
- * agree byte-for-byte with `scan_attendance` in migration 0014. These tests pin
- * the format and the parser's tolerance for what a camera actually hands us.
- *
- * CROSS-CHECKING THE HMAC AGAINST POSTGRES (do this once after any change to
- * computeCode, and after 0014 is ever re-derived):
- *
- *   select substr(
- *     encode(hmac('session-abc.12345', 'test-secret', 'sha256'), 'hex'), 1, 16);
- *
- * must equal the value asserted in "matches the documented SQL derivation".
- */
 describe('computeCode', () => {
   it('is deterministic for the same secret, session and window', async () => {
     const a = await computeCode('test-secret', 'session-abc', 12345)
@@ -53,21 +40,12 @@ describe('computeCode', () => {
   })
 
   it('matches the documented SQL derivation (regression pin)', async () => {
-    // Verified against Node's crypto with the same inputs, which is the same
-    // HMAC-SHA256 Postgres computes:
-    //   createHmac('sha256','test-secret').update('session-abc.12345')
-    //     .digest('hex').slice(0,16)  →  921a4f81e804a748
-    //
-    // If this ever fails, the browser's WebCrypto derivation has diverged from
-    // the server's and EVERY scan will be rejected. Re-run the psql snippet in
-    // this file's header before "fixing" the expectation.
     const code = await computeCode('test-secret', 'session-abc', 12345)
     expect(code).toBe('921a4f81e804a748')
   })
 })
 
 describe('currentWindow / secondsUntilRotate', () => {
-  // Exactly divisible by the 15s step, so it sits on a window boundary.
   const BOUNDARY = 1_700_000_010_000
 
   it('ticks once per QR_STEP_SECONDS', () => {
@@ -80,7 +58,6 @@ describe('currentWindow / secondsUntilRotate', () => {
     const stepMs = QR_STEP_SECONDS * 1000
     expect(secondsUntilRotate(BOUNDARY)).toBe(QR_STEP_SECONDS)
     expect(secondsUntilRotate(BOUNDARY + 1000)).toBe(QR_STEP_SECONDS - 1)
-    // One millisecond before rotating still reads as a full second remaining.
     expect(secondsUntilRotate(BOUNDARY + stepMs - 1)).toBe(1)
   })
 })
@@ -106,8 +83,6 @@ describe('parsePayload', () => {
   })
 
   it('survives an origin that itself contains a #', () => {
-    // lastIndexOf('#') is load-bearing here: the CORE must win over any earlier
-    // fragment in the URL.
     expect(parsePayload(`https://example.com/#/scan#${core}`)).not.toBeNull()
   })
 
@@ -134,9 +109,6 @@ describe('parsePayload', () => {
   })
 
   it('accepts exponent notation as a finite window (documents current behaviour)', () => {
-    // Number('1e5') === 100000, which IS finite, so this parses. The server
-    // re-derives the HMAC for that window and rejects it, so this is harmless —
-    // pinned here so a future tightening is a deliberate choice, not a surprise.
     expect(parsePayload('CP1|session|1e5|code')?.windowIndex).toBe(100000)
   })
 })

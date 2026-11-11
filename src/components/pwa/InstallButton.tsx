@@ -8,14 +8,6 @@ import { cn } from '@/lib/cn'
 
 type Guide = 'ios' | 'inapp' | 'unavailable'
 
-/**
- * "Install app" button that adapts to every situation so nobody hits a dead end:
- *  - installable → fires the native prompt
- *  - installed   → "Installed ✓"
- *  - ios         → Add-to-Home-Screen steps
- *  - inapp       → "open in your real browser first" steps (Messenger/FB/IG…)
- *  - unavailable → generic install-via-browser guidance
- */
 export function InstallButton({ className }: { className?: string }) {
   const { state, isIos, promptInstall } = usePwaInstall()
   const { toast } = useToast()

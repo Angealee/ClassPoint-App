@@ -13,21 +13,6 @@ import { DEFAULT_WEIGHTS, displayGrade, policyError, sumsToOne } from '@/lib/gra
 import { errorText } from '@/lib/errors'
 import type { GradePolicy, GradeSumsRow, Subject, TermKey } from '@/lib/types'
 
-/**
- * The weights for one subject, across all three terms.
- *
- * ⚠ THIS IS SUBJECT-WIDE, NOT SECTION-WIDE, and that is why it opens from the
- * Grades landing rather than from a grade sheet. A sheet is scoped to one
- * section, and editing weights from inside it would strongly imply the change
- * applied to that section alone — it applies to every section taking the
- * subject. The confirm says so in as many words, with the real count.
- *
- * Weights are typed as PERCENTAGES and stored as proportions. The two-field
- * splits balance themselves, so they cannot be made invalid; the three-field
- * ones show a running total and refuse to save until it reads 100%, because
- * auto-balancing three fields means guessing which of the other two was meant.
- */
-
 const TERMS: TermKey[] = ['prelim', 'midterm', 'finals']
 const TERM_LABEL: Record<TermKey, string> = {
   prelim: 'Prelim',
@@ -85,7 +70,6 @@ interface WeightsPanelProps {
   onDone: () => void
   subject: Subject
   policies: GradePolicy[]
-  /** Every section taking this subject — what the change actually reaches. */
   sectionIds: string[]
   onSaved: () => void
 }
@@ -104,8 +88,6 @@ export function WeightsPanel({
   const [busy, setBusy] = useState(false)
   const [impact, setImpact] = useState<GradeImpact | null>(null)
 
-  // Mount IS open now (the host renders this panel only while its tab is
-  // active), so there is nothing to gate on.
   useEffect(() => {
     const next: Record<string, Draft> = {}
     for (const p of policies) next[p.term] = toDraft(p)
@@ -121,7 +103,6 @@ export function WeightsPanel({
     setDrafts((d) => ({ ...d, [term]: { ...d[term], ...next } }))
   }
 
-  /** The two-field split balances itself — it can never be made invalid. */
   function setPair(which: 'cs' | 'exam', value: string) {
     const n = num(value)
     const other = Number.isFinite(n) ? String(Math.round((100 - n) * 100) / 100) : ''
@@ -174,15 +155,6 @@ export function WeightsPanel({
     [next, policies],
   )
 
-  /**
-   * Work out what this would do BEFORE writing it.
-   *
-   * Reads every section taking the subject, because that is the real blast
-   * radius and the instructor is looking at one subject card with no section on
-   * screen. The diff itself is `computeImpact`, which runs the same functions
-   * that produce the grades — a preview computed another way would be a second
-   * opinion about the thing it is previewing.
-   */
   async function preview() {
     if (problem) {
       toast(problem, 'error')
@@ -205,8 +177,6 @@ export function WeightsPanel({
   async function save() {
     setBusy(true)
     try {
-      // One transaction for all three terms: a failure partway used to leave
-      // the shares off 100%, which made every grade for the subject vanish.
       await saveGradePolicies(subject.id, next)
       setImpact(null)
       onSaved()
@@ -366,9 +336,6 @@ export function WeightsPanel({
         detail={impact ? <ImpactDetail impact={impact} /> : undefined}
         confirmLabel="Save weights"
         busy={busy}
-        // A transmutation edit is the one change that moves every grade the
-        // subject has ever produced, so it gets the typed-name challenge the
-        // other destructive actions in this app use.
         challengeText={transmuteChanged ? subject.code : undefined}
         onConfirm={() => void save()}
         onClose={() => setImpact(null)}

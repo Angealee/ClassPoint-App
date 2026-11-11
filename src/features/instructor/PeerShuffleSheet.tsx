@@ -18,27 +18,6 @@ import { PEER_MIN_RATERS_FOR_COMMENTS, type PeerGroup, type RosterPerson } from 
 
 const DEFAULT_SIZE = 4
 
-/**
- * Shuffle a section into random groups (0054).
- *
- * ── PREVIEW, THEN SAVE EXACTLY THAT ────────────────────────────────────────
- * The groups are drawn here, on screen, and can be redrawn as often as the
- * instructor likes. Save sends that exact plan to `apply_peer_group_plan`,
- * which writes it in one transaction — a server-side draw would save a
- * different random result from the one previewed.
- *
- * ── UNASSIGNED ONLY BY DEFAULT (the instructor's call) ─────────────────────
- * With the switch off, only students on no team are shuffled and every existing
- * group is untouched, so saving needs no confirmation. Turning it on reshuffles
- * the whole section, archives the current groups, and goes through a
- * ConfirmDialog, because that is the destructive version.
- *
- * ── GROUPS BELOW FOUR LOSE THEIR COMMENTS ─────────────────────────────────
- * In a group of N each student is rated by N − 1 classmates, and comments are
- * withheld below three raters. So a group of 3 is already under the line, not
- * only a pair. The preview says so whenever any planned group is that small,
- * rather than letting the instructor find out at release.
- */
 export function PeerShuffleSheet({
   open,
   sectionId,
@@ -66,8 +45,6 @@ export function PeerShuffleSheet({
   const [busy, setBusy] = useState(false)
 
   const byId = useMemo(() => new Map(roster.map((p) => [p.id, p])), [roster])
-  // Replace mode archives every live group first, so none of their names are
-  // taken any more and numbering can start again at Group 1.
   const pool = replace ? roster : unassigned
   const existingNames = useMemo(() => (replace ? [] : groups.map((g) => g.name)), [replace, groups])
 
@@ -75,7 +52,6 @@ export function PeerShuffleSheet({
     setPlan(buildGroupPlan(pool.map((p) => p.id), size, existingNames))
   }
 
-  // A fresh open starts from the defaults; a changed size or mode redraws.
   useEffect(() => {
     if (!open) return
     setSize(DEFAULT_SIZE)
@@ -86,7 +62,6 @@ export function PeerShuffleSheet({
   useEffect(() => {
     if (!open) return
     setPlan(buildGroupPlan(pool.map((p) => p.id), size, existingNames))
-    // `pool` is derived from roster/unassigned/replace, all listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, size, replace, roster, unassigned, existingNames])
 
@@ -102,8 +77,6 @@ export function PeerShuffleSheet({
       setConfirm(false)
       onSaved()
     } catch (e) {
-      // Every refusal from the RPC says "Nothing was changed", and it is true:
-      // the function rolls back as a whole.
       toast(errorText(e, "Couldn't save those groups."), 'error')
       setConfirm(false)
     } finally {

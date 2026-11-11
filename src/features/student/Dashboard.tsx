@@ -86,9 +86,6 @@ export function Dashboard() {
     )
   }
 
-  // Points needed to pass the student ranked directly above. Null when we can't
-  // tell (unranked, already first, or the board hasn't settled yet) — in which
-  // case NextMilestone falls back to the level, which is always knowable.
   const above = rank && rank > 1 ? leaderboard.find((e) => e.rank === rank - 1) : undefined
   const pointsToOvertake = above ? Math.max(1, above.points - me.semester_points + 1) : null
 
@@ -104,15 +101,10 @@ export function Dashboard() {
           <LiveBadge live={live} />
         </motion.div>
 
-        {/* Conditional alerts. Both render nothing when they don't apply, so they
-            cost no space on an ordinary day — and Home previously had no
-            live-class signal at all, only a realtime-connection pill. */}
         <SemesterEndedBanner />
-        {/* A global event outranks a class banner — it's rare and time-boxed. */}
         <EventStartingBanner />
         <LiveClassBanner onScan={() => navigate('/app/attendance?scan=1')} />
 
-        {/* The scoreboard: level, points, XP, rank and streak as ONE object. */}
         <motion.div variants={item}>
           <HomeHero
             points={me.semester_points}
@@ -134,21 +126,16 @@ export function Dashboard() {
           />
         </motion.div>
 
-        {/* Renders nothing while the instructor has grades switched off, while
-            nothing is marked, or if the fetch failed — so an ordinary day
-            before grades open costs no space and shows no error. */}
         <GradesCard
           grades={grades}
           boostEnabled={!semesterEnded}
           onOpen={() => navigate('/app/grades')}
         />
 
-        {/* The only home-screen entry point to /app/points. */}
         <motion.div variants={item}>
           <UsePointsTeaser balance={me.semester_points} onOpen={() => navigate('/app/points')} />
         </motion.div>
 
-        {/* The only home-screen entry point to the trophy case. */}
         {achievements.length > 0 && (
           <motion.div variants={item}>
             <AchievementsTeaser
@@ -159,9 +146,6 @@ export function Dashboard() {
           </motion.div>
         )}
 
-        {/* Recent points. FLAT, not grouped by day: across five rows the
-            Today/Yesterday headers cost a line each and say less than the
-            per-row relative time already does. */}
         <motion.div variants={item}>
           <SectionLabel
             action={
@@ -202,12 +186,6 @@ export function Dashboard() {
   )
 }
 
-/**
- * Show-up rate at a glance, linking to the full stats screen.
- *
- * Reads `attendance` off StudentData, which already loads it off the critical
- * path — this card fires no query of its own.
- */
 function AttendanceCard({
   attendance,
   onOpen,
@@ -240,22 +218,8 @@ function AttendanceCard({
   )
 }
 
-/** Subjects shown on the card; the rest are one tap away on the Grades screen. */
 const GRADES_CARD_ROWS = 2
 
-/**
- * Home-screen glance at grades: the LATEST "so far" figure per subject.
- *
- * It is a figure, not a link row — the instructor's call (2026-11-09), so a
- * student sees where they stand without opening anything. The word "so far" is
- * on every line for the reason the Grades screen spells out in full: it is the
- * same number the instructor's sheet shows under its So-far toggle, and it moves
- * as marks come in.
- *
- * Reads `grades` off StudentData and fires no query of its own. Renders NOTHING
- * (not an error, not a placeholder) when grades are off, loading, failed or
- * empty — the Grades screen is where those states get explained.
- */
 function GradesCard({
   grades,
   boostEnabled,
@@ -265,8 +229,6 @@ function GradesCard({
   boostEnabled: boolean
   onOpen: () => void
 }) {
-  // The card IS a grade figure, so it waits for the instructor to open grades (0065:
-  // scores and points on the Grades screen do not).
   if (!grades?.enabled || !grades.figures) return null
 
   const rows: Array<{ subject: MyGradeSubject; latest: TermSummary }> = []
@@ -328,7 +290,6 @@ function GradesCard({
   )
 }
 
-/** Home-screen entry point to the trophy case: a few badges + unlock count. */
 function AchievementsTeaser({
   achievements,
   hasUnseen,
@@ -339,7 +300,6 @@ function AchievementsTeaser({
   onOpen: () => void
 }) {
   const unlocked = achievements.filter((a) => a.unlockedAt)
-  // Newest unlocked first; fall back to the first few locked ones to entice.
   const showcase = (
     unlocked.length
       ? [...unlocked].sort((a, b) => (b.unlockedAt ?? '').localeCompare(a.unlockedAt ?? ''))
@@ -389,10 +349,6 @@ function AchievementsTeaser({
   )
 }
 
-/**
- * Home-screen entry to Use Points. Deliberately a card and not a 5th bottom
- * tab — four is the comfortable limit on a phone.
- */
 function UsePointsTeaser({ balance, onOpen }: { balance: number; onOpen: () => void }) {
   return (
     <button type="button" onClick={onOpen} className="block w-full text-left">
@@ -446,12 +402,6 @@ function LiveBadge({ live }: { live: boolean }) {
   )
 }
 
-/**
- * Mirrors the real stack above: greeting, hero, milestone line, two teaser
- * cards, feed. Built from the Skeleton primitive rather than a bare
- * `animate-pulse` wrapper so it sweeps like every other loading state in the
- * app instead of blinking on its own schedule.
- */
 function DashboardSkeleton() {
   return (
     <div className="space-y-5">

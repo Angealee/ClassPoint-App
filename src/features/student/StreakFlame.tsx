@@ -2,30 +2,10 @@ import { FlameIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { useStudentData } from './StudentData'
 
-/**
- * The attendance streak, made permanently visible.
- *
- * Uses `present_streak` (0036): classes in a row marked PRESENT. A late resets
- * it, and so does an absence. That is deliberately stricter than the `streak`
- * metric behind the badges, which only breaks on an absence — the badge one has
- * to be forgiving because it's a permanent award, while this one is a live
- * "how am I doing right now?" number and should mean exactly what it says.
- *
- * excused/irregular are neutral in both: a legitimate excuse never breaks a run.
- *
- * ZERO IS SHOWN, not hidden. The first version returned null below 1, which
- * meant the flame vanished for precisely the students who most needed a nudge —
- * you could only see it once you were already doing well. An unlit flame with
- * an invitation is more useful than nothing.
- *
- * @param variant `compact` for a header row, `full` for a standalone card.
- */
 export function StreakFlame({ variant = 'full' }: { variant?: 'compact' | 'full' }) {
   const { achievementProgress } = useStudentData()
   const streak = achievementProgress?.present_streak ?? null
 
-  // Null means the metric hasn't loaded yet (or the database is behind the
-  // client) — that's the one case where rendering nothing is right.
   if (streak === null) return null
 
   const lit = streak >= 1
@@ -90,14 +70,6 @@ export function StreakFlame({ variant = 'full' }: { variant?: 'compact' | 'full'
   )
 }
 
-/**
- * The flame itself.
- *
- * An SVG rather than a 🔥 emoji: the emoji renders differently on every
- * platform, cannot take the surrounding text colour, and sat awkwardly on the
- * text baseline. This one inherits `currentColor` and flickers via a CSS
- * keyframe (see `.cp-flame` in index.css), which reduced-motion switches off.
- */
 function Flame({ hot, lit, className }: { hot: boolean; lit: boolean; className?: string }) {
   return (
     <FlameIcon
@@ -105,7 +77,6 @@ function Flame({ hot, lit, className }: { hot: boolean; lit: boolean; className?
       className={cn(
         className,
         !lit && 'opacity-30',
-        // Only a hot streak moves — a flicker on "1 in a row" is noise.
         hot && 'cp-flame',
       )}
     />

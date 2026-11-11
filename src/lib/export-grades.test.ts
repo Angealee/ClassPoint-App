@@ -3,21 +3,6 @@ import { buildOverallSheet, buildTermSheet } from './export-grades'
 import { cellKey, defaultPolicy } from './grading'
 import type { GradeItem, GradePolicy, GradeSumsRow, RosterPerson, TermKey, TermSums } from './types'
 
-/**
- * Pins the two rules the exported workbook has to obey.
- *
- * **An unmarked cell is BLANK, never 0.** A spreadsheet 0 gets averaged as one,
- * so writing zeros would turn "not marked yet" into a real mark the instant
- * anyone put `=AVERAGE()` under the column — and the whole blank-versus-zero
- * distinction this feature rests on would be destroyed on the way out of the
- * app. Same rule `export-peer.ts` follows for an unrated student.
- *
- * **Computed figures go out UNROUNDED.** The app shows two decimals, but a
- * spreadsheet is where people re-check arithmetic; rounding on the way out
- * means a hand-recomputed total disagrees with the column beside it. Excel can
- * format what it is given and cannot recover precision thrown away.
- */
-
 const policy = defaultPolicy('sub', 'finals')
 
 const students: RosterPerson[] = [
@@ -44,7 +29,6 @@ describe('buildTermSheet', () => {
   const items = [item('q1', 'Quiz 1', 20), item('q2', 'Quiz 2', 20)]
 
   it('writes an unmarked cell as BLANK, not zero', () => {
-    // Ana sat Quiz 1 and scored nothing; Quiz 2 has not been marked for her.
     const scores = new Map([[cellKey('q1', 's1'), 0]])
     const rows = buildTermSheet(students, items, scores, policy)
     const ana = rows[2]
@@ -61,16 +45,12 @@ describe('buildTermSheet', () => {
   })
 
   it('leaves archived columns out entirely', () => {
-    // An archived item is out of the denominator, so it must not appear as a
-    // column either — a header with no bearing on the grade beside it.
     const withArchived = [...items, item('q3', 'Quiz 3', 60, '2026-10-01T00:00:00Z')]
     const rows = buildTermSheet(students, withArchived, new Map(), policy)
     expect(rows[0]).not.toContain('Quiz 3')
   })
 
   it('writes computed figures unrounded', () => {
-    // 7/40 → (0.175 * 0.4 + 0.6) * 100 = 67.00000000000001 in IEEE754. The
-    // point is not the artefact — it is that nothing rounded on the way out.
     const scores = new Map([
       [cellKey('q1', 's1'), 7],
       [cellKey('q2', 's1'), 0],
@@ -80,14 +60,10 @@ describe('buildTermSheet', () => {
 
     expect(typeof quizScore).toBe('number')
     expect(quizScore).toBeCloseTo(67, 10)
-    // A rounded export would be exactly 67; an unrounded one carries the full
-    // double. Either way it must NOT be a pre-formatted string.
     expect(String(quizScore)).not.toMatch(/^"?67\.00"?$/)
   })
 
   it('writes a withheld term grade as blank', () => {
-    // No items at all → termGrade is null, and a grade column must stay empty
-    // rather than carrying a number nobody computed.
     const rows = buildTermSheet(students, [], new Map(), policy)
     expect(rows[2][rows[2].length - 1]).toBe('')
   })
@@ -118,9 +94,6 @@ describe('buildOverallSheet', () => {
   })
 
   it('leaves a withheld final BLANK and names the missing term in a Note column', () => {
-    // The spreadsheet bug, at the point it would leave the app: writing a
-    // number here is the lie; writing "No Midterm" into the grade column would
-    // put text where every downstream formula expects a number.
     const sheet = buildOverallSheet(rowsFor('s1', 'Ana', ['prelim', 'finals']), all)
     const ana = sheet[2]
 

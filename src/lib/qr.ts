@@ -1,35 +1,17 @@
-/**
- * Rotating attendance-QR codes.
- *
- * The instructor's browser holds the session's secret (from start_class_session)
- * and derives a short code that changes every QR_STEP_SECONDS. The QR encodes the
- * session id, the current time-window index, and that code. When a student scans
- * it, `scan_attendance` (SECURITY DEFINER) re-derives the same HMAC server-side
- * and rejects any window that isn't current — so a screenshot shared with an
- * absent classmate stops working within ~30 seconds.
- *
- * This MUST stay byte-for-byte compatible with the Postgres side in
- * migration 0014: HMAC-SHA256(key = secret, msg = `${sessionId}.${window}`),
- * lowercase hex, first 16 chars.
- */
 
-/** Seconds each QR code is valid before it rotates. Mirrors the SQL (15s). */
 export const QR_STEP_SECONDS = 15
 
 const PREFIX = 'CP1'
 
-/** The current time-window index (integer that ticks every QR_STEP_SECONDS). */
 export function currentWindow(nowMs: number = Date.now()): number {
   return Math.floor(nowMs / 1000 / QR_STEP_SECONDS)
 }
 
-/** Seconds remaining before the code rotates to the next window. */
 export function secondsUntilRotate(nowMs: number = Date.now()): number {
   const stepMs = QR_STEP_SECONDS * 1000
   return Math.ceil((stepMs - (nowMs % stepMs)) / 1000)
 }
 
-/** Derive the rotating code for a session + window (matches the SQL HMAC). */
 export async function computeCode(
   secret: string,
   sessionId: string,
@@ -50,18 +32,10 @@ export async function computeCode(
   return hex.slice(0, 16)
 }
 
-/** The raw `CP1|…` core the HMAC covers — used inside the deep-link URL. */
 export function buildCore(sessionId: string, windowIndex: number, code: string): string {
   return `${PREFIX}|${sessionId}|${windowIndex}|${code}`
 }
 
-/**
- * Encode the QR payload the student scans — now a deep-link URL so a phone's
- * NATIVE camera can offer "Open link" straight into the app's /scan route. The
- * raw code rides in the hash fragment (never sent to the server / logs, and
- * survives SPA routing). The in-app scanner still accepts the bare `CP1|…`
- * form too (see parsePayload), so old-format codes and both scanners work.
- */
 export function buildPayload(sessionId: string, windowIndex: number, code: string): string {
   const core = buildCore(sessionId, windowIndex, code)
   const origin =
@@ -77,14 +51,8 @@ export interface ScannedPayload {
   code: string
 }
 
-/**
- * Parse a scanned string back into its parts, or null if it isn't ours.
- * Accepts BOTH the new deep-link URL (`https://…/scan#CP1|…`) and the legacy
- * bare payload (`CP1|…`), so a rollback is just reverting buildPayload.
- */
 export function parsePayload(text: string): ScannedPayload | null {
   let raw = text.trim()
-  // Strip any `…/scan#` (or `…#`) prefix down to the `CP1|…` core.
   const hash = raw.lastIndexOf('#')
   if (hash !== -1) raw = raw.slice(hash + 1)
   const parts = raw.split('|')
@@ -95,7 +63,6 @@ export function parsePayload(text: string): ScannedPayload | null {
   return { sessionId, windowIndex, code }
 }
 
-/** Build the full, ready-to-render payload for a session's current window. */
 export async function buildCurrentPayload(
   secret: string,
   sessionId: string,
@@ -105,14 +72,6 @@ export async function buildCurrentPayload(
   const code = await computeCode(secret, sessionId, win)
   return buildPayload(sessionId, win, code)
 }
-
-// ── Global events (0055) ─────────────────────────────────────────────────────
-// A DISTINCT prefix ('CP1E') so the class scanner and the event scanner reject
-// each other's codes — parsePayload wants exactly 'CP1', parseEventPayload wants
-// 'CP1E'. Same HMAC (computeCode over `${id}.${window}`) and same 15s window, so
-// the server side mirrors scan_attendance byte-for-byte, just against the event
-// secret. v1 is in-app-scanner only; the payload is still built as a deep link so
-// native-camera support is a one-line route change later.
 
 const EVENT_PREFIX = 'CP1E'
 
@@ -135,7 +94,6 @@ export function buildEventPayload(eventId: string, windowIndex: number, code: st
   return `${origin}/scan#${core}`
 }
 
-/** Parse a scanned event string, or null if it isn't an event QR. */
 export function parseEventPayload(text: string): ScannedEventPayload | null {
   let raw = text.trim()
   const hash = raw.lastIndexOf('#')

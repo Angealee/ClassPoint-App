@@ -34,10 +34,8 @@ type View = 'home' | 'live' | 'review'
 const sessionDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
-/** Remembers the last subject started per section, so the picker pre-fills. */
 const LAST_SUBJECT_KEY = 'cp_last_subject_'
 
-/** How many weeks of sessions the Attendance tab shows before "See all". */
 const RECENT_WEEKS = 2
 
 export function Attendance() {
@@ -68,7 +66,6 @@ export function Attendance() {
   const [historyLoading, setHistoryLoading] = useState(true)
   const [tagging, setTagging] = useState<string>()
 
-  /** Fill the form from a saved preset. Subject and topic are left alone. */
   function applyPreset(preset: SessionPreset) {
     setLateAfter(preset.lateAfterMin)
     setAbsentAfter(preset.absentAfterMin)
@@ -107,25 +104,13 @@ export function Attendance() {
     }
   }, [selectedSectionId])
 
-  // Which review the URL is currently holding, so it is only fetched once.
-  // Declared here because the section-change effect below has to be able to
-  // clear it.
   const loadedReviewRef = useRef<string | null>(null)
   const prevSectionRef = useRef<string | null>(null)
 
-  // On section change: resume any active session, else land on the config home.
-  //
-  // A ?review=<id> in the URL owns the view instead — skip the reset so it isn't
-  // stomped back to home/live. Read from searchParams at run time rather than
-  // depending on it, or this re-runs and resets the view.
   useEffect(() => {
     if (!selectedSectionId) return
     let cancelled = false
 
-    // A review belongs to ONE section. Switching sections while a review is
-    // open has to abandon it — otherwise the review view keeps showing the
-    // PREVIOUS section's session. That became possible only once ?review=
-    // started persisting, so it is guarded here rather than left to chance.
     const sectionChanged =
       prevSectionRef.current !== null && prevSectionRef.current !== selectedSectionId
     prevSectionRef.current = selectedSectionId
@@ -149,8 +134,6 @@ export function Attendance() {
         }
       })
       .catch(() => {
-        // Silently swallowing this told the instructor "no live session" during
-        // a transient blip — inviting them to start a SECOND one mid-class.
         if (!cancelled) toast('Could not check for a live class — pull to retry.', 'error')
       })
       .finally(() => !cancelled && setChecking(false))
@@ -161,16 +144,6 @@ export function Attendance() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSectionId, loadHistory])
 
-  // `?review=<id>` IS the review view — it is no longer consumed and stripped.
-  //
-  // Stripping it looked tidy and cost real work: a refresh, an accidental back,
-  // or a phone locking and reopening dropped the instructor to home, and the
-  // session stayed ended-but-NOT-finalised with penalties never applied. The
-  // only marker was a pill on a card they might not scroll to.
-  //
-  // Now the URL holds the review, so any of those resume exactly where they
-  // were. The ref stops a re-fetch on every render; the param is cleared in
-  // afterReview(), which is the one legitimate exit.
   const reviewParam = searchParams.get('review')
   useEffect(() => {
     if (!reviewParam || loadedReviewRef.current === reviewParam) return
@@ -190,14 +163,9 @@ export function Attendance() {
 
   const thresholdsValid = absentAfter >= lateAfter && lateAfter >= 0 && absentAfter >= 0
 
-  // Subjects this section takes. Usually one or two, so chips beat a dropdown.
   const sectionSubjects = subjectsForSection(selectedSectionId)
-  // A section with nothing assigned can still hold class (the RPC allows an
-  // untagged session then) — being blocked by a setup gap would be worse.
   const subjectMissing = sectionSubjects.length > 0 && !subjectId
 
-  // Default to the subject you ran last for this section: the same class meets
-  // on the same day most weeks, so the common case stays a single tap.
   useEffect(() => {
     if (!selectedSectionId) {
       setSubjectId('')
@@ -270,10 +238,6 @@ export function Attendance() {
     </Select>
   )
 
-  // Newest week first, matching the list's newest-first order. Capped at two
-  // weeks so "Recent sessions" stays recent — by finals the full list is 36+
-  // rows, pushing the start-a-class controls off screen. The "See all & stats"
-  // link carries the complete history.
   const weeks = useMemo(
     () => groupByWeek(history, (s) => s.startedAt).slice(0, RECENT_WEEKS),
     [history],
@@ -285,7 +249,6 @@ export function Attendance() {
         session={session}
         sectionName={sectionName}
         onEnd={() => {
-          // Put the review in the URL as we enter it, so a refresh resumes.
           loadedReviewRef.current = session.id
           setView('review')
           setSearchParams({ review: session.id }, { replace: true })
@@ -299,14 +262,10 @@ export function Attendance() {
 
   return (
     <div className="space-y-5">
-      {/* Sticky, highlighted section bar — pins under the app header so the
-          selected section is always in view and never scrolled past. */}
       <div className="sticky top-[52px] z-10 -mx-4 -mt-5 border-b border-accent-solid/20 bg-canvas/85 px-4 py-3 backdrop-blur-md md:top-0 md:-mx-8 md:mt-0 md:px-8">
         <ScreenTitle title="Attendance" actions={sectionSelect} />
       </div>
 
-      {/* Global event — a separate, cross-section check-in for a special event
-          (0055). Its own screen so it never tangles with the per-section class flow. */}
       <button
         type="button"
         onClick={() => navigate('/teach/event')}
@@ -363,9 +322,6 @@ export function Attendance() {
           </div>
         )}
 
-        {/* Saved settings. The thresholds and penalties are what you set once
-            and reuse; subject and topic change every class, so a preset
-            deliberately does not touch them. */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Saved settings</span>
@@ -509,7 +465,6 @@ export function Attendance() {
         </Button>
       </Card>
 
-      {/* History — grouped by term week, newest first */}
       <div>
         <div className="mb-2 flex items-center justify-between gap-2 px-1">
           <div className="flex items-center gap-2">
@@ -569,9 +524,6 @@ export function Attendance() {
                           )}
                         </div>
                       </button>
-                      {/* Sessions from before subjects existed (0028). Tagging is
-                          offered right here because this is the screen you're on
-                          day to day; the chips vanish once nothing is untagged. */}
                       {!s.subjectId && sectionSubjects.length > 0 && (
                         <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
                           <span className="text-xs text-muted">Tag as</span>

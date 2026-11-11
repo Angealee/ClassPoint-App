@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from 'react'
 interface LockoutOptions {
   /** Failed attempts before a lock kicks in. */
   threshold?: number
-  /** Base lock duration; each subsequent lock doubles it (capped). */
   baseMs?: number
   /** Upper bound on a single lock duration. */
   maxMs?: number
@@ -18,15 +17,6 @@ interface LockoutState {
   reset: () => void
 }
 
-/**
- * Client-side brute-force speed bump, persisted in localStorage so a reload
- * doesn't reset it. After `threshold` failures the form locks for `baseMs`,
- * and each further lock doubles the wait (60s → 2m → 4m …) up to `maxMs`.
- *
- * This is a deterrent layered under real auth, not a security boundary on its
- * own — a determined attacker can clear storage. The server-side password check
- * (and any Supabase rate limiting / MFA) remains the real gate.
- */
 export function useLockout(key: string, opts: LockoutOptions = {}): LockoutState {
   const threshold = opts.threshold ?? 5
   const baseMs = opts.baseMs ?? 60_000

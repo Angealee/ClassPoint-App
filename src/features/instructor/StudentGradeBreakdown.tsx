@@ -33,28 +33,11 @@ const TERM_LABEL: Record<TermKey, string> = {
   finals: 'Finals',
 }
 
-/**
- * One student's full working, for every subject their section takes.
- *
- * This is the screen you open when a student asks why their grade is what it
- * is, so it shows every mark rather than the components alone — anything less
- * sends you back to the grid with their name in your head.
- *
- * It is the SAME component on the record page and on the printed sheet. The
- * print route forces the light theme on `documentElement` instead of this
- * carrying a second set of hardcoded styles, so the two cannot drift.
- *
- * ⚠ It reads the student's scores ONLY (`listGradeScores(ids, studentId)`).
- * Without that filter one record page would pull the whole class's marks for
- * every item of every term — roughly 4,800 rows to render one person.
- */
-
 interface TermLine {
   term: TermKey
   policy: GradePolicy | null
   items: GradeItem[]
   scores: Map<string, number>
-  /** This student's attendance in the term — Recitation IS this (0063). */
   attendance: GradeAttendance | undefined
   grade: number | null
 }
@@ -71,7 +54,6 @@ interface Props {
   studentId: string
   sectionId: string
   subjects: Subject[]
-  /** Print opens everything; the record page keeps each subject collapsed. */
   expanded?: boolean
 }
 
@@ -102,8 +84,6 @@ export function StudentGradeBreakdown({ studentId, sectionId, subjects, expanded
           const scores = new Map<string, number>()
           for (const r of rows) scores.set(cellKey(r.itemId, r.studentId), r.score)
 
-          // Attendance for each term, failing soft: before 0063 the RPC does not
-          // exist and that must cost the Recitation figure, not the record page.
           const attendanceByTerm = await Promise.all(
             TERMS.map((term) =>
               getGradeAttendance(sectionId, subject.id, term)
@@ -147,8 +127,6 @@ export function StudentGradeBreakdown({ studentId, sectionId, subjects, expanded
       )
       setBlocks(built)
     } catch (e) {
-      // Its own try/catch (the 0034 SectionGrid precedent): before 0057 is
-      // applied this must cost the grades card alone, not the record page.
       setLoadError(errorText(e, 'Could not load grades.'))
     } finally {
       setLoading(false)
@@ -265,7 +243,6 @@ function TermDetail({ line, studentId }: { line: TermLine; studentId: string }) 
   )
 }
 
-/** The share a component has of CLASS STANDING — the exam is weighed separately. */
 function componentWeight(component: GradeComponent, policy: GradePolicy): number | null {
   if (component === 'performance_task') return policy.ptWeight
   if (component === 'quiz') return policy.quizWeight
@@ -323,8 +300,6 @@ function ComponentDetail({
                 <span className="min-w-0 truncate text-muted">{item.name}</span>
                 <span className="shrink-0 tabular-nums">
                   {v === undefined ? (
-                    // Not marked yet — deliberately not shown as a zero, even
-                    // though the official grade counts it as one.
                     <span className="text-muted">not marked</span>
                   ) : (
                     <>

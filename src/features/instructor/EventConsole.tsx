@@ -37,20 +37,11 @@ import type { EventAttendee, EventSession, EventStats } from '@/lib/types'
 
 type Person = { id: string; fullName: string; displayName: string; avatarUrl: string | null }
 
-/**
- * Global event console (0055).
- *
- * A special/limited, cross-section check-in. NO section is picked — any active
- * student may scan. The instructor sets a name + flat points, shows the rotating
- * QR, and watches a live count that POLLS get_event_stats (event_attendance is
- * NOT in realtime, so a school-wide event can't push hundreds of row events).
- */
 export function EventConsole() {
   const [event, setEvent] = useState<EventSession | null>(null)
   const [review, setReview] = useState<EventSession | null>(null)
   const [checking, setChecking] = useState(true)
 
-  // Resume an already-running event on mount (a reload during the event).
   useEffect(() => {
     let cancelled = false
     getActiveEventForInstructor()
@@ -62,7 +53,6 @@ export function EventConsole() {
     }
   }, [])
 
-  // A live event always wins — it is the thing that needs attention.
   if (event) {
     return <EventMonitor event={event} onEnded={() => setEvent(null)} />
   }
@@ -72,7 +62,6 @@ export function EventConsole() {
   return <EventSetup checking={checking} onStarted={setEvent} onReview={setReview} />
 }
 
-/** Create form: name + flat points, then Start. Plus a list of recent events. */
 function EventSetup({
   checking,
   onStarted,
@@ -155,11 +144,6 @@ function EventSetup({
 const eventDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
-/**
- * Past events, newest first — so a finished event can be reopened read-only to
- * review who attended. Fetched once; fails silent (renders nothing) so a missing
- * table never breaks the setup screen.
- */
 function RecentEventsList({ onReview }: { onReview: (e: EventSession) => void }) {
   const [events, setEvents] = useState<EventSession[]>([])
   const [loading, setLoading] = useState(true)
@@ -214,11 +198,8 @@ function clock(ms: number): string {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-/** Cap on the live monitor/feed roster fetch — recent N is all that's shown; the
- *  count comes from get_event_stats, so this never has to be the full roster. */
 const MONITOR_CAP = 100
 
-/** Live monitor: rotating QR + polled total/per-section counts + manual add + End. */
 function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => void }) {
   const { toast } = useToast()
   const [payload, setPayload] = useState('')
@@ -230,15 +211,11 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
   const [ending, setEnding] = useState(false)
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
-  // Fullscreen "present" QR + live check-in wall — same as the class session, so
-  // a whole hall can scan.
   const [presenting, setPresenting] = useState(false)
   const [bigSize, setBigSize] = useState(320)
   const stageRef = useRef<HTMLDivElement>(null)
   const startedMs = new Date(event.startedAt).getTime()
 
-  // Size the fullscreen QR to the LEFT STAGE (a ResizeObserver, so the QR shrinks
-  // to make room for the feed panel on desktop and never overlaps it).
   useEffect(() => {
     if (!presenting) return
     const el = stageRef.current
@@ -251,7 +228,6 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
     return () => ro.disconnect()
   }, [presenting])
 
-  // Rotating QR — same pattern as the class session, against the event secret.
   useEffect(() => {
     const secret = event.qrSecret
     if (!secret) return
@@ -276,9 +252,6 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
     }
   }, [event.id, event.qrSecret])
 
-  // Poll the count — event_attendance isn't in realtime on purpose (scale).
-  // Faster (2s) while presenting so a name appears within a couple seconds on the
-  // projector; the ordinary monitor stays at 4s.
   const refreshStats = useCallback(() => {
     void getEventStats(event.id)
       .then(setStats)
@@ -290,9 +263,6 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
     return () => window.clearInterval(id)
   }, [refreshStats, presenting])
 
-  // The names, refetched only when the polled total CHANGES — so the inline list
-  // and the fullscreen feed both stay live without a roster query every poll. An
-  // event never loses a check-in, so a count-gated refetch can't miss one.
   useEffect(() => {
     let cancelled = false
     getEventAttendees(event.id, MONITOR_CAP)
@@ -390,8 +360,6 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
         </div>
       )}
 
-      {/* Who checked in — the header count is the accurate total; `attendees` is a
-          recent slice (capped), so pass `count` from stats. */}
       <AttendeeListView people={attendees} loaded={attLoaded} count={stats?.total} />
 
       <div className="grid grid-cols-2 gap-3">
@@ -403,8 +371,6 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
         </Button>
       </div>
 
-      {/* Fullscreen "present" mode — QR on the left, a live check-in wall on the
-          right (desktop only). */}
       <AnimatePresence>
         {presenting && (
           <motion.div
@@ -413,7 +379,6 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex bg-canvas"
           >
-            {/* Close sits top-LEFT so it never overlaps the feed panel. */}
             <IconButton
               label="Exit fullscreen"
               variant="outline"
@@ -424,7 +389,6 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
               icon={<XIcon className="h-6 w-6" />}
             />
 
-            {/* Left stage — QR + count. Sized by the ResizeObserver above. */}
             <div
               ref={stageRef}
               className="flex flex-1 flex-col items-center justify-center gap-6 p-6"
@@ -451,7 +415,6 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
               </div>
             </div>
 
-            {/* Live check-in wall — desktop only (a 22–26rem column on the right). */}
             <PresentFeed
               people={attendees}
               total={stats?.total ?? 0}
@@ -481,13 +444,6 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
   )
 }
 
-/**
- * The live check-in wall in fullscreen present mode — a Twitch-style feed on the
- * right edge, DESKTOP ONLY (`hidden md:flex`). Newest at the BOTTOM, auto-scrolls
- * as people scan. `people` is newest-first (the fetch order), so it renders
- * reversed. Renders nothing on a phone, where the present overlay stays a single
- * centred column.
- */
 function PresentFeed({
   people,
   total,
@@ -498,10 +454,8 @@ function PresentFeed({
   loaded: boolean
 }) {
   const feedRef = useRef<HTMLDivElement>(null)
-  // oldest → newest, so the newest sits at the bottom like a chat log.
   const ordered = useMemo(() => [...people].reverse(), [people])
 
-  // Stick to the bottom as new check-ins arrive (it's a projector — always latest).
   useEffect(() => {
     const el = feedRef.current
     if (el) el.scrollTop = el.scrollHeight
@@ -558,11 +512,6 @@ function PresentFeed({
 const clockTime = (iso: string) =>
   new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 
-/**
- * The list of checked-in students (presentational). `count` is the accurate
- * total (the monitor passes stats.total, since its `people` is a capped recent
- * slice); it defaults to the list length for the review's full fetch.
- */
 function AttendeeListView({
   people,
   loaded,
@@ -610,7 +559,6 @@ function AttendeeListView({
   )
 }
 
-/** Self-fetching wrapper — used by the read-only review (one-time full fetch). */
 function AttendeeList({ eventId }: { eventId: string }) {
   const [people, setPeople] = useState<EventAttendee[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -632,11 +580,6 @@ function AttendeeList({ eventId }: { eventId: string }) {
   return <AttendeeListView people={people} loaded={loaded} />
 }
 
-/**
- * Read-only review of a FINISHED event: total, per-section turnout and the full
- * attendee list. No QR, no manual add, no End — the server refuses scans and
- * manual adds on an ended event anyway (this just doesn't offer them).
- */
 function EventReview({ event, onBack }: { event: EventSession; onBack: () => void }) {
   const [stats, setStats] = useState<EventStats | null>(null)
 
@@ -702,7 +645,6 @@ function EventReview({ event, onBack }: { event: EventSession; onBack: () => voi
   )
 }
 
-/** Manual add: pick a section, search, tap a student — the same idempotent award. */
 function ManualAddSheet({
   open,
   onClose,

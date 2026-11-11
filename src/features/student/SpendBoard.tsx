@@ -16,23 +16,6 @@ import { StudentProfilePreview } from './StudentProfilePreview'
 const TOP_N = 10
 const GLOBAL = 'global'
 
-/**
- * The spend board — who has cashed out the most points this semester (0038).
- *
- * ── WHY THIS EXISTS ────────────────────────────────────────────────────────
- * Spending used to be pure loss. An approved redemption writes a negative
- * `point_events` row, so it drops your XP, your level and your rank, and
- * nothing showed an upside — a student who thought about it never spent, which
- * is why the rewards catalog saw so little use. This is the counterweight: a
- * second board where spending is what WINS. Two ways to be top of the class.
- *
- * ── NO QUERY OF ITS OWN ────────────────────────────────────────────────────
- * `spent_points` and `spend_rank` ride on `leaderboard_snapshot`, so the board
- * this screen renders arrived in the SAME fetch that filled the points board.
- * That is the whole reason spend lives in the snapshot rather than behind its
- * own RPC: both boards settle at the same moment and can never disagree about
- * the same student.
- */
 export function SpendBoard() {
   const { loading, leaderboard, capturedAt, me, sections, sectionName, refresh } = useStudentData()
   const [selected, setSelected] = useState<LeaderboardEntry | null>(null)
@@ -40,14 +23,6 @@ export function SpendBoard() {
 
   const isGlobal = view === GLOBAL
 
-  /**
-   * Spenders only, in spend order.
-   *
-   * A null `spend_rank` means "hasn't spent anything", and that is deliberately
-   * not a place at the bottom — most students will be null, and ordering a
-   * ~170-way tie at zero by name would look like a ranking while meaning
-   * nothing.
-   */
   const ranked = useMemo(
     () =>
       leaderboard
@@ -63,23 +38,12 @@ export function SpendBoard() {
   return (
     <PullToRefresh onRefresh={refresh}>
       <div className="space-y-4">
-      {/* Titled "Leaderboard", not "Spend board" — the switcher below names
-          which one, and having the heading say it too would be the same word
-          twice. It keeps a back arrow because, unlike the points board, this
-          screen is not a bottom tab: you can arrive from Use points. */}
         <PageHeader
           title="Leaderboard"
           fallback="/app/leaderboard"
           subtitle={<SnapshotChip capturedAt={capturedAt} />}
         />
 
-        {/* ⚠ OUT OF THE HEADER'S `actions` SLOT AND ONTO ITS OWN ROW, the same
-            change the points board took and for the same reason — the two
-            boards share a switcher, so a picker that is readable on one and
-            clipped on the other is worse than either. It was
-            `wrapperClassName="max-w-34 shrink-0"` + `className="h-9! text-sm!"`,
-            i.e. a 136px box whose chevron eats 40px of it, which is about
-            enough for "Global". Full width, standard height, readable names. */}
         {sections.length > 0 && (
           <Select
             value={view}
@@ -98,8 +62,6 @@ export function SpendBoard() {
 
         <BoardSwitcher value="spent" />
 
-        {/* One line of what this board actually measures. The points board
-            needs no such caption — everyone already knows what points are. */}
         <p className="text-xs text-muted">
           Points cashed in this semester. Spending costs you places on the other
           board — that&rsquo;s the trade.
@@ -108,12 +70,6 @@ export function SpendBoard() {
         {loading ? (
           <ListSkeleton rows={6} />
         ) : top.length === 0 ? (
-          /* The same art as the points board, so day one of a semester feels
-             like one app rather than two different empty states. The
-             actionable line stays — it is the thing worth saying here, and a
-             bare heading would have thrown it away.
-             Note `ranked` already filters to spenders, so this branch means
-             "nobody has spent", never "everybody is on zero". */
           <SilentBoard
             detail={
               isGlobal
@@ -128,21 +84,13 @@ export function SpendBoard() {
             sectionName={sectionName}
             showSection={isGlobal}
             metric="spent"
-            // There is no `previous_spend_rank` — 0038 deliberately records no
-            // spend history, for the same reason 0037 left `previous_rank` null
-            // rather than invent movement it never observed. So no arrows, no
-            // tenure flame, no climber banner on this board.
             rankSignals={false}
-            // Confetti belongs to the board you climb. Landing here means you
-            // gave something up, which is a different feeling.
             confetti={false}
             pinnedSelf={meEntry && meIdx >= TOP_N ? meEntry : null}
             onSelect={(entry) => setSelected(entry)}
           />
         )}
 
-        {/* The way ON to this board, for anyone not on it. Shown once the data
-            has loaded so it doesn't flash during the initial render. */}
         {!loading && !meEntry && (
           <Card className="text-center">
             <p className="text-sm font-semibold">You&rsquo;re not on this board yet</p>

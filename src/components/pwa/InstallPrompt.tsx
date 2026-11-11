@@ -7,17 +7,11 @@ import { usePwaInstall } from '@/lib/pwa'
 
 const DISMISS_KEY = 'cp_install_dismissed'
 
-/**
- * Custom "Install ClassPoint" banner. Reads the shared install state (captured
- * once in PwaInstallProvider); on iOS it shows Add-to-Home-Screen steps. The
- * explicit Install button in the instructor UI uses the same source of truth.
- */
 export function InstallPrompt() {
   const { state, promptInstall } = usePwaInstall()
   const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISS_KEY) === '1')
   const [iosReady, setIosReady] = useState(false)
 
-  // iOS never fires beforeinstallprompt — wait a beat before nudging.
   useEffect(() => {
     if (state !== 'ios') return
     const t = window.setTimeout(() => setIosReady(true), 2500)

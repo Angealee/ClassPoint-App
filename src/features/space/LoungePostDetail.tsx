@@ -25,15 +25,6 @@ import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import { MAX_POST_LENGTH, type LoungePost, type LoungeReply } from '@/lib/types'
 
-/**
- * `/app/space/post/:postId` — one post and its replies.
- *
- * It is a ROUTE rather than a sheet because the shoutout notification needs
- * somewhere to point: a push that opens the feed and makes you hunt for the
- * post is a worse notification than no notification. `PageHeader`'s
- * history-aware back handles arriving cold from a push, where there is no
- * in-app history to go back to.
- */
 export function LoungePostDetail() {
   const { postId = '' } = useParams()
   const { spaceAccess } = useStudentData()
@@ -75,8 +66,6 @@ export function LoungePostDetail() {
     void load()
   }, [load])
 
-  // Same auto-grow as the main composer. Reset to `auto` first or the box can
-  // only ever get taller.
   useEffect(() => {
     const el = areaRef.current
     if (!el) return
@@ -91,12 +80,9 @@ export function LoungePostDetail() {
     try {
       await replyToPost(postId, text)
       setBody('')
-      // Refetch rather than appending: `can_delete` is computed per viewer by
-      // the RPC and is not something the client can invent.
       setReplies(await getLoungeReplies(postId))
       setPost(await getLoungePost(postId))
     } catch (e) {
-      // The text is deliberately NOT cleared — a failed send must not eat it.
       toast(errorText(e, 'Could not reply.'), 'error')
     } finally {
       setSending(false)
@@ -178,8 +164,6 @@ export function LoungePostDetail() {
                 }}
                 rows={2}
                 placeholder="Reply…"
-                // text-base: below 16px iOS Safari zooms on focus and never
-                // zooms back.
                 className={cn(
                   'w-full resize-none overflow-y-auto rounded-xl border bg-card px-3.5 py-2.5 text-base text-ink',
                   'placeholder:text-muted/70 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30',

@@ -7,18 +7,6 @@ import { SessionHistory } from './SessionHistory'
 
 type HistoryTab = 'points' | 'attendance'
 
-/**
- * One home for "what already happened": the points ledger and the attendance
- * record. Two tabs rather than two nav slots, mirroring the Requests page
- * (Points | Excuses) — the pattern this app already uses for a shared inbox.
- *
- * Class attendance stats used to hang off a text link on the Attendance screen,
- * which the live and review views replace outright — so during a running class
- * they were unreachable. Living here, they're always one tap away.
- *
- * The tab is mirrored into ?tab= so a deep link (and the browser's back button)
- * can land on the attendance side directly.
- */
 export function History() {
   const [searchParams, setSearchParams] = useSearchParams()
   const initial: HistoryTab = searchParams.get('tab') === 'attendance' ? 'attendance' : 'points'

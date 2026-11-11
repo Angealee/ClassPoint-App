@@ -5,16 +5,6 @@ import type {
   LoungeEventSummary,
 } from '@/lib/types'
 
-// ============================================================================
-// Random Events (migration 0045)
-//
-// ⚠ NOTHING HERE CAN RETURN THE ANSWER KEY. It is a real column on
-// `lounge_events`, which authenticated users can select — so every read path in
-// 0045 omits it and reports only `has_key`. If a future query selects the table
-// directly instead of going through these RPCs, a student can read the key and
-// win every event.
-// ============================================================================
-
 interface OpenEventRow {
   id: string
   question: string
@@ -27,7 +17,6 @@ interface OpenEventRow {
   created_at: string
 }
 
-/** The event currently running, or null. At most one is open at a time. */
 export async function getOpenEvent(): Promise<LoungeEvent | null> {
   const rows = await rpc<OpenEventRow[]>('get_open_event')
   const r = rows?.[0]
@@ -45,13 +34,6 @@ export async function getOpenEvent(): Promise<LoungeEvent | null> {
   }
 }
 
-/**
- * Answer, or change your answer.
- *
- * Editing is allowed while the event is open: nobody else can see it yet, so
- * there is nothing to game, and refusing an edit punishes a typo rather than a
- * cheat.
- */
 export async function submitEventAnswer(eventId: string, body: string): Promise<string> {
   return await rpc<string>('submit_event_answer', { p_event: eventId, p_body: body })
 }
@@ -67,13 +49,6 @@ interface AnswerRow {
   created_at: string
 }
 
-/**
- * Answers for an event.
- *
- * While it is OPEN a student gets back only their own — enforced in the RPC and
- * again in RLS, because the first correct answer being copyable is what would
- * make auto-award pay the fastest copier.
- */
 export async function getEventAnswers(eventId: string): Promise<LoungeEventAnswer[]> {
   const rows = await rpc<AnswerRow[]>('get_event_answers', { p_event: eventId })
   return (rows ?? []).map((r) => ({
@@ -88,9 +63,6 @@ export async function getEventAnswers(eventId: string): Promise<LoungeEventAnswe
   }))
 }
 
-// ── Instructor ──────────────────────────────────────────────────────────────
-
-/** Posting an event notifies everyone in the beta, chunked at 50. */
 export async function createLoungeEvent(opts: {
   question: string
   points: number
@@ -107,18 +79,10 @@ export async function createLoungeEvent(opts: {
   })
 }
 
-/**
- * Close it and pay out. Returns how many were awarded.
- *
- * Idempotent — a second call awards nothing. That matters because three things
- * can close an event: the instructor, the cron at `closes_at`, and a retried
- * request.
- */
 export async function closeLoungeEvent(eventId: string): Promise<number> {
   return (await rpc<number>('close_lounge_event', { p_event: eventId })) ?? 0
 }
 
-/** One-tap award for an open-ended answer, worth the event's point value. */
 export async function awardEventAnswer(answerId: string): Promise<number> {
   return (await rpc<number>('award_event_answer', { p_answer: answerId })) ?? 0
 }

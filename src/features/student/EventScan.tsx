@@ -22,12 +22,6 @@ function errorText(e: unknown): string {
   return 'Could not record your attendance — scan the current QR and try again.'
 }
 
-/**
- * The "Event is starting" scan screen (0055). Reached from the global banner on
- * Home. A single flat check-in: scan the event QR, earn the points once. It uses
- * `parseEventPayload` (the CP1E prefix), so a class QR scanned here is rejected —
- * and the class scanner rejects an event QR the same way.
- */
 export function EventScan() {
   const { me, liveEvent, liveEventChecked, noteEventCheckedIn } = useStudentData()
   const navigate = useNavigate()
@@ -59,9 +53,6 @@ export function EventScan() {
     [noteEventCheckedIn],
   )
 
-  // A native-camera scan of the event QR lands on /scan, which stashes it and
-  // routes here — submit it once on arrival (the id is in the code, so this works
-  // even before liveEvent has loaded over realtime).
   useEffect(() => {
     const cap = readEventScanCapture()
     if (cap) void submit(cap.eventId, cap.windowIndex, cap.code)
@@ -75,8 +66,6 @@ export function EventScan() {
       setScanning(false)
       return
     }
-    // Reject only on a real mismatch; a null liveEvent (realtime lag) still
-    // submits — the server validates the event.
     if (liveEvent && parsed.eventId !== liveEvent.id) {
       setError('That QR is for a different event.')
       setScanning(false)
@@ -101,8 +90,6 @@ export function EventScan() {
         fallback="/app"
       />
 
-      {/* result and submitting sit ABOVE the liveEvent check so a native-camera
-          auto-submit shows even before liveEvent has loaded over realtime. */}
       {result ? (
         <ResultView result={result} onDone={() => navigate('/app')} />
       ) : submitting ? (
@@ -129,9 +116,6 @@ export function EventScan() {
               <p className="text-sm font-semibold text-ink">Your attendance is already recorded.</p>
             </div>
           ) : scanning ? (
-            // The same stage Attendance uses, so the two scanners cannot drift
-            // apart again. This one keeps its own Cancel: unlike the sheet,
-            // there is no back bar here to get out by.
             <ScanStage
               scanKey={scanKey}
               onDetect={(t) => void onDetect(t)}

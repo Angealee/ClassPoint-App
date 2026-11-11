@@ -32,7 +32,6 @@ interface AuthContextValue {
   signInInstructor: (email: string, password: string) => Promise<{ error?: string }>
   claim: (input: ClaimInput) => Promise<{ error?: string }>
   resetPin: (token: string, pin: string) => Promise<{ error?: string }>
-  /** Change your own PIN from inside the app (requires the current one). */
   changePin: (currentPin: string, newPin: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
@@ -51,7 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState<Session | null>(null)
   const [role, setRole] = useState<Role | null>(null)
-  // Guard against out-of-order role resolutions from rapid auth changes.
   const resolveSeq = useRef(0)
 
   const resolveRole = useCallback(async (next: Session | null) => {
@@ -122,8 +120,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: { token, username, pin, display_name: displayName ?? null },
       })
       if (error) {
-        // Surface the real cause for debugging (usually: function not deployed,
-        // or JWT verification still ON so the unauthenticated caller is rejected).
         console.error('[claim-token] invoke failed:', error)
         return { error: "Couldn't reach the claim service. Ask your instructor to check setup." }
       }
@@ -144,7 +140,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: "Couldn't reach the reset service. Ask your instructor to check setup." }
       }
       if (!data?.ok) return { error: (data?.error as string) ?? 'Something went wrong.' }
-      // Sign in with the freshly set PIN using the username the function returned.
       const username = data.username as string | undefined
       if (!username) return { error: 'Reset succeeded — please sign in with your new PIN.' }
       return signInStudent(username, pin)
@@ -152,15 +147,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [signInStudent],
   )
 
-  /**
-   * Change the signed-in student's own PIN.
-   *
-   * The current PIN is REQUIRED even though Supabase would let a valid session
-   * set a new password on its own: without it, anyone who picks up an unlocked
-   * phone can lock the owner out of their own account. Re-authenticating is the
-   * check — a failed `signInWithPassword` leaves the existing session alone, so
-   * a wrong guess costs nothing but the error message.
-   */
   const changePin = useCallback(async (currentPin: string, newPin: string) => {
     const email = session?.user?.email
     if (!email) return { error: 'You are not signed in.' }

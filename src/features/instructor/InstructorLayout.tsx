@@ -45,15 +45,11 @@ interface InstructorContextValue {
   selectedSectionId: string
   setSelectedSectionId: (id: string) => void
   refreshSections: () => Promise<void>
-  /** The active semester (0027). Null only if none is marked active. */
   semester: Semester | null
   /** Subjects offered this semester. */
   subjects: Subject[]
-  /** Which subjects each section takes: { sectionId: subjectId[] }. */
   sectionSubjects: Record<string, string[]>
-  /** Subjects assigned to one section, in code order — for session pickers. */
   subjectsForSection: (sectionId: string) => Subject[]
-  /** Re-read semester, subjects and assignments after editing them. */
   refreshSemester: () => Promise<void>
 }
 
@@ -65,24 +61,6 @@ export function useInstructor(): InstructorContextValue {
   return ctx
 }
 
-/**
- * Four tabs, not five.
- *
- * Awarding lost its tab and moved into the section roster — you tick students
- * where you're already looking at them, and the bulk flow survived intact.
- * "Activity" became "History", which now holds BOTH the points ledger and the
- * class attendance stats as sub-tabs. Those stats used to hang off a text link
- * on the Attendance screen, which the live-class view replaces outright, so
- * they were unreachable exactly when a class was running.
- */
-/**
- * Grades took the fifth tab rather than another round button in `actions`.
- *
- * That slot already carries four controls, and a fifth puts ~212px of buttons
- * in a 375px header — on the thing the instructor opens most often. Entering
- * marks is weekly core work, unlike Ops or Peer Evaluation, so it earns a tab;
- * five is the comfortable limit on a phone and this is the fifth.
- */
 const nav: NavItem[] = [
   { to: '/teach', label: 'Students', Icon: UsersIcon, end: true },
   { to: '/teach/attendance', label: 'Attendance', Icon: QrIcon },
@@ -91,16 +69,6 @@ const nav: NavItem[] = [
   { to: '/teach/leaderboard', label: 'Ranks', Icon: TrophyIcon },
 ]
 
-/**
- * Point-request inbox button. Lives in the Shell's actions slot rather than the
- * tab bar — five tabs is already the comfortable limit on a phone.
- *
- * Presentational on purpose: Shell renders `actions` in BOTH the desktop
- * sidebar and the mobile header, so this component mounts twice. The count and
- * its realtime subscription therefore live in InstructorLayout, which mounts
- * once — two instances subscribing to one topic is exactly what makes
- * supabase-js throw.
- */
 function RedemptionInbox({ count }: { count: number }) {
   const navigate = useNavigate()
 
@@ -127,14 +95,6 @@ function RedemptionInbox({ count }: { count: number }) {
   )
 }
 
-/**
- * Ops & trust entry point (0034).
- *
- * Stateless BY REQUIREMENT: Shell renders `actions` in both the desktop sidebar
- * and the mobile header, so this mounts twice. A component in that slot must
- * never own a subscription or a fetch — see RedemptionInbox above, whose count
- * lives in the layout for exactly this reason.
- */
 function OpsButton() {
   const navigate = useNavigate()
   return (
@@ -148,15 +108,6 @@ function OpsButton() {
   )
 }
 
-/**
- * Peer Evaluation entry point (0049).
- *
- * Stateless, like OpsButton and for the same reason: Shell renders `actions` in
- * BOTH the desktop sidebar and the mobile header, so this mounts twice. It
- * carries no badge deliberately — a count here would need a fetch or a
- * subscription, and the way to add one later is to hoist the number into this
- * layout the way the redemptions and excuses counts already are.
- */
 function PeerButton() {
   const navigate = useNavigate()
   return (
@@ -180,14 +131,10 @@ export function InstructorLayout() {
   const [semester, setSemester] = useState<Semester | null>(null)
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [sectionSubjects, setSectionSubjects] = useState<Record<string, string[]>>({})
-  // One inbox, two request types: point spends + absence excuses.
   const [pendingRedemptions, setPendingRedemptions] = useState(0)
   const [pendingExcuses, setPendingExcuses] = useState(0)
-  // Reports group by TARGET, so seven complaints about one post count as one.
   const [pendingReports, setPendingReports] = useState(0)
 
-  // Owned here (single mount) rather than in RedemptionInbox, which Shell
-  // renders twice. Page-scoped channels: subscribed on mount, removed on unmount.
   useEffect(() => {
     let cancelled = false
     const refresh = () => {
@@ -225,9 +172,6 @@ export function InstructorLayout() {
     }
   }, [])
 
-  // The active semester gates everything else: sections are scoped to it, and
-  // every week/term label in the instructor area derives from its dates. Mirrored
-  // into a ref so refreshSections() can read it without a stale closure.
   const semesterIdRef = useRef<string | undefined>(undefined)
 
   async function loadSemester() {
@@ -239,8 +183,6 @@ export function InstructorLayout() {
       setSectionSubjects({})
       return
     }
-    // Do this before any child renders: term.ts falls back to hardcoded dates
-    // until it's configured, and we'd rather never show the fallback labels.
     configureTermCalendar({
       semesterId: active.id,
       semesterName: active.name,
@@ -258,8 +200,6 @@ export function InstructorLayout() {
   async function refreshSections() {
     const data = await listSections(semesterIdRef.current)
     setSections(data)
-    // Keep the current pick when it still exists; otherwise fall back to the
-    // first. The "still exists" check matters when the semester changes.
     setSelectedSectionId((cur) => (data.some((s) => s.id === cur) ? cur : (data[0]?.id ?? '')))
   }
 
@@ -268,8 +208,6 @@ export function InstructorLayout() {
     await refreshSections()
   }
 
-  // Memoized: screens use this as an effect dependency (Attendance defaults its
-  // subject picker from it), and a fresh function each render would loop.
   const subjectsForSection = useCallback(
     (sectionId: string): Subject[] => {
       const ids = new Set(sectionSubjects[sectionId] ?? [])
@@ -290,13 +228,6 @@ export function InstructorLayout() {
     navigate('/', { replace: true })
   }
 
-  /**
-   * Memoized: without this, a fresh object every render re-rendered EVERY
-   * instructor screen each time a redemption or excuse row changed anywhere in
-   * the database (those two badge channels fire often). refreshSections and
-   * refreshSemester are plain declarations, so they're intentionally excluded —
-   * they're called from event handlers, never used as effect dependencies.
-   */
   const contextValue = useMemo(
     () => ({
       sections,
@@ -328,8 +259,6 @@ export function InstructorLayout() {
           </span>
         }
         actions={
-          // Wrapped so the desktop sidebar's justify-between treats these as a
-          // single unit instead of spreading them apart.
           <div className="flex items-center gap-2">
             <RedemptionInbox count={pendingRedemptions + pendingExcuses + pendingReports} />
             <PeerButton />

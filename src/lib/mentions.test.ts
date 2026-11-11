@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {resolveMentions, type MentionCandidate, mentionQuery, matchMentions, applyMention } from './mentions'
 
-/**
- * The three load-bearing cases are the last three in the first block. Each one
- * fails by notifying the WRONG PERSON, which is the kind of bug nobody reports
- * as a bug — they just quietly stop trusting the feature.
- */
-
 const roster: MentionCandidate[] = [
   { id: 'maria', displayName: 'Maria' },
   { id: 'maria-santos', displayName: 'Maria Santos' },
@@ -36,11 +30,7 @@ describe('resolveMentions', () => {
     expect(resolveMentions('@Ann', [])).toEqual([])
   })
 
-  // ── The three that matter ────────────────────────────────────────────────
-
   it('prefers the LONGEST name, not the first match', () => {
-    // Scanning shortest-first matches "Maria" inside "@Maria Santos" and pings
-    // the wrong person.
     expect(resolveMentions('thanks @Maria Santos!', roster)).toEqual(['maria-santos'])
   })
 
@@ -70,7 +60,6 @@ describe('resolveMentions', () => {
     expect(resolveMentions('hi @AxB (C) there', odd)).toEqual([])
   })
 })
-
 
 describe('mentionQuery', () => {
   it('opens on a bare @ at the start and after a space', () => {
@@ -103,7 +92,6 @@ describe('matchMentions', () => {
 
   it('ranks a prefix match above a mid-name one', () => {
     const got = matchMentions('ar', people)
-    // "Maria"/"Mario" match at index 1; "Ann" does not match at all.
     expect(got.map((c) => c.displayName)).toEqual(['Maria Santos', 'Mario Cruz'])
   })
 
@@ -114,8 +102,6 @@ describe('matchMentions', () => {
 
 describe('applyMention', () => {
   it('replaces the typed query and leaves a trailing space', () => {
-    // The space is load-bearing: resolveMentions requires the name not to be
-    // followed by a word character, so without it the mention would not resolve.
     const { value, caret } = applyMention('hey @mar', 4, 8, 'Maria Santos')
     expect(value).toBe('hey @Maria Santos ')
     expect(caret).toBe(value.length)

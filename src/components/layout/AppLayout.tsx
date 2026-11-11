@@ -33,26 +33,8 @@ import {
   UserIcon,
 } from '@/components/ui/icons'
 
-/**
- * The previous intro's "done" flag. It is READ and never written any more: a
- * student who already got that intro has used the app for a semester, so
- * `beginTour` counts them as having had the tour rather than showing a
- * beginner's walkthrough to someone who has been recited at for months.
- */
 const LEGACY_ONBOARDED_KEY = 'cp_onboarded'
 
-/**
- * The seven destinations, in sidebar order.
- *
- * Student Space sits second — directly under Home — because it is the feature
- * being launched and burying it under a menu is how a beta goes unused. Grades
- * follows Attend: both answer "how am I doing in this class". Profile is last:
- * it is checked far less often than the ones it follows.
- *
- * Grades is deliberately NOT a bottom tab (decision 18): the bar is full, and
- * the menu mirrors this list, so it is two taps away on a phone without
- * displacing anything a student opens every day.
- */
 const SIDEBAR_NAV = [
   { to: '/app', label: 'Home', Icon: HomeIcon, end: true },
   { to: '/app/space', label: 'Student Space', Icon: SaturnIcon },
@@ -63,20 +45,8 @@ const SIDEBAR_NAV = [
   { to: '/app/profile', label: 'Profile', Icon: UserIcon },
 ] as const
 
-/**
- * The mobile bottom bar carries three of those plus the menu.
- *
- * Five tabs is the comfortable limit on a phone and the bar is already full, so
- * Student Space, Grades, Peer eval and Profile live in the menu overlay — which
- * mirrors the full sidebar, so nothing is more than two taps away.
- */
 const TAB_ROUTES = ['/app', '/app/leaderboard', '/app/attendance'] as const
 
-/**
- * Bell + unread badge, rendered into the Shell's `actions` slot (mobile header
- * and desktop sidebar footer both get it for free). Opening the sheet marks
- * everything read.
- */
 function NotificationBell() {
   const { unreadCount } = useStudentData()
   const [open, setOpen] = useState(false)
@@ -92,7 +62,6 @@ function NotificationBell() {
         <BellIcon className="h-4.5 w-4.5" />
         {unreadCount > 0 && (
           <motion.span
-            // Pops on every increment so a new arrival is felt, not just seen.
             key={unreadCount}
             initial={{ scale: 0.5 }}
             animate={{ scale: 1 }}
@@ -108,18 +77,6 @@ function NotificationBell() {
   )
 }
 
-/**
- * The shell with a live nav, the sidebar account block, and the mobile menu.
- *
- * ⚠ Both open states live HERE, not in the nav item or the menu component.
- * Shell renders `nav` twice — desktop sidebar and mobile tab bar — so a button
- * owning its own state would produce two menus that disagree. Same rule as the
- * `actions` slot.
- *
- * The two surfaces are chosen in JS rather than with `md:` classes because the
- * mobile one portals to <body>, where a `md:hidden` wrapper would style
- * nothing and both could open at once. See lib/useIsDesktop.ts.
- */
 function StudentShell() {
   const { hasUnseenAchievements, spaceAccess } = useStudentData()
   const { signOut } = useAuth()
@@ -131,8 +88,6 @@ function StudentShell() {
 
   const closeMenu = () => setMenuOpen(false)
 
-  // Sign out is confirmed in a ConfirmDialog, which is itself a Sheet. Close
-  // this surface FIRST so two portalled overlays never stack their focus traps.
   const requestSignOut = () => {
     setMenuOpen(false)
     setSignOutOpen(true)
@@ -142,16 +97,12 @@ function StudentShell() {
     const chip = spaceChip(spaceAccess.state)
     return SIDEBAR_NAV.map((item) => ({
       ...item,
-      // BETA / Paused / Soon — whichever the server says. Hardcoding BETA here
-      // would tell a locked student they are in a beta they cannot open.
       badge:
         item.to === '/app/space' ? (
           <Chip tone={chip.tone} size="sm">
             {chip.label}
           </Chip>
         ) : undefined,
-      // The unseen-achievements dot follows the trophy case, which lives on
-      // Profile.
       dot: item.to === '/app/profile' ? hasUnseenAchievements : undefined,
     }))
   }, [hasUnseenAchievements, spaceAccess.state])
@@ -169,7 +120,6 @@ function StudentShell() {
         id: 'menu',
         label: 'Menu',
         Icon: MenuIcon,
-        // Surfaces the Profile dot, since Profile is only reachable in here.
         dot: hasUnseenAchievements,
         active: menuOpen,
         onClick: () => setMenuOpen((v) => !v),
@@ -229,15 +179,6 @@ function LevelUpOverlay() {
   return <LevelUpBurst level={levelUp} onDone={clearLevelUp} />
 }
 
-/**
- * Renders the achievement-unlock celebration, one at a time from the queue.
- *
- * GATED ON THE LEVEL-UP BURST. Both are full-screen `z-50` overlays, and a
- * point award can trip a level AND a badge in the same instant — which drew the
- * two on top of each other, with the level-up's backdrop over the badge art.
- * Now the badge waits its turn: neither auto-dismisses any more, so the student
- * dismisses the first and the second appears behind it.
- */
 function AchievementUnlockOverlay() {
   const { unlockedAchievement, clearUnlockedAchievement, levelUp } = useStudentData()
   return (
@@ -254,14 +195,6 @@ function AwayRecapOverlay() {
   return <AwayRecap events={awayEvents} onClose={clearAwayRecap} />
 }
 
-/**
- * Count this open and decide whether the tour plays. Safe to call twice in one
- * session — see `beginTour` — which is what lets a lazy `useState`
- * initialiser run it: React runs those twice under StrictMode.
- *
- * Reaching `localStorage` can itself throw (some private-browsing modes), so
- * the globals are touched inside the try. Failing closed means NO tour.
- */
 function startTour(studentId: string): TourSession {
   try {
     const legacy = localStorage.getItem(LEGACY_ONBOARDED_KEY) === '1'
@@ -271,30 +204,6 @@ function startTour(studentId: string): TourSession {
   }
 }
 
-/**
- * The tour, the "What's new" sheet and the away-recap, in that order of
- * precedence — one layer deciding which of three full-attention things the
- * student sees, so they never stack.
- *
- * ── WHY THE AWAY-RECAP MOVED IN HERE ───────────────────────────────────────
- * It used to be a sibling that mounted whenever it had events. Both it and
- * "What's new" are Sheets, and Sheet's focus trap is document-level: left
- * mounted behind the tour it would drag focus back into itself the moment
- * anything inside the tour was tabbed to. So they wait their turn, and the
- * recap — whose events are held in StudentData until cleared — simply appears
- * when the tour is done.
- *
- * ── THE TOUR TAKES A TURN IN THE OVERLAY CHAIN ─────────────────────────────
- * A level-up and a badge unlock already serialise because two full-screen
- * overlays once drew on top of each other. The tour waits for both to clear
- * rather than racing them. `open` stays true meanwhile, so the recap and
- * "What's new" keep waiting too.
- *
- * ── NOTHING UNTIL WE KNOW WHO THIS IS ──────────────────────────────────────
- * The play count is per student (a shared phone must not hand one student's
- * plays to the next), so there is nothing to decide before `me` has loaded.
- * The shell is showing its own skeleton in the meantime.
- */
 function IntroLayer() {
   const { me } = useStudentData()
   if (!me) return null
@@ -312,9 +221,6 @@ function IntroLayerFor({ studentId }: { studentId: string }) {
     } catch {
       /* a blocked store costs a replay on remount, never the screen */
     }
-    // Only for a student who has never seen a release note: finishing the tour
-    // must not ALSO throw "What's new" at them, but on opens 2 and 3 a seen
-    // version already exists and a genuinely newer entry should still appear.
     if (getSeenVersion() === null) setSeenVersion(LATEST_VERSION)
     setOpen(false)
   }
@@ -332,30 +238,6 @@ function IntroLayerFor({ studentId }: { studentId: string }) {
   )
 }
 
-/**
- * Everything inside the provider, chosen by whether this student is archived.
- *
- * ── WHY THE GATE IS HERE AND NOT IN `RequireRole` ───────────────────────────
- * `RequireRole` runs before any student data exists — role comes from the email
- * domain alone — so gating there would need its own fetch and would flash the
- * wrong shell first. Here, `me.archived_at` is already on the row the app
- * fetches anyway, so the decision is made before the first screen paints.
- *
- * ⚠ EVERY OVERLAY IS SUPPRESSED for an archived student, not just hidden
- *   behind the archived screen. A level-up burst, a badge unlock, the "What's
- *   new" sheet or an away-recap on top of a farewell message would be absurd —
- *   and three of the four exist to pull someone back into an app they can no
- *   longer use.
- *
- * ⚠ `archived_at` is NOT `semesterEnded`. That one is derived from section
- *   membership, and the two genuinely disagree: a student can be archived while
- *   still sitting in an active-semester section, and can be in a past-semester
- *   section without being archived. Both flags stay; this one wins.
- *
- * While `me` is still null the normal shell renders its own skeleton, which is
- * correct: we do not yet know which of the two this is, and guessing archived
- * would flash a farewell at everybody.
- */
 function StudentOrArchived() {
   const { me } = useStudentData()
 
@@ -371,7 +253,6 @@ function StudentOrArchived() {
   )
 }
 
-/** Student shell — responsive sidebar (desktop) / bottom tabs (mobile). */
 export function AppLayout() {
   return (
     <StudentDataProvider>

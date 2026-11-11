@@ -1,21 +1,4 @@
-/* ClassPoint · service-worker push handlers. (v2 — outbox + self-healing)
- *
- * vite-plugin-pwa generates the main service worker (Workbox) and imports this
- * file via `workbox.importScripts` (see vite.config.ts). Keep it dependency-free
- * and plain JS — it runs in the SW global scope, not the app bundle.
- *
- * The Edge Function `send-push` delivers a JSON payload shaped like:
- *   { title, body, tag, url, icon }
- *
- * `pushsubscriptionchange` self-healing: the page posts the Supabase config to
- * this worker (see lib/push.ts), stored in IndexedDB because this event fires
- * with no page and no Supabase session. When the browser rotates the push
- * subscription we re-subscribe and swap the endpoint server-side via the
- * `replace_push_subscription` RPC — the old (unguessable) endpoint URL is the
- * credential.
- */
 
-// Distinct buzz per event type, mirroring the in-app haptics (lib/haptics.ts).
 const VIBRATION_BY_TAG = {
   'cp-points': [60],
   'cp-level': [50, 40, 90],
@@ -55,7 +38,6 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      // Focus an existing tab if one is open, otherwise open a new one.
       for (const client of clients) {
         if ('focus' in client) {
           client.navigate(target).catch(() => {})
@@ -67,8 +49,6 @@ self.addEventListener('notificationclick', (event) => {
     }),
   )
 })
-
-/* ── Self-healing subscription plumbing ──────────────────────────────────── */
 
 const CONFIG_DB = 'cp-push-config'
 const CONFIG_STORE = 'kv'
@@ -119,7 +99,6 @@ function writeConfig(config) {
   )
 }
 
-// VAPID keys are base64url; the browser wants an ArrayBuffer-backed view.
 function urlBase64ToUint8Array(base64) {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4)
   const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -129,7 +108,6 @@ function urlBase64ToUint8Array(base64) {
   return out
 }
 
-// The page keeps this worker supplied with the config it needs offline.
 self.addEventListener('message', (event) => {
   const msg = event.data
   if (msg && msg.type === 'cp-push-config' && msg.config) {
@@ -144,7 +122,7 @@ self.addEventListener('pushsubscriptionchange', (event) => {
       if (!cfg || !cfg.supabaseUrl || !cfg.anonKey || !cfg.vapidKey) return
       const oldEndpoint =
         (event.oldSubscription && event.oldSubscription.endpoint) || null
-      if (!oldEndpoint) return // nothing to swap against; the page re-syncs on next open
+      if (!oldEndpoint) return
 
       const sub = await self.registration.pushManager.subscribe({
         userVisibleOnly: true,

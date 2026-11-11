@@ -31,19 +31,6 @@ const STEPS: { key: Step; label: string }[] = [
   { key: 'activate', label: 'Activate' },
 ]
 
-/**
- * The rollover wizard (Phase I).
- *
- * Resumable by construction: every step COMMITS as you go — sections and
- * subjects are real rows the moment you add them, promotions move students
- * immediately. Nothing is staged in memory waiting for a final Save, so closing
- * the tab halfway loses nothing and reopening picks up where you were.
- *
- * The last step is the only irreversible one, and it's the only one behind a
- * typed-name challenge.
- *
- * @param semester The NEW semester being built (already created, not yet active).
- */
 export function SemesterRollover({
   semester,
   onDone,
@@ -63,8 +50,6 @@ export function SemesterRollover({
         </p>
       </div>
 
-      {/* Step rail. Steps are freely navigable: this is a checklist, not a
-          funnel, and an instructor mid-rollover often needs to go back. */}
       <div className="flex gap-1.5">
         {STEPS.map((s, i) => (
           <button
@@ -96,8 +81,6 @@ export function SemesterRollover({
     </div>
   )
 }
-
-/* ── Step 1: sections ────────────────────────────────────────────────────── */
 
 function SectionsStep({ semester, onNext }: { semester: Semester; onNext: () => void }) {
   const { toast } = useToast()
@@ -138,9 +121,6 @@ function SectionsStep({ semester, onNext }: { semester: Semester; onNext: () => 
   return (
     <Card className="p-4">
       <h3 className="text-sm font-semibold">Sections for {semester.name}</h3>
-      {/* Names start BLANK by the instructor's choice — no carried-forward or
-          year-bumped suggestion. A wrong suggestion here creates a real section
-          rather than failing, and mid-year vs. new-year want opposite defaults. */}
       <p className="mb-3 mt-0.5 text-xs text-muted">
         Name them yourself. A section name only has to be unique within this
         semester, so reusing last semester's names is fine.
@@ -179,8 +159,6 @@ function SectionsStep({ semester, onNext }: { semester: Semester; onNext: () => 
     </Card>
   )
 }
-
-/* ── Step 2: subjects ────────────────────────────────────────────────────── */
 
 function SubjectsStep({ semester, onNext }: { semester: Semester; onNext: () => void }) {
   const { subjects: currentSubjects } = useInstructor()
@@ -247,7 +225,6 @@ function SubjectsStep({ semester, onNext }: { semester: Semester; onNext: () => 
         repeat. Copy last semester's or write new ones.
       </p>
 
-      {/* One-tap copy from the semester that's ending — the common case. */}
       {currentSubjects.length > 0 && subjects.length === 0 && (
         <div className="mb-3 rounded-xl bg-card-2 p-3">
           <p className="mb-2 text-xs text-muted">Carry over from the current semester:</p>
@@ -330,8 +307,6 @@ function SubjectsStep({ semester, onNext }: { semester: Semester; onNext: () => 
   )
 }
 
-/* ── Step 3: promote ─────────────────────────────────────────────────────── */
-
 function PromoteStep({ semester, onNext }: { semester: Semester; onNext: () => void }) {
   const { sections: oldSections } = useInstructor()
   const { toast } = useToast()
@@ -364,9 +339,6 @@ function PromoteStep({ semester, onNext }: { semester: Semester; onNext: () => v
     try {
       const list = await listStudents(sourceId)
       setRoster(list)
-      // Default: everyone moves. The plan's "default all" — the common case is
-      // a whole cohort continuing, and unticking a few is less work than
-      // ticking thirty.
       setPicked(new Set(list.map((s) => s.id)))
     } catch (e) {
       toast(errorText(e, "Couldn't load that roster."), 'error')
@@ -555,8 +527,6 @@ function PromoteStep({ semester, onNext }: { semester: Semester; onNext: () => v
   )
 }
 
-/* ── Step 4: activate ────────────────────────────────────────────────────── */
-
 function ActivateStep({ semester, onDone }: { semester: Semester; onDone: () => void }) {
   const { toast } = useToast()
   const [checks, setChecks] = useState<RolloverCheck[]>([])
@@ -589,8 +559,6 @@ function ActivateStep({ semester, onDone }: { semester: Semester; onDone: () => 
       toast(`${semester.name} activated · ${n} students carried over.`, 'success')
       onDone()
     } catch (e) {
-      // The server re-runs the blocking checks, so this is where a stale UI
-      // gets corrected — surface the reason verbatim and re-read the list.
       toast(errorText(e, "Couldn't activate that semester."), 'error')
       void load()
     } finally {
@@ -665,8 +633,6 @@ function ActivateStep({ semester, onDone }: { semester: Semester; onDone: () => 
             ? `${warnings.find((w) => w.code === 'unplaced')?.count} student(s) are not in this semester — they become read-only. This cannot be undone from the app.`
             : 'This cannot be undone from the app.'
         }
-        // The same typed-name challenge that gates hard-deleting a student.
-        // This is a bigger action than that one.
         challengeText={semester.name}
         confirmLabel="Activate semester"
       />

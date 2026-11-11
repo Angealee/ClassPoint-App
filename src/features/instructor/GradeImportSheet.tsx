@@ -24,28 +24,6 @@ import { errorText } from '@/lib/errors'
 import { cn } from '@/lib/cn'
 import type { GradeComponent, GradeItem, RosterPerson, TermKey } from '@/lib/types'
 
-/**
- * Importing one term from the instructor's spreadsheet.
- *
- * ⚠ THE RISKIEST SCREEN IN THE FEATURE. Three stages, and the middle one
- * cannot be skipped:
- *
- *   1. CONFIRM THE STRUCTURE. Detection reads the merged group headers and the
- *      totals row, which works on the file this was built against — and one
- *      inserted column shifts all of it. Every range and every total is shown
- *      beside the real header text and stays editable. A wrong total rescales
- *      the whole class, which is the failure this feature exists to remove.
- *
- *   2. REVIEW THE NAMES. Exact matches are pre-ticked; nothing else is.
- *      Ambiguous rows are never resolved automatically, fuzzy ones are never
- *      ticked for you, a name with no student NEVER creates one, and students
- *      the sheet does not mention are listed in their own right — that last
- *      bucket is the strongest signal the wrong file was loaded.
- *
- *   3. CONFIRM THE COUNTS, then one transactional write.
- */
-
-/** One column per component — the source sheet has no per-item maximum. */
 const IMPORT_SUFFIX = ' (imported)'
 const importedName = (c: GradeComponent) => `${COMPONENT_LABEL[c]}${IMPORT_SUFFIX}`
 
@@ -83,7 +61,6 @@ export function GradeImportSheet({
   const [structure, setStructure] = useState<SheetStructure | null>(null)
   const [rows, setRows] = useState<ImportRow[]>([])
   const [report, setReport] = useState<MatchReport | null>(null)
-  /** sheet row index → the student it writes to, or null for "skip". */
   const [picks, setPicks] = useState<Map<number, string | null>>(new Map())
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState<Preflight | null>(null)
@@ -162,7 +139,6 @@ export function GradeImportSheet({
     )
     setRows(collected)
     setReport(next)
-    // ONLY exact matches start ticked. Fuzzy and ambiguous are decisions.
     const seeded = new Map<number, string | null>()
     for (const r of next.rows) {
       seeded.set(r.row.index, r.bucket === 'exact' ? r.candidates[0].studentId : null)
@@ -197,14 +173,11 @@ export function GradeImportSheet({
         if (!studentId) continue
         for (const c of mapped) {
           const value = row.totals[c]
-          // Null means the sheet had no marks there. Sending 0 would record a
-          // score nobody gave, and the official grade counts it.
           if (value === null) continue
           marks.push({ component: c, studentId, score: value })
         }
       }
 
-      // Count what already exists, so the confirm can say how much is replaced.
       const existing = await listGradeItems(sectionId, subjectId, term)
       const targets = new Map<GradeComponent, GradeItem>()
       for (const item of existing) {
@@ -259,7 +232,6 @@ export function GradeImportSheet({
       onImported()
       close()
     } catch (e) {
-      // The RPC is one transaction, so a refusal really did change nothing.
       toast(errorText(e, 'Nothing was imported.'), 'error')
       setConfirm(null)
     } finally {
@@ -638,8 +610,6 @@ function Group({
                 className={cn(picked === null && 'text-muted')}
               >
                 <option value="">Skip this row</option>
-                {/* Candidates first, then everyone, so an ambiguous row still
-                    allows the right answer when neither candidate is it. */}
                 {item.candidates.length > 0 && (
                   <optgroup label="Suggested">
                     {item.candidates.map((c) => (

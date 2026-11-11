@@ -1,10 +1,5 @@
 import { fetchAllRows } from './_internal'
 
-// ============================================================================
-// Full backup export (Phase A) — everything, for the "Backup all" workbook
-// ============================================================================
-
-/** Raw datasets for the full-backup workbook (assembled in lib/export-all.ts). */
 export interface FullBackupData {
   sections: Array<{ id: string; name: string }>
   students: Array<{
@@ -53,8 +48,6 @@ export interface FullBackupData {
   }>
 }
 
-
-/** Every dataset the full backup needs, in one go (instructor RLS covers all). */
 export async function fetchFullBackup(): Promise<FullBackupData> {
   const [sections, students, secrets, events, records, sessions, redemptions] =
     await Promise.all([

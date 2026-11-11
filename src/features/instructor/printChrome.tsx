@@ -1,28 +1,12 @@
 import { useEffect, type ReactNode } from 'react'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 
-/**
- * Shared chrome for the two grade print routes.
- *
- * ── WHY THIS FORCES THE LIGHT THEME INSTEAD OF HARDCODING COLOURS ───────────
- * `StudentReport` (0023-era) carries its own namespaced light-only stylesheet
- * so dark mode cannot leak onto paper. That works, but it means any component
- * it prints must exist twice — once in tokens, once in literals — and this
- * route prints `StudentGradeBreakdown`, which the record page also renders.
- *
- * The theme is a single `dark` class on `documentElement`, so removing it for
- * the life of this route gives every token its light value and the SAME
- * component prints correctly. One definition of the arithmetic, one of the
- * layout, and nothing to keep in step.
- */
 export function useForcedLightTheme(): void {
   useEffect(() => {
     const root = document.documentElement
     const wasDark = root.classList.contains('dark')
     if (wasDark) root.classList.remove('dark')
     return () => {
-      // Restore on the way out, or going Back from a printout would silently
-      // put the whole app in light mode.
       if (wasDark) root.classList.add('dark')
     }
   }, [])
@@ -33,11 +17,6 @@ interface PrintChromeProps {
   subtitle?: string
   onBack: () => void
   loading?: boolean
-  /**
-   * Printed ON the paper, never only on screen. A failed load that renders as
-   * an empty table reads as "nobody has a grade", which is the worst thing a
-   * grade sheet can say by accident.
-   */
   loadError?: string | null
   children: ReactNode
 }
@@ -67,8 +46,6 @@ export function PrintChrome({
         <header className="gp-header">
           <h1>{title}</h1>
           {subtitle && <p className="gp-muted">{subtitle}</p>}
-          {/* With no audit log on grades, this stamp is the only "as of" the
-              printed sheet will ever carry. */}
           <p className="gp-muted gp-stamp">Generated {stamp}</p>
         </header>
 

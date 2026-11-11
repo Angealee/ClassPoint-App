@@ -4,45 +4,12 @@ import { describe, expect, it } from 'vitest'
 import { TONE, type ToneName } from './tone'
 import { STATUS_META } from '@/components/attendance/StatusChip'
 
-/**
- * Guards the semantic colour layer.
- *
- * Two things are worth a test here, and neither is about taste.
- *
- * 1. The DEMOTION. Brand red used to mean "bad" (absent, rejected, a penalty)
- *    and "good" (a rank climb, the Activities category, an active nav item) at
- *    the same time. Separating them is only worth anything if it STAYS
- *    separated — one hand-typed `text-brand-500` on a penalty chip and red goes
- *    back to meaning nothing in particular.
- *
- * 2. The LEAK. 111 raw-palette colours were replaced with role tokens. Nothing
- *    stops the 112th being typed tomorrow, and it would look almost right —
- *    `--success-solid` IS emerald-500 — while quietly opting that one element
- *    out of every future theme change.
- *
- * Pure source-text parsing, no mocking, in the spirit of the other pure-lib
- * suites. It cannot check what a colour LOOKS like; it checks that the app has
- * exactly one place where that question is answered.
- */
-
 const SRC = join(process.cwd(), 'src')
 const TONES = Object.keys(TONE) as ToneName[]
 
-/** Raw Tailwind palette families. `brand` and `gold` are the app's OWN scales
- *  (declared in @theme), so they are legitimate — these are not. */
 const RAW =
   /\b(?:bg|text|border|ring|fill|stroke|divide|shadow)-(?:emerald|sky|red|orange|zinc|slate|gray|rose|violet|indigo|purple|blue|green|yellow|amber|teal|cyan|lime|fuchsia|pink|stone|neutral)-\d{2,3}\b/
 
-/**
- * Deliberate token-free islands, each for a reason that a test must not
- * "fix" away:
- *  ShareCard    — inline styles + a hard-coded palette, because var(--x) does
- *                 not resolve inside modern-screenshot's cloned capture
- *                 context. Tokenising it exports a black or transparent image.
- *  PodiumBoard  — the medal ramps are two-stop gradients (from-zinc-200
- *                 to-zinc-500) plus the ink that sits on them. Bespoke art.
- *  BadgeArt     — per-rarity gradient art, same reasoning.
- */
 const ART_ISLANDS = ['ShareCard.tsx', 'PodiumBoard.tsx', 'BadgeArt.tsx']
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -74,11 +41,6 @@ describe('TONE', () => {
     }
   })
 
-  /**
-   * THE demotion invariant. `danger` and `accent` are both reds; if danger ever
-   * borrows a brand class they collapse back into one colour and a "−5" chip
-   * looks like an active tab again.
-   */
   it('keeps danger clear of brand red', () => {
     for (const value of Object.values(TONE.danger)) {
       expect(value, `danger must not use brand: "${value}"`).not.toMatch(/brand/)
@@ -87,11 +49,6 @@ describe('TONE', () => {
     expect(TONE.accent.chip).not.toBe(TONE.danger.chip)
   })
 
-  /**
-   * Tailwind's scanner only sees COMPLETE class strings in source. A value
-   * assembled as `bg-${role}-solid/10` generates no CSS at all and the element
-   * renders with no background — which looks like a layout bug, not a colour one.
-   */
   it('has no interpolated class strings', () => {
     const src = readFileSync(join(SRC, 'lib', 'tone.ts'), 'utf8')
     const table = src.slice(src.indexOf('export const TONE'))
@@ -105,7 +62,6 @@ describe('attendance status roles', () => {
     expect(STATUS_META.late.tone).toBe('warn')
     // Was brand-500 — the same colour as an active nav item.
     expect(STATUS_META.absent.tone).toBe('danger')
-    // Neutral by design: a legitimate pass, not a reward and not a punishment.
     expect(STATUS_META.excused.tone).toBe('info')
     expect(STATUS_META.irregular.tone).toBe('neutral')
   })
@@ -116,23 +72,6 @@ describe('attendance status roles', () => {
   })
 })
 
-/**
- * Brand red is DEFINED in the token layer and referenced nowhere else.
- *
- * `--accent` and `--ring` are built from the brand scale, so `bg-accent-solid`
- * and `bg-brand-500` render identically — which is exactly why this needs a
- * test rather than a convention. Nothing visibly breaks when someone types the
- * raw scale; it just quietly opts that one element out of the accent, so
- * retuning `--accent` later leaves it behind.
- *
- * `brand-950` is exempt: it is the near-black ink that sits ON gold surfaces
- * (the gold Button variant, the podium pedestal), not a use of brand red.
- *
- * The pattern deliberately does NOT enumerate utility prefixes. The first
- * version listed them (`bg|text|border|…`) and silently missed
- * `border-t-brand-500` in Spinner — verified by injecting one and watching the
- * test pass. Matching the scale itself catches every prefix, present and future.
- */
 const RAW_BRAND = /-brand-(?:50|[1-9]00)\b/
 
 describe('brand red lives in the token layer only', () => {
@@ -140,7 +79,6 @@ describe('brand red lives in the token layer only', () => {
     const offenders: string[] = []
     for (const f of FILES) {
       for (const [i, line] of readFileSync(f, 'utf8').split('\n').entries()) {
-        // Skip prose: several comments quote the old classes as history.
         const code = line.replace(/^\s*(\*|\/\/).*/, '')
         const hit = code.match(RAW_BRAND)
         if (hit) offenders.push(`${f.replace(SRC, 'src')}:${i + 1}  ${hit[0]}`)
@@ -155,7 +93,6 @@ describe('no raw palette leaks', () => {
     const offenders: string[] = []
     for (const f of FILES) {
       for (const [i, line] of readFileSync(f, 'utf8').split('\n').entries()) {
-        // Skip prose: several comments quote the old colours as history.
         const code = line.replace(/^\s*(\*|\/\/).*/, '')
         const hit = code.match(RAW)
         if (hit) offenders.push(`${f.replace(SRC, 'src')}:${i + 1}  ${hit[0]}`)

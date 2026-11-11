@@ -5,18 +5,11 @@ import { getProfileViews } from '@/lib/api'
 import { VisitorsSheet } from './VisitorsSheet'
 import type { ProfileViews, ProfileVisitorRow } from '@/lib/types'
 
-/**
- * "Who viewed your profile" — a Messenger-style strip of recent visitors plus a
- * total view counter. Only meaningful for your OWN profile (the RPC returns
- * empty for anyone else), so render it only when `isMe`. Fails silent: if the
- * views RPC isn't available yet, the section simply doesn't appear.
- */
 export function ProfileVisitors({
   studentId,
   onOpenViewer,
 }: {
   studentId: string
-  /** Tap a visitor to open their profile (only on your own Profile page). */
   onOpenViewer?: (row: ProfileVisitorRow) => void
 }) {
   const [views, setViews] = useState<ProfileViews | null>(null)
@@ -38,7 +31,6 @@ export function ProfileVisitors({
     }
   }, [studentId])
 
-  // If the feature isn't wired up server-side yet, stay out of the way.
   if (state === 'error') return null
 
   return (
@@ -99,7 +91,6 @@ export function ProfileVisitors({
   )
 }
 
-/** "Seen by El Gabriel, Juan +3 more" from the recent visitors + distinct count. */
 function caption({ recent, visitors }: ProfileViews): string {
   if (recent.length === 0) return `${visitors} ${visitors === 1 ? 'person' : 'people'}`
   const [a, b] = recent

@@ -4,14 +4,6 @@ import { CheckIcon } from '@/components/ui/icons'
 import { getMyEventHistory } from '@/lib/api'
 import type { EventHistoryEntry } from '@/lib/types'
 
-/**
- * A student's past GLOBAL EVENT check-ins (0055) — the same list on the event
- * scan screen, the student's Attendance history and the instructor's per-student
- * record, so there is ONE definition (no fourth copy to drift). Deliberately its
- * OWN section, kept apart from class attendance: an event never counts toward a
- * show-up rate, a streak or any achievement metric. Self-contained fetch, fails
- * silent (renders nothing), so a missing RPC never touches the screen it sits on.
- */
 export function StudentEventHistory({
   studentId,
   title = 'Event attendance',

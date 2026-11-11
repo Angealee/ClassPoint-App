@@ -11,47 +11,18 @@ import { cn } from '@/lib/cn'
 import type { LeaderboardEntry } from '@/lib/types'
 
 interface PodiumBoardProps {
-  /** Already-sorted entries (rank ascending) for the current view. */
   entries: LeaderboardEntry[]
   /** The viewing student's id, so their own card/row stands out. */
   meId?: string | null
   /** Resolve a section id to its display name. */
   sectionName?: (id: string) => string
-  /** Show the section name on cards/rows (handy on multi-section views). */
   showSection?: boolean
-  /** A pinned "your standing" row for a viewer who sits outside `entries`. */
   pinnedSelf?: LeaderboardEntry | null
-  /** Tapping a card/row calls this (e.g. to open a profile preview). */
   onSelect?: (entry: LeaderboardEntry) => void
   /** Soft gold spotlight behind the podium (on by default). */
   glow?: boolean
-  /** One-shot confetti when the board first appears (on by default). */
   confetti?: boolean
-  /**
-   * Show the rank-movement arrow and tenure flame (0037).
-   *
-   * MUST be false on a filtered view. `previous_rank` and `rank_since` describe
-   * a student's position on the WHOLE board, while a section view renumbers
-   * rows by their position within that section — so a row could read "#4 ▲3"
-   * when the position on screen never moved. Rather than silently mixing two
-   * different rankings, the signals are simply omitted where they can't be
-   * stated truthfully.
-   */
   rankSignals?: boolean
-  /**
-   * Which number this board ranks on (0038).
-   *
-   * `'spent'` is NOT a cosmetic swap. This component derives a level from
-   * `entry.points` for the XP ring and the "Lv N" label, and spend totals run
-   * through the level curve produce a CONFIDENTLY WRONG level for every
-   * student. So the spend board skips the level computation entirely — plain
-   * ring, no level line — rather than showing a number that means nothing.
-   *
-   * Varying the board instead of copying it is deliberate: this codebase has
-   * paid five times over for duplicating the show-up-rate rule and four times
-   * for duplicating the points row, discovering each time that the copies had
-   * drifted apart.
-   */
   metric?: 'points' | 'spent'
 }
 
@@ -85,22 +56,6 @@ const TIER: Record<
   },
 }
 
-/**
- * The spend board's own ramp — a TICKET STUB rather than a medal.
- *
- * You did not win third place at spending; you cashed something in. So the
- * champion wears a ticket instead of a crown, the stands carry punched notches,
- * and the metal ramps give way to a violet family that is unmistakably not
- * gold. That last part is the point: a student who lands on a board should know
- * which one it is from a glance at a screenshot, without reading a word.
- *
- * Raw palette values, exactly like the medal ramps above — PodiumBoard is one
- * of the three declared token-free art islands (see tone.test.ts). A two-stop
- * gradient plus the ink that sits on it is not something a flat role token can
- * express, which is why --silver and --bronze were removed in Phase 4.
- *
- * Violet to indigo to slate is a DESCENDING ramp, so it still reads as 1-2-3.
- */
 const TIER_SPEND: typeof TIER = {
   1: {
     border: 'border-violet-400/70!',
@@ -125,28 +80,16 @@ const TIER_SPEND: typeof TIER = {
   },
 }
 
-/**
- * What share of everything they earned this semester they have actually spent.
- *
- * `points` is the balance still on the board and `spent_points` is what left, so the
- * two together are what they earned — the same arithmetic UsePoints already
- * shows you about yourself ("you've cashed in 12 of the 40 you've earned").
- *
- * It fills the ring that level progress leaves empty on this board, and it is
- * the most interesting figure on it: who is all-in versus who is hoarding.
- */
 function spentSharePct(entry: LeaderboardEntry): number {
   const earned = entry.spent_points + entry.points
   return earned > 0 ? (entry.spent_points / earned) * 100 : 0
 }
 
-/** Stand heights — #1 tallest, creating the classic winners' staircase. */
 const PEDESTAL_H: Record<Place, string> = {
   1: 'h-14 sm:h-20',
   2: 'h-10 sm:h-12',
   3: 'h-7 sm:h-8',
 }
-
 
 export function PodiumBoard({
   entries,
@@ -161,7 +104,6 @@ export function PodiumBoard({
   metric = 'points',
 }: PodiumBoardProps) {
   const reduced = useReducedMotion() ?? false
-  // One-shot celebration when the board first mounts; auto-clears after ~2s.
   const [showConfetti, setShowConfetti] = useState(confetti)
   useEffect(() => {
     if (!confetti) return
@@ -177,18 +119,6 @@ export function PodiumBoard({
   const rest = entries.slice(3)
   const climber = biggestClimber(entries)
 
-  /**
-   * THREE FIXED SLOTS: #2 left, #1 centre, #3 right. A missing place is a hole.
-   *
-   * This replaces `top3.length >= 3 ? [#2, #1, #3] : top3`, which fell back to
-   * natural order — so a board with only two ranked students put #1 on the LEFT
-   * and #2 beside it, i.e. the podium read backwards in exactly the situation
-   * (the first week of a semester) where it is most likely to happen.
-   *
-   * Fixed slots are also what let the row be a 3-column grid: every card is one
-   * third whether or not it exists, so the champion stays centred and the two
-   * cards present do not stretch to fill the row.
-   */
   const podiumSlots: Array<{ entry: LeaderboardEntry; place: Place } | null> = [
     top3[1] ?? null,
     top3[0] ?? null,
@@ -197,19 +127,7 @@ export function PodiumBoard({
 
   return (
     <div className="space-y-3">
-      {/* `overflow-x-clip` contains the glow below, which is deliberately
-          w-[130%] and was the app's one real source of horizontal overflow —
-          measured at 414px of scroll width inside a 360px box, which is what
-          made every screen on the leaderboard read as cropped. Clipped on the X
-          axis only, so the crown still floats above the champion's card
-          (`-top-9`); `clip` allows a per-axis value where `hidden` does not. */}
       <div className="relative overflow-x-clip">
-        {/* A single STATIC wash grounds the podium. It used to breathe
-            (cp-arena-glow); with comments now flying in front of the board, one
-            more thing pulsing was one too many.
-            The hue follows the board — a GOLD halo behind the violet spend
-            podium was the one thing still saying "points" on a screen that had
-            otherwise changed colour completely. */}
         {glow && (
           <div
             className="pointer-events-none absolute left-1/2 top-6 h-44 w-[130%] -translate-x-1/2 rounded-[50%]"
@@ -221,40 +139,8 @@ export function PodiumBoard({
             }}
           />
         )}
-        {/* Confetti stays: it fires ONCE on arrival, so it is a moment rather
-            than ambient motion. */}
         {showConfetti && <ConfettiBurst />}
 
-        {/* ⚠ A GRID, NOT A FLEX ROW, AND THAT IS THE WHOLE FIX.
-            (The instructor's report, 2026-11-08: "the rank 1 2 3 design width
-            is changing based on the name, it looks awkward and weird. It SHOULD
-            not move.")
-
-            The cards used to be `flex-1` items with `max-w-[12rem]` on the
-            champion and `max-w-[10rem]` on the other two. `flex: 1 1 0%` looks
-            like it should give three equal columns — but a flex item's
-            `min-width` defaults to `auto`, so each card's min-content size
-            becomes its floor, and the children that do NOT truncate contribute
-            to it: the points figure, the "Lv 12" meta line, the pedestal, the
-            signals row. So the three cards resized as names got longer and as
-            a score gained a digit, and the podium visibly shifted between two
-            refreshes of the same board.
-
-            `grid-cols-3` with `min-w-0` on every cell makes each card exactly
-            one third of the row, whatever is in it. `min-w-0` is the half that
-            actually matters: a grid item ALSO defaults to `min-width: auto` and
-            refuses to shrink below its content — the documented trap that made
-            `truncate` silently do nothing in `Stat` and `ScaleRow`. With it,
-            every `truncate` inside the card finally has a width to truncate
-            against.
-
-            The champion is still raised, by HEIGHT alone — the taller pedestal
-            (PEDESTAL_H) and the larger avatar. Width was never carrying that
-            distinction, it was only making the row unstable.
-
-            Gaps and padding went up (gap-1.5 → gap-2.5, px-2 → px-3 inside the
-            card) on the same instruction: "do not squish it for space". That
-            costs vertical space, which is the trade that was asked for. */}
         <div className="relative grid grid-cols-3 items-end gap-2.5 px-0.5 pt-12 sm:gap-3 sm:px-1">
           {podiumSlots.map((slot, i) =>
             slot ? (
@@ -270,23 +156,14 @@ export function PodiumBoard({
                 onClick={pick?.(slot.entry)}
               />
             ) : (
-              // An empty slot holds its third of the row open, so two cards
-              // stay card-sized and the champion stays centred.
               <div key={`empty-${i}`} aria-hidden />
             ),
           )}
         </div>
 
-        {/* Shared stage floor — grounds the three stands so they read as one
-            podium instead of floating bars. */}
         <div className="relative z-[1] -mt-px h-2.5 rounded-b-lg border border-t-0 border-line bg-gradient-to-b from-card-2 to-card shadow-sm" />
       </div>
 
-      {/* Who moved most, sitting between the podium and the rest — which is
-          exactly what it means: the bridge from "the winners" to "everyone
-          else". Gated on rankSignals for the same reason the per-row arrows
-          are: previous_rank describes the WHOLE board, so on a section view it
-          would be mixing two different rankings. */}
       {rankSignals && climber && (
         <div className="flex items-center gap-2.5 rounded-xl bg-success-solid/10 px-3 py-2">
           <span className="text-sm font-bold text-success" aria-hidden>
@@ -305,9 +182,6 @@ export function PodiumBoard({
         </div>
       )}
 
-      {/* One divided list, not seven floating cards. This is where most
-          students actually find themselves, so it should read as a ranking —
-          and it reclaims the vertical space seven card gaps were spending. */}
       {rest.length > 0 && (
         <Rows>
           {rest.map((entry, i) => (
@@ -322,7 +196,6 @@ export function PodiumBoard({
               rankSignals={rankSignals}
               metric={metric}
               onClick={pick?.(entry)}
-              // entries[i + 2] is the row directly above this one (place i+3).
               gapToAbove={
                 meId === entry.student_id
                   ? Math.max(0, entries[i + 2].points - entry.points)
@@ -347,8 +220,6 @@ export function PodiumBoard({
             index={0}
             reduced={reduced}
             metric={metric}
-            // Safe even in a section view: this row is numbered by the real
-            // global rank, not a position within the filtered list.
             rankSignals
             onClick={pick?.(pinnedSelf)}
           />
@@ -380,16 +251,12 @@ function PodiumCard({
 }) {
   const spend = metric === 'spent'
   const tier = spend ? TIER_SPEND[place] : TIER[place]
-  // On the spend board there is no level to show — see the `metric` doc above.
   const progress = spend ? null : getLevelProgress(entry.points)
   const value = spend ? entry.spent_points : entry.points
-  // Gold level progress on the points board, share-of-earnings on the spend
-  // board. Same ring, same geometry, so the two podiums read as siblings.
   const ringPct = spend ? spentSharePct(entry) : (progress?.progressPct ?? 0)
   const ringColor = spend ? '#a78bfa' : '#ffba1f'
   const champ = place === 1
 
-  // Tap a podium card → a brief celebratory spotlight, then open the profile.
   const [spot, setSpot] = useState(false)
   const activate = onClick
     ? () => {
@@ -421,21 +288,11 @@ function PodiumCard({
         }
       }}
       className={cn(
-        // `min-w-0`, and no `flex-1` and no `max-w`: the parent is a
-        // `grid-cols-3`, so the column already IS exactly one third. `flex-1`
-        // here did nothing useful in a grid, and the two different `max-w`
-        // caps are what made the champion a different WIDTH from its
-        // neighbours — the instability being fixed. `min-w-0` is required:
-        // a grid item defaults to `min-width: auto` and would otherwise refuse
-        // to shrink below its content, which is what silently defeats every
-        // `truncate` inside this card.
         'relative flex min-w-0 flex-col',
         activate &&
           'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
       )}
     >
-      {/* A crown for the top of the points board, a ticket for the top of the
-          spend board. Same slot, same bob — the glyph is the tell. */}
       {champ && (
         <div className="pointer-events-none absolute -top-9 left-1/2 z-20 -translate-x-1/2">
           {spend ? (
@@ -452,14 +309,9 @@ function PodiumCard({
 
       <Card pad="none"
         className={cn(
-          // px-3 at phone width, up from px-2: the name had ~100px to live in
-          // and truncated on most real names. "Do not squish it for space" —
-          // so the card is roomier and the podium is taller.
           'relative flex flex-col items-center gap-2 overflow-hidden border px-3 text-center sm:gap-2.5 sm:px-3.5',
           tier.border,
           champ ? 'pb-3.5 pt-8 sm:pb-4 sm:pt-8' : 'pb-3.5 pt-6 sm:pb-3.5 sm:pt-6',
-          // The champion's card carries a steady gold edge instead of a
-          // breathing glow — still clearly the winner, no longer pulsing.
           champ && 'ring-1 ring-gold-400/40',
         )}
       >
@@ -470,10 +322,6 @@ function PodiumCard({
         {/* "You" tint. */}
         {isMe && <div className="pointer-events-none absolute inset-0 bg-accent-solid/10" />}
 
-        {/* One ring, two meanings: level progress on the points board, and how
-            much of everything they've earned they've cashed in on the spend
-            board. It used to sit empty on the spend board, which read as
-            something that had failed to load. */}
         <div
           className="relative z-[1] rounded-full p-[3px]"
           style={{
@@ -498,9 +346,6 @@ function PodiumCard({
             {entry.display_name}
             {isMe && <span className="text-accent"> (you)</span>}
           </p>
-          {/* The ring's number, written out — "Lv 3" on one board, "60%
-              cashed in" on the other. Reading the same slot differently is
-              itself a signal of which board you're on. */}
           <p className="truncate text-2xs text-muted sm:text-xs">
             {sectionLabel}
             {sectionLabel ? ' · ' : ''}
@@ -514,18 +359,11 @@ function PodiumCard({
             reduced={reduced}
             className="font-display text-xl font-bold text-gold-400 sm:text-2xl"
           />
-          {/* "used" rather than "spent": the shop screen is called Use points
-              and the ledger writes "Used · …", so this is the word students
-              already have for it. */}
           <span className="text-xs font-medium text-muted">
             {metric === 'spent' ? 'used' : 'pts'}
           </span>
         </div>
 
-        {/* Movement + tenure (0037). Their own centred row rather than the name
-            line: these cards are a third of the screen wide, and the top of the
-            board is exactly where "held #1 for six days" is worth reading. Both
-            render nothing when they have nothing to say, so the row collapses. */}
         {rankSignals && (
           <div className="relative z-[1] flex flex-wrap items-center justify-center gap-1">
             <RankDelta entry={entry} />
@@ -534,8 +372,6 @@ function PodiumCard({
         )}
       </Card>
 
-      {/* Winners' stand — attached to the card; its top border is the platform
-          line, its open bottom merges into the shared floor below. */}
       <motion.div
         initial={reduced ? false : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -548,11 +384,6 @@ function PodiumCard({
         )}
       >
         <div className="absolute inset-x-0 top-0 h-1 bg-white/30" />
-        {/* Punched notches — the stand becomes a torn ticket stub. Half of each
-            circle sits outside the pedestal and is clipped away by its own
-            overflow-hidden, so what shows is a bite out of the edge rather
-            than a dot on top of it. Sized for the SHORTEST stand (#3 is h-7),
-            or the notches would meet in the middle there. */}
         {spend && (
           <>
             <span
@@ -599,17 +430,9 @@ function RestRow({
   rankSignals?: boolean
   metric: 'points' | 'spent'
   onClick?: () => void
-  /**
-   * Points needed to pass the row above — shown on YOUR row only.
-   *
-   * On every row it becomes ten small numbers competing with the points
-   * column, and for someone forty points back it reads as discouraging rather
-   * than motivating. On your own row it is the one figure you can act on.
-   */
   gapToAbove?: number | null
 }) {
   const spend = metric === 'spent'
-  // Null on the spend board — see the `metric` doc on PodiumBoardProps.
   const level = spend ? null : getLevelProgress(entry.points).level
   const value = spend ? entry.spent_points : entry.points
   return (
@@ -642,9 +465,6 @@ function RestRow({
         )}
       >
         {isMe && <div className="pointer-events-none absolute inset-0 bg-accent-solid/10" />}
-        {/* The rank is the primary datum on a leaderboard, so it anchors the
-            row. It used to be the quietest element in it — muted, and the same
-            size as the points on the far right. */}
         <span className="relative z-[1] w-7 shrink-0 text-center font-display text-lg font-bold tabular-nums">
           {place}
         </span>
@@ -654,15 +474,7 @@ function RestRow({
             {entry.display_name}
             {isMe && <span className="text-accent"> (you)</span>}
           </p>
-          {/* Section + level, then the two movement signals (0037). Both hide
-              themselves when there's nothing to say — no arrow on an unchanged
-              rank, no flame under a day — so this line stays quiet for most
-              rows instead of becoming a column of dashes and zeroes. */}
           <p className="flex items-center gap-1.5 text-xs text-muted">
-            {/* A stable colour per section, so you can find your own class among
-                208 students on the global board. Both theme values ride as CSS
-                variables rather than reading the theme once in JS, so the dot
-                follows a theme switch like everything else. */}
             {sectionLabel && (
               <span
                 aria-hidden
@@ -704,7 +516,6 @@ function RestRow({
     </motion.div>
   )
 }
-
 
 /** Eases a number from 0 up to `value` once on mount. */
 function CountUp({
