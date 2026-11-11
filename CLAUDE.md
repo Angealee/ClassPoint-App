@@ -241,7 +241,7 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   state; boost requests and the Ops switch fail with a readable message.
   0062 also carries `save_subject_policy` (the atomic weights save) — until it lands the
   weights editor works as before, at the old non-atomic risk.
-  **Next number: 0063.**
+  **Next number: 0066.** (0063 is pasted; 0064 and 0065 are written — see their sections below.)
   ⚠ **EVERY "WRITTEN AND NOT YET APPLIED" CLAIM IN THE BLOCK ABOVE IS NOW
   UNVERIFIED PROSE — ASK THE DATABASE INSTEAD.** It was written file by file
   over months, nobody could check it without reading every migration and
@@ -3538,17 +3538,17 @@ the work in dark and the stroke does it in light. Its animation is a **CSS keyfr
 the stands would drift off their shared floor), so the global reduced-motion block covers
 it with no `useReducedMotion` guard.
 
-**`ArchivedFarewell` follows `AuthTransition`'s single-timer pattern**, for the reason
-that component records: three sub-animations finish at three moments and
-`reducedMotion="user"` changes which, so one `setTimeout` is the only clock that cannot
-disagree with itself. Duration is **reading time, clamped** (3.6–9s) rather than fixed —
-4s yanks a four-line send-off away mid-sentence and 9s on an empty message is a student
-staring at a logo. `onDone` lives in a ref so the timer effect depends on nothing that
-changes (an inline-arrow callback is a new identity every render — the Sheet focus-trap
-bug that cost 21 sheets their keystrokes). **`TAP_GUARD_MS` 700 is load-bearing**: this
-screen appears immediately after the student taps "Sign in", and without it the tap
-already in flight would dismiss the farewell before it drew a frame — the same lesson
-`LevelUpBurst` records. z-[90]: above Sheet (40) and the bursts (50), below
+**`ArchivedFarewell` WAITS FOR THE STUDENT (instructor, 2026-11-11).** It used to follow
+`AuthTransition`'s single-timer pattern — a clamped reading time (3.6–9s) and then a fade-out
+by itself. That is gone: it fades IN (opacity only) and holds until a tap, click, or
+Enter / Space / Escape. A send-off that leaves while someone is still reading it is worse than one
+that waits, and nothing is in its way (the screen behind it is a read-only recap). So there is **no
+end timer at all**; the only timer left is `TAP_GUARD_MS` 700, which is still load-bearing: this
+screen appears immediately after the student taps "Sign in", and without it the tap already in
+flight would dismiss the farewell before it drew a frame — the same lesson `LevelUpBurst`
+records. `onDone` lives in a ref (an inline-arrow callback is a new identity every render — the
+Sheet focus-trap bug that cost 21 sheets their keystrokes). The layer takes focus on mount so the
+keyboard can dismiss it. z-[90]: above Sheet (40) and the bursts (50), below
 `AuthTransitionOverlay` (100), which is still fading out over the top of it.
 
 ⚠ **`material.test.ts`' PLATE GUARD WAS MISSING HALF ITS CALL SITES, and it was only
@@ -4279,6 +4279,45 @@ their screen (and an archived student has no grades at all).
   list (collapsed → 8 rows + filter → "Show all 11" → 11 rows). **Not verified:** the notification
   actually arriving, and every write path against a database.
 
+**Use points is now the spending hub (2026-11-09).** From the user's screenshots of
+`/app/grades` and `/app/points`: nothing on Grades told a student their points could be used,
+and `/app/points` was a generic form that did not know about their columns. Decisions (user,
+all the recommended ones): **the hub on /app/points** · **actionable columns first** · **keep the
+free-form request and the catalog below as "Something else"** · **an always-visible banner plus
+row links on Grades**. Where the user's plan was right and where it was corrected:
+- **One confirm flow, not two.** The boost confirm used to live on Grades, so spending was split
+  across two screens and the warning and rules existed twice. It now lives ONLY in
+  `components/points/GradeColumns.tsx` (rendered by `UsePoints`); `StudentGrades` no longer
+  imports `requestGradeBoost`, the confirm dialog, or even the student's redemption list (one
+  fewer query per visit).
+- **Routing is a query param, not a new route:** `/app/points?column=<id>`. The column is
+  scrolled into view and ringed; a deep link to a column that is NOT actionable opens the
+  collapsed list and highlights it there, because a highlight on something nobody can see is
+  worse than none. The existing history-aware back arrow returns to Grades.
+- **Not every column is a row.** Most are not boostable, and a screen of mostly dead rows teaches
+  students to ignore it. `boostColumns` (in `student-grades.ts`, 6 tests) splits them: boostable
+  ones are cards grouped by subject and term in the grid's own order (`17 → 20 / 20`, the REAL
+  gain after the cap, the bonus note when it was capped); everything else is one collapsed
+  "Not available yet (N)" list that says WHY (`boostReason`: waiting, mark not in, already full,
+  not offered, or "+3 from 5 pts"). It asks `boostState`, never re-derives it, and a test pins
+  that it agrees with `boostableCount`.
+- **The banner on Grades is never a dead end.** It shows even when nothing is boostable and says
+  "no column offers a boost yet" — a link that appeared only when there was something to do
+  would leave a student with nothing to tap in exactly the situation in the user's screenshot.
+  Each boostable row carries `+3 · use points ›`, a LINK (44px tap region), not a button.
+- **Enabled and disabled are no longer twins:** "Use 5 points" is the filled primary button;
+  "Need 45 more points", "3 requests waiting" and "Closed" are outline and disabled.
+- **While grades are switched off** the hub cannot list columns, so that section says "Grades
+  aren't open yet" and the catalog and free-form request below keep working.
+- `student-grades.test.ts`'s "never the official figure" guard now also reads `UsePoints.tsx` and
+  `GradeColumns.tsx`.
+- Verified by probe (removed, residue-checked) with fixture data on the REAL screens: 1440 dark,
+  375 and 320 in dark and light — zero overflow and zero overlapping tap targets on both
+  screens; the three row links carry the right column ids; deep links to an actionable and to a
+  non-actionable column; the hidden, "none boostable" and normal states. **Not verified:** the
+  request itself from this screen (it is the same RPC call moved, but it has still never run
+  against the database) and anything on a real login.
+
 **Grades UI rework (2026-11-09, from the user's screenshot: "it is a mess").** Decisions
 (user): **one compact toolbar** · **keep the grid compact and CENTRE it (REVERSED below — it now fills)** · **in So far, show
 only the computed parts that have marks** · **all four extras** (flat cells, partial flag, column
@@ -4394,6 +4433,175 @@ switch, Columns terms, the corner dot, the inbox, Reverse) and the whole write p
 `reverse_grade_boost` are typechecked and diffed, never run. 0062's verify block is the
 test: **do a full request → approve → reverse on a scratch student before opening
 grades to the class.**
+
+Since 0065 (Scores and points stay available when the grade switch is OFF — Era 8.0 Phase 9).
+Decision (instructor, 2026-11-11): **the switch hides the GRADE, not the screen.** **0065 is WRITTEN
+AND NOT YET APPLIED** — paste it AFTER 0064, twice; paste it BEFORE deploying the client (the client
+treats a missing `figures` as "figures shown when enabled", so deploying first is safe but keeps
+the old all-or-nothing behaviour).
+
+**"Student grades" now means "show students their GRADE".** Off used to mean "Grades aren't open
+yet" and nothing else — not even their own quiz scores — and `request_grade_boost` refused. Now,
+OFF: a student sees every column and their score on it ("23 / 40") and can use points on any of
+them exactly as when it is on; they do NOT see the term "so far" figure, the part scores, "How is
+this worked out?", or the Home Grades card. ON: as before. A student's own marks were never secret
+from them, so the switch no longer gates the screen.
+
+**HIDING IS REAL, NOT CSS.** While figures are hidden `get_my_grades` WITHHOLDS the weights
+(`policies: []`) and the attendance counts (`attendance: {}`) — the two inputs besides the marks
+that `grading.ts` needs — so a grade cannot be reconstructed from the payload, and `summarizeTerm`
+returns null on its own. The new `figures` key is what the screen reads; the screen decides what to
+SHOW from `figures`, not from an accident of what is missing. Only an ARCHIVED account is
+`enabled: false` now. Recitation's attendance row disappears with the figures (its counts are
+withheld) — an attendance rate IS the Recitation grade. `request_grade_boost` lost its
+"Grades are not open yet" gate. Ownership moves 0064 → 0065, same signatures, bodies diffed.
+Turning the switch ON still pushes "Your grades are open", which is now exactly true.
+
+**"use points", not "up to +N · use points" (instructor).** The row link and the card header chip
+no longer promise an amount: the maximum depends on the student's balance and the column, so a
+number on a row read as a price. The amount is on the card's picker, where it is the student's choice.
+
+**Grades screen polish (instructor's picks, 2026-11-11):** every score row has a thin progress bar
+and a score coloured by `rateTone` (the same 70 / 85 bands attendance uses — one threshold
+app-wide); the row action is a QUIET text link with a ticket icon ("Use points"), shown ONLY on a
+column that can still gain (a perfect score has none, and neither does an absent, waiting or
+unmarked one); a "In order / Lowest first" control sorts within each part (`sortItems` — weakest
+SHARE of the maximum, not lowest raw mark; unmarked last; stable; pinned by tests); and while grades
+are hidden the top card is a lock and one line ("Grades open soon — your scores are below"), not a
+"0 of N marked" that reads as a failure. **Declined:** a balance chip in the header and two columns
+on wide screens. Verified by probe (removed, residue-checked) at 320px: 23/40 reads 57% in danger,
+38/40 and 20/20 in success, the link has no border and carries the column id, no link on the
+perfect score, zero overflow.
+
+Since 0064 (Points assist is AUTOMATIC — Era 8.0 Phase 8). Decisions (instructor, 2026-11-11):
+**no terms to set** · **1 point = 1 mark** · **the student chooses how many points** ·
+**never past the column's maximum** · **still approved by hand** · **only a per-column Off
+survives**. **0064 is WRITTEN AND NOT YET APPLIED** — paste it AFTER 0063, twice, then run
+`applied_state.sql` BLOCK 6 (three new rows). **Migration before client, always:** the client now
+calls `request_grade_boost(item, points)` and reads `offered` from `get_my_grades`, so deploying it
+before the paste makes every request fail and every column read "not offered".
+
+**0064 REVERSES 0063's "the instructor sets the terms".** The per-part defaults, the per-column own
+terms, `effectiveTerms`/`assistModeOf`, the Points-assist tab and its panel are all GONE. A column
+is open the moment a student's mark is in; the only instructor control is `grade_items.assist_off`
+("Students can use points on this column" switch in the Columns edit row). `grade_assist_defaults`
+and `grade_items.points_cost/_bonus` are RETIRED, not dropped (their data is the record of what
+was once set, the nightly backup still mirrors them, and dropping a column the mirror depends on
+is exactly the drift the 0057 parking logic exists for) — nothing reads or writes them, and both
+carry a `comment on` saying so. **Do not re-add terms** without asking: the instructor removed them
+on purpose because setting a cost and a bonus per part was work with no payoff.
+
+**THE RULE, in one place.** `src/lib/grade-boost.ts`: `maxPointsFor(score, max)` is the marks
+still missing, rounded UP to a whole point (17.5/20 may use 3) and capped at 50 (a single
+request's ceiling); `pointsGain(points, score, max)` is `min(points, max - score)` — so a mark
+**can never pass the maximum** (3 points on 17.5/20 gains 2.5, and the screen says 2.5 before
+they confirm). `request_grade_boost` re-checks all of it and stores the capped amount as the bonus
+the student agreed to (`point_redemptions.grade_bonus`); **`decide_point_redemption` needed no
+change** — it already applied that bonus, re-capped at the moment of approval. Change one side,
+change the other, same commit. The signature changed, so 0064 drops `request_grade_boost(uuid)`
+first (a `create or replace` with a new parameter list makes an OVERLOAD and PostgREST rejects
+every call as ambiguous — the 0028 lesson). Still: once per column, absent refused (0063's rule),
+mark must be in, approved by hand, reversible.
+
+**The student's card** (`GradeColumns`) has a points picker: − / editable number / + (44px
+targets, `text-base`), defaulting to the most they can use (`min(maxPoints, free points)`), clamped
+if the balance or mark moves under it; the confirm states the REAL gain and the resulting mark,
+and the button reads "Use N points". The Grades row link says "up to +N · use points".
+
+**Verified by probe (removed, residue-checked)** with the real card at 320px: no overflow, 16px
+input, 44px steppers; 17/20 defaults to 3 with + disabled and "That's full marks"; 17.5/20 with 2
+free points defaults to 2 and shows 17.5→19.5; a typed 9 clamps to 3 and a typed 0 to 1; letters are
+stripped; the button submits a typed-but-unblurred value; zero free points disables everything and
+hides the "up to N" hint. **Not verified against a database** — 0064 is unpasted.
+
+Since 0063 (Points assist, the Absent mark, Recitation from attendance — Era 8.0 Phase 7).
+Decisions (instructor, 2026-11-09/11): **automatic by part, with defaults** · **fixed marks per
+part** · **an Absent mark, tied to attendance** · **Recitation IS the attendance rate** ·
+**"boost" becomes "points assist" everywhere a person reads it, server wording included**.
+⚠ **The per-part terms, per-column own terms and the Points-assist tab described in this section were REMOVED by 0064 (above); the Absent mark, attendance Recitation and wording changes stand.**
+
+**0063 is PASTED (the user, 2026-11-11 — "Success. No rows returned"); NOT YET CONFIRMED by
+`applied_state.sql`.** Run BLOCK 1b (0063 should read ALL PRESENT) and BLOCK 6 (its two new rows
+must read `true`), and paste the file a second time to prove idempotency, before trusting it. Had it
+not been applied the client would have degraded rather than broken: the A marks, the Points-assist
+tab and the class picker each fail in their own catch, and Recitation would read the 60 floor (no
+attendance counts to read).
+
+**"BOOST" IS NOW A WORD ONLY CODE USES.** Identifiers (`request_grade_boost`, `grade_boosts`,
+`'grade_boost'` audit action, `grade-boost.ts`, `BoostState`) keep their names — renaming a function
+or a CHECK value breaks every client already holding the old one for no reader's gain. Every STRING
+a person reads says "points assist": the app, and 0063 re-issues `request_grade_boost`,
+`decide_point_redemption` and `reverse_grade_boost` with the new push titles, ledger lines
+("Used · Points assist · …", "Refund · Points assist reversed · …"), request note and errors. Old
+ledger rows keep the old wording — they are history.
+
+**A COLUMN IS OPEN WITHOUT THE INSTRUCTOR FLAGGING IT.** Terms live per SUBJECT and per PART in
+`grade_assist_defaults` (Performance Tasks / Quizzes / Exam — Recitation has none: it is computed,
+so there is no mark to add to). `cp_assist_terms(item)` is the ONE answer to "what are this column's
+terms": off beats the column's own `points_cost/_bonus` beats the part's default. `assist_off` is the
+new per-column switch. `src/lib/grade-boost.ts` `assistModeOf` / `effectiveTerms` mirror it for the
+instructor's preview (pinned by tests; **change one side, change the other, same commit**).
+Set up → **Points assist** edits the per-part terms (subject-wide, and the sheet says so); the
+Columns edit row has Follow the part / Own terms / Off. Saving defaults has NO confirm on purpose —
+it moves no grade, and requests already waiting carry the terms the student agreed to.
+
+**THE ABSENT MARK.** A cell is a MARK, ABSENT (shown A) or BLANK. Two sources, one definition
+(`cp_grade_absent(item, student)`): the instructor typed A (`grade_absences`), or the column is
+tied to a class (`grade_items.session_id`) and the student is recorded **absent OR excused** there
+(the instructor's call — an excused absence is still a class missed). **Arithmetically an A is a
+BLANK**: out of "so far", a zero in Official — so `grading.ts` and `get_section_grade_sums` needed
+NO change for it; only display and the assist rule differ. It blocks a points assist **even when a
+mark was typed** (a 0 for an absentee must not be the easiest column to gain on) and the server
+checks it twice: at the request and again at approval, because the class link can be added between.
+A cell is one thing or the other: two triggers delete the other half, so no code path (grid,
+importer, an approved assist) can leave a cell saying both. `src/lib/grade-cell.ts` is the one
+definition of what a committed cell MEANS and is shared by the desktop grid and the phone entry:
+typing A on a cell that already reads A writes NOTHING (tabbing over a derived A must not create a
+manual row), a derived A cannot be cleared by erasing it, and a typed mark over a derived A keeps
+the A (it is about the class). `parseScoreInput` accepts `A`/`ab`/`abs`/`absent` in any case;
+`abc` is still a typo. The phone has an A button beside each field because the decimal pad has no
+letters. Exports write the letter A (text — `AVERAGE()` ignores it exactly as it ignores a blank).
+
+**RECITATION IS ATTENDANCE, AS-IS.** 97% attendance is a Recitation grade of 97 — **no 60 floor, no
+transmutation**, so 0% is 0 (harsher than the other parts, by choice; pinned in `grading.test.ts`
+because it is the number most likely to be "fixed"). It rides in the SAME `recitation` slot of
+`TermSums` holding COUNTS (`sumScore = showed`, `sumMax = sumMaxMarked = counted`), so every
+reader — grid, Overall, both exports, both prints, the weights preview — needed no change of its own.
+`cp_term_attendance(section, subject, term)` returns counts only (late counts as present; excused and
+irregular leave the denominator — the rule `lib/attendance.ts` states and `get_term_attendance` 0034
+implements), **subject-scoped** (attendance is per subject; untagged sessions are not counted) and
+compared in **Manila time**. `recitationScore` in grading.ts computes the rate — the ONE place, so
+"no weighting arithmetic in a migration" still holds. With no class counted yet it reads the floor
+and does not make a term "started" (`hasAnyItems` and `completionByTerm` ignore Recitation: classes
+being held is not work being graded). Typed Recitation columns are RETIRED — hidden from every
+screen (`listGradeItems` filters them, `sumsFromScores` skips them, `get_my_grades` omits them) but
+the rows and marks stay in `grade_items` and the 365-day backup. Imported past terms that carried a
+Recitation total therefore recompute from attendance: **check an imported term before trusting its
+Recitation**.
+
+**The grid.** Recitation is a computed column labelled "attendance". `CellEdit` gained `absent`;
+`onCommit(edit, previous: CellState)`; `GradeSheet` keeps `absencesRef` beside `scoresRef`, loads
+attendance and absences in their own catches, and flushes three kinds of write (mark / A / clear).
+A column's class link is picked in the Columns edit row from THIS term's classes for the subject
+(plus the linked one even if outside the list, so editing never silently drops it). Student side:
+`MyGradeItem.absent`, `MyGradeSubject.attendance`; the Grades screen shows "Absent" and an
+Attendance row under Recitation; `boostState` gained `absent` and answers it BEFORE "unmarked"
+(absent first, as the server does — "you were absent" is the truer reason and tells them not to
+wait for a mark that is not coming).
+
+**Verified by probe (removed, residue-checked)** with the REAL `GradeGrid` and `GradeItemEntry` and
+fixture data: every figure matches a hand calculation (Ana: quizzes 33/40 → 93, attendance 9/10 → 90,
+class standing 75.75, term 69.45 "partial"; Ben with only attendance reads a dash, not a number);
+typing `a` commits one write with `absent: true`; tabbing over or erasing a derived A commits
+NOTHING; a number over a typed A commits value + `absent: false`; a mark over a derived A keeps the
+"A" tag and its explanation; `abc` is refused with "…or A for absent". Phone entry at 320px: zero
+overflow, inputs 16px, A buttons 44×44, the derived A's button disabled — but the name column is only
+~94px wide beside the field, the A button and "/20", so a long name truncates early (its `title`
+carries it); widen it if that reads badly on a real phone.
+
+**NOT verified against a database:** the BEHAVIOUR of 0063 (it pasted clean; its bodies were
+extracted, diffed and parsed, but the rules have never been exercised), the absent rules end to end, the attendance counts, the triggers. **Not built:** an
+Absent mark on imported marks (the importer writes marks only); per-student overrides of a derived A.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

@@ -12,9 +12,10 @@ import {
   sumsFromScores,
   termGrade,
 } from '@/lib/grading'
-import { formatScoreInput, isOverMax, parseScoreInput } from '@/lib/grade-entry'
+import { isOverMax, parseScoreInput } from '@/lib/grade-entry'
+import { cellDisplay, resolveCommit, type AbsentSource, type CellState } from '@/lib/grade-cell'
 import { type CellEdit } from './GradeGrid'
-import type { GradeItem, GradePolicy, GradeView, RosterPerson } from '@/lib/types'
+import type { GradeAttendance, GradeItem, GradePolicy, GradeView, RosterPerson } from '@/lib/types'
 
 /**
  * Entering marks on a phone: one column at a time, down the roster.
@@ -33,17 +34,23 @@ interface GradeItemEntryProps {
   students: RosterPerson[]
   items: GradeItem[]
   scores: Map<string, number>
+  /** cellKey → why a cell reads Absent (0063). */
+  absences: Map<string, AbsentSource>
+  /** studentId → attendance counts; Recitation is computed from them (0063). */
+  attendance: Map<string, GradeAttendance>
   /** For the term figure under each name — the same policy and view the grid uses. */
   policy: GradePolicy
   view: GradeView
   failed: Set<string>
-  onCommit: (edit: CellEdit, previous: number | null) => void
+  onCommit: (edit: CellEdit, previous: CellState) => void
 }
 
 export function GradeItemEntry({
   students,
   items,
   scores,
+  absences,
+  attendance,
   policy,
   view,
   failed,
@@ -54,7 +61,7 @@ export function GradeItemEntry({
 
   // Seeded per item: switching columns re-reads the parent's map, which is
   // always current because every commit writes through to it.
-  const [values, setValues] = useState<Map<string, number | null>>(new Map())
+  const [values, setValues] = useState<Map<string, CellState>>(new Map())
   const [badCell, setBadCell] = useState<{ studentId: string; reason: string } | null>(null)
 
   // The roster's inputs, by row. Enter walks to the next one through this map
@@ -64,21 +71,24 @@ export function GradeItemEntry({
   const inputs = useRef(new Map<number, HTMLInputElement>())
 
   const current = useMemo(() => {
-    if (!item) return new Map<string, number | null>()
-    const m = new Map<string, number | null>()
+    if (!item) return new Map<string, CellState>()
+    const m = new Map<string, CellState>()
     for (const s of students) {
-      const own = values.get(`${item.id}:${s.id}`)
+      const own = values.get(cellKey(item.id, s.id))
       if (own !== undefined) m.set(s.id, own)
       else {
         const v = scores.get(cellKey(item.id, s.id))
-        m.set(s.id, v === undefined ? null : v)
+        m.set(s.id, {
+          value: v === undefined ? null : v,
+          absent: absences.get(cellKey(item.id, s.id)) ?? null,
+        })
       }
     }
     return m
-  }, [item, students, scores, values])
+  }, [item, students, scores, absences, values])
 
   const marked = useMemo(
-    () => [...current.values()].filter((v) => v !== null).length,
+    () => [...current.values()].filter((c) => c.value !== null).length,
     [current],
   )
 
@@ -99,13 +109,13 @@ export function GradeItemEntry({
       for (const i of items) {
         const key = cellKey(i.id, s.id)
         const typed = values.get(key)
-        const v = typed !== undefined ? typed : scores.get(key)
+        const v = typed !== undefined ? typed.value : scores.get(key)
         if (v !== undefined && v !== null) marks.set(i.id, v)
       }
-      out.set(s.id, termGrade(sumsFromScores(items, marks), policy, view))
+      out.set(s.id, termGrade(sumsFromScores(items, marks, attendance.get(s.id)), policy, view))
     }
     return out
-  }, [students, items, scores, values, policy, view])
+  }, [students, items, scores, values, policy, view, attendance])
 
   if (!item) {
     return (
@@ -116,20 +126,22 @@ export function GradeItemEntry({
   function commit(student: RosterPerson, el: HTMLInputElement) {
     if (!item) return
     const parsed = parseScoreInput(el.value)
-    const previous = current.get(student.id) ?? null
+    const before: CellState = current.get(student.id) ?? { value: null, absent: null }
 
     if (!parsed.ok) {
       setBadCell({ studentId: student.id, reason: parsed.reason })
-      el.value = formatScoreInput(previous)
+      el.value = cellDisplay(before)
       return
     }
 
     setBadCell(null)
-    el.value = formatScoreInput(parsed.value)
-    if (previous === parsed.value) return
+    // The same rule the desktop grid uses (lib/grade-cell.ts): a mark, A, or a clear.
+    const outcome = resolveCommit(parsed, before)
+    el.value = outcome.display
+    if (outcome.kind === 'none') return
 
-    setValues((m) => new Map(m).set(`${item.id}:${student.id}`, parsed.value))
-    onCommit({ itemId: item.id, studentId: student.id, value: parsed.value }, previous)
+    setValues((m) => new Map(m).set(cellKey(item.id, student.id), outcome.next))
+    onCommit({ itemId: item.id, studentId: student.id, ...outcome.write }, before)
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>, index: number) {
@@ -178,11 +190,13 @@ export function GradeItemEntry({
 
       <Rows>
         {students.map((student, index) => {
-          const value = current.get(student.id) ?? null
+          const cell = current.get(student.id) ?? { value: null, absent: null }
+          const value = cell.value
+          const isA = value === null && cell.absent !== null
           const over = isOverMax(value, item.maxScore)
           const isBad = badCell?.studentId === student.id
           return (
-            <div key={student.id} className="flex items-center gap-3 p-3">
+            <div key={student.id} className="flex items-center gap-2 p-3">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm">{student.fullName}</p>
                 <p className="text-2xs tabular-nums text-muted">
@@ -196,23 +210,58 @@ export function GradeItemEntry({
                   else inputs.current.delete(index)
                 }}
                 type="text"
+                // The decimal pad, because numbers are what this is for. It has no
+                // letters, so Absent is the A button beside it, not a typed key.
                 inputMode="decimal"
-                defaultValue={formatScoreInput(value)}
-                aria-label={`${item.name} for ${student.fullName}`}
+                defaultValue={cellDisplay(cell)}
+                aria-label={`${item.name} for ${student.fullName}${isA ? ', absent' : ''}`}
                 aria-invalid={isBad || undefined}
                 onFocus={(e) => e.currentTarget.select()}
                 onBlur={(e) => commit(student, e.currentTarget)}
                 onKeyDown={(e) => onKeyDown(e, index)}
                 className={cn(
                   // text-base, or iOS zooms the page on every single cell.
-                  'h-11 w-20 shrink-0 rounded-xl border border-line bg-canvas text-center text-base tabular-nums',
+                  'h-11 w-16 shrink-0 rounded-xl border border-line bg-canvas text-center text-base tabular-nums',
                   'focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]',
                   isBad && 'border-danger text-danger',
                   !isBad && over && 'border-warn text-warn',
+                  !isBad && isA && 'border-warn font-semibold text-warn',
                   !isBad && failed.has(cellKey(item.id, student.id)) && 'border-danger',
                 )}
               />
-              <span className="w-10 shrink-0 text-right text-2xs text-muted">
+              {/* Absent. A toggle: it marks the student absent, or takes a TYPED A
+                  back off. An A that comes from attendance can't be toggled here
+                  (it is about the class) and the button says so. */}
+              <button
+                type="button"
+                aria-pressed={isA}
+                aria-label={`Absent: ${student.fullName}`}
+                disabled={cell.absent === 'auto'}
+                title={
+                  cell.absent === 'auto'
+                    ? 'Recorded absent or excused in the class this column was held in.'
+                    : isA
+                      ? 'Marked absent — tap to undo'
+                      : 'Mark absent'
+                }
+                onClick={() => {
+                  const el = inputs.current.get(index)
+                  if (!el) return
+                  el.value = cell.absent === 'manual' ? '' : 'A'
+                  commit(student, el)
+                }}
+                className={cn(
+                  'h-11 w-11 shrink-0 rounded-xl border text-sm font-semibold',
+                  'focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]',
+                  isA
+                    ? 'border-warn bg-warn-solid/10 text-warn'
+                    : 'border-line text-muted hover:text-ink',
+                  'disabled:opacity-60',
+                )}
+              >
+                A
+              </button>
+              <span className="w-9 shrink-0 text-right text-2xs text-muted">
                 /{item.maxScore}
               </span>
             </div>

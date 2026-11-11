@@ -3,19 +3,6 @@ import { motion } from 'framer-motion'
 import { Logo } from '@/components/ui/Logo'
 
 /**
- * How long the whole run lasts, scaled to how much there is to read.
- *
- * A fixed duration is wrong at both ends: 4s yanks a four-line send-off away
- * mid-sentence, and 9s on an empty message is a student staring at a logo. So
- * it is reading time, clamped — and a tap skips it regardless, which is what
- * makes the ceiling safe.
- */
-const BASE_MS = 3200
-const PER_CHAR_MS = 28
-const MIN_MS = 3600
-const MAX_MS = 9000
-
-/**
  * Ignore the first tap for this long.
  *
  * ⚠ LOAD-BEARING, and the same lesson LevelUpBurst records. This screen appears
@@ -26,11 +13,6 @@ const MAX_MS = 9000
  */
 const TAP_GUARD_MS = 700
 
-function runMs(message: string | null): number {
-  const chars = message?.length ?? 0
-  return Math.min(MAX_MS, Math.max(MIN_MS, BASE_MS + chars * PER_CHAR_MS))
-}
-
 /**
  * The send-off an archived student reads on their way out (0060).
  *
@@ -40,11 +22,16 @@ function runMs(message: string | null): number {
  * reveals is a read-only recap. It is the first thing they see, so it owns the
  * whole viewport.
  *
- * ── ONE TIMER, NOT THREE ────────────────────────────────────────────────────
- * Three sub-animations finish at three different moments, and
- * `reducedMotion="user"` changes which. `AuthTransition` already learned this:
- * a single `setTimeout` is the only clock that cannot disagree with itself, so
- * `onDone` never hangs on an animation that was neutralised.
+ * ── IT NEVER GOES AWAY ON ITS OWN ──────────────────────────────────────────
+ * It used to run for a clamped reading time and then fade out by itself. The
+ * instructor's call (2026-11-11): the message stays until the student taps or
+ * presses a key. A send-off that leaves while someone is still reading it is
+ * worse than one that waits, and there is nobody it is in the way of — the
+ * screen behind it is a read-only recap. So there is no end timer at all; the
+ * only timer left is the tap guard below, and `onDone` fires from a tap or a key.
+ *
+ * It fades IN (opacity only) and then holds. Reduced motion neutralises the
+ * fade-in and the layer simply appears, which is the same end state.
  *
  * ── Z-INDEX ─────────────────────────────────────────────────────────────────
  * z-[90]: above Sheet (40) and the celebration bursts (50), below
@@ -53,7 +40,7 @@ function runMs(message: string | null): number {
  *
  * Everything animated here is opacity and transform, so it runs on the
  * compositor, and `<MotionConfig reducedMotion="user">` in App.tsx neutralises
- * the movement app-wide while the timer still fires on time.
+ * the movement app-wide.
  */
 export function ArchivedFarewell({
   semesterName,
@@ -65,8 +52,8 @@ export function ArchivedFarewell({
   message: string | null
   onDone: () => void
 }) {
-  const total = runMs(message)
   const [armed, setArmed] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   // Latest-ref so the timer effect depends on nothing that changes: an inline
   // arrow `onDone` from the parent is a new identity every render, and an
@@ -79,28 +66,34 @@ export function ArchivedFarewell({
 
   useEffect(() => {
     const guard = setTimeout(() => setArmed(true), TAP_GUARD_MS)
-    const end = setTimeout(() => doneRef.current(), total)
-    return () => {
-      clearTimeout(guard)
-      clearTimeout(end)
-    }
-  }, [total])
+    return () => clearTimeout(guard)
+  }, [])
+
+  // Focus the layer so Enter, Space or Escape can dismiss it without a pointer
+  // (a modal dialog that cannot be closed from the keyboard is a trap).
+  useEffect(() => {
+    rootRef.current?.focus()
+  }, [])
 
   return (
     <motion.div
+      ref={rootRef}
       role="dialog"
       aria-modal="true"
       aria-label="A message from your instructor"
+      tabIndex={-1}
       onClick={() => armed && onDone()}
-      className="fixed inset-0 z-[90] flex flex-col items-center justify-center gap-6 bg-canvas px-7 text-center"
-      initial={{ opacity: 0 }}
-      // in (0–0.12), hold (0.12–0.86), out into the recap (0.86–1).
-      animate={{ opacity: [0, 1, 1, 1, 0] }}
-      transition={{
-        duration: total / 1000,
-        times: [0, 0.12, 0.5, 0.86, 1],
-        ease: 'easeInOut',
+      onKeyDown={(e) => {
+        if (armed && (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape')) {
+          e.preventDefault()
+          onDone()
+        }
       }}
+      className="fixed inset-0 z-[90] flex cursor-pointer flex-col items-center justify-center gap-6 bg-canvas px-7 text-center outline-none"
+      initial={{ opacity: 0 }}
+      // In, then HOLD — nothing here ends it but the student.
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.8, ease: 'easeOut' }}
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.86 }}

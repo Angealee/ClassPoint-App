@@ -1,38 +1,31 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Button } from '@/components/ui/Button'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Card, Rows } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { ScreenTitle } from '@/components/ui/ScreenTitle'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
-import { useToast } from '@/components/ui/Toast'
-import { ChevronDownIcon, TableIcon } from '@/components/ui/icons'
-import { listMyRedemptions, requestGradeBoost } from '@/lib/api'
-import { errorText } from '@/lib/errors'
-import { boostState, formatMarks, type BoostState } from '@/lib/grade-boost'
+import { Meter } from '@/components/ui/Meter'
+import { ChevronDownIcon, LockIcon, TableIcon, TicketIcon } from '@/components/ui/icons'
+import { boostState, formatMarks } from '@/lib/grade-boost'
+import { rateTone } from '@/lib/attendance'
 import { displayGrade } from '@/lib/grading'
+import { TONE } from '@/lib/tone'
 import {
   TERM_TITLE,
   boostableCount,
+  sortItems,
   explainTerm,
   latestSoFar,
   summarizeTerm,
   termsWithItems,
 } from '@/lib/student-grades'
 import { cn } from '@/lib/cn'
-import {
-  MAX_PENDING_REDEMPTIONS,
-  type MyGradeItem,
-  type Redemption,
-  type TermKey,
-} from '@/lib/types'
+import type { MyGradeItem, TermKey } from '@/lib/types'
 import { useStudentData } from './StudentData'
-
-type Available = Extract<BoostState, { kind: 'available' }>
 
 /**
  * The student's own grades.
@@ -45,19 +38,21 @@ type Available = Extract<BoostState, { kind: 'available' }>
  *
  * ── DATA ───────────────────────────────────────────────────────────────────
  * From `StudentData`, which fetches it once off the critical path, and which the
- * Home card reads too. This screen fires no grade query of its own. It does
- * read the student's redemption list — not for grades, but because "can I afford
- * this, and do I already have three waiting" is answered by requests that are
- * not boosts at all.
+ * Home card and the Use-points screen read too. This screen fires no query of its
+ * own.
  *
- * Everything the screen offers is a PREVIEW of what `request_grade_boost` will
- * accept (see `grade-boost.ts`); the server is the authority and re-checks all
- * of it.
- */
+ * ── IT DOES NOT SPEND POINTS ───────────────────────────────────────────────
+ * Spending lives on /app/points, once, so the confirm dialog and its rules exist
+ * in one place. This screen only POINTS there: a banner that is always present
+ * (so it is never a dead end, even when no column offers a boost), and a small
+ * link on each boostable row that deep-links with `?column=<id>` so that column
+ * is brought into view. Everything shown is a PREVIEW of what
+ * `request_grade_boost` will accept (see `grade-boost.ts`); the server is the
+ * authority.
+  */
 export function StudentGrades() {
   const { me, grades, gradesLoading, gradesError, reloadGrades, refresh, semesterEnded } =
     useStudentData()
-  const { toast } = useToast()
 
   const subjects = useMemo(() => grades?.subjects ?? [], [grades])
 
@@ -67,6 +62,9 @@ export function StudentGrades() {
   const [pickedSubject, setPickedSubject] = useState<string | null>(null)
   const [pickedTerm, setPickedTerm] = useState<TermKey | null>(null)
   const [explainOpen, setExplainOpen] = useState(false)
+  // How the scores are listed inside each part: as entered, or weakest first so the
+  // columns with the most room to gain are on top.
+  const [order, setOrder] = useState<'order' | 'lowest'>('order')
 
   const subject = subjects.find((s) => s.subjectId === pickedSubject) ?? subjects[0] ?? null
   const terms = useMemo(() => (subject ? termsWithItems(subject) : []), [subject])
@@ -77,53 +75,6 @@ export function StudentGrades() {
         ? (latestSoFar(subject)?.term ?? terms[0] ?? null)
         : null
 
-  // ── spendable points ─────────────────────────────────────────────────────
-  const studentId = me?.id
-  const [history, setHistory] = useState<Redemption[]>([])
-  useEffect(() => {
-    if (!studentId) return
-    let alive = true
-    listMyRedemptions(studentId)
-      .then((rows) => {
-        if (alive) setHistory(rows)
-      })
-      // Best-effort: without it the buttons stay enabled and the server says no.
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-    // `grades` is a dependency on purpose: a decision or a new request replaces
-    // it (StudentData reloads on the point_redemptions event), and that is when
-    // the pending total changes.
-  }, [studentId, grades])
-
-  const pending = useMemo(() => history.filter((r) => r.status === 'pending'), [history])
-  const pendingPoints = pending.reduce((n, r) => n + r.points, 0)
-  const available = Math.max(0, (me?.semester_points ?? 0) - pendingPoints)
-  const tooMany = pending.length >= MAX_PENDING_REDEMPTIONS
-
-  // ── the request ──────────────────────────────────────────────────────────
-  const [target, setTarget] = useState<{ item: MyGradeItem; offer: Available } | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-
-  async function onConfirm() {
-    if (!target) return
-    setSubmitting(true)
-    try {
-      await requestGradeBoost(target.item.id)
-      toast('Request sent — your instructor will decide.', 'success')
-      setTarget(null)
-      await reloadGrades()
-    } catch (e) {
-      toast(errorText(e, 'Could not send that request. Try again.'), 'error')
-      // The column may have changed under us (a new mark, a retired column).
-      setTarget(null)
-      void reloadGrades()
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   const onRefresh = async () => {
     await Promise.all([reloadGrades(), refresh()])
   }
@@ -132,11 +83,7 @@ export function StudentGrades() {
   const header = (
     <ScreenTitle
       title="Grades"
-      subtitle={
-        grades?.enabled
-          ? `${available} point${available === 1 ? '' : 's'} available to spend`
-          : 'Your marks, as your instructor enters them.'
-      }
+      subtitle="Your marks, as your instructor enters them."
     />
   )
 
@@ -187,7 +134,11 @@ export function StudentGrades() {
   }
 
   const summary = summarizeTerm(subject, term)
-  const explanation = explainTerm(subject, term)
+  // While the instructor's switch is off the server withholds the weights, so these
+  // are null anyway — but the screen decides what to SHOW from `figures`, not from
+  // an accident of what is missing.
+  const figures = grades.figures
+  const explanation = figures ? explainTerm(subject, term) : null
   const boostable = boostableCount(subjects)
 
   return (
@@ -240,22 +191,37 @@ export function StudentGrades() {
           />
         )}
 
-        <Card elevation="raised" className="p-5">
-          <p className="text-xs text-muted">{TERM_TITLE[term]} · so far</p>
-          <div className="mt-0.5 flex items-end justify-between gap-3">
-            <p className="font-display text-4xl font-bold tabular-nums">
-              {displayGrade(summary.soFar)}
+        {figures ? (
+          <Card elevation="raised" className="p-5">
+            <p className="text-xs text-muted">{TERM_TITLE[term]} · so far</p>
+            <div className="mt-0.5 flex items-end justify-between gap-3">
+              <p className="font-display text-4xl font-bold tabular-nums">
+                {displayGrade(summary.soFar)}
+              </p>
+              <p className="pb-1 text-right text-xs tabular-nums text-muted">
+                {summary.marked} of {summary.total} marked
+              </p>
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              {summary.soFar === null
+                ? `Nothing in ${TERM_TITLE[term]} has been marked yet.`
+                : 'Based on what’s marked so far. Parts your instructor hasn’t marked yet count at the 60 minimum, so this moves as marks come in.'}
             </p>
-            <p className="pb-1 text-right text-xs tabular-nums text-muted">
-              {summary.marked} of {summary.total} marked
+          </Card>
+        ) : (
+          // Grades are not open yet (0065): the scores below are the student's own
+          // and stay visible, and so does using points on them. Only the GRADE waits.
+          // One calm line — no big number, no "0 of N marked" to read as a failure.
+          <Card pad="tight" className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card-2 text-muted">
+              <LockIcon className="h-5 w-5" />
+            </span>
+            <p className="min-w-0 flex-1 text-sm">
+              <span className="font-semibold">Grades open soon.</span>{' '}
+              <span className="text-muted">Your scores are below, and you can use points on them now.</span>
             </p>
-          </div>
-          <p className="mt-2 text-xs text-muted">
-            {summary.soFar === null
-              ? `Nothing in ${TERM_TITLE[term]} has been marked yet.`
-              : 'Based on what’s marked so far. Parts your instructor hasn’t marked yet count at the 60 minimum, so this moves as marks come in.'}
-          </p>
-        </Card>
+          </Card>
+        )}
 
         {/* What the figure is made of. Shown as the shares of THIS term, not as
             "50% of 60%", and only when the weights are usable — the same rule
@@ -294,105 +260,113 @@ export function StudentGrades() {
           </div>
         )}
 
-        {boostable > 0 && !semesterEnded && (
-          <p className="rounded-lg bg-gold-400/10 px-3 py-2 text-xs font-medium text-warn">
-            {boostable} column{boostable === 1 ? '' : 's'} can be boosted with points. Spending
-            lowers your XP, level and rank.
-          </p>
-        )}
+        {/* The way to spend points. ALWAYS shown, because a link that appears only
+            when something is boostable leaves a student with nothing to tap in
+            exactly the case that matters most — a class where the instructor has
+            not offered any column yet. It says so instead. */}
+        <Link to="/app/points" className="block">
+          <Card interactive>
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-400/15 text-reward">
+                <TicketIcon className="h-5.5 w-5.5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-sm font-bold">Use your points</span>
+                <span className="block text-xs text-muted">
+                  {me?.semester_points ?? 0} point{(me?.semester_points ?? 0) === 1 ? "" : "s"}
+                  {" · "}
+                  {semesterEnded
+                    ? "points assist is closed this semester"
+                    : boostable > 0
+                      ? boostable + " column" + (boostable === 1 ? "" : "s") + " open for points assist"
+                      : "no column is open for points assist yet"}
+                </span>
+              </span>
+              <span className="shrink-0 text-lg text-muted">›</span>
+            </div>
+          </Card>
+        </Link>
+
+                <SegmentedControl
+          label="Order the scores"
+          tone="quiet"
+          size="sm"
+          value={order}
+          onChange={setOrder}
+          options={[
+            { value: 'order', label: 'In order' },
+            { value: 'lowest', label: 'Lowest first' },
+          ]}
+          className="w-full sm:w-64"
+        />
 
         {summary.components
-          .filter((c) => summary.items.some((i) => i.component === c.component))
-          .map((c) => (
+          .filter((c) =>
+            c.component === 'recitation'
+              ? c.possible > 0
+              : summary.items.some((i) => i.component === c.component),
+          )
+          .map((c) =>
+            c.component === 'recitation' ? (
+              // Recitation is NOT typed (0063): it is this term's attendance rate,
+              // as-is — 9 of 10 classes is a Recitation of 90.
+              <div key={c.component}>
+                <div className="mb-1.5 flex items-baseline justify-between px-1">
+                  <h2 className="text-sm font-semibold">{c.label}</h2>
+                  {figures && (
+                    <span className="text-xs tabular-nums text-muted">
+                      {c.score === null ? '—' : displayGrade(c.score)}
+                    </span>
+                  )}
+                </div>
+                <Rows>
+                  <div className="p-3.5">
+                    <p className="text-sm font-medium">Attendance</p>
+                    <p className="text-xs tabular-nums text-muted">
+                      {c.earned} of {c.possible} class{c.possible === 1 ? '' : 'es'} attended —
+                      your attendance rate is your Recitation grade.
+                    </p>
+                  </div>
+                </Rows>
+              </div>
+            ) : (
             <div key={c.component}>
               <div className="mb-1.5 flex items-baseline justify-between px-1">
                 <h2 className="text-sm font-semibold">{c.label}</h2>
-                <span className="text-xs tabular-nums text-muted">
-                  {c.score === null ? '—' : displayGrade(c.score)}
-                </span>
+                {figures && (
+                  <span className="text-xs tabular-nums text-muted">
+                    {c.score === null ? '—' : displayGrade(c.score)}
+                  </span>
+                )}
               </div>
               <Rows>
-                {summary.items
-                  .filter((i) => i.component === c.component)
-                  .map((item) => (
+                {sortItems(
+                  summary.items.filter((i) => i.component === c.component),
+                  order,
+                ).map((item) => (
                     <ItemRow
                       key={item.id}
                       item={item}
-                      available={available}
-                      tooMany={tooMany}
                       locked={semesterEnded}
-                      onBoost={(offer) => setTarget({ item, offer })}
                     />
                   ))}
               </Rows>
             </div>
-          ))}
+            ),
+          )}
       </div>
 
-      <ConfirmDialog
-        open={!!target}
-        variant="danger"
-        title={target ? `Use ${target.offer.cost} points on ${target.item.name}?` : ''}
-        message={
-          target ? (
-            <>
-              You’re asking to spend{' '}
-              <span className="font-semibold text-ink">{target.offer.cost} points</span> to add{' '}
-              <span className="font-semibold text-ink">
-                {formatMarks(target.offer.gain)} mark{target.offer.gain === 1 ? '' : 's'}
-              </span>
-              : <span className="font-semibold text-ink">{formatMarks(target.offer.score)}</span>{' '}
-              becomes{' '}
-              <span className="font-semibold text-ink">{formatMarks(target.offer.newScore)}</span> out
-              of {formatMarks(target.item.maxScore)}.
-              {target.offer.gain < target.offer.bonus && (
-                <>
-                  {' '}
-                  The bonus is {formatMarks(target.offer.bonus)}, but this column tops out at{' '}
-                  {formatMarks(target.item.maxScore)}, so you’d gain {formatMarks(target.offer.gain)}.
-                </>
-              )}{' '}
-              Nothing is spent until your instructor approves it.
-            </>
-          ) : null
-        }
-        // The same words UsePoints uses, because the warning is the validation:
-        // this is a trade of leaderboard standing for marks, and it is only
-        // reversible by the instructor.
-        detail={
-          target
-            ? `If approved, your total drops to ${Math.max(0, (me?.semester_points ?? 0) - target.offer.cost)} — your level and leaderboard rank drop with it, and you climb the spend board. You can’t undo it yourself.`
-            : undefined
-        }
-        confirmLabel="Send request"
-        busy={submitting}
-        onConfirm={onConfirm}
-        onClose={() => setTarget(null)}
-      />
     </PullToRefresh>
   )
 }
 
-function ItemRow({
-  item,
-  available,
-  tooMany,
-  locked,
-  onBoost,
-}: {
-  item: MyGradeItem
-  available: number
-  tooMany: boolean
-  /** The semester has ended — no new requests, whatever the column says. */
-  locked: boolean
-  onBoost: (offer: Available) => void
-}) {
+function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has ended — no new requests, whatever the column says. */ locked: boolean }) {
   const state = boostState(item)
 
-  const scoreLine =
-    item.score === null
-      ? 'Not marked yet'
-      : `${formatMarks(item.score)} / ${formatMarks(item.maxScore)}`
+  // How well they did on this one, in the same 70 / 85 bands attendance uses — one
+  // threshold app-wide, so a "red" here means what a red means everywhere.
+  const pct = item.score !== null && item.maxScore > 0 ? (item.score / item.maxScore) * 100 : null
+  const tone = pct === null ? null : rateTone(pct)
 
   return (
     <div className="flex items-center gap-3 p-3.5">
@@ -401,10 +375,29 @@ function ItemRow({
           {item.name}
         </p>
         <p className="text-xs tabular-nums text-muted">
-          {scoreLine}
+          {item.score === null ? (
+            item.absent ? 'Absent' : 'Not marked yet'
+          ) : (
+            <>
+              <span className={cn('font-semibold', tone && TONE[tone].text)}>
+                {formatMarks(item.score)}
+              </span>{' '}
+              / {formatMarks(item.maxScore)}
+            </>
+          )}
           {state.kind === 'boosted' && ` · was ${formatMarks(state.before)}`}
-          {state.kind === 'unmarked' && !locked && ' · points can boost this once it’s marked'}
+          {state.kind === 'unmarked' && !locked && ' · points assist opens once it’s marked'}
         </p>
+        {pct !== null && tone && (
+          <Meter
+            value={pct}
+            max={100}
+            size="sm"
+            tone={tone}
+            label={`${item.name}: ${Math.round(pct)}%`}
+            className="mt-1.5"
+          />
+        )}
       </div>
 
       {state.kind === 'boosted' && (
@@ -421,19 +414,28 @@ function ItemRow({
         </Chip>
       )}
 
+      {/* Absent (0063): say why there is no way to use points here, instead of a
+          row that just offers nothing. */}
+      {state.kind === 'absent' && (
+        <Chip tone="neutral" size="sm">
+          Absent
+        </Chip>
+      )}
+
       {state.kind === 'available' && !locked && (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={tooMany || state.cost > available}
-          onClick={() => onBoost(state)}
+        // A QUIET LINK, only on a column that can still gain (a perfect score has no
+        // link at all). The old outlined red pill, repeated down every row, competed
+        // with the grade and with itself. A LINK, not a button: the request is made
+        // on /app/points, once, and this carries the column with it so it is brought
+        // into view there. The same 44px tap region as a small button (`cp-tap-y`),
+        // and it names no amount — the amount is the student's choice, on that screen.
+        <Link
+          to={'/app/points?column=' + item.id}
+          className="cp-tap-y inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-accent underline-offset-2 hover:underline"
         >
-          {tooMany
-            ? `${MAX_PENDING_REDEMPTIONS} waiting`
-            : state.cost > available
-              ? `Need ${state.cost - available} more`
-              : `+${formatMarks(state.gain)} for ${state.cost} pts`}
-        </Button>
+          <TicketIcon className="h-4 w-4" aria-hidden />
+          Use points
+        </Link>
       )}
     </div>
   )

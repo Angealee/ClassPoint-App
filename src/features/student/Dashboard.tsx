@@ -265,7 +265,9 @@ function GradesCard({
   boostEnabled: boolean
   onOpen: () => void
 }) {
-  if (!grades?.enabled) return null
+  // The card IS a grade figure, so it waits for the instructor to open grades (0065:
+  // scores and points on the Grades screen do not).
+  if (!grades?.enabled || !grades.figures) return null
 
   const rows: Array<{ subject: MyGradeSubject; latest: TermSummary }> = []
   for (const subject of grades.subjects) {
@@ -294,7 +296,7 @@ function GradesCard({
               <p className="font-display text-sm font-bold">Grades</p>
               <p className="text-xs text-muted">
                 {boostable > 0
-                  ? `${boostable} column${boostable === 1 ? '' : 's'} you can boost with points`
+                  ? `${boostable} column${boostable === 1 ? '' : 's'} open for points assist`
                   : 'Based on what’s marked so far'}
               </p>
             </div>

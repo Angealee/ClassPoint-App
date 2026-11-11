@@ -163,14 +163,14 @@ export function Redemptions() {
       const result = await reverseGradeBoost(reversing.gradeItemId, reversing.studentId)
       toast(
         result.markRestored
-          ? `Boost reversed — ${result.pointsRefunded} points returned.`
+          ? `Points assist reversed — ${result.pointsRefunded} points returned.`
           : `${result.pointsRefunded} points returned. The mark had been edited since, so it was left as typed.`,
         'success',
       )
       setReversing(null)
       await load()
     } catch (e) {
-      toast(errorText(e, 'Could not reverse that boost.'), 'error')
+      toast(errorText(e, 'Could not reverse that points assist.'), 'error')
     } finally {
       setBusy(false)
     }
@@ -331,7 +331,7 @@ export function Redemptions() {
                       <p className="truncate text-sm font-semibold">{r.studentName}</p>
                       <p className="truncate text-xs text-muted">
                         {r.points} pts ·{' '}
-                        {r.grade ? `Boost · ${r.grade.itemName}` : KIND_LABEL[r.kind]}
+                        {r.grade ? `Points assist · ${r.grade.itemName}` : KIND_LABEL[r.kind]}
                         {r.decidedAt ? ` · ${timeAgo(r.decidedAt)}` : ''}
                       </p>
                     </div>
@@ -431,7 +431,7 @@ export function Redemptions() {
 
       <ConfirmDialog
         open={!!reversing}
-        title="Reverse this boost?"
+        title="Reverse this points assist?"
         message={
           reversing ? (
             <>
@@ -442,8 +442,8 @@ export function Redemptions() {
             </>
           ) : null
         }
-        detail="They are told, and can ask for a boost on this column again."
-        confirmLabel="Reverse boost"
+        detail="They are told, and can ask for a points assist on this column again."
+        confirmLabel="Reverse points assist"
         busy={busy}
         onConfirm={onReverse}
         onClose={() => setReversing(null)}
@@ -507,7 +507,7 @@ function BoostsApplied({
           </button>
         }
       >
-        Boosts applied ({boosts.length})
+        Points assists applied ({boosts.length})
       </SectionLabel>
 
       {open && (
@@ -517,12 +517,12 @@ function BoostsApplied({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Find a student or column"
-              aria-label="Find a boost"
+              aria-label="Find a points assist"
             />
           )}
 
           {matching.length === 0 ? (
-            <EmptyState compact>No boost matches that.</EmptyState>
+            <EmptyState compact>No points assist matches that.</EmptyState>
           ) : (
             <Rows>
               {visible.map((r) => {
@@ -582,7 +582,7 @@ function BoostDetail({ r }: { r: RedemptionRequest }) {
   return (
     <div className="mt-3 space-y-1.5 rounded-lg bg-card-2 px-3 py-2 text-sm">
       <p>
-        <span className="font-semibold">Grade boost</span>
+        <span className="font-semibold">Points assist</span>
         <span className="text-muted">
           {' '}
           · {g.itemName} · {COMPONENT_LABEL[g.component]}

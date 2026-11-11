@@ -90,6 +90,56 @@ export function emptySums(): TermSums {
 }
 
 /**
+ * ── RECITATION IS ATTENDANCE (0063, the instructor's call, 2026-11-09) ──────
+ *
+ * The Recitation part is NOT typed any more: it is the term's attendance rate,
+ * as is. 97% attendance is a Recitation grade of 97 — no 60 floor and no
+ * transmutation — so zero attendance is 0, which is harsher than the other parts
+ * by choice.
+ *
+ * It rides in the SAME `recitation` slot of `TermSums` it always had, holding
+ * COUNTS rather than marks:
+ *
+ *   sumScore     = classes the student showed up to   (present + late)
+ *   sumMax       = classes counted                    (present + late + absent)
+ *   sumMaxMarked = classes counted                    (identical: attendance has
+ *                                                      no "not marked yet")
+ *
+ * so every reader of `TermSums` — the grid, Overall, both exports, both print
+ * routes, the weights preview, the student's own screen — needs no change of its
+ * own. Excused and irregular classes are NEUTRAL and leave the denominator, the
+ * rule `lib/attendance.ts` states and `get_term_attendance` (0034) implements.
+ *
+ * The counts come from SQL (`cp_term_attendance`); the RATE is computed here and
+ * only here, which keeps the "no weighting arithmetic in a migration" rule intact.
+ */
+export interface AttendanceCounts {
+  showed: number
+  counted: number
+}
+
+export const NO_ATTENDANCE: AttendanceCounts = { showed: 0, counted: 0 }
+
+/** Attendance counts as the `recitation` slot of a term's sums. */
+export function attendanceSums(a: AttendanceCounts | undefined): TermSums['recitation'] {
+  if (!a || !(a.counted > 0)) return { sumScore: 0, sumMax: 0, sumMaxMarked: 0 }
+  return { sumScore: a.showed, sumMax: a.counted, sumMaxMarked: a.counted }
+}
+
+/**
+ * The Recitation grade: the attendance rate as-is, 0–100, unrounded.
+ *
+ * With no classes counted yet there is no rate to take. It reads the transmutation
+ * floor — the same "an empty part counts at the minimum" rule `componentScore`
+ * follows — rather than 0, which would punish a term whose classes have not
+ * happened. It does not make a term "started" (see `hasAnyItems`).
+ */
+export function recitationScore(sums: TermSums['recitation'], policy: GradePolicy): number {
+  if (!(sums.sumMax > 0)) return policy.transmuteBase * 100
+  return (sums.sumScore / sums.sumMax) * 100
+}
+
+/**
  * Transmute one component: `(raw / total * span + base) * 100`.
  *
  * With base 0.6 the floor is 60.00 and a perfect score is 100.00. A score above
@@ -121,6 +171,11 @@ export function componentScores(
   const out = {} as Record<GradeComponent, number>
   for (const c of GRADE_COMPONENTS) {
     const s = sums[c]
+    if (c === 'recitation') {
+      // Attendance, as-is — identical under both views (see `recitationScore`).
+      out[c] = recitationScore(s, policy)
+      continue
+    }
     const total = view === 'official' ? s.sumMax : s.sumMaxMarked
     out[c] = componentScore(s.sumScore, total, policy.transmuteBase, policy.transmuteSpan)
   }
@@ -171,10 +226,17 @@ export function weightedComponents(policy: GradePolicy): GradeComponent[] {
   return GRADE_COMPONENTS.filter((c) => componentShare(policy, c) > 0)
 }
 
-/** Does this term have any item at all (official), or any marked one (so far)? */
+/**
+ * Does this term have any item at all (official), or any marked one (so far)?
+ *
+ * Recitation is left out on purpose: it is attendance, and classes being held does
+ * not make a term "started" for grading — a Finals with attendance but no quiz yet
+ * would otherwise read a confident, low grade for a term that has no work in it.
+ */
 export function hasAnyItems(sums: TermSums, view: GradeView = 'official'): boolean {
-  return GRADE_COMPONENTS.some((c) =>
-    view === 'official' ? sums[c].sumMax > 0 : sums[c].sumMaxMarked > 0,
+  return GRADE_COMPONENTS.some(
+    (c) =>
+      c !== 'recitation' && (view === 'official' ? sums[c].sumMax > 0 : sums[c].sumMaxMarked > 0),
   )
 }
 
@@ -318,10 +380,19 @@ export interface GradeItemLike {
 export function sumsFromScores(
   items: GradeItemLike[],
   scoreByItemId: Map<string, number>,
+  /**
+   * The student's attendance for this subject and term. Recitation IS this (0063),
+   * so a caller that omits it gets an empty Recitation, which reads as the floor.
+   */
+  attendance?: AttendanceCounts,
 ): TermSums {
   const out = emptySums()
+  out.recitation = attendanceSums(attendance)
   for (const item of items) {
     if (item.archivedAt !== null) continue // archived items leave the denominator
+    // Recitation columns are retired (0063) — the part is attendance now, and a
+    // leftover typed column must not be added to it.
+    if (item.component === 'recitation') continue
     const bucket = out[item.component]
     bucket.sumMax += item.maxScore
     const score = scoreByItemId.get(item.id)
@@ -385,6 +456,9 @@ export function completionByTerm(
 
   for (const row of rows) {
     for (const c of GRADE_COMPONENTS) {
+      // Recitation is computed from attendance, not entered — there is nothing
+      // for the instructor to "finish" there.
+      if (c === 'recitation') continue
       marked[row.term] = (marked[row.term] ?? 0) + row.sums[c].sumMaxMarked
       total[row.term] = (total[row.term] ?? 0) + row.sums[c].sumMax
     }

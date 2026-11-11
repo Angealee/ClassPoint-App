@@ -98,7 +98,16 @@ with expected (migration, kind, name) as (
     ('0062', 'function', 'request_grade_boost'),
     ('0062', 'function', 'reverse_grade_boost'),
     ('0062', 'function', 'set_student_grades_enabled'),
-    ('0062', 'function', 'save_subject_policy')
+    ('0062', 'function', 'save_subject_policy'),
+    -- 0063 · Points assist, the Absent mark, Recitation from attendance
+    ('0063', 'table',    'grade_assist_defaults'),
+    ('0063', 'table',    'grade_absences'),
+    ('0063', 'column',   'grade_items.assist_off'),
+    ('0063', 'column',   'grade_items.session_id'),
+    ('0063', 'function', 'cp_grade_absent'),
+    ('0063', 'function', 'cp_term_attendance'),
+    ('0063', 'function', 'get_grade_attendance'),
+    ('0063', 'function', 'get_grade_absences')
 )
 select
   e.migration,
@@ -175,7 +184,12 @@ with expected (migration, kind, name) as (
     ('0062', 'table', 'grade_boosts'), ('0062', 'function', 'get_my_grades'),
     ('0062', 'function', 'request_grade_boost'), ('0062', 'function', 'reverse_grade_boost'),
     ('0062', 'function', 'set_student_grades_enabled'),
-    ('0062', 'function', 'save_subject_policy')
+    ('0062', 'function', 'save_subject_policy'),
+    ('0063', 'table', 'grade_assist_defaults'), ('0063', 'table', 'grade_absences'),
+    ('0063', 'column', 'grade_items.assist_off'), ('0063', 'column', 'grade_items.session_id'),
+    ('0063', 'function', 'cp_grade_absent'),
+    ('0063', 'function', 'cp_term_attendance'), ('0063', 'function', 'get_grade_attendance'),
+    ('0063', 'function', 'get_grade_absences')
 ),
 probe as (
   select
@@ -342,6 +356,104 @@ select
       from pg_constraint
      where conname = 'point_events_points_check'
        and pg_get_constraintdef(oid) like '%points <= 50)%'
+  )
+union all
+--   0063 moves decide_point_redemption again (wording + the absent re-check). The
+--   new OBJECTS prove the file was pasted; this proves the BODY is the new one. A
+--   partial paste would leave 0062's, which still says "Boost approved" to the
+--   student and never refuses an absent one at approval.
+select
+  '0063 · decide_point_redemption is the points-assist version',
+  exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'decide_point_redemption'
+       and pg_get_functiondef(p.oid) like '%Points assist approved%'
+       and pg_get_functiondef(p.oid) like '%cp_grade_absent%'
+  )
+union all
+--   …and the aggregate carries ATTENDANCE in its recit_* slots. If this reads
+--   false the Overall tab, both exports and both print routes still show the old
+--   typed Recitation while the grid shows attendance — two answers for one grade.
+select
+  '0063 · get_section_grade_sums reads attendance for Recitation',
+  exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'get_section_grade_sums'
+       and pg_get_functiondef(p.oid) like '%cp_term_attendance%'
+  )
+union all
+--   0064 makes points assist AUTOMATIC: request_grade_boost takes the points the
+--   STUDENT chose. If this reads false the old one-argument function is still
+--   there and every request from the new client fails.
+select
+  '0064 · request_grade_boost takes a points amount',
+  exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'request_grade_boost'
+       and pg_get_function_identity_arguments(p.oid) like '%p_points%'
+  )
+  and (
+    select count(*) from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'request_grade_boost'
+  ) = 1
+union all
+--   …and the per-part terms function is gone (a leftover means 0064 was only
+--   partly pasted).
+select
+  '0064 · cp_assist_terms is gone',
+  not exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'cp_assist_terms'
+  )
+union all
+--   …and a student's own grades report `offered`, not the retired terms.
+select
+  '0064 · get_my_grades reports offered',
+  exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'get_my_grades'
+       and pg_get_functiondef(p.oid) like '%''offered''%'
+       and pg_get_functiondef(p.oid) not like '%pointsCost%'
+  )
+union all
+--   0065: the switch hides the GRADE, not the screen. get_my_grades reports 'figures',
+--   and a request no longer needs "grades are open". If either reads false, students
+--   with the switch off still see "Grades aren't open yet" and cannot use points.
+select
+  '0065 · get_my_grades reports figures',
+  exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'get_my_grades'
+       and pg_get_functiondef(p.oid) like '%''figures''%'
+  )
+union all
+select
+  '0065 · request_grade_boost has no grades-open gate',
+  exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'request_grade_boost'
+       and pg_get_functiondef(p.oid) not like '%Grades are not open yet%'
   );
 
 

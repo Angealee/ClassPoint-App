@@ -1,4 +1,4 @@
-import { boostState } from './grade-boost'
+import { boostState, type BoostState } from './grade-boost'
 import {
   COMPONENT_LABEL,
   GRADE_COMPONENTS,
@@ -94,9 +94,12 @@ export function summarizeTerm(subject: MyGradeSubject, term: TermKey): TermSumma
   for (const i of items) if (i.score !== null) scoreById.set(i.id, i.score)
 
   // `archivedAt: null` — get_my_grades only ever returns live columns.
+  // Recitation is the student’s attendance rate for the term (0063), so the counts
+  // travel with the subject and go in beside their marks.
   const sums = sumsFromScores(
     items.map((i) => ({ id: i.id, component: i.component, maxScore: i.maxScore, archivedAt: null })),
     scoreById,
+    subject.attendance?.[term],
   )
 
   const usable = policy !== null && policyError(policy) === null
@@ -188,6 +191,68 @@ export function latestSoFar(subject: MyGradeSubject): TermSummary | null {
   return null
 }
 
+export type AvailableBoost = Extract<BoostState, { kind: 'available' }>
+
+/** One column with the subject it belongs to and what can be done about it. */
+export interface BoostColumn<S extends BoostState = BoostState> {
+  subject: MyGradeSubject
+  item: MyGradeItem
+  state: S
+}
+
+/**
+ * Every column the student has, split into what they can act on and what they
+ * cannot — the shape the Use-points screen draws.
+ *
+ * ACTIONABLE FIRST, by the instructor's choice: most columns are not boostable
+ * (unmarked, already full, or simply not offered), and a screen of mostly dead
+ * rows teaches students to ignore it. So the boostable ones are the screen, and
+ * the rest are one collapsed list that says WHY — a student who cannot find the
+ * quiz they care about should be able to learn that it is unmarked or not
+ * offered, not wonder whether the app lost it.
+ *
+ * Both lists keep the grid's own order (subject, then term, then component and
+ * position), so a column sits in the same place here as on the Grades screen.
+ * The decision of what a column IS comes from `boostState`, never re-derived.
+ */
+export function boostColumns(subjects: MyGradeSubject[]): {
+  actionable: Array<BoostColumn<AvailableBoost>>
+  other: BoostColumn[]
+} {
+  const actionable: Array<BoostColumn<AvailableBoost>> = []
+  const other: BoostColumn[] = []
+  for (const subject of subjects) {
+    for (const term of TERM_ORDER) {
+      for (const item of itemsForTerm(subject, term)) {
+        const state = boostState(item)
+        if (state.kind === 'available') actionable.push({ subject, item, state })
+        else other.push({ subject, item, state })
+      }
+    }
+  }
+  return { actionable, other }
+}
+
+/** Why a column is not actionable, in the words the student reads. */
+export function boostReason(state: BoostState): string {
+  switch (state.kind) {
+    case 'boosted':
+      return `+${state.marks} from ${state.points} pts`
+    case 'pending':
+      return 'Waiting on your instructor'
+    case 'unmarked':
+      return 'Your mark isn’t in yet'
+    case 'full':
+      return 'Already at full marks'
+    case 'not-offered':
+      return 'Not offered for points'
+    case 'absent':
+      return 'You were absent for this one'
+    case 'available':
+      return 'Available'
+  }
+}
+
 /** Columns that could be boosted right now, across every subject — for the nudge. */
 export function boostableCount(subjects: MyGradeSubject[]): number {
   // Asks `boostState` rather than re-stating its rules: a second copy of "can
@@ -198,4 +263,19 @@ export function boostableCount(subjects: MyGradeSubject[]): number {
     for (const i of s.items) if (boostState(i).kind === 'available') n += 1
   }
   return n
+}
+
+/**
+ * The scores inside a part, as entered or weakest first.
+ *
+ * "Weakest" is the share of the column's maximum, not the raw mark — a 15/20 is
+ * stronger than a 30/50. An unmarked column has no share to compare and goes last,
+ * and the sort is stable, so ties keep the instructor's order. Never mutates its
+ * input.
+ */
+export function sortItems(items: MyGradeItem[], order: 'order' | 'lowest'): MyGradeItem[] {
+  if (order === 'order') return items
+  const share = (i: MyGradeItem) =>
+    i.score === null || !(i.maxScore > 0) ? Number.POSITIVE_INFINITY : i.score / i.maxScore
+  return [...items].sort((a, b) => share(a) - share(b))
 }

@@ -1648,8 +1648,34 @@ export interface GradeItem {
    * not offered. Always both or neither — the table CHECKs it. Null too when
    * read from a database that has not had 0062 yet.
    */
-  pointsCost: number | null
-  pointsBonus: number | null
+  /**
+   * The ONE instructor control over points assist (0063/0064): points can't be used
+   * on this column. Every column is otherwise open — 1 point = 1 mark, the student
+   * chooses how many, never past the maximum. False when read from a database
+   * without 0063.
+   */
+  assistOff: boolean
+  /**
+   * The class this column was held in (0063). Anyone recorded absent OR excused in
+   * that class is Absent on this column. Null = not tied to a class.
+   */
+  sessionId: string | null
+}
+
+/**
+ * One Absent mark (0063): 'manual' = the instructor typed A, 'auto' = the student
+ * is recorded absent or excused in the class the column is tied to.
+ */
+export interface GradeAbsence {
+  itemId: string
+  studentId: string
+  source: 'manual' | 'auto'
+}
+
+/** Classes a student showed up to, and classes counted — the Recitation inputs. */
+export interface GradeAttendance {
+  showed: number
+  counted: number
 }
 
 /** Mirrors `request_point_redemption`'s own ceiling; a column cannot cost more. */
@@ -1699,9 +1725,13 @@ export interface MyGradeItem {
   position: number
   /** null = not marked yet. Never a zero standing in for that. */
   score: number | null
-  /** The terms on offer, or null when points cannot be used on this column. */
-  pointsCost: number | null
-  pointsBonus: number | null
+  /**
+   * Points can be used on this column (0064): every column is open unless the
+   * instructor switched it off. The amount is the STUDENT's choice, 1 point = 1 mark.
+   */
+  offered: boolean
+  /** Marked absent, or recorded absent / excused in the class it was held in (0063). */
+  absent: boolean
   /** Set once a boost has been applied to this column. */
   boost: { marks: number; points: number; before: number } | null
   /** A boost request for this column is waiting on the instructor. */
@@ -1714,12 +1744,24 @@ export interface MyGradeSubject {
   name: string
   /** The weights, so the client can derive the "so far" figure with grading.ts. */
   policies: GradePolicy[]
+  /** Attendance counts per term — Recitation is computed from them (0063). */
+  attendance: Record<TermKey, GradeAttendance>
   items: MyGradeItem[]
 }
 
 export interface MyGrades {
-  /** False while the instructor has grades switched off (or the account is archived). */
+  /**
+   * The screen is available. False only for an ARCHIVED account (0065) — a student
+   * always sees their own marks, whatever the grade switch says.
+   */
   enabled: boolean
+  /**
+   * The GRADE FIGURES may be shown (the term "so far" grade, the part scores, how
+   * it is worked out). False while the instructor's switch is off: marks and
+   * points still work, and the weights and attendance are withheld by the server
+   * so a grade cannot be computed from the payload.
+   */
+  figures: boolean
   subjects: MyGradeSubject[]
 }
 

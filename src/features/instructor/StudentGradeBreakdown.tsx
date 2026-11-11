@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
-import { listGradeItems, listGradePolicies, listGradeScores } from '@/lib/api'
+import { getGradeAttendance, listGradeItems, listGradePolicies, listGradeScores } from '@/lib/api'
 import {
   cellKey,
   classStanding,
@@ -17,7 +17,14 @@ import {
   termGrade,
 } from '@/lib/grading'
 import { errorText } from '@/lib/errors'
-import type { GradeComponent, GradeItem, GradePolicy, Subject, TermKey } from '@/lib/types'
+import type {
+  GradeAttendance,
+  GradeComponent,
+  GradeItem,
+  GradePolicy,
+  Subject,
+  TermKey,
+} from '@/lib/types'
 
 const TERMS: TermKey[] = ['prelim', 'midterm', 'finals']
 const TERM_LABEL: Record<TermKey, string> = {
@@ -47,6 +54,8 @@ interface TermLine {
   policy: GradePolicy | null
   items: GradeItem[]
   scores: Map<string, number>
+  /** This student's attendance in the term — Recitation IS this (0063). */
+  attendance: GradeAttendance | undefined
   grade: number | null
 }
 
@@ -93,20 +102,32 @@ export function StudentGradeBreakdown({ studentId, sectionId, subjects, expanded
           const scores = new Map<string, number>()
           for (const r of rows) scores.set(cellKey(r.itemId, r.studentId), r.score)
 
-          const terms: TermLine[] = TERMS.map((term) => {
+          // Attendance for each term, failing soft: before 0063 the RPC does not
+          // exist and that must cost the Recitation figure, not the record page.
+          const attendanceByTerm = await Promise.all(
+            TERMS.map((term) =>
+              getGradeAttendance(sectionId, subject.id, term)
+                .then((m) => m.get(studentId))
+                .catch(() => undefined),
+            ),
+          )
+
+          const terms: TermLine[] = TERMS.map((term, ti) => {
             const policy = policies.find((p) => p.term === term) ?? null
+            const attendance = attendanceByTerm[ti]
             const items = orderedItems(live.filter((i) => i.term === term))
             const marked = new Map<string, number>()
             for (const item of items) {
               const v = scores.get(cellKey(item.id, studentId))
               if (v !== undefined) marked.set(item.id, v)
             }
-            const sums = sumsFromScores(items, marked)
+            const sums = sumsFromScores(items, marked, attendance)
             return {
               term,
               policy,
               items,
               scores,
+              attendance,
               grade: policy ? termGrade(sums, policy, 'official') : null,
             }
           })
@@ -199,7 +220,7 @@ function TermDetail({ line, studentId }: { line: TermLine; studentId: string }) 
     const v = line.scores.get(cellKey(item.id, studentId))
     if (v !== undefined) marked.set(item.id, v)
   }
-  const sums = sumsFromScores(line.items, marked)
+  const sums = sumsFromScores(line.items, marked, line.attendance)
   const comps = componentScores(sums, line.policy, 'official')
   const cs = classStanding(comps, line.policy)
 
@@ -224,6 +245,7 @@ function TermDetail({ line, studentId }: { line: TermLine; studentId: string }) 
             component={component}
             items={line.items.filter((i) => i.component === component)}
             marked={marked}
+            attendance={line.attendance}
             score={comps[component]}
             weight={componentWeight(component, line.policy as GradePolicy)}
           />
@@ -255,12 +277,14 @@ function ComponentDetail({
   component,
   items,
   marked,
+  attendance,
   score,
   weight,
 }: {
   component: GradeComponent
   items: GradeItem[]
   marked: Map<string, number>
+  attendance: GradeAttendance | undefined
   score: number
   weight: number | null
 }) {
@@ -278,7 +302,13 @@ function ComponentDetail({
         </span>
         <span className="text-sm tabular-nums">
           <span className="text-muted">
-            {total > 0 ? `${round2(raw)} / ${round2(total)} → ` : 'no columns → '}
+            {component === 'recitation'
+              ? attendance && attendance.counted > 0
+                ? `${attendance.showed} of ${attendance.counted} classes → `
+                : 'no classes yet → '
+              : total > 0
+                ? `${round2(raw)} / ${round2(total)} → `
+                : 'no columns → '}
           </span>
           <b>{displayGrade(score)}</b>
         </span>

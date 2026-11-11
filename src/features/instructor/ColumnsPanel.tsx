@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card, Rows } from '@/components/ui/Card'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -6,14 +6,34 @@ import { IconButton } from '@/components/ui/IconButton'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { SectionLabel } from '@/components/ui/SectionLabel'
+import { Toggle } from '@/components/ui/Toggle'
 import { useToast } from '@/components/ui/Toast'
 import { PencilIcon, TrashIcon } from '@/components/ui/icons'
 import { COMPONENT_LABEL, GRADE_COMPONENTS } from '@/lib/grading'
 import { parseScoreInput } from '@/lib/grade-entry'
-import { boostTermsError, formatMarks } from '@/lib/grade-boost'
+import { termOf } from '@/lib/term'
 import { errorText } from '@/lib/errors'
-import { createGradeItem, setGradeItemArchived, updateGradeItem } from '@/lib/api'
-import type { GradeComponent, GradeItem, TermKey } from '@/lib/types'
+import { createGradeItem, listSessions, setGradeItemArchived, updateGradeItem } from '@/lib/api'
+import type { GradeComponent, GradeItem, SessionSummary, TermKey } from '@/lib/types'
+
+/** "20" or "17.5" — no trailing zeros. */
+const formatMax = (n: number) => String(Math.round(n * 100) / 100)
+
+/** The parts a typed column can belong to. Recitation is attendance (0063). */
+const COLUMN_PARTS = GRADE_COMPONENTS.filter((c) => c !== 'recitation')
+
+/** "Mon, Jun 15 · IT 32 · Topic" — enough to tell one class from the next. */
+function sessionLabel(s: SessionSummary): string {
+  const day = new Date(s.startedAt).toLocaleDateString('en-PH', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'Asia/Manila',
+  })
+  return [day, s.subjectCode, s.topic].filter(Boolean).join(' · ')
+}
+
+
 
 /**
  * Add, rename, re-weight and retire the score columns of one term.
@@ -49,6 +69,20 @@ export function ColumnsPanel({
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState<GradeItem | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<GradeItem | null>(null)
+
+  // This section's classes, in their OWN catch (the 0034 SectionGrid precedent):
+  // before 0063 the link column does not exist, and that must cost the class
+  // picker, never the panel.
+  const [sessions, setSessions] = useState<SessionSummary[]>([])
+  useEffect(() => {
+    let cancelled = false
+    listSessions(sectionId)
+      .then((rows) => !cancelled && setSessions(rows.filter((r) => r.subjectId === subjectId)))
+      .catch(() => !cancelled && setSessions([]))
+    return () => {
+      cancelled = true
+    }
+  }, [sectionId, subjectId])
 
   async function add(e: FormEvent) {
     e.preventDefault()
@@ -90,7 +124,8 @@ export function ColumnsPanel({
     item: GradeItem,
     nextName: string,
     nextMax: string,
-    boost: { cost: number | null; bonus: number | null },
+    pointsOff: boolean,
+    nextSessionId: string | null,
   ) {
     const parsed = parseScoreInput(nextMax)
     if (!parsed.ok || parsed.value === null || parsed.value <= 0) {
@@ -99,14 +134,14 @@ export function ColumnsPanel({
     }
     setBusy(true)
     try {
-      // The boost terms are sent only when they CHANGED. A rename on a database
-      // that has not had 0062 yet must keep working, and it cannot if every
-      // save carries two columns that database does not know about.
-      const boostChanged = boost.cost !== item.pointsCost || boost.bonus !== item.pointsBonus
+      // The points switch and the class link are sent only when they CHANGED. A
+      // rename on a database that has not had 0063 yet must keep working, and it
+      // cannot if every save carries columns it does not know.
       await updateGradeItem(item.id, {
         name: nextName,
         maxScore: parsed.value,
-        ...(boostChanged ? { pointsCost: boost.cost, pointsBonus: boost.bonus } : {}),
+        ...(pointsOff !== item.assistOff ? { assistOff: pointsOff } : {}),
+        ...(nextSessionId !== item.sessionId ? { sessionId: nextSessionId } : {}),
       })
       setEditing(null)
       onChanged()
@@ -182,12 +217,16 @@ export function ColumnsPanel({
               value={component}
               onChange={(e) => setComponent(e.target.value as GradeComponent)}
             >
-              {GRADE_COMPONENTS.map((c) => (
+              {COLUMN_PARTS.map((c) => (
                 <option key={c} value={c}>
                   {COMPONENT_LABEL[c]}
                 </option>
               ))}
             </Select>
+            <p className="text-2xs text-muted">
+              Recitation isn’t a column: it is each student’s attendance for the term,
+              worked out from your class attendance.
+            </p>
             <div className="flex gap-3">
               <Input
                 label="Name"
@@ -212,7 +251,7 @@ export function ColumnsPanel({
           </form>
         </Card>
 
-        {GRADE_COMPONENTS.map((c) => {
+        {COLUMN_PARTS.map((c) => {
           const group = live.filter((i) => i.component === c)
           if (group.length === 0) return null
           return (
@@ -224,12 +263,14 @@ export function ColumnsPanel({
                     <EditRow
                       key={item.id}
                       item={item}
+                      sessions={sessions}
+                      term={term}
                       busy={busy}
                       canMoveUp={index > 0}
                       canMoveDown={index < group.length - 1}
                       onMove={(dir) => void move(item, dir)}
                       onCancel={() => setEditing(null)}
-                      onSave={(n, m, boost) => void saveEdit(item, n, m, boost)}
+                      onSave={(n, m, off, sessionId) => void saveEdit(item, n, m, off, sessionId)}
                     />
                   ) : (
                     // ⚠ `gap-3`, not `gap-2`: two `sm` IconButtons (32px) have
@@ -244,10 +285,15 @@ export function ColumnsPanel({
                         </p>
                         <p className="text-2xs text-muted">
                           out of {item.maxScore} · {markedCounts.get(item.id) ?? 0} marked
-                          {item.pointsCost !== null && item.pointsBonus !== null && (
-                            <span className="text-reward">
+                          {item.assistOff && <span> · points off</span>}
+                          {item.sessionId && (
+                            <span>
                               {' '}
-                              · {item.pointsCost} pts → +{formatMarks(item.pointsBonus)} boost
+                              · held{' '}
+                              {(() => {
+                                const linked = sessions.find((x) => x.id === item.sessionId)
+                                return linked ? sessionLabel(linked).split(' · ')[0] : 'in a class'
+                              })()}
                             </span>
                           )}
                         </p>
@@ -327,6 +373,8 @@ export function ColumnsPanel({
 
 function EditRow({
   item,
+  sessions,
+  term,
   busy,
   canMoveUp,
   canMoveDown,
@@ -335,33 +383,27 @@ function EditRow({
   onSave,
 }: {
   item: GradeItem
+  sessions: SessionSummary[]
+  term: TermKey
   busy: boolean
   canMoveUp: boolean
   canMoveDown: boolean
   onMove: (dir: -1 | 1) => void
   onCancel: () => void
-  onSave: (
-    name: string,
-    maxScore: string,
-    boost: { cost: number | null; bonus: number | null },
-  ) => void
+  onSave: (name: string, maxScore: string, pointsOff: boolean, sessionId: string | null) => void
 }) {
   const [name, setName] = useState(item.name)
   const [maxScore, setMaxScore] = useState(String(item.maxScore))
-  const [cost, setCost] = useState(item.pointsCost === null ? '' : String(item.pointsCost))
-  const [bonus, setBonus] = useState(item.pointsBonus === null ? '' : formatMarks(item.pointsBonus))
-
-  // NaN stands for "typed, but not a number" so the shared validator can name it.
-  const costN = cost.trim() === '' ? null : /^\d+$/.test(cost.trim()) ? Number(cost.trim()) : NaN
-  const bonusParsed = parseScoreInput(bonus)
-  const bonusN = bonusParsed.ok ? bonusParsed.value : NaN
+  const [pointsOff, setPointsOff] = useState(item.assistOff)
+  const [sessionId, setSessionId] = useState(item.sessionId ?? '')
   const maxParsed = parseScoreInput(maxScore)
   const maxN = maxParsed.ok && maxParsed.value !== null ? maxParsed.value : item.maxScore
-  const boostError = boostTermsError(costN, bonusN, maxN)
-  const terms =
-    costN !== null && bonusN !== null && boostError === null
-      ? { cost: costN, bonus: bonusN }
-      : null
+
+  // This term's classes for this subject — plus the linked one, so editing a
+  // column tied to a class outside the list never silently drops the link.
+  const choices = sessions.filter(
+    (x) => x.id === item.sessionId || termOf(x.startedAt) === term || termOf(x.startedAt) === null,
+  )
 
   return (
     <div className="space-y-2 p-3">
@@ -410,51 +452,52 @@ function EditRow({
         </Button>
       </div>
 
-      {/* Let students spend points on this column (0062). Blank = not offered.
-          Stated as the exact trade, because that is the sentence the student
-          will be shown before they confirm. */}
-      <div className="space-y-1.5 rounded-xl bg-card-2 p-2.5">
-        <p className="text-xs font-medium">Let students spend points on this column</p>
-        <div className="flex items-end gap-2">
-          <Input
-            value={cost}
-            inputMode="numeric"
-            onChange={(e) => setCost(e.target.value)}
-            wrapperClassName="min-w-0 flex-1"
-            aria-label="Points a student spends"
-            placeholder="Points"
-            hint="Points spent"
-          />
-          <Input
-            value={bonus}
-            inputMode="decimal"
-            onChange={(e) => setBonus(e.target.value)}
-            wrapperClassName="min-w-0 flex-1"
-            aria-label="Marks added"
-            placeholder="Marks"
-            hint="Marks added"
-          />
-        </div>
-        {boostError ? (
-          <p className="text-2xs text-danger">{boostError}</p>
-        ) : terms ? (
+      {/* The class this column was held in (0063). Anyone recorded absent OR
+          excused there is marked Absent on this column — so an absentee is never
+          typed twice, and cannot be given a points assist for a quiz they missed. */}
+      <div className="space-y-1 rounded-xl bg-card-2 p-2.5">
+        <Select
+          label="Held in class"
+          value={sessionId}
+          onChange={(e) => setSessionId(e.target.value)}
+        >
+          <option value="">Not tied to a class</option>
+          {choices.map((x) => (
+            <option key={x.id} value={x.id}>
+              {sessionLabel(x)}
+            </option>
+          ))}
+        </Select>
+        <p className="text-2xs text-muted">
+          Students recorded absent or excused in that class are marked{' '}
+          <b className="text-ink">A</b> on this column automatically, and can’t use points on it.
+          You can also type A in any cell yourself.
+        </p>
+      </div>
+
+      {/* Points assist (0064) is AUTOMATIC: every column is open the moment a
+          student's mark is in — 1 point = 1 mark, they choose how many, never past
+          the maximum. This switch is the only control left. */}
+      <div className="flex items-center gap-3 rounded-xl bg-card-2 p-2.5">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium">Students can use points on this column</p>
           <p className="text-2xs text-muted">
-            A student whose mark is in can spend{' '}
-            <span className="font-semibold text-ink">{terms.cost} points</span> to add{' '}
-            <span className="font-semibold text-ink">{formatMarks(terms.bonus)} marks</span> (never
-            past {formatMarks(maxN)}). Once per column, and you approve each one.
+            1 point = 1 mark, never past {formatMax(maxN)}. Students who were absent can’t, and you
+            approve each request.
           </p>
-        ) : (
-          <p className="text-2xs text-muted">Leave both blank and this column isn’t offered.</p>
-        )}
+        </div>
+        <Toggle
+          on={!pointsOff}
+          label="Students can use points on this column"
+          onChange={(next) => setPointsOff(!next)}
+        />
       </div>
 
       <div className="flex gap-2">
         <Button
           size="sm"
           loading={busy}
-          disabled={boostError !== null}
-          onClick={() => onSave(name, maxScore, { cost: costN, bonus: bonusN })}
+          onClick={() => onSave(name, maxScore, pointsOff, sessionId === '' ? null : sessionId)}
         >
           Save
         </Button>

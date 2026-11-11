@@ -513,7 +513,7 @@ function StudentGradesCard() {
           ? result.notified > 0
             ? `Students can now see their grades — ${result.notified} notified.`
             : 'Students can now see their grades.'
-          : 'Student grades are hidden again.',
+          : 'Grades are hidden again — students still see their scores.',
         'success',
       )
     } catch (e) {
@@ -535,8 +535,8 @@ function StudentGradesCard() {
             {failed
               ? 'Couldn’t read the setting. This needs migration 0062 applied.'
               : on
-                ? 'Students can see their marks and spend points on flagged columns.'
-                : 'Hidden. Students are told grades aren’t open yet.'}
+                ? 'Students see their scores AND their grade (the term figure and the part scores).'
+                : 'Grades hidden. Students still see their scores and can use points assist — just not the grade.'}
           </span>
           {failed && (
             <button type="button" onClick={load} className="mt-1 text-xs font-semibold text-accent">
@@ -558,8 +558,8 @@ function StudentGradesCard() {
         open={confirming}
         variant="default"
         title="Open grades to students?"
-        message="Every student will see their own marks and a “so far” figure for each subject, and can ask to spend points on any column you have flagged."
-        detail="Check the marks first. Every student in a class that has marks is sent a notification, and a student who has seen a mark has seen it."
+        message="Every student will see a “so far” grade for each subject and a score for each part, on top of the scores they can already see. Using points works the same either way."
+        detail="Check the marks first. Every student in a class that has marks is sent a notification, and a student who has seen a grade has seen it."
         confirmLabel="Open grades"
         busy={busy}
         onConfirm={() => apply(true)}

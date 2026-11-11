@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
+  attendanceSums,
   completionByTerm,
   componentScore,
+  componentScores,
   componentShare,
   defaultPolicy,
   displayGrade,
   emptySums,
   finalGrade,
+  hasAnyItems,
   orderedItems,
   policyError,
+  recitationScore,
   subjectPolicyError,
   sumsFromScores,
   sumsToOne,
@@ -82,13 +86,15 @@ describe('componentScore', () => {
 
 describe('termGrade — parity with the instructor spreadsheet', () => {
   it('reproduces row 3 of the Finals sheet (AD = 91.52)', () => {
-    // PT 37.5/50 → 90.00 · Quiz 97/100 → 98.80 · Recitation 97/100 → 98.80
+    // PT 37.5/50 → 90.00 · Quiz 97/100 → 98.80 · Recitation 98.8% attendance → 98.8
+    // (Recitation is attendance as-is since 0063; 98.8/100 stands in for the 98.80
+    // the old typed 97/100 transmuted to, so this stays a parity check on the sheet.)
     // CS = 90*0.5 + 98.8*0.25 + 98.8*0.25 = 94.40
     // Exam 34/50 → 87.20 · Term = 94.40*0.6 + 87.20*0.4 = 91.52
     const s = sums({
       performance_task: [37.5, 50],
       quiz: [97, 100],
-      recitation: [97, 100],
+      recitation: [98.8, 100],
       exam: [34, 50],
     })
     expect(displayGrade(termGrade(s, POLICY))).toBe('91.52')
@@ -101,7 +107,7 @@ describe('termGrade — parity with the instructor spreadsheet', () => {
     const s = sums({
       performance_task: [0, 50],
       quiz: [86, 100],
-      recitation: [86, 100],
+      recitation: [94.4, 100],
       exam: [0, 50],
     })
     expect(displayGrade(termGrade(s, POLICY))).toBe('70.32')
@@ -115,7 +121,7 @@ describe('termGrade — parity with the instructor spreadsheet', () => {
     const s = sums({
       performance_task: [48.25, 50],
       quiz: [97, 100],
-      recitation: [97, 100],
+      recitation: [98.8, 100],
       exam: [35.58, 50],
     })
     expect(displayGrade(termGrade(s, POLICY))).toBe('94.61')
@@ -128,10 +134,10 @@ describe('termGrade — parity with the instructor spreadsheet', () => {
 
 describe('termGrade — structure', () => {
   it('equals class standing exactly when the exam carries no weight', () => {
-    // PT 40/50 → 92 · Quiz 80/100 → 92 · Recitation 80/100 → 92 ⇒ CS = 92.
+    // PT 40/50 → 92 · Quiz 80/100 → 92 · Recitation 92% attendance → 92 ⇒ CS = 92.
     const policy: GradePolicy = { ...POLICY, csWeight: 1, examWeight: 0 }
-    const s = sums({ performance_task: [40, 50], quiz: [80, 100], recitation: [80, 100] })
-    expect(termGrade(s, policy)).toBe(92)
+    const s = sums({ performance_task: [40, 50], quiz: [80, 100], recitation: [92, 100] })
+    expect(termGrade(s, policy)).toBeCloseTo(92, 9)
   })
 
   it('is null for a term that has no items in any component', () => {
@@ -399,5 +405,77 @@ describe('completionByTerm (Era 8.0)', () => {
   it('answers every term for an empty roster', () => {
     const out = completionByTerm([])
     expect(out).toEqual({ prelim: null, midterm: null, finals: null })
+  })
+})
+
+describe('Recitation is attendance, as-is (0063)', () => {
+  it('97% attendance is a Recitation grade of 97 — no floor, no transmutation', () => {
+    // The instructor's own example. Through the old transmutation this would
+    // have read 98.8; as-is it is exactly the rate.
+    const sums97 = attendanceSums({ showed: 97, counted: 100 })
+    expect(recitationScore(sums97, POLICY)).toBe(97)
+  })
+
+  it('zero attendance is 0, not 60 — harsher than the other parts, by choice', () => {
+    // Pinned because it is the number most likely to be 'fixed' by someone who
+    // assumes every part floors at 60.
+    expect(recitationScore(attendanceSums({ showed: 0, counted: 10 }), POLICY)).toBe(0)
+    expect(componentScore(0, 10)).toBe(60)
+  })
+
+  it('reads the floor, not 0, while no class has been counted yet', () => {
+    expect(recitationScore(attendanceSums({ showed: 0, counted: 0 }), POLICY)).toBe(60)
+    expect(recitationScore(attendanceSums(undefined), POLICY)).toBe(60)
+  })
+
+  it('is the same under both views — attendance has no "not marked yet"', () => {
+    const s = emptySums()
+    s.recitation = attendanceSums({ showed: 9, counted: 10 })
+    expect(componentScores(s, POLICY, 'official').recitation).toBeCloseTo(90, 9)
+    expect(componentScores(s, POLICY, 'soFar').recitation).toBeCloseTo(90, 9)
+  })
+
+  it('does not make a term "started": attendance alone gives no term grade', () => {
+    // Classes being held is not work being graded. A Finals with attendance but
+    // no quiz yet must stay a dash, not a confident low number.
+    const s = emptySums()
+    s.recitation = attendanceSums({ showed: 9, counted: 10 })
+    expect(hasAnyItems(s, 'official')).toBe(false)
+    expect(hasAnyItems(s, 'soFar')).toBe(false)
+    expect(termGrade(s, POLICY)).toBeNull()
+  })
+
+  it('feeds Class Standing at its own weight', () => {
+    // PT 60 (0/50) · Quiz 100 (100/100) · Recitation 80% → 80. CS = 30 + 25 + 20 = 75.
+    const policy: GradePolicy = { ...POLICY, csWeight: 1, examWeight: 0 }
+    const s = sums({ performance_task: [0, 50], quiz: [100, 100] })
+    s.recitation = attendanceSums({ showed: 8, counted: 10 })
+    expect(termGrade(s, policy)).toBeCloseTo(60 * 0.5 + 100 * 0.25 + 80 * 0.25, 9)
+  })
+
+  it('sumsFromScores takes Recitation from attendance and ignores leftover typed columns', () => {
+    const items: GradeItemLike[] = [
+      { id: 'q1', component: 'quiz', maxScore: 20, archivedAt: null },
+      // A retired typed Recitation column: must not be added to the attendance.
+      { id: 'r1', component: 'recitation', maxScore: 10, archivedAt: null },
+    ]
+    const out = sumsFromScores(
+      items,
+      new Map([
+        ['q1', 15],
+        ['r1', 10],
+      ]),
+      { showed: 7, counted: 8 },
+    )
+    expect(out.recitation).toEqual({ sumScore: 7, sumMax: 8, sumMaxMarked: 8 })
+    expect(out.quiz).toEqual({ sumScore: 15, sumMax: 20, sumMaxMarked: 20 })
+  })
+
+  it('completionByTerm does not count Recitation as work left to enter', () => {
+    const s = emptySums()
+    s.quiz = { sumScore: 10, sumMax: 20, sumMaxMarked: 20 }
+    s.recitation = attendanceSums({ showed: 5, counted: 10 })
+    // Only the quiz is entered work: 20 of 20 marked = 100%, however many classes ran.
+    expect(completionByTerm([{ term: 'prelim', sums: s }]).prelim).toBe(100)
   })
 })
