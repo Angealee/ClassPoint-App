@@ -365,9 +365,6 @@ function BoostCard({
           </p>
           <p className="text-xs text-muted">{COMPONENT_LABEL[item.component]}</p>
         </div>
-        <Chip tone="reward" size="sm">
-          up to +{formatMarks(pointsGain(state.maxPoints, state.score, item.maxScore))}
-        </Chip>
       </div>
 
       <p className="text-sm tabular-nums">

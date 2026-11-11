@@ -9,7 +9,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ChevronDownIcon, TableIcon, TicketIcon } from '@/components/ui/icons'
-import { boostState, formatMarks, pointsGain } from '@/lib/grade-boost'
+import { boostState, formatMarks } from '@/lib/grade-boost'
 import { displayGrade } from '@/lib/grading'
 import {
   TERM_TITLE,
@@ -127,7 +127,11 @@ export function StudentGrades() {
   }
 
   const summary = summarizeTerm(subject, term)
-  const explanation = explainTerm(subject, term)
+  // While the instructor's switch is off the server withholds the weights, so these
+  // are null anyway — but the screen decides what to SHOW from `figures`, not from
+  // an accident of what is missing.
+  const figures = grades.figures
+  const explanation = figures ? explainTerm(subject, term) : null
   const boostable = boostableCount(subjects)
 
   return (
@@ -180,22 +184,38 @@ export function StudentGrades() {
           />
         )}
 
-        <Card elevation="raised" className="p-5">
-          <p className="text-xs text-muted">{TERM_TITLE[term]} · so far</p>
-          <div className="mt-0.5 flex items-end justify-between gap-3">
-            <p className="font-display text-4xl font-bold tabular-nums">
-              {displayGrade(summary.soFar)}
+        {figures ? (
+          <Card elevation="raised" className="p-5">
+            <p className="text-xs text-muted">{TERM_TITLE[term]} · so far</p>
+            <div className="mt-0.5 flex items-end justify-between gap-3">
+              <p className="font-display text-4xl font-bold tabular-nums">
+                {displayGrade(summary.soFar)}
+              </p>
+              <p className="pb-1 text-right text-xs tabular-nums text-muted">
+                {summary.marked} of {summary.total} marked
+              </p>
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              {summary.soFar === null
+                ? `Nothing in ${TERM_TITLE[term]} has been marked yet.`
+                : 'Based on what’s marked so far. Parts your instructor hasn’t marked yet count at the 60 minimum, so this moves as marks come in.'}
             </p>
-            <p className="pb-1 text-right text-xs tabular-nums text-muted">
-              {summary.marked} of {summary.total} marked
+          </Card>
+        ) : (
+          // Grades are not open yet (0065): the scores below are the student's own
+          // and stay visible, and so does using points on them. Only the GRADE waits.
+          <Card className="p-5">
+            <p className="text-xs text-muted">{TERM_TITLE[term]} · your scores</p>
+            <p className="mt-0.5 font-display text-2xl font-bold tabular-nums">
+              {summary.marked} of {summary.total}{' '}
+              <span className="text-base font-semibold text-muted">marked</span>
             </p>
-          </div>
-          <p className="mt-2 text-xs text-muted">
-            {summary.soFar === null
-              ? `Nothing in ${TERM_TITLE[term]} has been marked yet.`
-              : 'Based on what’s marked so far. Parts your instructor hasn’t marked yet count at the 60 minimum, so this moves as marks come in.'}
-          </p>
-        </Card>
+            <p className="mt-2 text-xs text-muted">
+              Your instructor hasn’t opened grades yet. You can see your scores and use your
+              points on them now — the grade itself shows up once it’s opened.
+            </p>
+          </Card>
+        )}
 
         {/* What the figure is made of. Shown as the shares of THIS term, not as
             "50% of 60%", and only when the weights are usable — the same rule
@@ -274,9 +294,11 @@ export function StudentGrades() {
               <div key={c.component}>
                 <div className="mb-1.5 flex items-baseline justify-between px-1">
                   <h2 className="text-sm font-semibold">{c.label}</h2>
-                  <span className="text-xs tabular-nums text-muted">
-                    {c.score === null ? '—' : displayGrade(c.score)}
-                  </span>
+                  {figures && (
+                    <span className="text-xs tabular-nums text-muted">
+                      {c.score === null ? '—' : displayGrade(c.score)}
+                    </span>
+                  )}
                 </div>
                 <Rows>
                   <div className="p-3.5">
@@ -292,9 +314,11 @@ export function StudentGrades() {
             <div key={c.component}>
               <div className="mb-1.5 flex items-baseline justify-between px-1">
                 <h2 className="text-sm font-semibold">{c.label}</h2>
-                <span className="text-xs tabular-nums text-muted">
-                  {c.score === null ? '—' : displayGrade(c.score)}
-                </span>
+                {figures && (
+                  <span className="text-xs tabular-nums text-muted">
+                    {c.score === null ? '—' : displayGrade(c.score)}
+                  </span>
+                )}
               </div>
               <Rows>
                 {summary.items
@@ -371,7 +395,7 @@ function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has end
           to={'/app/points?column=' + item.id}
           className="cp-tap-y inline-flex h-9 shrink-0 items-center gap-1 rounded-xl border border-line px-3 text-sm font-semibold text-accent transition-colors hover:bg-card-2"
         >
-          up to +{formatMarks(pointsGain(state.maxPoints, state.score, item.maxScore))} · use points
+          use points
           <span aria-hidden>›</span>
         </Link>
       )}

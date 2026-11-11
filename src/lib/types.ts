@@ -1750,8 +1750,18 @@ export interface MyGradeSubject {
 }
 
 export interface MyGrades {
-  /** False while the instructor has grades switched off (or the account is archived). */
+  /**
+   * The screen is available. False only for an ARCHIVED account (0065) — a student
+   * always sees their own marks, whatever the grade switch says.
+   */
   enabled: boolean
+  /**
+   * The GRADE FIGURES may be shown (the term "so far" grade, the part scores, how
+   * it is worked out). False while the instructor's switch is off: marks and
+   * points still work, and the weights and attendance are withheld by the server
+   * so a grade cannot be computed from the payload.
+   */
+  figures: boolean
   subjects: MyGradeSubject[]
 }
 

@@ -241,7 +241,7 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   state; boost requests and the Ops switch fail with a readable message.
   0062 also carries `save_subject_policy` (the atomic weights save) — until it lands the
   weights editor works as before, at the old non-atomic risk.
-  **Next number: 0065.** (0063 is pasted; 0064 is written — see its section below.)
+  **Next number: 0066.** (0063 is pasted; 0064 and 0065 are written — see their sections below.)
   ⚠ **EVERY "WRITTEN AND NOT YET APPLIED" CLAIM IN THE BLOCK ABOVE IS NOW
   UNVERIFIED PROSE — ASK THE DATABASE INSTEAD.** It was written file by file
   over months, nobody could check it without reading every migration and
@@ -4433,6 +4433,33 @@ switch, Columns terms, the corner dot, the inbox, Reverse) and the whole write p
 `reverse_grade_boost` are typechecked and diffed, never run. 0062's verify block is the
 test: **do a full request → approve → reverse on a scratch student before opening
 grades to the class.**
+
+Since 0065 (Scores and points stay available when the grade switch is OFF — Era 8.0 Phase 9).
+Decision (instructor, 2026-11-11): **the switch hides the GRADE, not the screen.** **0065 is WRITTEN
+AND NOT YET APPLIED** — paste it AFTER 0064, twice; paste it BEFORE deploying the client (the client
+treats a missing `figures` as "figures shown when enabled", so deploying first is safe but keeps
+the old all-or-nothing behaviour).
+
+**"Student grades" now means "show students their GRADE".** Off used to mean "Grades aren't open
+yet" and nothing else — not even their own quiz scores — and `request_grade_boost` refused. Now,
+OFF: a student sees every column and their score on it ("23 / 40") and can use points on any of
+them exactly as when it is on; they do NOT see the term "so far" figure, the part scores, "How is
+this worked out?", or the Home Grades card. ON: as before. A student's own marks were never secret
+from them, so the switch no longer gates the screen.
+
+**HIDING IS REAL, NOT CSS.** While figures are hidden `get_my_grades` WITHHOLDS the weights
+(`policies: []`) and the attendance counts (`attendance: {}`) — the two inputs besides the marks
+that `grading.ts` needs — so a grade cannot be reconstructed from the payload, and `summarizeTerm`
+returns null on its own. The new `figures` key is what the screen reads; the screen decides what to
+SHOW from `figures`, not from an accident of what is missing. Only an ARCHIVED account is
+`enabled: false` now. Recitation's attendance row disappears with the figures (its counts are
+withheld) — an attendance rate IS the Recitation grade. `request_grade_boost` lost its
+"Grades are not open yet" gate. Ownership moves 0064 → 0065, same signatures, bodies diffed.
+Turning the switch ON still pushes "Your grades are open", which is now exactly true.
+
+**"use points", not "up to +N · use points" (instructor).** The row link and the card header chip
+no longer promise an amount: the maximum depends on the student's balance and the column, so a
+number on a row read as a price. The amount is on the card's picker, where it is the student's choice.
 
 Since 0064 (Points assist is AUTOMATIC — Era 8.0 Phase 8). Decisions (instructor, 2026-11-11):
 **no terms to set** · **1 point = 1 mark** · **the student chooses how many points** ·

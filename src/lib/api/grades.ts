@@ -772,6 +772,8 @@ export async function reverseGradeBoost(
 
 type MyGradesRaw = {
   enabled: boolean
+  /** 0065. Absent on a database without it — then "enabled" meant "figures shown". */
+  figures?: boolean
   subjects: Array<{
     subjectId: string
     code: string
@@ -794,6 +796,7 @@ export async function getMyGrades(): Promise<MyGrades> {
   const raw = await rpc<MyGradesRaw>('get_my_grades')
   return {
     enabled: raw?.enabled === true,
+    figures: raw?.figures === undefined ? raw?.enabled === true : raw.figures === true,
     subjects: (raw?.subjects ?? []).map((s) => ({
       subjectId: s.subjectId,
       code: s.code,

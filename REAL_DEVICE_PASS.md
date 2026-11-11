@@ -91,7 +91,10 @@ Use `Scratch A`. Section needs one subject with weights set.
       blocked with a sentence. Restore, save → "Weights saved."
 
 **Visibility**
-- [ ] Phone, as `Scratch A`: Grades → "Grades aren't open yet." The Home card is absent.
+- [ ] Phone, as `Scratch A` (with 0065 applied): Grades shows the **scores** ("17 / 20") and each row's
+      **use points** link, but **no** term figure, no part scores and no "How is this worked out?" — a card
+      says your instructor hasn't opened grades yet. The Home card is absent.
+- [ ] Still switched off: use points on a column with a mark (as in section 11). It must work.
 - [ ] Laptop: **Ops → Student grades** → turn on → confirm.
       Expected toast: "Students can now see their grades — N notified." (N = students in a
       class that has at least one column.) Turning it off and on again is a *new* opening,
@@ -207,8 +210,8 @@ marks once more, because a student who has seen a mark has seen it.
 - [ ] Tap **Use 3 points** → the confirm states the real gain and the rank warning → send → the
       card moves to "Waiting on your instructor" and the banner count drops. This is the first
       time this request path runs from the new screen — do it with a scratch student.
-- [ ] With **Ops → Student grades** switched off, `/app/points` says "Grades aren't open yet" in
-      the columns section and the rest of the screen still works.
+- [ ] With **Ops → Student grades** switched off, `/app/points` STILL lists the columns and lets you
+      use points (0065). Only the grade figures are hidden, on Grades and Home.
 
 ## 12. Points assist, the Absent mark, Recitation from attendance (0063)
 

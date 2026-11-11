@@ -429,6 +429,31 @@ select
        and p.proname = 'get_my_grades'
        and pg_get_functiondef(p.oid) like '%''offered''%'
        and pg_get_functiondef(p.oid) not like '%pointsCost%'
+  )
+union all
+--   0065: the switch hides the GRADE, not the screen. get_my_grades reports 'figures',
+--   and a request no longer needs "grades are open". If either reads false, students
+--   with the switch off still see "Grades aren't open yet" and cannot use points.
+select
+  '0065 · get_my_grades reports figures',
+  exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'get_my_grades'
+       and pg_get_functiondef(p.oid) like '%''figures''%'
+  )
+union all
+select
+  '0065 · request_grade_boost has no grades-open gate',
+  exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'request_grade_boost'
+       and pg_get_functiondef(p.oid) not like '%Grades are not open yet%'
   );
 
 
