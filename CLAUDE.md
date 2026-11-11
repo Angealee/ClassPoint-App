@@ -4469,6 +4469,12 @@ targets, `text-base`), defaulting to the most they can use (`min(maxPoints, free
 if the balance or mark moves under it; the confirm states the REAL gain and the resulting mark,
 and the button reads "Use N points". The Grades row link says "up to +N · use points".
 
+**Verified by probe (removed, residue-checked)** with the real card at 320px: no overflow, 16px
+input, 44px steppers; 17/20 defaults to 3 with + disabled and "That's full marks"; 17.5/20 with 2
+free points defaults to 2 and shows 17.5→19.5; a typed 9 clamps to 3 and a typed 0 to 1; letters are
+stripped; the button submits a typed-but-unblurred value; zero free points disables everything and
+hides the "up to N" hint. **Not verified against a database** — 0064 is unpasted.
+
 Since 0063 (Points assist, the Absent mark, Recitation from attendance — Era 8.0 Phase 7).
 Decisions (instructor, 2026-11-09/11): **automatic by part, with defaults** · **fixed marks per
 part** · **an Absent mark, tied to attendance** · **Recitation IS the attendance rate** ·
