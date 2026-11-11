@@ -11,6 +11,7 @@ import {
 } from '@/lib/grading'
 import { finalGradeFor } from '@/lib/grade-impact'
 import type {
+  GradeAttendance,
   GradeItem,
   GradePolicy,
   GradeSumsRow,
@@ -53,6 +54,10 @@ export function buildTermSheet(
   items: GradeItem[],
   scores: Map<string, number>,
   policy: GradePolicy,
+  /** studentId → attendance counts. Recitation IS attendance (0063). */
+  attendance?: Map<string, GradeAttendance>,
+  /** cellKey → set when the cell reads Absent. Written as the letter A. */
+  absences?: Map<string, unknown>,
 ): Row[] {
   const live = orderedItems(items.filter((i) => i.archivedAt === null))
 
@@ -79,12 +84,16 @@ export function buildTermSheet(
 
     for (const item of live) {
       const v = scores.get(cellKey(item.id, student.id))
-      // Blank, not zero — see the header note.
-      row.push(v === undefined ? '' : v)
+      // Blank, not zero — see the header note. An ABSENT cell with no mark is the
+      // letter A: text, so AVERAGE() ignores it exactly as it ignores a blank, and
+      // the sheet still says why the cell is empty.
+      row.push(
+        v === undefined ? (absences?.has(cellKey(item.id, student.id)) ? 'A' : '') : v,
+      )
       if (v !== undefined) marked.set(item.id, v)
     }
 
-    const sums = sumsFromScores(live, marked)
+    const sums = sumsFromScores(live, marked, attendance?.get(student.id))
     const comps = componentScores(sums, policy, 'official')
     for (const c of GRADE_COMPONENTS) row.push(comps[c])
     row.push(classStanding(comps, policy))
@@ -158,9 +167,13 @@ export async function exportTermGrades(
   items: GradeItem[],
   scores: Map<string, number>,
   policy: GradePolicy,
+  attendance?: Map<string, GradeAttendance>,
+  absences?: Map<string, unknown>,
 ): Promise<void> {
   const XLSX = await import('xlsx')
-  const sheet = XLSX.utils.aoa_to_sheet(buildTermSheet(students, items, scores, policy))
+  const sheet = XLSX.utils.aoa_to_sheet(
+    buildTermSheet(students, items, scores, policy, attendance, absences),
+  )
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, sheet, safeSheetName(TERM_LABEL[term]))
   XLSX.writeFile(wb, fileName(`grades-${TERM_LABEL[term].toLowerCase()}`, sectionName, subjectCode))
@@ -171,6 +184,8 @@ export interface SubjectExportTerm {
   items: GradeItem[]
   scores: Map<string, number>
   policy: GradePolicy
+  attendance?: Map<string, GradeAttendance>
+  absences?: Map<string, unknown>
 }
 
 /**
@@ -192,7 +207,9 @@ export async function exportSubjectGrades(
   const wb = XLSX.utils.book_new()
 
   for (const t of terms) {
-    const sheet = XLSX.utils.aoa_to_sheet(buildTermSheet(students, t.items, t.scores, t.policy))
+    const sheet = XLSX.utils.aoa_to_sheet(
+      buildTermSheet(students, t.items, t.scores, t.policy, t.attendance, t.absences),
+    )
     XLSX.utils.book_append_sheet(wb, sheet, safeSheetName(TERM_LABEL[t.term]))
   }
 

@@ -250,10 +250,10 @@ export function StudentGrades() {
                   {me?.semester_points ?? 0} point{(me?.semester_points ?? 0) === 1 ? "" : "s"}
                   {" · "}
                   {semesterEnded
-                    ? "boosts are closed this semester"
+                    ? "points assist is closed this semester"
                     : boostable > 0
-                      ? boostable + " column" + (boostable === 1 ? "" : "s") + " you can boost"
-                      : "no column offers a boost yet"}
+                      ? boostable + " column" + (boostable === 1 ? "" : "s") + " open for points assist"
+                      : "no column is open for points assist yet"}
                 </span>
               </span>
               <span className="shrink-0 text-lg text-muted">›</span>
@@ -262,8 +262,33 @@ export function StudentGrades() {
         </Link>
 
                 {summary.components
-          .filter((c) => summary.items.some((i) => i.component === c.component))
-          .map((c) => (
+          .filter((c) =>
+            c.component === 'recitation'
+              ? c.possible > 0
+              : summary.items.some((i) => i.component === c.component),
+          )
+          .map((c) =>
+            c.component === 'recitation' ? (
+              // Recitation is NOT typed (0063): it is this term's attendance rate,
+              // as-is — 9 of 10 classes is a Recitation of 90.
+              <div key={c.component}>
+                <div className="mb-1.5 flex items-baseline justify-between px-1">
+                  <h2 className="text-sm font-semibold">{c.label}</h2>
+                  <span className="text-xs tabular-nums text-muted">
+                    {c.score === null ? '—' : displayGrade(c.score)}
+                  </span>
+                </div>
+                <Rows>
+                  <div className="p-3.5">
+                    <p className="text-sm font-medium">Attendance</p>
+                    <p className="text-xs tabular-nums text-muted">
+                      {c.earned} of {c.possible} class{c.possible === 1 ? '' : 'es'} attended —
+                      your attendance rate is your Recitation grade.
+                    </p>
+                  </div>
+                </Rows>
+              </div>
+            ) : (
             <div key={c.component}>
               <div className="mb-1.5 flex items-baseline justify-between px-1">
                 <h2 className="text-sm font-semibold">{c.label}</h2>
@@ -283,7 +308,8 @@ export function StudentGrades() {
                   ))}
               </Rows>
             </div>
-          ))}
+            ),
+          )}
       </div>
 
     </PullToRefresh>
@@ -295,7 +321,9 @@ function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has end
 
   const scoreLine =
     item.score === null
-      ? 'Not marked yet'
+      ? item.absent
+        ? 'Absent'
+        : 'Not marked yet'
       : `${formatMarks(item.score)} / ${formatMarks(item.maxScore)}`
 
   return (
@@ -307,7 +335,7 @@ function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has end
         <p className="text-xs tabular-nums text-muted">
           {scoreLine}
           {state.kind === 'boosted' && ` · was ${formatMarks(state.before)}`}
-          {state.kind === 'unmarked' && !locked && ' · points can boost this once it’s marked'}
+          {state.kind === 'unmarked' && !locked && ' · points assist opens once it’s marked'}
         </p>
       </div>
 
@@ -322,6 +350,14 @@ function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has end
       {state.kind === 'pending' && (
         <Chip tone="warn" size="sm">
           Waiting
+        </Chip>
+      )}
+
+      {/* Absent (0063): say why there is no way to use points here, instead of a
+          row that just offers nothing. */}
+      {state.kind === 'absent' && (
+        <Chip tone="neutral" size="sm">
+          Absent
         </Chip>
       )}
 

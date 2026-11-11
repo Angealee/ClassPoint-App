@@ -12,13 +12,17 @@ import { Meter } from '@/components/ui/Meter'
 import { StickyBar } from '@/components/ui/StickyBar'
 import { useToast } from '@/components/ui/Toast'
 import {
+  clearGradeAbsences,
   clearGradeScores,
+  getGradeAbsences,
+  getGradeAttendance,
   listGradeBoosts,
   listGradeItems,
   listGradePolicies,
   listGradeScores,
   listRosterBasics,
   getSectionGradeSums,
+  saveGradeAbsences,
   saveGradeScores,
 } from '@/lib/api'
 import {
@@ -32,6 +36,8 @@ import {
 import { cn } from '@/lib/cn'
 import { errorText } from '@/lib/errors'
 import { writeGradeScope } from '@/lib/grade-scope'
+import { parseScoreInput } from '@/lib/grade-entry'
+import { writeFor, type AbsentSource, type CellState } from '@/lib/grade-cell'
 import { useIsDesktop } from '@/lib/useIsDesktop'
 import { GradeGrid, type CellEdit } from './GradeGrid'
 import { OverallTable } from './OverallTable'
@@ -40,6 +46,7 @@ import { GradeSetupSheet } from './GradeSetupSheet'
 import { GradeImportSheet } from './GradeImportSheet'
 import { useInstructor } from './InstructorLayout'
 import type {
+  GradeAttendance,
   GradeBoost,
   GradeItem,
   GradePolicy,
@@ -147,18 +154,35 @@ export function GradeSheet() {
   // re-rendering this screen on every keystroke is exactly what the row-local
   // state exists to avoid.
   const scoresRef = useRef(new Map<string, number>())
+  // The same for Absent marks (0063): cellKey → why the cell reads A.
+  const absencesRef = useRef(new Map<string, AbsentSource>())
+  /**
+   * Each student's attendance counts for the term on screen — RECITATION IS THIS
+   * (0063). Loaded with the sheet, in its own catch: before 0063 the RPC does not
+   * exist and that must cost the Recitation figure, never the grid.
+   */
+  const [attendance, setAttendance] = useState<Map<string, GradeAttendance>>(() => new Map())
 
   // What the editor was last built from. A SNAPSHOT in state rather than the
   // ref itself, so nothing reads a ref during render: the editor is seeded from
   // `scores` and remounted by `key`, and both move together. Anything that
   // changes values from outside the editor — a reload, undo, a pasted column —
   // writes the ref and then calls `rebuild`.
-  const [grid, setGrid] = useState<{ key: number; scores: Map<string, number> }>({
+  const [grid, setGrid] = useState<{
+    key: number
+    scores: Map<string, number>
+    absences: Map<string, AbsentSource>
+  }>({
     key: 0,
     scores: new Map(),
+    absences: new Map(),
   })
   const rebuild = useCallback(() => {
-    setGrid((g) => ({ key: g.key + 1, scores: new Map(scoresRef.current) }))
+    setGrid((g) => ({
+      key: g.key + 1,
+      scores: new Map(scoresRef.current),
+      absences: new Map(absencesRef.current),
+    }))
   }, [])
 
   // ── The save queue ────────────────────────────────────────────────────────
@@ -167,7 +191,7 @@ export function GradeSheet() {
   const [dirty, setDirty] = useState(0)
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState<Set<string>>(new Set())
-  const [undoable, setUndoable] = useState<{ edit: CellEdit; previous: number | null } | null>(null)
+  const [undoable, setUndoable] = useState<{ edit: CellEdit; previous: CellState } | null>(null)
 
   const load = useCallback(async () => {
     if (!sectionId || !subjectId) return
@@ -195,6 +219,23 @@ export function GradeSheet() {
       const map = new Map<string, number>()
       for (const s of scoreRows) map.set(cellKey(s.itemId, s.studentId), s.score)
       scoresRef.current = map
+
+      // Absent marks and attendance, each in its OWN catch (the 0034 SectionGrid
+      // precedent): a database without 0063 costs the A marks and the Recitation
+      // figure, never the grid.
+      const [absenceRows, attendanceMap] = await Promise.all([
+        getGradeAbsences(sectionId, subjectId, term).catch(() => []),
+        getGradeAttendance(sectionId, subjectId, term).catch(
+          () => new Map<string, GradeAttendance>(),
+        ),
+      ])
+      const liveIds = new Set(live.map((i) => i.id))
+      const absentMap = new Map<string, AbsentSource>()
+      for (const a of absenceRows) {
+        if (liveIds.has(a.itemId)) absentMap.set(cellKey(a.itemId, a.studentId), a.source)
+      }
+      absencesRef.current = absentMap
+      setAttendance(attendanceMap)
 
       setStudents(roster)
       setItems(itemRows)
@@ -260,8 +301,11 @@ export function GradeSheet() {
     setDirty(0)
     setSaving(true)
 
-    const writes = batch.filter((c) => c.value !== null)
-    const clears = batch.filter((c) => c.value === null)
+    // Three kinds of cell (0063): a mark, an A, and a clear. The server drops the
+    // other half of a cell by trigger, so each kind is one write.
+    const absents = batch.filter((c) => c.absent)
+    const writes = batch.filter((c) => !c.absent && c.value !== null)
+    const clears = batch.filter((c) => !c.absent && c.value === null)
 
     try {
       // ONE upsert for every dirty cell, so a fast run down a column is a
@@ -273,7 +317,12 @@ export function GradeSheet() {
           writes.map((c) => ({ itemId: c.itemId, studentId: c.studentId, score: c.value as number })),
         )
       }
-      if (clears.length > 0) await clearGradeScores(clears)
+      if (absents.length > 0) await saveGradeAbsences(absents)
+      if (clears.length > 0) {
+        // A clear removes the mark AND a typed A. A derived A has no row to remove.
+        await clearGradeScores(clears)
+        await clearGradeAbsences(clears)
+      }
       setFailed((prev) => {
         if (prev.size === 0) return prev
         const next = new Set(prev)
@@ -313,6 +362,10 @@ export function GradeSheet() {
       const key = cellKey(edit.itemId, edit.studentId)
       if (edit.value === null) scoresRef.current.delete(key)
       else scoresRef.current.set(key, edit.value)
+      // A typed A is recorded; anything else removes a typed A (a derived one is
+      // about the class and stays).
+      if (edit.absent) absencesRef.current.set(key, 'manual')
+      else if (absencesRef.current.get(key) === 'manual') absencesRef.current.delete(key)
       pendingRef.current.set(key, edit)
       setDirty(pendingRef.current.size)
       schedule()
@@ -321,7 +374,7 @@ export function GradeSheet() {
   )
 
   const onCommit = useCallback(
-    (edit: CellEdit, previous: number | null) => {
+    (edit: CellEdit, previous: CellState) => {
       queue(edit)
       setUndoable({ edit, previous })
     },
@@ -337,15 +390,14 @@ export function GradeSheet() {
       for (let i = 0; i < values.length; i += 1) {
         const student = students[startIndex + i]
         if (!student) break
-        const raw = values[i].trim()
-        // Reuse the cell's own rule rather than a second parser — a pasted
-        // value and a typed one must mean the same thing.
-        const n = raw === '' ? null : Number(raw)
-        if (raw !== '' && (!Number.isFinite(n) || (n as number) < 0)) {
+        // The cell's own parser, so a pasted value and a typed one mean the same
+        // thing — including A for absent, and including what it REFUSES ('1e3').
+        const parsed = parseScoreInput(values[i])
+        if (!parsed.ok) {
           rejected += 1
           continue
         }
-        queue({ itemId, studentId: student.id, value: n })
+        queue({ itemId, studentId: student.id, value: parsed.value, absent: parsed.absent === true })
         applied += 1
       }
       setUndoable(null) // a paste is not one step to undo
@@ -362,7 +414,7 @@ export function GradeSheet() {
 
   const onUndo = useCallback(() => {
     if (!undoable) return
-    queue({ ...undoable.edit, value: undoable.previous })
+    queue({ itemId: undoable.edit.itemId, studentId: undoable.edit.studentId, ...writeFor(undoable.previous) })
     setUndoable(null)
     rebuild()
   }, [undoable, queue, rebuild])
@@ -415,6 +467,8 @@ export function GradeSheet() {
           liveItems,
           grid.scores,
           effectivePolicy,
+          attendance,
+          grid.absences,
         )
         return
       }
@@ -428,11 +482,20 @@ export function GradeSheet() {
           const scoreRows = await listGradeScores(itemRows.map((i) => i.id))
           const map = new Map<string, number>()
           for (const s of scoreRows) map.set(cellKey(s.itemId, s.studentId), s.score)
+          // Attendance and Absent marks for this term, each failing soft (0063).
+          const [att, abs] = await Promise.all([
+            getGradeAttendance(sectionId, subjectId, t).catch(
+              () => new Map<string, GradeAttendance>(),
+            ),
+            getGradeAbsences(sectionId, subjectId, t).catch(() => []),
+          ])
           return {
             term: t,
             items: itemRows,
             scores: map,
             policy: policies.find((p) => p.term === t) ?? defaultPolicy(subjectId, t),
+            attendance: att,
+            absences: new Map(abs.map((a) => [cellKey(a.itemId, a.studentId), a.source])),
           }
         }),
       )
@@ -450,6 +513,8 @@ export function GradeSheet() {
     students,
     liveItems,
     grid.scores,
+    grid.absences,
+    attendance,
     effectivePolicy,
     sectionId,
     subjectId,
@@ -759,6 +824,8 @@ export function GradeSheet() {
           view={view}
           failed={failed}
           boosts={boosts}
+          absences={grid.absences}
+          attendance={attendance}
           onCommit={onCommit}
           onPasteColumn={onPasteColumn}
           // ⚠ This prop existed and was never passed, so the desktop empty
@@ -774,6 +841,8 @@ export function GradeSheet() {
           students={students}
           items={liveItems}
           scores={grid.scores}
+          absences={grid.absences}
+          attendance={attendance}
           policy={effectivePolicy}
           view={view}
           failed={failed}

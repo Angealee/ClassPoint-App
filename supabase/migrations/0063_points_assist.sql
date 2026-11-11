@@ -52,7 +52,8 @@
 -- ── ONE-TIME SETUP ──────────────────────────────────────────────────────────
 --   Must go AFTER 0062 (and so after 0057/0058). Safe to re-run — paste it twice.
 --   Until it is applied the client degrades: the Absent mark and the per-part terms
---   are missing and Recitation reads as it did before; nothing breaks.
+--   are missing and Recitation reads the 60 minimum (there are no attendance counts to
+--   read yet); nothing errors, but do not open grades to students until it is applied.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------

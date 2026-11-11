@@ -294,7 +294,7 @@ function GradesCard({
               <p className="font-display text-sm font-bold">Grades</p>
               <p className="text-xs text-muted">
                 {boostable > 0
-                  ? `${boostable} column${boostable === 1 ? '' : 's'} you can boost with points`
+                  ? `${boostable} column${boostable === 1 ? '' : 's'} open for points assist`
                   : 'Based on what’s marked so far'}
               </p>
             </div>

@@ -241,7 +241,7 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   state; boost requests and the Ops switch fail with a readable message.
   0062 also carries `save_subject_policy` (the atomic weights save) — until it lands the
   weights editor works as before, at the old non-atomic risk.
-  **Next number: 0063.**
+  **Next number: 0064.** (0063 is written, see its section below.)
   ⚠ **EVERY "WRITTEN AND NOT YET APPLIED" CLAIM IN THE BLOCK ABOVE IS NOW
   UNVERIFIED PROSE — ASK THE DATABASE INSTEAD.** It was written file by file
   over months, nobody could check it without reading every migration and
@@ -4433,6 +4433,91 @@ switch, Columns terms, the corner dot, the inbox, Reverse) and the whole write p
 `reverse_grade_boost` are typechecked and diffed, never run. 0062's verify block is the
 test: **do a full request → approve → reverse on a scratch student before opening
 grades to the class.**
+
+Since 0063 (Points assist, the Absent mark, Recitation from attendance — Era 8.0 Phase 7).
+Decisions (instructor, 2026-11-09/11): **automatic by part, with defaults** · **fixed marks per
+part** · **an Absent mark, tied to attendance** · **Recitation IS the attendance rate** ·
+**"boost" becomes "points assist" everywhere a person reads it, server wording included**.
+**0063 is WRITTEN AND NOT YET APPLIED** — paste it AFTER 0062, twice, then run `applied_state.sql`
+BLOCK 1b and BLOCK 6 (two new rows). Until it lands the client degrades rather than breaks: the A
+marks, the Points-assist tab and the class picker each fail in their own catch, and Recitation
+reads the 60 floor (no attendance counts to read).
+
+**"BOOST" IS NOW A WORD ONLY CODE USES.** Identifiers (`request_grade_boost`, `grade_boosts`,
+`'grade_boost'` audit action, `grade-boost.ts`, `BoostState`) keep their names — renaming a function
+or a CHECK value breaks every client already holding the old one for no reader's gain. Every STRING
+a person reads says "points assist": the app, and 0063 re-issues `request_grade_boost`,
+`decide_point_redemption` and `reverse_grade_boost` with the new push titles, ledger lines
+("Used · Points assist · …", "Refund · Points assist reversed · …"), request note and errors. Old
+ledger rows keep the old wording — they are history.
+
+**A COLUMN IS OPEN WITHOUT THE INSTRUCTOR FLAGGING IT.** Terms live per SUBJECT and per PART in
+`grade_assist_defaults` (Performance Tasks / Quizzes / Exam — Recitation has none: it is computed,
+so there is no mark to add to). `cp_assist_terms(item)` is the ONE answer to "what are this column's
+terms": off beats the column's own `points_cost/_bonus` beats the part's default. `assist_off` is the
+new per-column switch. `src/lib/grade-boost.ts` `assistModeOf` / `effectiveTerms` mirror it for the
+instructor's preview (pinned by tests; **change one side, change the other, same commit**).
+Set up → **Points assist** edits the per-part terms (subject-wide, and the sheet says so); the
+Columns edit row has Follow the part / Own terms / Off. Saving defaults has NO confirm on purpose —
+it moves no grade, and requests already waiting carry the terms the student agreed to.
+
+**THE ABSENT MARK.** A cell is a MARK, ABSENT (shown A) or BLANK. Two sources, one definition
+(`cp_grade_absent(item, student)`): the instructor typed A (`grade_absences`), or the column is
+tied to a class (`grade_items.session_id`) and the student is recorded **absent OR excused** there
+(the instructor's call — an excused absence is still a class missed). **Arithmetically an A is a
+BLANK**: out of "so far", a zero in Official — so `grading.ts` and `get_section_grade_sums` needed
+NO change for it; only display and the assist rule differ. It blocks a points assist **even when a
+mark was typed** (a 0 for an absentee must not be the easiest column to gain on) and the server
+checks it twice: at the request and again at approval, because the class link can be added between.
+A cell is one thing or the other: two triggers delete the other half, so no code path (grid,
+importer, an approved assist) can leave a cell saying both. `src/lib/grade-cell.ts` is the one
+definition of what a committed cell MEANS and is shared by the desktop grid and the phone entry:
+typing A on a cell that already reads A writes NOTHING (tabbing over a derived A must not create a
+manual row), a derived A cannot be cleared by erasing it, and a typed mark over a derived A keeps
+the A (it is about the class). `parseScoreInput` accepts `A`/`ab`/`abs`/`absent` in any case;
+`abc` is still a typo. The phone has an A button beside each field because the decimal pad has no
+letters. Exports write the letter A (text — `AVERAGE()` ignores it exactly as it ignores a blank).
+
+**RECITATION IS ATTENDANCE, AS-IS.** 97% attendance is a Recitation grade of 97 — **no 60 floor, no
+transmutation**, so 0% is 0 (harsher than the other parts, by choice; pinned in `grading.test.ts`
+because it is the number most likely to be "fixed"). It rides in the SAME `recitation` slot of
+`TermSums` holding COUNTS (`sumScore = showed`, `sumMax = sumMaxMarked = counted`), so every
+reader — grid, Overall, both exports, both prints, the weights preview — needed no change of its own.
+`cp_term_attendance(section, subject, term)` returns counts only (late counts as present; excused and
+irregular leave the denominator — the rule `lib/attendance.ts` states and `get_term_attendance` 0034
+implements), **subject-scoped** (attendance is per subject; untagged sessions are not counted) and
+compared in **Manila time**. `recitationScore` in grading.ts computes the rate — the ONE place, so
+"no weighting arithmetic in a migration" still holds. With no class counted yet it reads the floor
+and does not make a term "started" (`hasAnyItems` and `completionByTerm` ignore Recitation: classes
+being held is not work being graded). Typed Recitation columns are RETIRED — hidden from every
+screen (`listGradeItems` filters them, `sumsFromScores` skips them, `get_my_grades` omits them) but
+the rows and marks stay in `grade_items` and the 365-day backup. Imported past terms that carried a
+Recitation total therefore recompute from attendance: **check an imported term before trusting its
+Recitation**.
+
+**The grid.** Recitation is a computed column labelled "attendance". `CellEdit` gained `absent`;
+`onCommit(edit, previous: CellState)`; `GradeSheet` keeps `absencesRef` beside `scoresRef`, loads
+attendance and absences in their own catches, and flushes three kinds of write (mark / A / clear).
+A column's class link is picked in the Columns edit row from THIS term's classes for the subject
+(plus the linked one even if outside the list, so editing never silently drops it). Student side:
+`MyGradeItem.absent`, `MyGradeSubject.attendance`; the Grades screen shows "Absent" and an
+Attendance row under Recitation; `boostState` gained `absent` and answers it BEFORE "unmarked"
+(absent first, as the server does — "you were absent" is the truer reason and tells them not to
+wait for a mark that is not coming).
+
+**Verified by probe (removed, residue-checked)** with the REAL `GradeGrid` and `GradeItemEntry` and
+fixture data: every figure matches a hand calculation (Ana: quizzes 33/40 → 93, attendance 9/10 → 90,
+class standing 75.75, term 69.45 "partial"; Ben with only attendance reads a dash, not a number);
+typing `a` commits one write with `absent: true`; tabbing over or erasing a derived A commits
+NOTHING; a number over a typed A commits value + `absent: false`; a mark over a derived A keeps the
+"A" tag and its explanation; `abc` is refused with "…or A for absent". Phone entry at 320px: zero
+overflow, inputs 16px, A buttons 44×44, the derived A's button disabled — but the name column is only
+~94px wide beside the field, the A button and "/20", so a long name truncates early (its `title`
+carries it); widen it if that reads badly on a real phone.
+
+**NOT verified against a database:** the whole of 0063 (parsed clean, bodies extracted and diffed,
+never run), the absent rules end to end, the attendance counts, the triggers. **Not built:** an
+Absent mark on imported marks (the importer writes marks only); per-student overrides of a derived A.
 
 ## DB map (migrations 0001–0016 are the source of truth)
 

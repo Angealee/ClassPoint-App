@@ -1,4 +1,4 @@
-import type { MyGradeItem } from './types'
+import type { GradeAssistDefault, GradeItem, MyGradeItem } from './types'
 
 /**
  * What a student may do about spending points on one grade column.
@@ -119,4 +119,44 @@ export function boostTermsError(
   if (!(bonus > 0)) return 'Marks must be more than 0.'
   if (bonus > max) return `Marks can’t be more than the column’s ${max}.`
   return null
+}
+
+// ── Which terms does a column have? (0063) ──────────────────────────────────
+
+/** Where a column's points-assist terms come from. */
+export type AssistMode = 'default' | 'own' | 'off'
+
+/**
+ * How a column is set up: following its part's terms, carrying its own, or off.
+ *
+ * `off` wins, then own terms, then the part's. Mirrors `cp_assist_terms` (0063) —
+ * the SQL is the authority a student's request is checked against, this is the
+ * instructor's preview of it. Change one side, change the other, same commit.
+ */
+export function assistModeOf(
+  item: Pick<GradeItem, 'assistOff' | 'pointsCost' | 'pointsBonus'>,
+): AssistMode {
+  if (item.assistOff) return 'off'
+  if (item.pointsCost !== null && item.pointsBonus !== null) return 'own'
+  return 'default'
+}
+
+/**
+ * The terms a column actually offers, or null for none.
+ *
+ * Recitation never offers any: it is computed from attendance, so there is no
+ * mark to add to (and the SQL returns null for it too).
+ */
+export function effectiveTerms(
+  item: Pick<GradeItem, 'component' | 'assistOff' | 'pointsCost' | 'pointsBonus'>,
+  defaults: readonly GradeAssistDefault[],
+): { cost: number; bonus: number; source: 'own' | 'default' } | null {
+  if (item.component === 'recitation') return null
+  const mode = assistModeOf(item)
+  if (mode === 'off') return null
+  if (mode === 'own') {
+    return { cost: item.pointsCost as number, bonus: item.pointsBonus as number, source: 'own' }
+  }
+  const d = defaults.find((x) => x.component === item.component)
+  return d ? { cost: d.pointsCost, bonus: d.pointsBonus, source: 'default' } : null
 }

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { boostGain, boostState, boostTermsError, formatMarks, round2 } from './grade-boost'
+import {
+  assistModeOf,
+  boostGain,
+  boostState,
+  boostTermsError,
+  effectiveTerms,
+  formatMarks,
+  round2,
+} from './grade-boost'
 import type { MyGradeItem } from './types'
 
 /**
@@ -179,5 +187,47 @@ describe('boostState — absent (0063)', () => {
     expect(boostState(item({ absent: true, pointsCost: null, pointsBonus: null })).kind).toBe(
       'not-offered',
     )
+  })
+})
+
+describe('assistModeOf / effectiveTerms (mirror of cp_assist_terms, 0063)', () => {
+  const quizDefault = { subjectId: 's', component: 'quiz' as const, pointsCost: 5, pointsBonus: 3 }
+  const col = (over: Partial<Parameters<typeof effectiveTerms>[0]> = {}) => ({
+    component: 'quiz' as const,
+    assistOff: false,
+    pointsCost: null,
+    pointsBonus: null,
+    ...over,
+  })
+
+  it('follows the part when the column has no terms of its own', () => {
+    expect(assistModeOf(col())).toBe('default')
+    expect(effectiveTerms(col(), [quizDefault])).toEqual({ cost: 5, bonus: 3, source: 'default' })
+  })
+
+  it('offers nothing while the part has no terms set', () => {
+    expect(effectiveTerms(col(), [])).toBeNull()
+    // A default for ANOTHER part does not leak across.
+    expect(
+      effectiveTerms(col(), [{ ...quizDefault, component: 'exam' as const }]),
+    ).toBeNull()
+  })
+
+  it('lets a column\u2019s own terms beat the part\u2019s', () => {
+    const own = col({ pointsCost: 2, pointsBonus: 1 })
+    expect(assistModeOf(own)).toBe('own')
+    expect(effectiveTerms(own, [quizDefault])).toEqual({ cost: 2, bonus: 1, source: 'own' })
+  })
+
+  it('lets off beat both', () => {
+    const off = col({ assistOff: true, pointsCost: 2, pointsBonus: 1 })
+    expect(assistModeOf(off)).toBe('off')
+    expect(effectiveTerms(off, [quizDefault])).toBeNull()
+  })
+
+  it('never offers terms on Recitation — it is attendance, there is no mark to add to', () => {
+    expect(
+      effectiveTerms(col({ component: 'recitation', pointsCost: 2, pointsBonus: 1 }), [quizDefault]),
+    ).toBeNull()
   })
 })

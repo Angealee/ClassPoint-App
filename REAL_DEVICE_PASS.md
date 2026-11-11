@@ -22,7 +22,7 @@ behave as written, stop there and tell me the step number and what you saw.
 Open the Supabase SQL editor. Paste each file **whole**, then paste it **a second time**
 (the second run must print no error — that is the idempotency test).
 
-Every migration (0001–0062) and both query files have already been run through a real
+Every migration (0001–0063) and both query files have already been run through a real
 PostgreSQL parser and are syntactically valid, so a paste will not fail on a typo or a
 stray `$`. What the parser **cannot** see is a column or type that only your database knows
 about — that is what the verify blocks below catch. (It flags 0025 on one line; that is a
@@ -39,6 +39,7 @@ parser limitation and 0025 is long applied.)
 5. [ ] Paste `0062_grade_boosts.sql` (twice).
        0060 and 0062 can go in **either** order: both now list all 18 audit actions. (They
        did not before — 0060 pasted after 0062 would have silently removed two of them.)
+5b. [ ] Paste `0063_points_assist.sql` (twice) AFTER 0062 — then run its verify block (foot of the file).
 6. [ ] Run `applied_state.sql` BLOCK 6. All four rows must read `true`: 0056, 0061,
        "0062 · decide_point_redemption has the grade branch",
        "0062 · point_events accepts a refund".
@@ -208,3 +209,43 @@ marks once more, because a student who has seen a mark has seen it.
       time this request path runs from the new screen — do it with a scratch student.
 - [ ] With **Ops → Student grades** switched off, `/app/points` says "Grades aren't open yet" in
       the columns section and the rest of the screen still works.
+
+## 12. Points assist, the Absent mark, Recitation from attendance (0063)
+
+Use `Scratch A` and `Scratch B`. Needs 0063 applied (section 1) and at least two classes of attendance
+for the subject in the term, with Scratch B recorded absent in one of them.
+
+**Setup (laptop)**
+- [ ] Set up → **Points assist**: turn **Quizzes** on at 5 points / 3 marks, leave Performance Tasks and
+      Exam off. Save. Expected: "Points assist saved." and the sentence under Quizzes.
+- [ ] Set up → Columns → a quiz column → Edit: it reads **Follow the part** with the Quizzes sentence.
+      No per-column flagging needed.
+- [ ] Same screen, an exam column: **Follow the part** says no terms are set yet — not offered.
+- [ ] Edit the quiz: **Held in class** → pick the class Scratch B was absent in → Save.
+
+**The A mark**
+- [ ] Grid: Scratch B's cell on that quiz shows **A** in amber without anyone typing it; hovering says why.
+- [ ] Type **a** in another student's cell and tab away → it reads **A**; type a number over it → the A is gone.
+- [ ] Tab through Scratch B's derived A without typing: nothing saves (no "1 unsaved change").
+- [ ] Erase Scratch B's derived A: it comes back.
+- [ ] Phone, instructor login: each row has an **A** button; tapping it toggles a typed A; Scratch B's is disabled.
+- [ ] Export the term: the A cells are the letter A, not 0 and not blank.
+
+**Recitation**
+- [ ] Grid, So far: a **Recitation · attendance** column with each student's rate (9 of 10 classes = 90.00).
+- [ ] Compare one student with the Attendance rate on their own screen — same number.
+- [ ] Overall tab and the printed sheet show the same Recitation for that student.
+- [ ] A term with no classes counted reads the 60 minimum for Recitation and still shows no term grade
+      until a quiz or exam exists.
+- [ ] **Imported terms:** open one you imported earlier — its Recitation now comes from attendance. If that
+      is wrong for that term, tell me before relying on its grades.
+
+**The student side (phone, Scratch A with a mark in the quiz, Scratch B absent)**
+- [ ] Scratch A: the quiz is open for points assist with no instructor action. Use points → request → approve
+      (as section 5) — the push and ledger line say **Points assist**, not "Boost".
+- [ ] Scratch B: the quiz shows **Absent**, sits under "Not available yet" with "You were absent for this
+      one", and a direct call is refused ("You were marked absent for …").
+- [ ] Give Scratch B a typed **0** on the quiz: still Absent, still refused.
+- [ ] Grades shows an **Attendance** row under Recitation: "9 of 10 classes attended".
+- [ ] Reverse the points assist from Requests → **Points assists applied**: the push reads "Points assist reversed".
+

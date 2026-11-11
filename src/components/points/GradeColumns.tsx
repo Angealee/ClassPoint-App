@@ -119,7 +119,7 @@ export function GradeColumns({
       ) : !grades?.enabled ? (
         <EmptyState
           icon={<TableIcon />}
-          description="Quizzes, tasks and exams you can boost appear here once your instructor opens grades."
+          description="Quizzes, tasks and exams open for points assist appear here once your instructor opens grades."
         >
           Grades aren’t open yet.
         </EmptyState>
@@ -134,16 +134,16 @@ export function GradeColumns({
         <div className="space-y-4">
           {semesterEnded && (
             <p className="rounded-lg bg-card-2 px-3 py-2 text-xs text-muted">
-              This semester has ended, so grade boosts are closed.
+              This semester has ended, so points assist is closed.
             </p>
           )}
 
           {actionable.length === 0 ? (
             <EmptyState
               icon={<TableIcon />}
-              description="Your instructor chooses which columns can be boosted. When one is open and your mark is in, it appears here."
+              description="Once your instructor turns on points assist for a part, its columns appear here as soon as your mark is in. A column you were absent for can’t be assisted."
             >
-              None of your columns can be boosted right now.
+              None of your columns are open for points assist right now.
             </EmptyState>
           ) : (
             <ActionableList

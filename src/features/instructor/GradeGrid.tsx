@@ -17,15 +17,16 @@ import {
   weightedComponents,
 } from '@/lib/grading'
 import {
-  formatScoreInput,
   isColumnPaste,
   isOverMax,
   parsePastedColumn,
   parseScoreInput,
 } from '@/lib/grade-entry'
 import { formatMarks } from '@/lib/grade-boost'
+import { cellDisplay, resolveCommit, type AbsentSource, type CellState, type CellWrite } from '@/lib/grade-cell'
 import { TONE } from '@/lib/tone'
 import type {
+  GradeAttendance,
   GradeBoost,
   GradeComponent,
   GradeItem,
@@ -52,10 +53,13 @@ import type {
  * fresh `key` — both are deliberate one-off actions where a remount is free.
  */
 
-export interface CellEdit {
+/**
+ * One committed cell. `absent: true` is the instructor typing A (0063); a clear is
+ * `value: null, absent: false`. What a commit MEANS lives in `lib/grade-cell.ts`.
+ */
+export interface CellEdit extends CellWrite {
   itemId: string
   studentId: string
-  value: number | null
 }
 
 interface GradeGridProps {
@@ -75,7 +79,17 @@ interface GradeGridProps {
    * empty map (the usual case, and the case before the migration) draws nothing.
    */
   boosts: Map<string, GradeBoost>
-  onCommit: (edit: CellEdit, previous: number | null) => void
+  /**
+   * cellKey → why the cell reads Absent (0063): 'manual' typed, 'auto' from the
+   * attendance of the class the column was held in. A snapshot, like `scores`.
+   */
+  absences: Map<string, AbsentSource>
+  /**
+   * studentId → classes attended / counted this term. RECITATION IS THIS (0063),
+   * so it goes into every row's sums beside the typed marks.
+   */
+  attendance: Map<string, GradeAttendance>
+  onCommit: (edit: CellEdit, previous: CellState) => void
   /** A column pasted from Excel, applied in one go by the parent. */
   onPasteColumn: (itemId: string, startIndex: number, values: string[]) => void
   /** Opens the Columns sheet from the empty state. */
@@ -90,6 +104,8 @@ export function GradeGrid({
   view,
   failed,
   boosts,
+  absences,
+  attendance,
   onCommit,
   onPasteColumn,
   onAddColumn,
@@ -176,7 +192,7 @@ export function GradeGrid({
   const [live, setLive] = useState(() => new Map(scores))
 
   const handleCommit = useCallback(
-    (edit: CellEdit, previous: number | null) => {
+    (edit: CellEdit, previous: CellState) => {
       setLive((prev) => {
         const next = new Map(prev)
         const key = cellKey(edit.itemId, edit.studentId)
@@ -215,11 +231,19 @@ export function GradeGrid({
    * the SET does — a new mark in a part that already had marks must not hand
    * every memoised row a fresh array and re-render all forty of them.
    */
+  // Recitation has no typed columns any more (0063): it is worth showing once
+  // anyone has a class counted, which is the attendance equivalent of "has a mark".
+  const anyAttendance = useMemo(
+    () => [...attendance.values()].some((a) => a.counted > 0),
+    [attendance],
+  )
   const visibleKey =
     view === 'official'
       ? 'all'
       : GRADE_COMPONENTS.filter((c) =>
-          items.some((i) => i.component === c && (itemStats.get(i.id)?.count ?? 0) > 0),
+          c === 'recitation'
+            ? anyAttendance
+            : items.some((i) => i.component === c && (itemStats.get(i.id)?.count ?? 0) > 0),
         ).join(',')
   const visibleComps = useMemo<GradeComponent[]>(
     () =>
@@ -250,14 +274,14 @@ export function GradeGrid({
         const v = live.get(cellKey(item.id, s.id))
         if (v !== undefined) marks.set(item.id, v)
       }
-      const g = termGrade(sumsFromScores(items, marks), policy, view)
+      const g = termGrade(sumsFromScores(items, marks, attendance.get(s.id)), policy, view)
       if (g !== null) {
         sum += g
         n += 1
       }
     }
     return { average: n > 0 ? sum / n : null, graded: n }
-  }, [students, items, live, policy, view])
+  }, [students, items, live, policy, view, attendance])
 
   if (items.length === 0) {
     return (
@@ -428,6 +452,10 @@ export function GradeGrid({
                 )}
               >
                 {COMPONENT_LABEL[c]}
+                {c === 'recitation' && (
+                  // Not typed: it is the term's attendance rate, as-is.
+                  <span className="block text-2xs font-normal text-muted/70">attendance</span>
+                )}
               </th>
             ))}
             {showCs && (
@@ -464,6 +492,8 @@ export function GradeGrid({
               view={view}
               failed={failed}
               boosts={boosts}
+              absences={absences}
+              attendance={attendance.get(student.id)}
               onCommit={handleCommit}
               onPasteColumn={onPasteColumn}
               registerInput={registerInput}
@@ -555,7 +585,11 @@ interface GradeRowProps {
   view: GradeView
   failed: Set<string>
   boosts: Map<string, GradeBoost>
-  onCommit: (edit: CellEdit, previous: number | null) => void
+  /** The whole snapshot; the row reads only its own cells, once, to seed itself. */
+  absences: Map<string, AbsentSource>
+  /** This student's attendance counts — Recitation. Stable identity per student. */
+  attendance: GradeAttendance | undefined
+  onCommit: (edit: CellEdit, previous: CellState) => void
   onPasteColumn: (itemId: string, startIndex: number, values: string[]) => void
   registerInput: (key: string, el: HTMLInputElement | null) => void
   moveFocus: (itemId: string, studentIndex: number, delta: number) => void
@@ -585,6 +619,8 @@ const GradeRow = memo(function GradeRow({
   view,
   failed,
   boosts,
+  absences,
+  attendance,
   onCommit,
   onPasteColumn,
   registerInput,
@@ -605,12 +641,29 @@ const GradeRow = memo(function GradeRow({
     }
     return m
   })
+  // Why each of this row's cells reads Absent (0063), seeded once like `values`.
+  const [absent, setAbsent] = useState<Map<string, AbsentSource>>(() => {
+    const m = new Map<string, AbsentSource>()
+    for (const item of items) {
+      const a = absences.get(cellKey(item.id, student.id))
+      if (a) m.set(item.id, a)
+    }
+    return m
+  })
   const [badCell, setBadCell] = useState<{ itemId: string; reason: string } | null>(null)
+
+  /** One cell's state, in the shape `lib/grade-cell.ts` reasons about. */
+  const stateOf = (itemId: string): CellState => ({
+    value: values.get(itemId) ?? null,
+    absent: absent.get(itemId) ?? null,
+  })
 
   const figures = useMemo(() => {
     const marked = new Map<string, number>()
     for (const [itemId, v] of values) if (v !== null) marked.set(itemId, v)
-    const sums = sumsFromScores(items, marked)
+    // Absent is arithmetically a blank, so it needs no handling here; Recitation
+    // comes from this student's attendance counts.
+    const sums = sumsFromScores(items, marked, attendance)
     const comps = componentScores(sums, policy, view)
     // Which components have nothing marked for this student — the "So far"
     // view renders a dash there instead of the floor.
@@ -637,31 +690,40 @@ const GradeRow = memo(function GradeRow({
       partial,
       partsMarked: weighted.filter((c) => !unmarked[c]).length,
     }
-  }, [values, items, policy, view, weighted])
+  }, [values, items, policy, view, weighted, attendance])
 
   function commit(item: GradeItem, el: HTMLInputElement) {
     const parsed = parseScoreInput(el.value)
-    const previous = values.get(item.id) ?? null
+    const current = stateOf(item.id)
 
     if (!parsed.ok) {
       // Put the last good value back rather than keeping something that is not
       // a score — the cell is one input wide and cannot carry an error label.
       setBadCell({ itemId: item.id, reason: parsed.reason })
-      el.value = formatScoreInput(previous)
+      el.value = cellDisplay(current)
       return
     }
 
     setBadCell(null)
-    el.value = formatScoreInput(parsed.value)
-    if (previous === parsed.value) return
+    // What the commit MEANS (a mark, A, or a clear) is `resolveCommit`'s call —
+    // the phone's entry screen asks the same function.
+    const outcome = resolveCommit(parsed, current)
+    el.value = outcome.display
+    if (outcome.kind === 'none') return
 
     setValues((m) => {
       const next = new Map(m)
-      if (parsed.value === null) next.delete(item.id)
-      else next.set(item.id, parsed.value)
+      if (outcome.next.value === null) next.delete(item.id)
+      else next.set(item.id, outcome.next.value)
       return next
     })
-    onCommit({ itemId: item.id, studentId: student.id, value: parsed.value }, previous)
+    setAbsent((m) => {
+      const next = new Map(m)
+      if (outcome.next.absent === null) next.delete(item.id)
+      else next.set(item.id, outcome.next.absent)
+      return next
+    })
+    onCommit({ itemId: item.id, studentId: student.id, ...outcome.write }, current)
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>, item: GradeItem) {
@@ -674,7 +736,7 @@ const GradeRow = memo(function GradeRow({
       commit(item, e.currentTarget)
       moveFocus(item.id, rowIndex, -1)
     } else if (e.key === 'Escape') {
-      e.currentTarget.value = formatScoreInput(values.get(item.id) ?? null)
+      e.currentTarget.value = cellDisplay(stateOf(item.id))
       setBadCell(null)
       e.currentTarget.blur()
     }
@@ -731,6 +793,11 @@ const GradeRow = memo(function GradeRow({
       {items.map((item) => {
         const key = cellKey(item.id, student.id)
         const value = values.get(item.id) ?? null
+        const absentSource = absent.get(item.id) ?? null
+        // A: no mark and absent. A derived absence WITH a mark typed over it shows
+        // the mark and a small tag instead, so the instructor can see why a points
+        // assist is blocked on a cell that has a score.
+        const isA = value === null && absentSource !== null
         const over = isOverMax(value, item.maxScore)
         const isBad = badCell?.itemId === item.id
         const boost = boosts.get(key)
@@ -740,8 +807,8 @@ const GradeRow = memo(function GradeRow({
         // place the instructor looks to find out.
         const boostNote = boost
           ? value === boost.scoreAfter
-            ? `Boosted +${formatMarks(boost.marksGranted)} for ${boost.pointsSpent} points (was ${formatMarks(boost.scoreBefore)}). Reverse it from Requests.`
-            : `A boost of +${formatMarks(boost.marksGranted)} was applied, but this mark has been edited since. Reverse it from Requests.`
+            ? `Points assist +${formatMarks(boost.marksGranted)} for ${boost.pointsSpent} points (was ${formatMarks(boost.scoreBefore)}). Reverse it from Requests.`
+            : `A points assist of +${formatMarks(boost.marksGranted)} was applied, but this mark has been edited since. Reverse it from Requests.`
           : undefined
         return (
           <td
@@ -775,15 +842,22 @@ const GradeRow = memo(function GradeRow({
               // but only four columns visible at a time. At size 4 the column
               // is ~88px and you can read nine.
               size={4}
-              defaultValue={formatScoreInput(value)}
-              aria-label={`${item.name} for ${student.fullName}${boost ? ', boosted with points' : ''}`}
+              defaultValue={cellDisplay({ value, absent: absentSource })}
+              aria-label={`${item.name} for ${student.fullName}${isA ? ', absent' : ''}${boost ? ', helped with points' : ''}`}
               aria-invalid={isBad || undefined}
               title={
                 isBad
                   ? badCell.reason
                   : over
                     ? `Above the maximum of ${item.maxScore}`
-                    : boostNote
+                    : isA
+                      ? absentSource === 'auto'
+                        ? 'Absent — recorded absent or excused in the class this column was held in. Points can’t be used on it.'
+                        : 'Absent — you marked this student absent. Points can’t be used on it.'
+                      : (boostNote ??
+                        (absentSource === 'auto'
+                          ? 'Recorded absent or excused in the class this column was held in. Points can’t be used on it.'
+                          : undefined))
               }
               onFocus={(e) => {
                 e.currentTarget.select()
@@ -804,9 +878,21 @@ const GradeRow = memo(function GradeRow({
                 'focus:bg-accent-solid/10 focus:ring-2 focus:ring-inset focus:ring-[var(--color-ring)]',
                 isBad && 'bg-danger-solid/10 text-danger',
                 !isBad && over && 'bg-warn-solid/10 text-warn',
+                !isBad && isA && 'font-semibold text-warn',
                 !isBad && failed.has(key) && 'bg-danger-solid/10',
               )}
             />
+            {!isA && absentSource === 'auto' && (
+              // A mark typed over a derived absence: the mark stays, the tag says
+              // why points are still blocked. Same discipline as the dot below —
+              // decoration over the cell, never in the way of a click.
+              <span
+                aria-hidden
+                className="pointer-events-none absolute left-1 top-0.5 text-2xs font-semibold leading-none text-warn"
+              >
+                A
+              </span>
+            )}
             {boost && (
               // A dot, not a chip: the cell is 88px with the input filling it,
               // and anything with width would sit on top of the mark. It is

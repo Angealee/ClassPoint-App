@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card, Rows } from '@/components/ui/Card'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -6,14 +6,55 @@ import { IconButton } from '@/components/ui/IconButton'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { SectionLabel } from '@/components/ui/SectionLabel'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { useToast } from '@/components/ui/Toast'
 import { PencilIcon, TrashIcon } from '@/components/ui/icons'
 import { COMPONENT_LABEL, GRADE_COMPONENTS } from '@/lib/grading'
 import { parseScoreInput } from '@/lib/grade-entry'
-import { boostTermsError, formatMarks } from '@/lib/grade-boost'
+import {
+  assistModeOf,
+  boostTermsError,
+  effectiveTerms,
+  formatMarks,
+  type AssistMode,
+} from '@/lib/grade-boost'
+import { termOf } from '@/lib/term'
 import { errorText } from '@/lib/errors'
-import { createGradeItem, setGradeItemArchived, updateGradeItem } from '@/lib/api'
-import type { GradeComponent, GradeItem, TermKey } from '@/lib/types'
+import {
+  createGradeItem,
+  listGradeAssistDefaults,
+  listSessions,
+  setGradeItemArchived,
+  updateGradeItem,
+} from '@/lib/api'
+import type {
+  GradeAssistDefault,
+  GradeComponent,
+  GradeItem,
+  SessionSummary,
+  TermKey,
+} from '@/lib/types'
+
+/** The parts a typed column can belong to. Recitation is attendance (0063). */
+const COLUMN_PARTS = GRADE_COMPONENTS.filter((c) => c !== 'recitation')
+
+/** "Mon, Jun 15 · IT 32 · Topic" — enough to tell one class from the next. */
+function sessionLabel(s: SessionSummary): string {
+  const day = new Date(s.startedAt).toLocaleDateString('en-PH', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'Asia/Manila',
+  })
+  return [day, s.subjectCode, s.topic].filter(Boolean).join(' · ')
+}
+
+/** What the instructor chose for a column's points assist, ready to save. */
+interface AssistChoice {
+  mode: AssistMode
+  cost: number | null
+  bonus: number | null
+}
 
 /**
  * Add, rename, re-weight and retire the score columns of one term.
@@ -49,6 +90,24 @@ export function ColumnsPanel({
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState<GradeItem | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<GradeItem | null>(null)
+
+  // The subject's terms per part, and this section's classes — each in its OWN
+  // catch (the 0034 SectionGrid precedent): before 0063 neither exists, and that
+  // must cost the "follow the part" sentence and the class picker, never the panel.
+  const [defaults, setDefaults] = useState<GradeAssistDefault[]>([])
+  const [sessions, setSessions] = useState<SessionSummary[]>([])
+  useEffect(() => {
+    let cancelled = false
+    listGradeAssistDefaults(subjectId)
+      .then((rows) => !cancelled && setDefaults(rows))
+      .catch(() => !cancelled && setDefaults([]))
+    listSessions(sectionId)
+      .then((rows) => !cancelled && setSessions(rows.filter((r) => r.subjectId === subjectId)))
+      .catch(() => !cancelled && setSessions([]))
+    return () => {
+      cancelled = true
+    }
+  }, [sectionId, subjectId])
 
   async function add(e: FormEvent) {
     e.preventDefault()
@@ -90,7 +149,8 @@ export function ColumnsPanel({
     item: GradeItem,
     nextName: string,
     nextMax: string,
-    boost: { cost: number | null; bonus: number | null },
+    assist: AssistChoice,
+    nextSessionId: string | null,
   ) {
     const parsed = parseScoreInput(nextMax)
     if (!parsed.ok || parsed.value === null || parsed.value <= 0) {
@@ -99,14 +159,27 @@ export function ColumnsPanel({
     }
     setBusy(true)
     try {
-      // The boost terms are sent only when they CHANGED. A rename on a database
-      // that has not had 0062 yet must keep working, and it cannot if every
-      // save carries two columns that database does not know about.
-      const boostChanged = boost.cost !== item.pointsCost || boost.bonus !== item.pointsBonus
+      // The points-assist setup and the class link are sent only when they
+      // CHANGED. A rename on a database that has not had 0062 / 0063 yet must keep
+      // working, and it cannot if every save carries columns it does not know.
+      //   default → no terms of its own, on
+      //   own     → this column's cost and marks
+      //   off     → no terms, switched off
+      const assistChanged =
+        assist.mode !== assistModeOf(item) ||
+        (assist.mode === 'own' &&
+          (assist.cost !== item.pointsCost || assist.bonus !== item.pointsBonus))
       await updateGradeItem(item.id, {
         name: nextName,
         maxScore: parsed.value,
-        ...(boostChanged ? { pointsCost: boost.cost, pointsBonus: boost.bonus } : {}),
+        ...(assistChanged
+          ? {
+              assistOff: assist.mode === 'off',
+              pointsCost: assist.mode === 'own' ? assist.cost : null,
+              pointsBonus: assist.mode === 'own' ? assist.bonus : null,
+            }
+          : {}),
+        ...(nextSessionId !== item.sessionId ? { sessionId: nextSessionId } : {}),
       })
       setEditing(null)
       onChanged()
@@ -182,12 +255,16 @@ export function ColumnsPanel({
               value={component}
               onChange={(e) => setComponent(e.target.value as GradeComponent)}
             >
-              {GRADE_COMPONENTS.map((c) => (
+              {COLUMN_PARTS.map((c) => (
                 <option key={c} value={c}>
                   {COMPONENT_LABEL[c]}
                 </option>
               ))}
             </Select>
+            <p className="text-2xs text-muted">
+              Recitation isn’t a column: it is each student’s attendance for the term,
+              worked out from your class attendance.
+            </p>
             <div className="flex gap-3">
               <Input
                 label="Name"
@@ -212,7 +289,7 @@ export function ColumnsPanel({
           </form>
         </Card>
 
-        {GRADE_COMPONENTS.map((c) => {
+        {COLUMN_PARTS.map((c) => {
           const group = live.filter((i) => i.component === c)
           if (group.length === 0) return null
           return (
@@ -224,12 +301,17 @@ export function ColumnsPanel({
                     <EditRow
                       key={item.id}
                       item={item}
+                      defaults={defaults}
+                      sessions={sessions}
+                      term={term}
                       busy={busy}
                       canMoveUp={index > 0}
                       canMoveDown={index < group.length - 1}
                       onMove={(dir) => void move(item, dir)}
                       onCancel={() => setEditing(null)}
-                      onSave={(n, m, boost) => void saveEdit(item, n, m, boost)}
+                      onSave={(n, m, assist, sessionId) =>
+                        void saveEdit(item, n, m, assist, sessionId)
+                      }
                     />
                   ) : (
                     // ⚠ `gap-3`, not `gap-2`: two `sm` IconButtons (32px) have
@@ -244,10 +326,15 @@ export function ColumnsPanel({
                         </p>
                         <p className="text-2xs text-muted">
                           out of {item.maxScore} · {markedCounts.get(item.id) ?? 0} marked
-                          {item.pointsCost !== null && item.pointsBonus !== null && (
-                            <span className="text-reward">
+                          <AssistTag item={item} defaults={defaults} />
+                          {item.sessionId && (
+                            <span>
                               {' '}
-                              · {item.pointsCost} pts → +{formatMarks(item.pointsBonus)} boost
+                              · held{' '}
+                              {(() => {
+                                const linked = sessions.find((x) => x.id === item.sessionId)
+                                return linked ? sessionLabel(linked).split(' · ')[0] : 'in a class'
+                              })()}
                             </span>
                           )}
                         </p>
@@ -325,8 +412,38 @@ export function ColumnsPanel({
   )
 }
 
+/** The points-assist note on a column row: its terms, where they come from, or off. */
+function AssistTag({
+  item,
+  defaults,
+}: {
+  item: GradeItem
+  defaults: readonly GradeAssistDefault[]
+}) {
+  const mode = assistModeOf(item)
+  if (mode === 'off') return <span> · points off</span>
+  const eff = effectiveTerms(item, defaults)
+  if (!eff) return null
+  return (
+    <span className="text-reward">
+      {' '}
+      · {eff.cost} pts → +{formatMarks(eff.bonus)}
+      {eff.source === 'default' ? ' (part)' : ''}
+    </span>
+  )
+}
+
+const MODE_LABEL: Record<AssistMode, string> = {
+  default: 'Follow the part',
+  own: 'Own terms',
+  off: 'Off',
+}
+
 function EditRow({
   item,
+  defaults,
+  sessions,
+  term,
   busy,
   canMoveUp,
   canMoveDown,
@@ -335,6 +452,9 @@ function EditRow({
   onSave,
 }: {
   item: GradeItem
+  defaults: GradeAssistDefault[]
+  sessions: SessionSummary[]
+  term: TermKey
   busy: boolean
   canMoveUp: boolean
   canMoveDown: boolean
@@ -343,13 +463,16 @@ function EditRow({
   onSave: (
     name: string,
     maxScore: string,
-    boost: { cost: number | null; bonus: number | null },
+    assist: AssistChoice,
+    sessionId: string | null,
   ) => void
 }) {
   const [name, setName] = useState(item.name)
   const [maxScore, setMaxScore] = useState(String(item.maxScore))
+  const [mode, setMode] = useState<AssistMode>(() => assistModeOf(item))
   const [cost, setCost] = useState(item.pointsCost === null ? '' : String(item.pointsCost))
   const [bonus, setBonus] = useState(item.pointsBonus === null ? '' : formatMarks(item.pointsBonus))
+  const [sessionId, setSessionId] = useState(item.sessionId ?? '')
 
   // NaN stands for "typed, but not a number" so the shared validator can name it.
   const costN = cost.trim() === '' ? null : /^\d+$/.test(cost.trim()) ? Number(cost.trim()) : NaN
@@ -357,11 +480,28 @@ function EditRow({
   const bonusN = bonusParsed.ok ? bonusParsed.value : NaN
   const maxParsed = parseScoreInput(maxScore)
   const maxN = maxParsed.ok && maxParsed.value !== null ? maxParsed.value : item.maxScore
-  const boostError = boostTermsError(costN, bonusN, maxN)
-  const terms =
-    costN !== null && bonusN !== null && boostError === null
+  // Own terms must be COMPLETE: both blank is "follow the part", which is a
+  // different choice, and silently saving it as that would hide a half-finished edit.
+  const ownError =
+    mode !== 'own'
+      ? null
+      : costN === null && bonusN === null
+        ? 'Fill in the points and the marks.'
+        : boostTermsError(costN, bonusN, maxN)
+  const ownTerms =
+    mode === 'own' && ownError === null && costN !== null && bonusN !== null
       ? { cost: costN, bonus: bonusN }
       : null
+  const partTerms = effectiveTerms(
+    { component: item.component, assistOff: false, pointsCost: null, pointsBonus: null },
+    defaults,
+  )
+
+  // This term's classes for this subject — plus the linked one, so editing a
+  // column tied to a class outside the list never silently drops the link.
+  const choices = sessions.filter(
+    (x) => x.id === item.sessionId || termOf(x.startedAt) === term || termOf(x.startedAt) === null,
+  )
 
   return (
     <div className="space-y-2 p-3">
@@ -410,51 +550,107 @@ function EditRow({
         </Button>
       </div>
 
-      {/* Let students spend points on this column (0062). Blank = not offered.
-          Stated as the exact trade, because that is the sentence the student
-          will be shown before they confirm. */}
-      <div className="space-y-1.5 rounded-xl bg-card-2 p-2.5">
-        <p className="text-xs font-medium">Let students spend points on this column</p>
-        <div className="flex items-end gap-2">
-          <Input
-            value={cost}
-            inputMode="numeric"
-            onChange={(e) => setCost(e.target.value)}
-            wrapperClassName="min-w-0 flex-1"
-            aria-label="Points a student spends"
-            placeholder="Points"
-            hint="Points spent"
-          />
-          <Input
-            value={bonus}
-            inputMode="decimal"
-            onChange={(e) => setBonus(e.target.value)}
-            wrapperClassName="min-w-0 flex-1"
-            aria-label="Marks added"
-            placeholder="Marks"
-            hint="Marks added"
-          />
-        </div>
-        {boostError ? (
-          <p className="text-2xs text-danger">{boostError}</p>
-        ) : terms ? (
+      {/* The class this column was held in (0063). Anyone recorded absent OR
+          excused there is marked Absent on this column — so an absentee is never
+          typed twice, and cannot be given a points assist for a quiz they missed. */}
+      <div className="space-y-1 rounded-xl bg-card-2 p-2.5">
+        <Select
+          label="Held in class"
+          value={sessionId}
+          onChange={(e) => setSessionId(e.target.value)}
+        >
+          <option value="">Not tied to a class</option>
+          {choices.map((x) => (
+            <option key={x.id} value={x.id}>
+              {sessionLabel(x)}
+            </option>
+          ))}
+        </Select>
+        <p className="text-2xs text-muted">
+          Students recorded absent or excused in that class are marked{' '}
+          <b className="text-ink">A</b> on this column automatically, and can’t use points on it.
+          You can also type A in any cell yourself.
+        </p>
+      </div>
+
+      {/* Points assist for THIS column (0063). Three choices, because the common
+          case — follow the part — needs no typing at all. Stated as the exact
+          trade, since that is the sentence the student is shown before they confirm. */}
+      <div className="space-y-2 rounded-xl bg-card-2 p-2.5">
+        <p className="text-xs font-medium">Points assist</p>
+        <SegmentedControl
+          label="Points assist for this column"
+          size="sm"
+          value={mode}
+          onChange={setMode}
+          options={(['default', 'own', 'off'] as AssistMode[]).map((m) => ({
+            value: m,
+            label: MODE_LABEL[m],
+          }))}
+        />
+        {mode === 'own' && (
+          <div className="flex items-end gap-2">
+            <Input
+              value={cost}
+              inputMode="numeric"
+              onChange={(e) => setCost(e.target.value)}
+              wrapperClassName="min-w-0 flex-1"
+              aria-label="Points a student spends"
+              placeholder="Points"
+              hint="Points spent"
+            />
+            <Input
+              value={bonus}
+              inputMode="decimal"
+              onChange={(e) => setBonus(e.target.value)}
+              wrapperClassName="min-w-0 flex-1"
+              aria-label="Marks added"
+              placeholder="Marks"
+              hint="Marks added"
+            />
+          </div>
+        )}
+        {mode === 'own' && ownError ? (
+          <p className="text-2xs text-danger">{ownError}</p>
+        ) : mode === 'own' && ownTerms ? (
           <p className="text-2xs text-muted">
             A student whose mark is in can spend{' '}
-            <span className="font-semibold text-ink">{terms.cost} points</span> to add{' '}
-            <span className="font-semibold text-ink">{formatMarks(terms.bonus)} marks</span> (never
-            past {formatMarks(maxN)}). Once per column, and you approve each one.
+            <span className="font-semibold text-ink">{ownTerms.cost} points</span> to add{' '}
+            <span className="font-semibold text-ink">{formatMarks(ownTerms.bonus)} marks</span>{' '}
+            (never past {formatMarks(maxN)}). Once per column, and you approve each one.
           </p>
-        ) : (
-          <p className="text-2xs text-muted">Leave both blank and this column isn’t offered.</p>
-        )}
+        ) : mode === 'default' ? (
+          partTerms ? (
+            <p className="text-2xs text-muted">
+              Follows {COMPONENT_LABEL[item.component]}: a student whose mark is in can spend{' '}
+              <span className="font-semibold text-ink">{partTerms.cost} points</span> to add{' '}
+              <span className="font-semibold text-ink">{formatMarks(partTerms.bonus)} marks</span>{' '}
+              (never past {formatMarks(maxN)}).
+            </p>
+          ) : (
+            <p className="text-2xs text-muted">
+              No terms are set for {COMPONENT_LABEL[item.component]} yet, so this column isn’t
+              offered. Set them in the <b className="text-ink">Points assist</b> tab.
+            </p>
+          )
+        ) : mode === 'off' ? (
+          <p className="text-2xs text-muted">Not offered, whatever the part says.</p>
+        ) : null}
       </div>
 
       <div className="flex gap-2">
         <Button
           size="sm"
           loading={busy}
-          disabled={boostError !== null}
-          onClick={() => onSave(name, maxScore, { cost: costN, bonus: bonusN })}
+          disabled={ownError !== null}
+          onClick={() =>
+            onSave(
+              name,
+              maxScore,
+              { mode, cost: ownTerms?.cost ?? null, bonus: ownTerms?.bonus ?? null },
+              sessionId === '' ? null : sessionId,
+            )
+          }
         >
           Save
         </Button>
