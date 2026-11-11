@@ -2,7 +2,6 @@ import { supabase } from '@/lib/supabase'
 import { fetchAllPages, num, rpc, withAuthRetry } from './_internal'
 import type {
   GradeAbsence,
-  GradeAssistDefault,
   GradeAttendance,
   GradeBoost,
   GradeItem,
@@ -77,9 +76,6 @@ type ItemRow = {
   max_score: number | string
   position: number
   archived_at: string | null
-  /** 0062. Absent when the row was read from a database that lacks it. */
-  points_cost?: number | null
-  points_bonus?: number | string | null
   /** 0063. Absent when the row was read from a database that lacks it. */
   assist_off?: boolean
   session_id?: string | null
@@ -96,8 +92,6 @@ function mapItem(row: ItemRow): GradeItem {
     name: row.name,
     position: row.position,
     archivedAt: row.archived_at,
-    pointsCost: row.points_cost ?? null,
-    pointsBonus: num(row.points_bonus),
     assistOff: row.assist_off === true,
     sessionId: row.session_id ?? null,
   }
@@ -107,26 +101,20 @@ const ITEM_COLS =
   'id, section_id, subject_id, term, component, name, max_score, position, archived_at'
 
 /**
- * The same plus the boost terms (0062).
+ * The same plus the 0063 pair: a column switched off, and the class it was held in.
  *
- * Kept SEPARATE from `ITEM_COLS` on purpose: `listGradeItems` is the root of
- * every grade screen, and a build that selects a column the database does not
- * have yet makes every read 400. It tries this first and falls back to the plain
- * list, so pasting the client before 0062 costs the boost fields and nothing
- * else — the 0034 SectionGrid precedent, applied to the one query everything
- * hangs off.
+ * Kept SEPARATE from `ITEM_COLS` on purpose: `listGradeItems` is the root of every
+ * grade screen, and a build that selects a column the database does not have yet
+ * makes every read 400. It tries this first and falls back to the plain list, so
+ * pasting the client before 0063 costs those fields and nothing else — the 0034
+ * SectionGrid precedent, applied to the one query everything hangs off.
+ * (points_cost / points_bonus are RETIRED in 0064 and no longer selected.)
  */
-const ITEM_COLS_WITH_BOOST = `${ITEM_COLS}, points_cost, points_bonus`
-
-/** …and the 0063 pair: a column switched off, and the class it was held in. */
-const ITEM_COLS_WITH_ASSIST = `${ITEM_COLS_WITH_BOOST}, assist_off, session_id`
+const ITEM_COLS_WITH_ASSIST = `${ITEM_COLS}, assist_off, session_id`
 
 /** PostgREST's "that column is not there" — Postgres 42703 reaches us as this. */
-function isMissingBoostColumn(error: { code?: string; message?: string }): boolean {
-  return (
-    error.code === '42703' ||
-    /points_(cost|bonus)|assist_off|session_id/.test(error.message ?? '')
-  )
+function isMissingAssistColumn(error: { code?: string; message?: string }): boolean {
+  return error.code === '42703' || /assist_off|session_id/.test(error.message ?? '')
 }
 
 // ----------------------------------------------------------------------------
@@ -256,13 +244,10 @@ export async function listGradeItems(
     return q.order('component').order('position').order('created_at')
   }
 
-  // Newest column set first, falling back one migration at a time: pasting the
-  // client before 0063 (or 0062) costs those fields and nothing else.
+  // Newest column set first: pasting the client before 0063 costs those fields
+  // and nothing else.
   let { data, error } = await run(ITEM_COLS_WITH_ASSIST)
-  if (error && isMissingBoostColumn(error)) {
-    ;({ data, error } = await run(ITEM_COLS_WITH_BOOST))
-  }
-  if (error && isMissingBoostColumn(error)) {
+  if (error && isMissingAssistColumn(error)) {
     ;({ data, error } = await run(ITEM_COLS))
   }
   if (error) throw error
@@ -307,19 +292,12 @@ export async function createGradeItem(input: NewGradeItem): Promise<GradeItem> {
  */
 export async function updateGradeItem(
   id: string,
-  patch: Partial<
-    Pick<
-      GradeItem,
-      'name' | 'maxScore' | 'position' | 'pointsCost' | 'pointsBonus' | 'assistOff' | 'sessionId'
-    >
-  >,
+  patch: Partial<Pick<GradeItem, 'name' | 'maxScore' | 'position' | 'assistOff' | 'sessionId'>>,
 ): Promise<void> {
   const row: {
     name?: string
     max_score?: number
     position?: number
-    points_cost?: number | null
-    points_bonus?: number | null
     assist_off?: boolean
     session_id?: string | null
   } = {}
@@ -329,12 +307,6 @@ export async function updateGradeItem(
   // 0063. Sent only when CHANGED, so a rename still works before the migration.
   if (patch.assistOff !== undefined) row.assist_off = patch.assistOff
   if (patch.sessionId !== undefined) row.session_id = patch.sessionId
-  // The pair is written TOGETHER or not at all: the table CHECKs both-or-neither,
-  // so sending one half would be rejected with a constraint name nobody can read.
-  if (patch.pointsCost !== undefined || patch.pointsBonus !== undefined) {
-    row.points_cost = patch.pointsCost ?? null
-    row.points_bonus = patch.pointsBonus ?? null
-  }
   if (Object.keys(row).length === 0) return
 
   await withAuthRetry(async () => {
@@ -557,69 +529,6 @@ export async function getGradeAttendance(
     out.set(r.student_id, { showed: num(r.showed) ?? 0, counted: num(r.counted) ?? 0 })
   }
   return out
-}
-
-// ----------------------------------------------------------------------------
-// Points-assist terms per part (migration 0063)
-// ----------------------------------------------------------------------------
-
-/** The subject's terms for each part. Missing parts simply have none. */
-export async function listGradeAssistDefaults(subjectId: string): Promise<GradeAssistDefault[]> {
-  const { data, error } = await supabase
-    .from('grade_assist_defaults')
-    .select('subject_id, component, points_cost, points_bonus')
-    .eq('subject_id', subjectId)
-  if (error) throw error
-  return ((data ?? []) as Array<{
-    subject_id: string
-    component: GradeAssistDefault['component']
-    points_cost: number
-    points_bonus: number | string
-  }>).map((r) => ({
-    subjectId: r.subject_id,
-    component: r.component,
-    pointsCost: r.points_cost,
-    pointsBonus: num(r.points_bonus) ?? 0,
-  }))
-}
-
-/**
- * Save the terms for every part at once. A part with `null` terms is removed
- * (its columns stop being offered unless they carry their own terms).
- */
-export async function saveGradeAssistDefaults(
-  subjectId: string,
-  terms: Array<{
-    component: GradeAssistDefault['component']
-    terms: { pointsCost: number; pointsBonus: number } | null
-  }>,
-): Promise<void> {
-  const keep = terms.filter((t) => t.terms !== null)
-  const drop = terms.filter((t) => t.terms === null).map((t) => t.component)
-
-  await withAuthRetry(async () => {
-    if (keep.length > 0) {
-      const { error } = await supabase.from('grade_assist_defaults').upsert(
-        keep.map((t) => ({
-          subject_id: subjectId,
-          component: t.component,
-          points_cost: t.terms!.pointsCost,
-          points_bonus: t.terms!.pointsBonus,
-          updated_at: new Date().toISOString(),
-        })),
-        { onConflict: 'subject_id,component' },
-      )
-      if (error) throw error
-    }
-    if (drop.length > 0) {
-      const { error } = await supabase
-        .from('grade_assist_defaults')
-        .delete()
-        .eq('subject_id', subjectId)
-        .in('component', drop)
-      if (error) throw error
-    }
-  })
 }
 
 // ----------------------------------------------------------------------------
@@ -916,8 +825,7 @@ export async function getMyGrades(): Promise<MyGrades> {
         ...i,
         maxScore: num(i.maxScore) ?? 0,
         score: num(i.score),
-        pointsCost: i.pointsCost ?? null,
-        pointsBonus: num(i.pointsBonus),
+        offered: i.offered === true,
         absent: i.absent === true,
         boost: i.boost
           ? {
@@ -933,10 +841,12 @@ export async function getMyGrades(): Promise<MyGrades> {
 }
 
 /**
- * Spend points on a grade column. The terms (cost and bonus) are the
- * instructor's and are read server-side — the client sends only WHICH column,
- * so there is nothing for a modified client to tamper with.
+ * Use points on a grade column (points assist). 1 point = 1 mark and the student
+ * chooses how many, so the client sends WHICH column and HOW MANY points. The
+ * server re-checks everything — the column is open, the student was not absent,
+ * the mark is in, the amount does not pass the maximum, the balance covers it —
+ * so a modified client gains nothing by lying about the amount.
  */
-export async function requestGradeBoost(itemId: string): Promise<string> {
-  return await rpc<string>('request_grade_boost', { p_item_id: itemId })
+export async function requestGradeBoost(itemId: string, points: number): Promise<string> {
+  return await rpc<string>('request_grade_boost', { p_item_id: itemId, p_points: points })
 }

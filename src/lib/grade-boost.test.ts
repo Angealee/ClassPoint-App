@@ -1,24 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import {
-  assistModeOf,
   boostGain,
   boostState,
-  boostTermsError,
-  effectiveTerms,
   formatMarks,
+  maxPointsFor,
+  pointsGain,
   round2,
 } from './grade-boost'
 import type { MyGradeItem } from './types'
 
 /**
- * `request_grade_boost` (0062) is the authority; `boostState` is its preview.
+ * `request_grade_boost` (0064) is the authority; `boostState` is its preview.
  * Every branch below corresponds to an exception the SQL raises, so a drift
  * between the two shows up here rather than as a button that always fails.
  *
- * THE ONE THAT MATTERS IS THE CAP. The instructor chose "cap at max and show
- * the real gain first": a student at 17/20 offered +10 gains 3, not 10, and the
- * screen must say 3 BEFORE they confirm — telling them 10 and delivering 3 is
- * the specific thing this rule exists to prevent.
+ * THE ONE THAT MATTERS IS THE CAP. Points assist is automatic (0064): 1 point = 1
+ * mark, the STUDENT chooses how many, and a mark can never pass the column's
+ * maximum. A student at 17/20 may use at most 3 points; at 17.5/20 they may use 3
+ * and gain 2.5. The screen must say the real gain BEFORE they confirm.
  */
 
 function item(over: Partial<MyGradeItem> = {}): MyGradeItem {
@@ -30,8 +29,7 @@ function item(over: Partial<MyGradeItem> = {}): MyGradeItem {
     maxScore: 20,
     position: 0,
     score: 12,
-    pointsCost: 5,
-    pointsBonus: 4,
+    offered: true,
     absent: false,
     boost: null,
     pending: false,
@@ -53,7 +51,7 @@ describe('boostGain', () => {
   })
 
   it('never goes negative for a mark typed above the maximum', () => {
-    // Extra credit the instructor chose to allow: the boost must not TAKE marks.
+    // Extra credit the instructor chose to allow: points must not TAKE marks.
     expect(boostGain(22, 20, 4)).toBe(0)
   })
 
@@ -78,28 +76,81 @@ describe('formatMarks', () => {
   })
 })
 
+describe('maxPointsFor — the most a student may use (mirror of request_grade_boost, 0064)', () => {
+  it('is the marks still missing: 17/20 may use at most 3', () => {
+    expect(maxPointsFor(17, 20)).toBe(3)
+  })
+
+  it('rounds UP to a whole point: 17.5/20 may use 3 (points are whole numbers)', () => {
+    expect(maxPointsFor(17.5, 20)).toBe(3)
+    // 19.5/20: half a mark missing, one point is the smallest unit.
+    expect(maxPointsFor(19.5, 20)).toBe(1)
+  })
+
+  it('is never more than the 50 a single request may be', () => {
+    expect(maxPointsFor(0, 100)).toBe(50)
+    expect(maxPointsFor(50, 100)).toBe(50)
+    expect(maxPointsFor(51, 100)).toBe(49)
+  })
+
+  it('is zero at or past the maximum — nothing to gain', () => {
+    expect(maxPointsFor(20, 20)).toBe(0)
+    expect(maxPointsFor(22, 20)).toBe(0)
+  })
+
+  it('does not round a floating point sliver up into an extra point', () => {
+    // 20 - 19.9 is 0.10000000000000142 in JavaScript — still one point, but
+    // 20 - 17.0000000000001 must not read as a gap of 3.0000000000001 → 4.
+    expect(maxPointsFor(17.00000000001, 20)).toBe(3)
+  })
+})
+
+describe('pointsGain — what N points really add (1 point = 1 mark, capped)', () => {
+  it('adds one mark per point when there is room', () => {
+    expect(pointsGain(3, 12, 20)).toBe(3)
+  })
+
+  it('NEVER passes the maximum: a mark of 17.5 on /20 gains 2.5 from 3 points', () => {
+    // The instructor's rule. The student is charged 3 points and the screen says
+    // 2.5 BEFORE they confirm — telling them 3 and delivering 2.5 is the thing
+    // this cap exists to prevent.
+    expect(pointsGain(3, 17.5, 20)).toBe(2.5)
+    expect(17.5 + pointsGain(3, 17.5, 20)).toBe(20)
+  })
+
+  it('caps a request that overshoots (a stale screen cannot push past the maximum)', () => {
+    expect(pointsGain(10, 17, 20)).toBe(3)
+  })
+
+  it('is zero at the maximum and never negative above it', () => {
+    expect(pointsGain(5, 20, 20)).toBe(0)
+    expect(pointsGain(5, 22, 20)).toBe(0)
+  })
+})
+
 describe('boostState', () => {
-  it('offers a boost with the real gain and the resulting mark', () => {
-    expect(boostState(item({ score: 17, pointsBonus: 10, pointsCost: 5 }))).toEqual({
+  it('offers the column with the marks missing and the most points usable', () => {
+    expect(boostState(item({ score: 17 }))).toEqual({
       kind: 'available',
-      cost: 5,
-      bonus: 10,
-      gain: 3,
-      newScore: 20,
       score: 17,
+      gap: 3,
+      maxPoints: 3,
     })
   })
 
-  it('is not offered when the instructor has not set terms', () => {
-    expect(boostState(item({ pointsCost: null, pointsBonus: null }))).toEqual({
-      kind: 'not-offered',
-    })
+  it('needs NO setup from the instructor: a marked column below its max is simply open', () => {
+    // The whole point of 0064. No cost, no bonus, no per-part terms.
+    expect(boostState(item()).kind).toBe('available')
+  })
+
+  it('is not offered only when the instructor switched the column off', () => {
+    expect(boostState(item({ offered: false }))).toEqual({ kind: 'not-offered' })
   })
 
   it('says "unmarked" — not "not offered" — when the mark is not in yet', () => {
     // Different reasons, different sentences: one is "nothing to do here", the
     // other is "come back once your instructor has marked it".
-    expect(boostState(item({ score: null }))).toEqual({ kind: 'unmarked', cost: 5, bonus: 4 })
+    expect(boostState(item({ score: null }))).toEqual({ kind: 'unmarked' })
   })
 
   it('says "full" at the maximum, and above it', () => {
@@ -107,59 +158,27 @@ describe('boostState', () => {
     expect(boostState(item({ score: 21 }))).toEqual({ kind: 'full' })
   })
 
-  it('treats a pending request as pending, even with the terms removed since', () => {
-    expect(boostState(item({ pending: true, pointsCost: null, pointsBonus: null }))).toEqual({
-      kind: 'pending',
-    })
+  it('treats a pending request as pending, even if the column is switched off since', () => {
+    expect(boostState(item({ pending: true, offered: false }))).toEqual({ kind: 'pending' })
   })
 
-  it('keeps showing a receipt after the instructor removes the terms', () => {
+  it('keeps showing a receipt after the column is switched off', () => {
     // The receipt is history, not an offer. Hiding it would make the column look
     // as though the points had never been spent.
-    const s = boostState(
-      item({
-        pointsCost: null,
-        pointsBonus: null,
-        boost: { marks: 3, points: 5, before: 17 },
-      }),
-    )
-    expect(s).toEqual({ kind: 'boosted', marks: 3, points: 5, before: 17 })
+    const s = boostState(item({ offered: false, boost: { marks: 3, points: 3, before: 17 } }))
+    expect(s).toEqual({ kind: 'boosted', marks: 3, points: 3, before: 17 })
   })
 
   it('shows boosted over pending and over full marks', () => {
-    // After a boost the mark is often AT the maximum, and "full" must not win.
+    // After points the mark is often AT the maximum, and "full" must not win.
     const s = boostState(
-      item({ score: 20, pending: true, boost: { marks: 3, points: 5, before: 17 } }),
+      item({ score: 20, pending: true, boost: { marks: 3, points: 3, before: 17 } }),
     )
     expect(s.kind).toBe('boosted')
   })
 })
 
-describe('boostTermsError', () => {
-  it('accepts both blank (not offered)', () => {
-    expect(boostTermsError(null, null, 20)).toBeNull()
-  })
-
-  it('refuses one half — the table CHECKs both-or-neither', () => {
-    expect(boostTermsError(5, null, 20)).toMatch(/both/i)
-    expect(boostTermsError(null, 4, 20)).toMatch(/both/i)
-  })
-
-  it('keeps the cost inside what a request may be (1 to 50, whole)', () => {
-    expect(boostTermsError(0, 4, 20)).not.toBeNull()
-    expect(boostTermsError(51, 4, 20)).not.toBeNull()
-    expect(boostTermsError(2.5, 4, 20)).not.toBeNull()
-    expect(boostTermsError(50, 4, 20)).toBeNull()
-  })
-
-  it('refuses a bonus that is zero or larger than the column', () => {
-    expect(boostTermsError(5, 0, 20)).not.toBeNull()
-    expect(boostTermsError(5, 21, 20)).not.toBeNull()
-    expect(boostTermsError(5, 20, 20)).toBeNull()
-  })
-})
-
-describe('boostState — absent (0063)', () => {
+describe('boostState — absent (0063, unchanged by 0064)', () => {
   it('refuses an absent student even with a mark typed — a 0 for an absentee is not eligible', () => {
     // The instructor’s rule: ONLY absentees are kept out. A typed 0 would
     // otherwise be the easiest column in the class to gain on.
@@ -178,56 +197,12 @@ describe('boostState — absent (0063)', () => {
 
   it('keeps the receipt and the waiting request ahead of absent — those are history', () => {
     expect(
-      boostState(item({ absent: true, boost: { marks: 3, points: 5, before: 12 } })).kind,
+      boostState(item({ absent: true, boost: { marks: 3, points: 3, before: 12 } })).kind,
     ).toBe('boosted')
     expect(boostState(item({ absent: true, pending: true })).kind).toBe('pending')
   })
 
-  it('is not offered before it is absent — a column with no terms stays quiet', () => {
-    expect(boostState(item({ absent: true, pointsCost: null, pointsBonus: null })).kind).toBe(
-      'not-offered',
-    )
-  })
-})
-
-describe('assistModeOf / effectiveTerms (mirror of cp_assist_terms, 0063)', () => {
-  const quizDefault = { subjectId: 's', component: 'quiz' as const, pointsCost: 5, pointsBonus: 3 }
-  const col = (over: Partial<Parameters<typeof effectiveTerms>[0]> = {}) => ({
-    component: 'quiz' as const,
-    assistOff: false,
-    pointsCost: null,
-    pointsBonus: null,
-    ...over,
-  })
-
-  it('follows the part when the column has no terms of its own', () => {
-    expect(assistModeOf(col())).toBe('default')
-    expect(effectiveTerms(col(), [quizDefault])).toEqual({ cost: 5, bonus: 3, source: 'default' })
-  })
-
-  it('offers nothing while the part has no terms set', () => {
-    expect(effectiveTerms(col(), [])).toBeNull()
-    // A default for ANOTHER part does not leak across.
-    expect(
-      effectiveTerms(col(), [{ ...quizDefault, component: 'exam' as const }]),
-    ).toBeNull()
-  })
-
-  it('lets a column\u2019s own terms beat the part\u2019s', () => {
-    const own = col({ pointsCost: 2, pointsBonus: 1 })
-    expect(assistModeOf(own)).toBe('own')
-    expect(effectiveTerms(own, [quizDefault])).toEqual({ cost: 2, bonus: 1, source: 'own' })
-  })
-
-  it('lets off beat both', () => {
-    const off = col({ assistOff: true, pointsCost: 2, pointsBonus: 1 })
-    expect(assistModeOf(off)).toBe('off')
-    expect(effectiveTerms(off, [quizDefault])).toBeNull()
-  })
-
-  it('never offers terms on Recitation — it is attendance, there is no mark to add to', () => {
-    expect(
-      effectiveTerms(col({ component: 'recitation', pointsCost: 2, pointsBonus: 1 }), [quizDefault]),
-    ).toBeNull()
+  it('is not offered before it is absent — a switched-off column stays quiet', () => {
+    expect(boostState(item({ absent: true, offered: false })).kind).toBe('not-offered')
   })
 })

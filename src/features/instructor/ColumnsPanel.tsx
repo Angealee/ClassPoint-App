@@ -6,34 +6,18 @@ import { IconButton } from '@/components/ui/IconButton'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { SectionLabel } from '@/components/ui/SectionLabel'
-import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { Toggle } from '@/components/ui/Toggle'
 import { useToast } from '@/components/ui/Toast'
 import { PencilIcon, TrashIcon } from '@/components/ui/icons'
 import { COMPONENT_LABEL, GRADE_COMPONENTS } from '@/lib/grading'
 import { parseScoreInput } from '@/lib/grade-entry'
-import {
-  assistModeOf,
-  boostTermsError,
-  effectiveTerms,
-  formatMarks,
-  type AssistMode,
-} from '@/lib/grade-boost'
 import { termOf } from '@/lib/term'
 import { errorText } from '@/lib/errors'
-import {
-  createGradeItem,
-  listGradeAssistDefaults,
-  listSessions,
-  setGradeItemArchived,
-  updateGradeItem,
-} from '@/lib/api'
-import type {
-  GradeAssistDefault,
-  GradeComponent,
-  GradeItem,
-  SessionSummary,
-  TermKey,
-} from '@/lib/types'
+import { createGradeItem, listSessions, setGradeItemArchived, updateGradeItem } from '@/lib/api'
+import type { GradeComponent, GradeItem, SessionSummary, TermKey } from '@/lib/types'
+
+/** "20" or "17.5" — no trailing zeros. */
+const formatMax = (n: number) => String(Math.round(n * 100) / 100)
 
 /** The parts a typed column can belong to. Recitation is attendance (0063). */
 const COLUMN_PARTS = GRADE_COMPONENTS.filter((c) => c !== 'recitation')
@@ -49,12 +33,7 @@ function sessionLabel(s: SessionSummary): string {
   return [day, s.subjectCode, s.topic].filter(Boolean).join(' · ')
 }
 
-/** What the instructor chose for a column's points assist, ready to save. */
-interface AssistChoice {
-  mode: AssistMode
-  cost: number | null
-  bonus: number | null
-}
+
 
 /**
  * Add, rename, re-weight and retire the score columns of one term.
@@ -91,16 +70,12 @@ export function ColumnsPanel({
   const [editing, setEditing] = useState<GradeItem | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<GradeItem | null>(null)
 
-  // The subject's terms per part, and this section's classes — each in its OWN
-  // catch (the 0034 SectionGrid precedent): before 0063 neither exists, and that
-  // must cost the "follow the part" sentence and the class picker, never the panel.
-  const [defaults, setDefaults] = useState<GradeAssistDefault[]>([])
+  // This section's classes, in their OWN catch (the 0034 SectionGrid precedent):
+  // before 0063 the link column does not exist, and that must cost the class
+  // picker, never the panel.
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   useEffect(() => {
     let cancelled = false
-    listGradeAssistDefaults(subjectId)
-      .then((rows) => !cancelled && setDefaults(rows))
-      .catch(() => !cancelled && setDefaults([]))
     listSessions(sectionId)
       .then((rows) => !cancelled && setSessions(rows.filter((r) => r.subjectId === subjectId)))
       .catch(() => !cancelled && setSessions([]))
@@ -149,7 +124,7 @@ export function ColumnsPanel({
     item: GradeItem,
     nextName: string,
     nextMax: string,
-    assist: AssistChoice,
+    pointsOff: boolean,
     nextSessionId: string | null,
   ) {
     const parsed = parseScoreInput(nextMax)
@@ -159,26 +134,13 @@ export function ColumnsPanel({
     }
     setBusy(true)
     try {
-      // The points-assist setup and the class link are sent only when they
-      // CHANGED. A rename on a database that has not had 0062 / 0063 yet must keep
-      // working, and it cannot if every save carries columns it does not know.
-      //   default → no terms of its own, on
-      //   own     → this column's cost and marks
-      //   off     → no terms, switched off
-      const assistChanged =
-        assist.mode !== assistModeOf(item) ||
-        (assist.mode === 'own' &&
-          (assist.cost !== item.pointsCost || assist.bonus !== item.pointsBonus))
+      // The points switch and the class link are sent only when they CHANGED. A
+      // rename on a database that has not had 0063 yet must keep working, and it
+      // cannot if every save carries columns it does not know.
       await updateGradeItem(item.id, {
         name: nextName,
         maxScore: parsed.value,
-        ...(assistChanged
-          ? {
-              assistOff: assist.mode === 'off',
-              pointsCost: assist.mode === 'own' ? assist.cost : null,
-              pointsBonus: assist.mode === 'own' ? assist.bonus : null,
-            }
-          : {}),
+        ...(pointsOff !== item.assistOff ? { assistOff: pointsOff } : {}),
         ...(nextSessionId !== item.sessionId ? { sessionId: nextSessionId } : {}),
       })
       setEditing(null)
@@ -301,7 +263,6 @@ export function ColumnsPanel({
                     <EditRow
                       key={item.id}
                       item={item}
-                      defaults={defaults}
                       sessions={sessions}
                       term={term}
                       busy={busy}
@@ -309,9 +270,7 @@ export function ColumnsPanel({
                       canMoveDown={index < group.length - 1}
                       onMove={(dir) => void move(item, dir)}
                       onCancel={() => setEditing(null)}
-                      onSave={(n, m, assist, sessionId) =>
-                        void saveEdit(item, n, m, assist, sessionId)
-                      }
+                      onSave={(n, m, off, sessionId) => void saveEdit(item, n, m, off, sessionId)}
                     />
                   ) : (
                     // ⚠ `gap-3`, not `gap-2`: two `sm` IconButtons (32px) have
@@ -326,7 +285,7 @@ export function ColumnsPanel({
                         </p>
                         <p className="text-2xs text-muted">
                           out of {item.maxScore} · {markedCounts.get(item.id) ?? 0} marked
-                          <AssistTag item={item} defaults={defaults} />
+                          {item.assistOff && <span> · points off</span>}
                           {item.sessionId && (
                             <span>
                               {' '}
@@ -412,36 +371,8 @@ export function ColumnsPanel({
   )
 }
 
-/** The points-assist note on a column row: its terms, where they come from, or off. */
-function AssistTag({
-  item,
-  defaults,
-}: {
-  item: GradeItem
-  defaults: readonly GradeAssistDefault[]
-}) {
-  const mode = assistModeOf(item)
-  if (mode === 'off') return <span> · points off</span>
-  const eff = effectiveTerms(item, defaults)
-  if (!eff) return null
-  return (
-    <span className="text-reward">
-      {' '}
-      · {eff.cost} pts → +{formatMarks(eff.bonus)}
-      {eff.source === 'default' ? ' (part)' : ''}
-    </span>
-  )
-}
-
-const MODE_LABEL: Record<AssistMode, string> = {
-  default: 'Follow the part',
-  own: 'Own terms',
-  off: 'Off',
-}
-
 function EditRow({
   item,
-  defaults,
   sessions,
   term,
   busy,
@@ -452,7 +383,6 @@ function EditRow({
   onSave,
 }: {
   item: GradeItem
-  defaults: GradeAssistDefault[]
   sessions: SessionSummary[]
   term: TermKey
   busy: boolean
@@ -460,42 +390,14 @@ function EditRow({
   canMoveDown: boolean
   onMove: (dir: -1 | 1) => void
   onCancel: () => void
-  onSave: (
-    name: string,
-    maxScore: string,
-    assist: AssistChoice,
-    sessionId: string | null,
-  ) => void
+  onSave: (name: string, maxScore: string, pointsOff: boolean, sessionId: string | null) => void
 }) {
   const [name, setName] = useState(item.name)
   const [maxScore, setMaxScore] = useState(String(item.maxScore))
-  const [mode, setMode] = useState<AssistMode>(() => assistModeOf(item))
-  const [cost, setCost] = useState(item.pointsCost === null ? '' : String(item.pointsCost))
-  const [bonus, setBonus] = useState(item.pointsBonus === null ? '' : formatMarks(item.pointsBonus))
+  const [pointsOff, setPointsOff] = useState(item.assistOff)
   const [sessionId, setSessionId] = useState(item.sessionId ?? '')
-
-  // NaN stands for "typed, but not a number" so the shared validator can name it.
-  const costN = cost.trim() === '' ? null : /^\d+$/.test(cost.trim()) ? Number(cost.trim()) : NaN
-  const bonusParsed = parseScoreInput(bonus)
-  const bonusN = bonusParsed.ok ? bonusParsed.value : NaN
   const maxParsed = parseScoreInput(maxScore)
   const maxN = maxParsed.ok && maxParsed.value !== null ? maxParsed.value : item.maxScore
-  // Own terms must be COMPLETE: both blank is "follow the part", which is a
-  // different choice, and silently saving it as that would hide a half-finished edit.
-  const ownError =
-    mode !== 'own'
-      ? null
-      : costN === null && bonusN === null
-        ? 'Fill in the points and the marks.'
-        : boostTermsError(costN, bonusN, maxN)
-  const ownTerms =
-    mode === 'own' && ownError === null && costN !== null && bonusN !== null
-      ? { cost: costN, bonus: bonusN }
-      : null
-  const partTerms = effectiveTerms(
-    { component: item.component, assistOff: false, pointsCost: null, pointsBonus: null },
-    defaults,
-  )
 
   // This term's classes for this subject — plus the linked one, so editing a
   // column tied to a class outside the list never silently drops the link.
@@ -573,84 +475,29 @@ function EditRow({
         </p>
       </div>
 
-      {/* Points assist for THIS column (0063). Three choices, because the common
-          case — follow the part — needs no typing at all. Stated as the exact
-          trade, since that is the sentence the student is shown before they confirm. */}
-      <div className="space-y-2 rounded-xl bg-card-2 p-2.5">
-        <p className="text-xs font-medium">Points assist</p>
-        <SegmentedControl
-          label="Points assist for this column"
-          size="sm"
-          value={mode}
-          onChange={setMode}
-          options={(['default', 'own', 'off'] as AssistMode[]).map((m) => ({
-            value: m,
-            label: MODE_LABEL[m],
-          }))}
-        />
-        {mode === 'own' && (
-          <div className="flex items-end gap-2">
-            <Input
-              value={cost}
-              inputMode="numeric"
-              onChange={(e) => setCost(e.target.value)}
-              wrapperClassName="min-w-0 flex-1"
-              aria-label="Points a student spends"
-              placeholder="Points"
-              hint="Points spent"
-            />
-            <Input
-              value={bonus}
-              inputMode="decimal"
-              onChange={(e) => setBonus(e.target.value)}
-              wrapperClassName="min-w-0 flex-1"
-              aria-label="Marks added"
-              placeholder="Marks"
-              hint="Marks added"
-            />
-          </div>
-        )}
-        {mode === 'own' && ownError ? (
-          <p className="text-2xs text-danger">{ownError}</p>
-        ) : mode === 'own' && ownTerms ? (
+      {/* Points assist (0064) is AUTOMATIC: every column is open the moment a
+          student's mark is in — 1 point = 1 mark, they choose how many, never past
+          the maximum. This switch is the only control left. */}
+      <div className="flex items-center gap-3 rounded-xl bg-card-2 p-2.5">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium">Students can use points on this column</p>
           <p className="text-2xs text-muted">
-            A student whose mark is in can spend{' '}
-            <span className="font-semibold text-ink">{ownTerms.cost} points</span> to add{' '}
-            <span className="font-semibold text-ink">{formatMarks(ownTerms.bonus)} marks</span>{' '}
-            (never past {formatMarks(maxN)}). Once per column, and you approve each one.
+            1 point = 1 mark, never past {formatMax(maxN)}. Students who were absent can’t, and you
+            approve each request.
           </p>
-        ) : mode === 'default' ? (
-          partTerms ? (
-            <p className="text-2xs text-muted">
-              Follows {COMPONENT_LABEL[item.component]}: a student whose mark is in can spend{' '}
-              <span className="font-semibold text-ink">{partTerms.cost} points</span> to add{' '}
-              <span className="font-semibold text-ink">{formatMarks(partTerms.bonus)} marks</span>{' '}
-              (never past {formatMarks(maxN)}).
-            </p>
-          ) : (
-            <p className="text-2xs text-muted">
-              No terms are set for {COMPONENT_LABEL[item.component]} yet, so this column isn’t
-              offered. Set them in the <b className="text-ink">Points assist</b> tab.
-            </p>
-          )
-        ) : mode === 'off' ? (
-          <p className="text-2xs text-muted">Not offered, whatever the part says.</p>
-        ) : null}
+        </div>
+        <Toggle
+          on={!pointsOff}
+          label="Students can use points on this column"
+          onChange={(next) => setPointsOff(!next)}
+        />
       </div>
 
       <div className="flex gap-2">
         <Button
           size="sm"
           loading={busy}
-          disabled={ownError !== null}
-          onClick={() =>
-            onSave(
-              name,
-              maxScore,
-              { mode, cost: ownTerms?.cost ?? null, bonus: ownTerms?.bonus ?? null },
-              sessionId === '' ? null : sessionId,
-            )
-          }
+          onClick={() => onSave(name, maxScore, pointsOff, sessionId === '' ? null : sessionId)}
         >
           Save
         </Button>

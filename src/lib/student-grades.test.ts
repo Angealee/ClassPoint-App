@@ -30,8 +30,7 @@ function it_(over: Partial<MyGradeItem> & { id: string }): MyGradeItem {
     maxScore: 10,
     position: 0,
     score: null,
-    pointsCost: null,
-    pointsBonus: null,
+    offered: true,
     absent: false,
     boost: null,
     pending: false,
@@ -203,7 +202,7 @@ describe('explainTerm', () => {
 })
 
 describe('boostColumns / boostReason', () => {
-  const offered = { pointsCost: 5, pointsBonus: 4 }
+  const offered = { offered: true }
 
   it('puts boostable columns in one list and everything else in another', () => {
     const s = subject([
@@ -212,7 +211,7 @@ describe('boostColumns / boostReason', () => {
       it_({ id: 'full', score: 10, ...offered }),
       it_({ id: 'pending', score: 5, ...offered, pending: true }),
       it_({ id: 'done', score: 9, ...offered, boost: { marks: 4, points: 5, before: 5 } }),
-      it_({ id: 'none', score: 5 }),
+      it_({ id: 'none', score: 5, offered: false }),
     ])
     const { actionable, other } = boostColumns([s])
     expect(actionable.map((c) => c.item.id)).toEqual(['ok'])
@@ -250,7 +249,7 @@ describe('boostColumns / boostReason', () => {
 
   it('says why a column is not actionable, in plain words', () => {
     expect(boostReason({ kind: 'pending' })).toMatch(/waiting/i)
-    expect(boostReason({ kind: 'unmarked', cost: 5, bonus: 4 })).toMatch(/isn.t in/i)
+    expect(boostReason({ kind: 'unmarked' })).toMatch(/isn.t in/i)
     expect(boostReason({ kind: 'full' })).toMatch(/full marks/i)
     expect(boostReason({ kind: 'not-offered' })).toMatch(/not offered/i)
     expect(boostReason({ kind: 'boosted', marks: 3, points: 5, before: 17 })).toBe('+3 from 5 pts')
@@ -260,18 +259,17 @@ describe('boostColumns / boostReason', () => {
 describe('boostableCount', () => {
   it('counts only columns a request could be made on right now', () => {
     const s = subject([
-      it_({ id: 'ok', score: 5, pointsCost: 5, pointsBonus: 4 }),
-      it_({ id: 'unmarked', score: null, pointsCost: 5, pointsBonus: 4 }),
-      it_({ id: 'full', score: 10, pointsCost: 5, pointsBonus: 4 }),
-      it_({ id: 'pending', score: 5, pointsCost: 5, pointsBonus: 4, pending: true }),
+      it_({ id: 'ok', score: 5, offered: true }),
+      it_({ id: 'unmarked', score: null, offered: true }),
+      it_({ id: 'full', score: 10, offered: true }),
+      it_({ id: 'pending', score: 5, offered: true, pending: true }),
       it_({
         id: 'done',
         score: 9,
-        pointsCost: 5,
-        pointsBonus: 4,
+        offered: true,
         boost: { marks: 4, points: 5, before: 5 },
       }),
-      it_({ id: 'none', score: 5 }),
+      it_({ id: 'none', score: 5, offered: false }),
     ])
     expect(boostableCount([s])).toBe(1)
   })
@@ -375,7 +373,7 @@ describe('Recitation from attendance (0063)', () => {
   })
 
   it('files an absent column under “not available”, never as something to act on', () => {
-    const s = subject([it_({ id: 'q', component: 'quiz', score: 4, pointsCost: 3, pointsBonus: 2, absent: true })])
+    const s = subject([it_({ id: 'q', component: 'quiz', score: 4, offered: true, absent: true })])
     const { actionable, other } = boostColumns([s])
     expect(actionable).toHaveLength(0)
     expect(other[0].state.kind).toBe('absent')

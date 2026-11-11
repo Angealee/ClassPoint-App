@@ -149,7 +149,7 @@ export const DRAFT_8_0_0: ChangelogEntry = {
       major: true,
       items: [
         'A new Grades screen shows every mark you have, part by part, with a “so far” figure for each term. It fills in as your instructor enters marks.',
-        'Your instructor can open quizzes, tasks and exams for points assist: spend a few points to add marks to a mark you already have. You see exactly what you would gain before you send the request, and nothing is spent until it is approved. If you were absent for a column, points can’t be used on it.',
+        'Spend points to add marks to a quiz, task or exam mark you already have: 1 point adds 1 mark, you choose how many, and a mark can never go past its maximum. You see exactly what you would gain before you send the request, and nothing is spent until your instructor approves it. If you were absent for a column, points can’t be used on it.',
         'It is a real trade. Spending points lowers your XP, level and rank like any other spend, and the screen says so before you commit.',
       ],
     },

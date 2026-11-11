@@ -3,10 +3,9 @@ import { Sheet } from '@/components/ui/Sheet'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { WeightsPanel } from './WeightsPanel'
 import { ColumnsPanel } from './ColumnsPanel'
-import { PointsAssistPanel } from './PointsAssistPanel'
 import type { GradeItem, GradePolicy, Subject, TermKey } from '@/lib/types'
 
-type SetupTab = 'weights' | 'columns' | 'assist'
+type SetupTab = 'weights' | 'columns'
 
 /**
  * Everything you set up before you type a mark, behind one button.
@@ -79,7 +78,6 @@ export function GradeSetupSheet({
           onChange={setTab}
           options={[
             { value: 'columns', label: 'Columns' },
-            { value: 'assist', label: 'Points assist' },
             { value: 'weights', label: 'Weights' },
           ]}
         />
@@ -90,9 +88,7 @@ export function GradeSetupSheet({
         <p className="text-xs text-muted">
           {tab === 'columns'
             ? 'Score columns belong to this section and this term.'
-            : tab === 'assist'
-              ? `Points-assist terms apply to every section taking ${subject.code}, in all three terms.`
-              : `Weights apply to every section taking ${subject.code}, in all three terms.`}
+            : `Weights apply to every section taking ${subject.code}, in all three terms.`}
         </p>
 
         {open &&
@@ -105,8 +101,6 @@ export function GradeSetupSheet({
               markedCounts={markedCounts}
               onChanged={onItemsChanged}
             />
-          ) : tab === 'assist' ? (
-            <PointsAssistPanel subject={subject} sectionCount={sectionIds.length} />
           ) : (
             <WeightsPanel
               subject={subject}

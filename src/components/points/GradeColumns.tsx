@@ -12,7 +12,7 @@ import { useStudentData } from '@/features/student/StudentData'
 import { requestGradeBoost } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { errorText } from '@/lib/errors'
-import { formatMarks } from '@/lib/grade-boost'
+import { formatMarks, pointsGain } from '@/lib/grade-boost'
 import {
   TERM_TITLE,
   boostColumns,
@@ -26,7 +26,13 @@ import { MAX_PENDING_REDEMPTIONS } from '@/lib/types'
 /**
  * The student's grade columns, as somewhere to spend points.
  *
- * ── THIS IS THE ONE PLACE A BOOST IS REQUESTED ─────────────────────────────
+ * ── AUTOMATIC, AND THE STUDENT CHOOSES THE AMOUNT (0064) ───────────────────
+ * Nothing is set up by the instructor: every column is open the moment the
+ * student's mark is in. 1 point = 1 mark, they pick how many (from 1 up to the
+ * marks still missing to the maximum, and no more than their balance), and the
+ * gain is capped so a mark can never pass the maximum. Still approved by hand.
+ *
+ * ── THIS IS THE ONE PLACE POINTS ARE USED ON A COLUMN ──────────────────────
  * The Grades screen only LINKS here (a banner, and a small link on each
  * boostable row, deep-linking with `?column=<id>`). Before this the confirm
  * dialog lived on Grades, so spending was split across two screens and the
@@ -65,7 +71,11 @@ export function GradeColumns({
   const { actionable, other } = useMemo(() => boostColumns(subjects), [subjects])
 
   const [otherOpen, setOtherOpen] = useState(false)
-  const [target, setTarget] = useState<BoostColumn<AvailableBoost> | null>(null)
+  // The column the student is confirming, and how many points they chose for it.
+  const [target, setTarget] = useState<{
+    column: BoostColumn<AvailableBoost>
+    points: number
+  } | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   // A deep link to a column that is NOT actionable has to open the collapsed
@@ -88,7 +98,7 @@ export function GradeColumns({
     if (!target) return
     setSubmitting(true)
     try {
-      await requestGradeBoost(target.item.id)
+      await requestGradeBoost(target.column.item.id, target.points)
       toast('Request sent — your instructor will decide.', 'success')
       setTarget(null)
       await reloadGrades()
@@ -141,9 +151,9 @@ export function GradeColumns({
           {actionable.length === 0 ? (
             <EmptyState
               icon={<TableIcon />}
-              description="Once your instructor turns on points assist for a part, its columns appear here as soon as your mark is in. A column you were absent for can’t be assisted."
+              description="A quiz, task or exam appears here as soon as your mark is in — 1 point adds 1 mark, up to the maximum. A column you were absent for can’t be assisted."
             >
-              None of your columns are open for points assist right now.
+              None of your columns can use points right now.
             </EmptyState>
           ) : (
             <ActionableList
@@ -153,7 +163,7 @@ export function GradeColumns({
               locked={semesterEnded}
               highlightId={highlightId}
               register={register}
-              onPick={setTarget}
+              onPick={(column, points) => setTarget({ column, points })}
             />
           )}
 
@@ -190,28 +200,37 @@ export function GradeColumns({
       <ConfirmDialog
         open={!!target}
         variant="danger"
-        title={target ? `Use ${target.state.cost} points on ${target.item.name}?` : ''}
+        title={target ? `Use ${target.points} point${target.points === 1 ? '' : 's'} on ${target.column.item.name}?` : ''}
         message={
           target ? (
             <>
               You’re asking to spend{' '}
-              <span className="font-semibold text-ink">{target.state.cost} points</span> to add{' '}
               <span className="font-semibold text-ink">
-                {formatMarks(target.state.gain)} mark{target.state.gain === 1 ? '' : 's'}
+                {target.points} point{target.points === 1 ? '' : 's'}
+              </span>{' '}
+              to add{' '}
+              <span className="font-semibold text-ink">
+                {formatMarks(
+                  pointsGain(target.points, target.column.state.score, target.column.item.maxScore),
+                )}{' '}
+                mark
+                {pointsGain(target.points, target.column.state.score, target.column.item.maxScore) === 1
+                  ? ''
+                  : 's'}
               </span>
-              : <span className="font-semibold text-ink">{formatMarks(target.state.score)}</span>{' '}
+              :{' '}
+              <span className="font-semibold text-ink">
+                {formatMarks(target.column.state.score)}
+              </span>{' '}
               becomes{' '}
-              <span className="font-semibold text-ink">{formatMarks(target.state.newScore)}</span>{' '}
-              out of {formatMarks(target.item.maxScore)}.
-              {target.state.gain < target.state.bonus && (
-                <>
-                  {' '}
-                  The bonus is {formatMarks(target.state.bonus)}, but this column tops out at{' '}
-                  {formatMarks(target.item.maxScore)}, so you’d gain{' '}
-                  {formatMarks(target.state.gain)}.
-                </>
-              )}{' '}
-              Nothing is spent until your instructor approves it.
+              <span className="font-semibold text-ink">
+                {formatMarks(
+                  target.column.state.score +
+                    pointsGain(target.points, target.column.state.score, target.column.item.maxScore),
+                )}
+              </span>{' '}
+              out of {formatMarks(target.column.item.maxScore)}. Nothing is spent until your
+              instructor approves it.
             </>
           ) : null
         }
@@ -219,7 +238,7 @@ export function GradeColumns({
         // marks, and only the instructor can reverse it.
         detail={
           target
-            ? `If approved, your total drops to ${Math.max(0, (me?.semester_points ?? 0) - target.state.cost)} — your level and leaderboard rank drop with it, and you climb the spend board. You can’t undo it yourself.`
+            ? `If approved, your total drops to ${Math.max(0, (me?.semester_points ?? 0) - target.points)} — your level and leaderboard rank drop with it, and you climb the spend board. You can’t undo it yourself.`
             : undefined
         }
         confirmLabel="Send request"
@@ -247,7 +266,7 @@ function ActionableList({
   locked: boolean
   highlightId: string | null
   register: (id: string) => (el: HTMLElement | null) => void
-  onPick: (c: BoostColumn<AvailableBoost>) => void
+  onPick: (c: BoostColumn<AvailableBoost>, points: number) => void
 }) {
   // One heading per subject + term. The columns arrive already ordered, so a
   // heading is just "the group changed".
@@ -278,7 +297,7 @@ function ActionableList({
               locked={locked}
               highlighted={c.item.id === highlightId}
               register={register(c.item.id)}
-              onPick={() => onPick(c)}
+              onPick={(points) => onPick(c, points)}
             />
           ))}
         </div>
@@ -302,10 +321,31 @@ function BoostCard({
   locked: boolean
   highlighted: boolean
   register: (el: HTMLElement | null) => void
-  onPick: () => void
+  onPick: (points: number) => void
 }) {
   const { item, state } = column
-  const short = state.cost - available
+
+  // The most they can use: the marks still missing (rounded up to a whole point,
+  // capped at 50 — `state.maxPoints`), and never more than they have free.
+  const limit = Math.max(0, Math.min(state.maxPoints, available))
+  const [points, setPoints] = useState(limit)
+  // A typed value is held as text so a half-typed number is not fought; it is
+  // clamped when they leave the field or press a step.
+  const [draft, setDraft] = useState<string | null>(null)
+
+  const clamp = (n: number) => Math.max(1, Math.min(limit, Math.round(n) || 1))
+  // If their balance or the mark moves under us (a refresh after a request),
+  // keep the choice inside the new range rather than offering what the server
+  // would refuse.
+  const chosen = limit === 0 ? 0 : Math.min(Math.max(points, 1), limit)
+  const gain = pointsGain(chosen, state.score, item.maxScore)
+  const reachesFull = chosen > 0 && state.score + gain >= item.maxScore
+  const blocked = locked || tooMany || limit === 0
+
+  function step(delta: number) {
+    setDraft(null)
+    setPoints(clamp(chosen + delta))
+  }
 
   return (
     <div ref={register}>
@@ -326,39 +366,83 @@ function BoostCard({
           <p className="text-xs text-muted">{COMPONENT_LABEL[item.component]}</p>
         </div>
         <Chip tone="reward" size="sm">
-          +{formatMarks(state.gain)} marks
+          up to +{formatMarks(pointsGain(state.maxPoints, state.score, item.maxScore))}
         </Chip>
       </div>
 
       <p className="text-sm tabular-nums">
         <span className="text-muted">{formatMarks(state.score)}</span>
         <span className="px-1.5 text-muted">→</span>
-        <span className="font-semibold">{formatMarks(state.newScore)}</span>
+        <span className="font-semibold">{formatMarks(state.score + gain)}</span>
         <span className="text-muted"> / {formatMarks(item.maxScore)}</span>
-        {state.gain < state.bonus && (
-          <span className="block text-xs text-muted">
-            Bonus is {formatMarks(state.bonus)}; this column tops out at{' '}
-            {formatMarks(item.maxScore)}.
-          </span>
-        )}
+        {reachesFull && <span className="block text-xs text-muted">That’s full marks.</span>}
       </p>
 
-      {/* Filled when the student can act NOW, outline when they cannot — the two
-          states used to look alike, so "Use 5 points" and "Need 45 more points"
-          read as equally available. */}
+      {/* How many points. 1 point = 1 mark; the most you can pick is what takes you
+          to the maximum, so a mark can never pass it. Steppers are real 44px
+          targets, and the number is editable for a quick jump. */}
+      <div
+        role="group"
+        aria-label={`Points to use on ${item.name}`}
+        className="flex items-center justify-between gap-3"
+      >
+        <span className="text-xs text-muted">Points to use</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label="One fewer point"
+            disabled={blocked || chosen <= 1}
+            onClick={() => step(-1)}
+            className="h-11 w-11 rounded-xl border border-line text-lg font-semibold disabled:opacity-40"
+          >
+            −
+          </button>
+          <input
+            // text-base: below 16px iOS Safari zooms the page on focus.
+            className="h-11 w-14 rounded-xl border border-line bg-canvas text-center text-base tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)] disabled:opacity-60"
+            inputMode="numeric"
+            aria-label="Number of points"
+            disabled={blocked}
+            value={draft ?? String(chosen)}
+            onChange={(e) => setDraft(e.target.value.replace(/\D/g, '').slice(0, 2))}
+            onBlur={() => {
+              if (draft !== null) setPoints(clamp(Number(draft)))
+              setDraft(null)
+            }}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <button
+            type="button"
+            aria-label="One more point"
+            disabled={blocked || chosen >= limit}
+            onClick={() => step(1)}
+            className="h-11 w-11 rounded-xl border border-line text-lg font-semibold disabled:opacity-40"
+          >
+            +
+          </button>
+        </div>
+      </div>
+      {limit > 0 && (
+        <p className="text-2xs text-muted">
+          You can use up to {limit} point{limit === 1 ? '' : 's'} here
+          {limit < state.maxPoints ? ' — that’s all you have free' : ' — that reaches full marks'}.
+        </p>
+      )}
+
+      {/* Filled when the student can act NOW, outline when they cannot. */}
       <Button
         className="w-full"
-        variant={locked || tooMany || state.cost > available ? 'outline' : 'primary'}
-        disabled={locked || tooMany || state.cost > available}
-        onClick={onPick}
+        variant={blocked ? 'outline' : 'primary'}
+        disabled={blocked}
+        onClick={() => onPick(draft !== null ? clamp(Number(draft)) : chosen)}
       >
         {locked
           ? 'Closed'
           : tooMany
             ? `${MAX_PENDING_REDEMPTIONS} requests waiting`
-            : state.cost > available
-              ? `Need ${short} more point${short === 1 ? '' : 's'}`
-              : `Use ${state.cost} point${state.cost === 1 ? '' : 's'}`}
+            : limit === 0
+              ? 'You have no free points'
+              : `Use ${chosen} point${chosen === 1 ? '' : 's'}`}
       </Button>
     </Card>
     </div>

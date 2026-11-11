@@ -9,7 +9,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ChevronDownIcon, TableIcon, TicketIcon } from '@/components/ui/icons'
-import { boostState, formatMarks } from '@/lib/grade-boost'
+import { boostState, formatMarks, pointsGain } from '@/lib/grade-boost'
 import { displayGrade } from '@/lib/grading'
 import {
   TERM_TITLE,
@@ -371,7 +371,7 @@ function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has end
           to={'/app/points?column=' + item.id}
           className="cp-tap-y inline-flex h-9 shrink-0 items-center gap-1 rounded-xl border border-line px-3 text-sm font-semibold text-accent transition-colors hover:bg-card-2"
         >
-          +{formatMarks(state.gain)} · use points
+          up to +{formatMarks(pointsGain(state.maxPoints, state.score, item.maxScore))} · use points
           <span aria-hidden>›</span>
         </Link>
       )}

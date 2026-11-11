@@ -535,7 +535,7 @@ function StudentGradesCard() {
             {failed
               ? 'Couldn’t read the setting. This needs migration 0062 applied.'
               : on
-                ? 'Students can see their marks and use points assist on the parts you have opened.'
+                ? 'Students can see their marks and use points assist on any column that is not switched off.'
                 : 'Hidden. Students are told grades aren’t open yet.'}
           </span>
           {failed && (
@@ -558,7 +558,7 @@ function StudentGradesCard() {
         open={confirming}
         variant="default"
         title="Open grades to students?"
-        message="Every student will see their own marks and a “so far” figure for each subject, and can ask to use points assist on any column of a part you have opened (students who were absent can’t)."
+        message="Every student will see their own marks and a “so far” figure for each subject, and can ask to use points assist on any column you have not switched off — 1 point per mark, never past the maximum, and never for a column they were absent for."
         detail="Check the marks first. Every student in a class that has marks is sent a notification, and a student who has seen a mark has seen it."
         confirmLabel="Open grades"
         busy={busy}

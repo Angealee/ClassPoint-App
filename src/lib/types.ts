@@ -1648,11 +1648,11 @@ export interface GradeItem {
    * not offered. Always both or neither — the table CHECKs it. Null too when
    * read from a database that has not had 0062 yet.
    */
-  pointsCost: number | null
-  pointsBonus: number | null
   /**
-   * Switched off (0063): not offered even though its part is. Only meaningful when
-   * the column has no terms of its own; false when read from a database without 0063.
+   * The ONE instructor control over points assist (0063/0064): points can't be used
+   * on this column. Every column is otherwise open — 1 point = 1 mark, the student
+   * chooses how many, never past the maximum. False when read from a database
+   * without 0063.
    */
   assistOff: boolean
   /**
@@ -1660,18 +1660,6 @@ export interface GradeItem {
    * that class is Absent on this column. Null = not tied to a class.
    */
   sessionId: string | null
-}
-
-/**
- * The subject's terms for one PART (0063): every column of that part follows them
- * unless it has its own or is switched off. Recitation is not a part here — it is
- * computed from attendance, so there is no mark to add to.
- */
-export interface GradeAssistDefault {
-  subjectId: string
-  component: Exclude<GradeComponent, 'recitation'>
-  pointsCost: number
-  pointsBonus: number
 }
 
 /**
@@ -1737,9 +1725,11 @@ export interface MyGradeItem {
   position: number
   /** null = not marked yet. Never a zero standing in for that. */
   score: number | null
-  /** The terms on offer (the column's own, else its part's), or null when none. */
-  pointsCost: number | null
-  pointsBonus: number | null
+  /**
+   * Points can be used on this column (0064): every column is open unless the
+   * instructor switched it off. The amount is the STUDENT's choice, 1 point = 1 mark.
+   */
+  offered: boolean
   /** Marked absent, or recorded absent / excused in the class it was held in (0063). */
   absent: boolean
   /** Set once a boost has been applied to this column. */

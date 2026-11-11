@@ -22,7 +22,7 @@ behave as written, stop there and tell me the step number and what you saw.
 Open the Supabase SQL editor. Paste each file **whole**, then paste it **a second time**
 (the second run must print no error — that is the idempotency test).
 
-Every migration (0001–0063) and both query files have already been run through a real
+Every migration (0001–0064) and both query files have already been run through a real
 PostgreSQL parser and are syntactically valid, so a paste will not fail on a typo or a
 stray `$`. What the parser **cannot** see is a column or type that only your database knows
 about — that is what the verify blocks below catch. (It flags 0025 on one line; that is a
@@ -39,7 +39,7 @@ parser limitation and 0025 is long applied.)
 5. [ ] Paste `0062_grade_boosts.sql` (twice).
        0060 and 0062 can go in **either** order: both now list all 18 audit actions. (They
        did not before — 0060 pasted after 0062 would have silently removed two of them.)
-5b. [ ] Paste `0063_points_assist.sql` (twice) AFTER 0062 — then run its verify block (foot of the file).
+5b. [ ] Paste `0063_points_assist.sql` (twice) AFTER 0062, then `0064_points_assist_automatic.sql` (twice) AFTER 0063 — and run the verify block at the foot of each.
 6. [ ] Run `applied_state.sql` BLOCK 6. All four rows must read `true`: 0056, 0061,
        "0062 · decide_point_redemption has the grade branch",
        "0062 · point_events accepts a refund".
@@ -76,14 +76,14 @@ Do this on a **scratch semester**, never the live one.
 - [ ] On open 1, you should **not** also get "What's new" stacked behind it.
 - [ ] Sign in as an *existing* student: the tour must not appear (by decision).
 
-## 5. Grades and boosts — the big one
+## 5. Grades and points assist — the big one
 
 Use `Scratch A`. Section needs one subject with weights set.
 
 **Setup (laptop)**
 - [ ] `/teach/grades` → **Set up → Columns**: add `Quiz 1` out of 20.
-- [ ] Edit it: **Let students spend points on this column** → 5 points / 10 marks.
-      Expected sentence: "…can spend 5 points to add 10 marks (never past 20)…".
+- [ ] Nothing to set up for points (0064): Quiz 1 is open to a student automatically once their
+      mark is in — 1 point = 1 mark, they choose how many, never past 20.
 - [ ] Enter `Scratch A` = 17 on Quiz 1.
 - [ ] Reorder: add `Quiz 2`, edit it, **Move up** → it sits before Quiz 1 in the list *and*
       in the grid.
@@ -103,19 +103,19 @@ Use `Scratch A`. Section needs one subject with weights set.
       shares. Home shows the Grades card.
 
 **The trade**
-- [ ] Phone: Quiz 1 shows **+3 for 5 pts** (not +10 — capped). Tap it.
-      Expected confirm: "17 becomes 20 out of 20 … you'd gain 3", plus the rank warning.
+- [ ] Phone: Quiz 1 shows **up to +3 · use points**. Open it and choose **3** points.
+      Expected confirm: "3 points … 17 becomes 20 out of 20", plus the rank warning.
 - [ ] Send it. Row shows **Waiting**. A second tap on a column already waiting is not possible.
 - [ ] Laptop: Requests → Points → the card shows the column and `17 → 20 (+3)`.
 - [ ] **Approve.** Check all of: mark is now 20 in the grid, with a gold dot in the cell;
-      `Scratch A`'s points dropped by 5; phone shows **+3 from 5 pts** and "was 17";
-      a push arrived ("Boost approved"); the points ledger has a `−5` row.
-- [ ] Spend board (Ranks → Spent): `Scratch A` counts 5.
+      `Scratch A`'s points dropped by 3; phone shows **+3 from 3 pts** and "was 17";
+      a push arrived ("Points assist approved"); the points ledger has a `−3` row.
+- [ ] Spend board (Ranks → Spent): `Scratch A` counts 3.
 
 **Undo**
-- [ ] Laptop: Requests → **Boosts applied** → Show → **Reverse** on it → confirm.
-      Expected: points +5 back, mark returns to 17, dot gone, column requestable again,
-      a push ("Boost reversed"), the ledger shows a `+5 refund` row, and the spend board
+- [ ] Laptop: Requests → **Points assists applied** → Show → **Reverse** on it → confirm.
+      Expected: points +3 back, mark returns to 17, dot gone, column requestable again,
+      a push ("Points assist reversed"), the ledger shows a `+3 refund` row, and the spend board
       goes back to 0.
 - [ ] Do it all again, but this time **retype the mark** (say 19) before reversing.
       Expected: points return, mark stays 19, toast says it was left as typed.
@@ -198,13 +198,13 @@ marks once more, because a student who has seen a mark has seen it.
 ## 11. Use points as the spending hub
 
 - [ ] Student, `/app/grades`: a **Use your points** banner is always under the term figure. It
-      says how many columns can be boosted, or "no column offers a boost yet".
-- [ ] A boostable row shows **+3 · use points ›**. Tapping it opens `/app/points` with **that
+      says how many columns are open for points assist, or "no column is open for points assist yet".
+- [ ] An open row shows **up to +3 · use points ›**. Tapping it opens `/app/points` with **that
       column ringed and in view**; the back arrow returns to Grades.
-- [ ] `/app/points` lists boostable columns as cards first (`17 → 20 / 20`), with **Not
+- [ ] `/app/points` lists open columns as cards first, each with a points picker (`17 → 20 / 20`), with **Not
       available yet (N)** collapsed below and **Something else** (catalog and free-form request)
       underneath.
-- [ ] Tap **Use 5 points** → the confirm states the real gain and the rank warning → send → the
+- [ ] Tap **Use 3 points** → the confirm states the real gain and the rank warning → send → the
       card moves to "Waiting on your instructor" and the banner count drops. This is the first
       time this request path runs from the new screen — do it with a scratch student.
 - [ ] With **Ops → Student grades** switched off, `/app/points` says "Grades aren't open yet" in
@@ -215,13 +215,10 @@ marks once more, because a student who has seen a mark has seen it.
 Use `Scratch A` and `Scratch B`. Needs 0063 applied (section 1) and at least two classes of attendance
 for the subject in the term, with Scratch B recorded absent in one of them.
 
-**Setup (laptop)**
-- [ ] Set up → **Points assist**: turn **Quizzes** on at 5 points / 3 marks, leave Performance Tasks and
-      Exam off. Save. Expected: "Points assist saved." and the sentence under Quizzes.
-- [ ] Set up → Columns → a quiz column → Edit: it reads **Follow the part** with the Quizzes sentence.
-      No per-column flagging needed.
-- [ ] Same screen, an exam column: **Follow the part** says no terms are set yet — not offered.
-- [ ] Edit the quiz: **Held in class** → pick the class Scratch B was absent in → Save.
+**Setup (laptop)** — there is NOTHING to set up for points assist (0064).
+- [ ] Set up → Columns shows **no** Points assist tab and no cost/marks fields. Editing a column shows one
+      switch, "Students can use points on this column", on by default.
+- [ ] Edit a quiz: **Held in class** → pick the class Scratch B was absent in → Save.
 
 **The A mark**
 - [ ] Grid: Scratch B's cell on that quiz shows **A** in amber without anyone typing it; hovering says why.
@@ -241,11 +238,17 @@ for the subject in the term, with Scratch B recorded absent in one of them.
       is wrong for that term, tell me before relying on its grades.
 
 **The student side (phone, Scratch A with a mark in the quiz, Scratch B absent)**
-- [ ] Scratch A: the quiz is open for points assist with no instructor action. Use points → request → approve
-      (as section 5) — the push and ledger line say **Points assist**, not "Boost".
+- [ ] Scratch A (quiz mark 17 / 20): the quiz is open for points with no instructor action. Use points → the
+      card shows a picker defaulting to **3** ("You can use up to 3 points here — that reaches full marks"),
+      and **+** is disabled at 3.
+- [ ] Choose 2 → the confirm says "2 points … 17 becomes 19 out of 20" → send → approve (as section 5). The
+      push and the ledger line say **Points assist**, not "Boost".
+- [ ] Give Scratch A a mark of **17.5** on another /20 quiz: the picker allows up to 3 and the confirm says
+      the gain is **2.5** and the result **20** — never 20.5.
+- [ ] A column at full marks: no picker, listed as "Already at full marks".
 - [ ] Scratch B: the quiz shows **Absent**, sits under "Not available yet" with "You were absent for this
       one", and a direct call is refused ("You were marked absent for …").
 - [ ] Give Scratch B a typed **0** on the quiz: still Absent, still refused.
+- [ ] Switch a column off (the Columns switch): it moves to "Not available yet — Not offered for points".
 - [ ] Grades shows an **Attendance** row under Recitation: "9 of 10 classes attended".
 - [ ] Reverse the points assist from Requests → **Points assists applied**: the push reads "Points assist reversed".
-

@@ -1,4 +1,4 @@
-import type { GradeAssistDefault, GradeItem, MyGradeItem } from './types'
+import { MAX_REDEEM_POINTS, type MyGradeItem } from './types'
 
 /**
  * What a student may do about spending points on one grade column.
@@ -34,11 +34,15 @@ export type BoostState =
    */
   | { kind: 'absent' }
   /** Offered, but their mark is not in — "Your mark … isn't in yet". */
-  | { kind: 'unmarked'; cost: number; bonus: number }
+  | { kind: 'unmarked' }
   /** Offered, but already at the maximum — "You already have full marks". */
   | { kind: 'full' }
-  /** A request can be made. `gain` is the REAL gain after the cap. */
-  | { kind: 'available'; cost: number; bonus: number; gain: number; newScore: number; score: number }
+  /**
+   * A request can be made, and the STUDENT chooses how many points (0064): 1 point
+   * = 1 mark, from 1 up to `maxPoints`. `gap` is the marks still missing to the
+   * maximum; use `pointsGain` for what a given number of points really adds.
+   */
+  | { kind: 'available'; score: number; gap: number; maxPoints: number }
 
 /** numeric(6,2) arithmetic without `0.1 + 0.2` showing up on a student's screen. */
 export function round2(n: number): number {
@@ -76,87 +80,40 @@ export function boostState(item: MyGradeItem): BoostState {
     }
   }
   if (item.pending) return { kind: 'pending' }
-  if (item.pointsCost === null || item.pointsBonus === null) return { kind: 'not-offered' }
+  if (!item.offered) return { kind: 'not-offered' }
 
   // Absent comes BEFORE "unmarked", as it does on the server: "you were absent" is
   // the truer reason and tells them not to wait for a mark that is not coming. It
   // applies even when a mark was typed (an absentee given a 0 cannot be assisted).
   if (item.absent) return { kind: 'absent' }
 
-  const cost = item.pointsCost
-  const bonus = item.pointsBonus
-  if (item.score === null) return { kind: 'unmarked', cost, bonus }
+  if (item.score === null) return { kind: 'unmarked' }
 
-  const gain = boostGain(item.score, item.maxScore, bonus)
-  if (gain <= 0) return { kind: 'full' }
+  const gap = round2(item.maxScore - item.score)
+  if (gap <= 0) return { kind: 'full' }
 
-  return {
-    kind: 'available',
-    cost,
-    bonus,
-    gain,
-    newScore: round2(item.score + gain),
-    score: item.score,
-  }
+  return { kind: 'available', score: item.score, gap, maxPoints: maxPointsFor(item.score, item.maxScore) }
 }
 
 /**
- * Could the instructor's terms ever be saved as typed? The Columns panel asks
- * this so it can show a sentence ("5 points for 10 marks") or the reason there
- * is none — mirroring `grade_items_boost_range_check`, which would otherwise
- * reject the write with a constraint name.
+ * The most points a student may use on a column: the marks still missing to the
+ * maximum, rounded UP to a whole point (points are whole numbers — 17.5/20 may use
+ * 3 and gains 2.5), and never more than the 50 a single request is allowed.
  *
- * Both blank = not offered, which is valid. One blank is not.
+ * Zero when there is nothing to gain. Mirrors the check in `request_grade_boost`
+ * (0064): "You can use at most N points on …". Change one side, change the other.
  */
-export function boostTermsError(
-  cost: number | null,
-  bonus: number | null,
-  max: number,
-): string | null {
-  if (cost === null && bonus === null) return null
-  if (cost === null || bonus === null) return 'Fill in both the points and the marks, or neither.'
-  if (!Number.isInteger(cost) || cost < 1 || cost > 50) return 'Points must be a whole number from 1 to 50.'
-  if (!(bonus > 0)) return 'Marks must be more than 0.'
-  if (bonus > max) return `Marks can’t be more than the column’s ${max}.`
-  return null
-}
-
-// ── Which terms does a column have? (0063) ──────────────────────────────────
-
-/** Where a column's points-assist terms come from. */
-export type AssistMode = 'default' | 'own' | 'off'
-
-/**
- * How a column is set up: following its part's terms, carrying its own, or off.
- *
- * `off` wins, then own terms, then the part's. Mirrors `cp_assist_terms` (0063) —
- * the SQL is the authority a student's request is checked against, this is the
- * instructor's preview of it. Change one side, change the other, same commit.
- */
-export function assistModeOf(
-  item: Pick<GradeItem, 'assistOff' | 'pointsCost' | 'pointsBonus'>,
-): AssistMode {
-  if (item.assistOff) return 'off'
-  if (item.pointsCost !== null && item.pointsBonus !== null) return 'own'
-  return 'default'
+export function maxPointsFor(score: number, max: number): number {
+  const gap = max - score
+  if (!(gap > 0)) return 0
+  return Math.min(MAX_REDEEM_POINTS, Math.ceil(round2(gap)))
 }
 
 /**
- * The terms a column actually offers, or null for none.
- *
- * Recitation never offers any: it is computed from attendance, so there is no
- * mark to add to (and the SQL returns null for it too).
+ * What `points` points ADD to a mark: 1 point = 1 mark, capped at the maximum so a
+ * mark can never pass it. This is what the confirm shows BEFORE the request goes,
+ * and what `request_grade_boost` stores as the bonus the student agreed to.
  */
-export function effectiveTerms(
-  item: Pick<GradeItem, 'component' | 'assistOff' | 'pointsCost' | 'pointsBonus'>,
-  defaults: readonly GradeAssistDefault[],
-): { cost: number; bonus: number; source: 'own' | 'default' } | null {
-  if (item.component === 'recitation') return null
-  const mode = assistModeOf(item)
-  if (mode === 'off') return null
-  if (mode === 'own') {
-    return { cost: item.pointsCost as number, bonus: item.pointsBonus as number, source: 'own' }
-  }
-  const d = defaults.find((x) => x.component === item.component)
-  return d ? { cost: d.pointsCost, bonus: d.pointsBonus, source: 'default' } : null
+export function pointsGain(points: number, score: number, max: number): number {
+  return Math.max(0, round2(Math.min(points, max - score)))
 }

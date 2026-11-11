@@ -241,7 +241,7 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   state; boost requests and the Ops switch fail with a readable message.
   0062 also carries `save_subject_policy` (the atomic weights save) — until it lands the
   weights editor works as before, at the old non-atomic risk.
-  **Next number: 0064.** (0063 is pasted, see its section below.)
+  **Next number: 0065.** (0063 is pasted; 0064 is written — see its section below.)
   ⚠ **EVERY "WRITTEN AND NOT YET APPLIED" CLAIM IN THE BLOCK ABOVE IS NOW
   UNVERIFIED PROSE — ASK THE DATABASE INSTEAD.** It was written file by file
   over months, nobody could check it without reading every migration and
@@ -4434,10 +4434,47 @@ switch, Columns terms, the corner dot, the inbox, Reverse) and the whole write p
 test: **do a full request → approve → reverse on a scratch student before opening
 grades to the class.**
 
+Since 0064 (Points assist is AUTOMATIC — Era 8.0 Phase 8). Decisions (instructor, 2026-11-11):
+**no terms to set** · **1 point = 1 mark** · **the student chooses how many points** ·
+**never past the column's maximum** · **still approved by hand** · **only a per-column Off
+survives**. **0064 is WRITTEN AND NOT YET APPLIED** — paste it AFTER 0063, twice, then run
+`applied_state.sql` BLOCK 6 (three new rows). **Migration before client, always:** the client now
+calls `request_grade_boost(item, points)` and reads `offered` from `get_my_grades`, so deploying it
+before the paste makes every request fail and every column read "not offered".
+
+**0064 REVERSES 0063's "the instructor sets the terms".** The per-part defaults, the per-column own
+terms, `effectiveTerms`/`assistModeOf`, the Points-assist tab and its panel are all GONE. A column
+is open the moment a student's mark is in; the only instructor control is `grade_items.assist_off`
+("Students can use points on this column" switch in the Columns edit row). `grade_assist_defaults`
+and `grade_items.points_cost/_bonus` are RETIRED, not dropped (their data is the record of what
+was once set, the nightly backup still mirrors them, and dropping a column the mirror depends on
+is exactly the drift the 0057 parking logic exists for) — nothing reads or writes them, and both
+carry a `comment on` saying so. **Do not re-add terms** without asking: the instructor removed them
+on purpose because setting a cost and a bonus per part was work with no payoff.
+
+**THE RULE, in one place.** `src/lib/grade-boost.ts`: `maxPointsFor(score, max)` is the marks
+still missing, rounded UP to a whole point (17.5/20 may use 3) and capped at 50 (a single
+request's ceiling); `pointsGain(points, score, max)` is `min(points, max - score)` — so a mark
+**can never pass the maximum** (3 points on 17.5/20 gains 2.5, and the screen says 2.5 before
+they confirm). `request_grade_boost` re-checks all of it and stores the capped amount as the bonus
+the student agreed to (`point_redemptions.grade_bonus`); **`decide_point_redemption` needed no
+change** — it already applied that bonus, re-capped at the moment of approval. Change one side,
+change the other, same commit. The signature changed, so 0064 drops `request_grade_boost(uuid)`
+first (a `create or replace` with a new parameter list makes an OVERLOAD and PostgREST rejects
+every call as ambiguous — the 0028 lesson). Still: once per column, absent refused (0063's rule),
+mark must be in, approved by hand, reversible.
+
+**The student's card** (`GradeColumns`) has a points picker: − / editable number / + (44px
+targets, `text-base`), defaulting to the most they can use (`min(maxPoints, free points)`), clamped
+if the balance or mark moves under it; the confirm states the REAL gain and the resulting mark,
+and the button reads "Use N points". The Grades row link says "up to +N · use points".
+
 Since 0063 (Points assist, the Absent mark, Recitation from attendance — Era 8.0 Phase 7).
 Decisions (instructor, 2026-11-09/11): **automatic by part, with defaults** · **fixed marks per
 part** · **an Absent mark, tied to attendance** · **Recitation IS the attendance rate** ·
 **"boost" becomes "points assist" everywhere a person reads it, server wording included**.
+⚠ **The per-part terms, per-column own terms and the Points-assist tab described in this section were REMOVED by 0064 (above); the Absent mark, attendance Recitation and wording changes stand.**
+
 **0063 is PASTED (the user, 2026-11-11 — "Success. No rows returned"); NOT YET CONFIRMED by
 `applied_state.sql`.** Run BLOCK 1b (0063 should read ALL PRESENT) and BLOCK 6 (its two new rows
 must read `true`), and paste the file a second time to prove idempotency, before trusting it. Had it
