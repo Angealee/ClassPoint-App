@@ -76,7 +76,7 @@ export function ScaleRow({
             aria-checked={value === opt.value}
             disabled={disabled}
             onClick={() => onChange(opt.value)}
-            className={cn(buttonClass(value === opt.value), 'truncate px-3')}
+            className={cn(buttonClass(value === opt.value), 'min-w-0 truncate px-3')}
           >
             {opt.label}
           </button>

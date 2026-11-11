@@ -1,4 +1,5 @@
 import { SectionLabel } from '@/components/ui/SectionLabel'
+import { ScreenTitle } from '@/components/ui/ScreenTitle'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -301,10 +302,7 @@ export function Attendance() {
       {/* Sticky, highlighted section bar — pins under the app header so the
           selected section is always in view and never scrolled past. */}
       <div className="sticky top-[52px] z-10 -mx-4 -mt-5 border-b border-accent-solid/20 bg-canvas/85 px-4 py-3 backdrop-blur-md md:top-0 md:-mx-8 md:mt-0 md:px-8">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="font-display text-xl font-bold">Attendance</h1>
-          {sectionSelect}
-        </div>
+        <ScreenTitle title="Attendance" actions={sectionSelect} />
       </div>
 
       {/* Global event — a separate, cross-section check-in for a special event
@@ -318,7 +316,7 @@ export function Attendance() {
           <BoltIcon className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Global event check-in</p>
+          <p className="text-sm font-semibold">Global event attendance</p>
           <p className="text-xs text-muted">
             A school-wide QR any section can scan — for a special event.
           </p>
@@ -334,7 +332,7 @@ export function Attendance() {
           </span>
           <div>
             <p className="font-display font-bold">Start a class</p>
-            <p className="text-xs text-muted">Students scan the QR to check in.</p>
+            <p className="text-xs text-muted">Students scan the QR to record attendance.</p>
           </div>
         </div>
 

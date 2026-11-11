@@ -28,7 +28,11 @@ export function EventStartingBanner() {
       onClick={() => navigate('/app/event')}
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
-      aria-label={liveEventChecked ? 'You are checked in to the event' : 'Scan to check in to the event'}
+      aria-label={
+          liveEventChecked
+            ? 'Your attendance at the event is recorded'
+            : 'Scan to record your attendance at the event'
+        }
       className={
         liveEventChecked
           ? 'flex w-full items-center gap-3 rounded-2xl border border-success-solid/30 bg-success-solid/10 p-3 text-left'
@@ -54,7 +58,7 @@ export function EventStartingBanner() {
             : `Event is starting: ${liveEvent.name}`}
         </p>
         <p className="truncate text-xs text-muted">
-          {liveEventChecked ? 'Checked in. Nice.' : `Tap to scan and check in${reward}`}
+          {liveEventChecked ? 'Recorded. Nice.' : `Tap to scan${reward}`}
         </p>
       </div>
 

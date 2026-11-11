@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import { glide } from '@/lib/motion'
 import { NavLink } from 'react-router-dom'
 import type { NavItem } from '@/components/layout/Shell'
 import { IdentityBlock, SettingsRow, SignOutRow, type AccountActions } from './AccountMenu'
@@ -122,7 +123,7 @@ export function MobileMenu({
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 24 }}
-          transition={{ type: 'spring', stiffness: 360, damping: 34 }}
+          transition={glide}
           className="fixed inset-0 z-50 flex flex-col bg-canvas outline-none"
         >
           {/* Unlike the app's sticky header, this is `fixed inset-0` and starts at
@@ -133,7 +134,7 @@ export function MobileMenu({
               type="button"
               onClick={onClose}
               aria-label="Close menu"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card-2 text-muted transition-colors hover:text-ink"
+              className="cp-tap-44 flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card-2 text-muted transition-colors hover:text-ink"
             >
               <XIcon className="h-4.5 w-4.5" />
             </button>

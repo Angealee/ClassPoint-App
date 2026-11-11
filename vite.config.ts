@@ -60,6 +60,36 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        /**
+         * Three vendor chunks, split for CACHE LIFETIME rather than first-load size.
+         *
+         * All three are imported eagerly (App.tsx pulls MotionConfig, main.tsx pulls
+         * the router, the api barrel pulls Supabase), so splitting them does NOT make
+         * the first visit smaller. What it buys is that a normal app deploy, which
+         * changes only our own code, no longer invalidates ~300KB of unchanged
+         * dependency bytes. For an installed PWA that updates often, that is the
+         * difference between a small update and a full re-download.
+         *
+         * react and react-dom MUST stay in one chunk together: separating a library
+         * from its renderer is the classic way to get an initialisation-order crash.
+         */
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          // Match on a path SEGMENT so 'react-is' or 'use-sync-external-store'
+          // cannot be swept into the react chunk by a bare substring test.
+          // Vite normalises module ids to POSIX separators on every platform.
+          if (/\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) {
+            return 'vendor-react'
+          }
+          if (id.includes('node_modules/framer-motion/')) return 'vendor-motion'
+          if (id.includes('node_modules/@supabase/')) return 'vendor-supabase'
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

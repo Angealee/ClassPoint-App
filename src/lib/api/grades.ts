@@ -1,0 +1,855 @@
+import { supabase } from '@/lib/supabase'
+import { fetchAllPages, num, rpc, withAuthRetry } from './_internal'
+import type {
+  GradeAbsence,
+  GradeAttendance,
+  GradeBoost,
+  GradeItem,
+  GradePolicy,
+  GradeScore,
+  GradeSumsRow,
+  MyGradeItem,
+  MyGrades,
+  ReverseBoostResult,
+  TermKey,
+  TermSums,
+} from '@/lib/types'
+
+// ============================================================================
+// Grades (migration 0057)
+//
+// Instructor-only, end to end: all three tables are instructor-gated in RLS
+// with no student branch at all, so there is no "own rows" path to widen by
+// accident. The ONE student door is `getMyGrades` (0062) at the foot of this
+// file — an aggregating RPC returning that student's own marks and nobody
+// else's, never a table read.
+//
+// Points reach a grade only through an individually-approved boost request
+// (0062): the server spends the points and writes the mark in one transaction.
+// Nothing in this module reads point_events or turns points into a grade itself.
+//
+// ⚠ NO ARITHMETIC LIVES HERE EITHER. This module fetches and writes; every
+// weight and the transmutation live in src/lib/grading.ts, which is the only
+// definition of them in the codebase. See that file's header for why there is
+// deliberately no SQL mirror.
+// ============================================================================
+
+/** `.in()` chunk size — the same ceiling getSectionStats uses. */
+const CHUNK = 150
+
+type PolicyRow = {
+  subject_id: string
+  term: TermKey
+  pt_weight: number | string
+  quiz_weight: number | string
+  recit_weight: number | string
+  cs_weight: number | string
+  exam_weight: number | string
+  final_weight: number | string
+  transmute_base: number | string
+  transmute_span: number | string
+}
+
+function mapPolicy(row: PolicyRow): GradePolicy {
+  // Every weight is `numeric` and therefore arrives as a string — see num().
+  return {
+    subjectId: row.subject_id,
+    term: row.term,
+    ptWeight: num(row.pt_weight) ?? 0,
+    quizWeight: num(row.quiz_weight) ?? 0,
+    recitWeight: num(row.recit_weight) ?? 0,
+    csWeight: num(row.cs_weight) ?? 0,
+    examWeight: num(row.exam_weight) ?? 0,
+    finalWeight: num(row.final_weight) ?? 0,
+    transmuteBase: num(row.transmute_base) ?? 0,
+    transmuteSpan: num(row.transmute_span) ?? 0,
+  }
+}
+
+type ItemRow = {
+  id: string
+  section_id: string
+  subject_id: string
+  term: TermKey
+  component: GradeItem['component']
+  name: string
+  max_score: number | string
+  position: number
+  archived_at: string | null
+  /** 0063. Absent when the row was read from a database that lacks it. */
+  assist_off?: boolean
+  session_id?: string | null
+}
+
+function mapItem(row: ItemRow): GradeItem {
+  return {
+    id: row.id,
+    sectionId: row.section_id,
+    subjectId: row.subject_id,
+    term: row.term,
+    component: row.component,
+    maxScore: num(row.max_score) ?? 0,
+    name: row.name,
+    position: row.position,
+    archivedAt: row.archived_at,
+    assistOff: row.assist_off === true,
+    sessionId: row.session_id ?? null,
+  }
+}
+
+const ITEM_COLS =
+  'id, section_id, subject_id, term, component, name, max_score, position, archived_at'
+
+/**
+ * The same plus the 0063 pair: a column switched off, and the class it was held in.
+ *
+ * Kept SEPARATE from `ITEM_COLS` on purpose: `listGradeItems` is the root of every
+ * grade screen, and a build that selects a column the database does not have yet
+ * makes every read 400. It tries this first and falls back to the plain list, so
+ * pasting the client before 0063 costs those fields and nothing else — the 0034
+ * SectionGrid precedent, applied to the one query everything hangs off.
+ * (points_cost / points_bonus are RETIRED in 0064 and no longer selected.)
+ */
+const ITEM_COLS_WITH_ASSIST = `${ITEM_COLS}, assist_off, session_id`
+
+/** PostgREST's "that column is not there" — Postgres 42703 reaches us as this. */
+function isMissingAssistColumn(error: { code?: string; message?: string }): boolean {
+  return error.code === '42703' || /assist_off|session_id/.test(error.message ?? '')
+}
+
+// ----------------------------------------------------------------------------
+// Policies
+// ----------------------------------------------------------------------------
+
+/**
+ * The three weight rows for one subject.
+ *
+ * 0057 seeds all three on subject creation, so a short list means someone
+ * deleted one — `subjectPolicyError` in grading.ts names the missing term
+ * rather than letting a final grade be computed out of 70%.
+ */
+export async function listGradePolicies(subjectId: string): Promise<GradePolicy[]> {
+  const { data, error } = await supabase
+    .from('grade_policies')
+    .select(
+      'subject_id, term, pt_weight, quiz_weight, recit_weight, cs_weight, exam_weight, final_weight, transmute_base, transmute_span',
+    )
+    .eq('subject_id', subjectId)
+  if (error) throw error
+  return ((data ?? []) as PolicyRow[]).map(mapPolicy)
+}
+
+/**
+ * Save one term's weights.
+ *
+ * Validate with `policyError` BEFORE calling: the table's CHECKs cover the two
+ * row-level sums and will reject a bad write, but with a constraint name rather
+ * than a sentence anyone would want to read. The cross-row rule (the three
+ * terms' shares summing to 1) cannot be a CHECK at all and is only ever caught
+ * client-side — see the comment in 0057.
+ */
+export async function saveGradePolicy(policy: GradePolicy): Promise<void> {
+  await withAuthRetry(async () => {
+    const { error } = await supabase
+      .from('grade_policies')
+      .update({
+        pt_weight: policy.ptWeight,
+        quiz_weight: policy.quizWeight,
+        recit_weight: policy.recitWeight,
+        cs_weight: policy.csWeight,
+        exam_weight: policy.examWeight,
+        final_weight: policy.finalWeight,
+        transmute_base: policy.transmuteBase,
+        transmute_span: policy.transmuteSpan,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('subject_id', policy.subjectId)
+      .eq('term', policy.term)
+    if (error) throw error
+  })
+}
+
+/**
+ * Save a subject's weights for every term it was given — ALL OR NOTHING.
+ *
+ * This replaces the weights screen's loop of three `saveGradePolicy` calls. A
+ * failure after the first or second left the three terms' shares not adding up
+ * to 100%, which `finalGrade` reports as every grade for the subject
+ * disappearing. One RPC (0062) writes them in a single transaction and refuses a
+ * set whose shares do not sum to exactly 1.
+ *
+ * Falls back to the old sequential saves when the function does not exist yet,
+ * so the weights editor keeps working before 0062 is pasted — at the old,
+ * non-atomic risk, which is no worse than before.
+ */
+export async function saveGradePolicies(
+  subjectId: string,
+  policies: GradePolicy[],
+): Promise<void> {
+  try {
+    await rpc('save_subject_policy', {
+      p_subject_id: subjectId,
+      p_policies: policies.map((p) => ({
+        term: p.term,
+        pt_weight: p.ptWeight,
+        quiz_weight: p.quizWeight,
+        recit_weight: p.recitWeight,
+        cs_weight: p.csWeight,
+        exam_weight: p.examWeight,
+        final_weight: p.finalWeight,
+        transmute_base: p.transmuteBase,
+        transmute_span: p.transmuteSpan,
+      })),
+    })
+  } catch (e) {
+    const err = e as { code?: string; message?: string } | null
+    // PostgREST's "no such function" (PGRST202) or Postgres's (42883). Matched
+    // narrowly: a REAL failure — the sum refusal, a CHECK — must surface, not
+    // be retried around by writing the rows one at a time.
+    const missing =
+      err?.code === 'PGRST202' ||
+      err?.code === '42883' ||
+      (/save_subject_policy/.test(err?.message ?? '') &&
+        /could not find|does not exist/i.test(err?.message ?? ''))
+    if (!missing) throw e
+    for (const p of policies) await saveGradePolicy(p)
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Items — the score columns
+// ----------------------------------------------------------------------------
+
+/**
+ * Every score column for a scope. Archived ones are included, flagged.
+ *
+ * RECITATION COLUMNS ARE NOT RETURNED (0063). The Recitation part is the term's
+ * attendance rate now, so a typed column there would be a number nothing reads.
+ * The rows stay in `grade_items` — retired, not deleted — and in the nightly
+ * backup; they are simply not part of the grade.
+ */
+export async function listGradeItems(
+  sectionId: string,
+  subjectId: string,
+  term?: TermKey,
+): Promise<GradeItem[]> {
+  const run = (cols: string) => {
+    let q = supabase
+      .from('grade_items')
+      .select(cols)
+      .eq('section_id', sectionId)
+      .eq('subject_id', subjectId)
+      .neq('component', 'recitation')
+    if (term) q = q.eq('term', term)
+    return q.order('component').order('position').order('created_at')
+  }
+
+  // Newest column set first: pasting the client before 0063 costs those fields
+  // and nothing else.
+  let { data, error } = await run(ITEM_COLS_WITH_ASSIST)
+  if (error && isMissingAssistColumn(error)) {
+    ;({ data, error } = await run(ITEM_COLS))
+  }
+  if (error) throw error
+  return ((data ?? []) as unknown as ItemRow[]).map(mapItem)
+}
+
+export interface NewGradeItem {
+  sectionId: string
+  subjectId: string
+  term: TermKey
+  component: GradeItem['component']
+  name: string
+  maxScore: number
+  position?: number
+}
+
+export async function createGradeItem(input: NewGradeItem): Promise<GradeItem> {
+  return withAuthRetry(async () => {
+    const { data, error } = await supabase
+      .from('grade_items')
+      .insert({
+        section_id: input.sectionId,
+        subject_id: input.subjectId,
+        term: input.term,
+        component: input.component,
+        name: input.name.trim(),
+        max_score: input.maxScore,
+        position: input.position ?? 0,
+      })
+      .select(ITEM_COLS)
+      .single()
+    if (error) throw error
+    return mapItem(data as ItemRow)
+  })
+}
+
+/**
+ * Rename, re-max or reposition a column.
+ *
+ * Changing `maxScore` moves every grade in the section, exactly as a weight
+ * change does — the caller is expected to confirm it the same way.
+ */
+export async function updateGradeItem(
+  id: string,
+  patch: Partial<Pick<GradeItem, 'name' | 'maxScore' | 'position' | 'assistOff' | 'sessionId'>>,
+): Promise<void> {
+  const row: {
+    name?: string
+    max_score?: number
+    position?: number
+    assist_off?: boolean
+    session_id?: string | null
+  } = {}
+  if (patch.name !== undefined) row.name = patch.name.trim()
+  if (patch.maxScore !== undefined) row.max_score = patch.maxScore
+  if (patch.position !== undefined) row.position = patch.position
+  // 0063. Sent only when CHANGED, so a rename still works before the migration.
+  if (patch.assistOff !== undefined) row.assist_off = patch.assistOff
+  if (patch.sessionId !== undefined) row.session_id = patch.sessionId
+  if (Object.keys(row).length === 0) return
+
+  await withAuthRetry(async () => {
+    const { error } = await supabase.from('grade_items').update(row).eq('id', id)
+    if (error) throw error
+  })
+}
+
+/**
+ * Retire a column, or bring one back.
+ *
+ * Archiving takes the item's `max_score` out of the denominator, so every grade
+ * in the section moves — the same magnitude as editing a weight, and gated the
+ * same way. The scores survive, so restoring puts the class back exactly.
+ */
+export async function setGradeItemArchived(id: string, archived: boolean): Promise<void> {
+  await withAuthRetry(async () => {
+    const { error } = await supabase
+      .from('grade_items')
+      .update({ archived_at: archived ? new Date().toISOString() : null })
+      .eq('id', id)
+    if (error) throw error
+  })
+}
+
+// ----------------------------------------------------------------------------
+// Scores — the cells
+// ----------------------------------------------------------------------------
+
+/**
+ * Every mark against these columns.
+ *
+ * ⚠ PAGED, and it has to be: a section's term is ~40 students × ~20 items = 800
+ * rows, which sits just under PostgREST's silent 1000-row cap — and three terms,
+ * or a section that grows, is straight past it. The 0031 lesson is that the cap
+ * truncates without an error, so the grid would quietly lose its last columns.
+ *
+ * Ordered by the primary key, which is unique, so pages cannot skip or repeat.
+ */
+export async function listGradeScores(
+  itemIds: string[],
+  /**
+   * Narrow to one student.
+   *
+   * The per-student breakdown wants ~120 cells; without this it would pull the
+   * whole class's marks for every item of every term — roughly 4,800 rows — to
+   * render one person's record.
+   */
+  studentId?: string,
+): Promise<GradeScore[]> {
+  if (itemIds.length === 0) return []
+
+  const out: GradeScore[] = []
+  for (let i = 0; i < itemIds.length; i += CHUNK) {
+    const chunk = itemIds.slice(i, i + CHUNK)
+    const rows = await fetchAllPages<{
+      item_id: string
+      student_id: string
+      score: number | string
+    }>((from, to) => {
+      let q = supabase
+        .from('grade_scores')
+        .select('item_id, student_id, score')
+        .in('item_id', chunk)
+      if (studentId) q = q.eq('student_id', studentId)
+      return q.order('item_id').order('student_id').range(from, to)
+    })
+    for (const r of rows) {
+      out.push({ itemId: r.item_id, studentId: r.student_id, score: num(r.score) ?? 0 })
+    }
+  }
+  return out
+}
+
+/**
+ * Write a batch of marks.
+ *
+ * ONE upsert for every dirty cell, so a fast run down a column is a single
+ * round trip rather than forty. `onConflict` is the primary key, which makes
+ * this idempotent — a retry can never double-write.
+ *
+ * A score of 0 is a real mark and belongs here. CLEARING a cell is a different
+ * operation entirely (`clearGradeScores`): it removes the row, which changes
+ * that student's in-progress denominator.
+ */
+export async function saveGradeScores(scores: GradeScore[]): Promise<void> {
+  if (scores.length === 0) return
+  await withAuthRetry(async () => {
+    const { error } = await supabase.from('grade_scores').upsert(
+      scores.map((s) => ({ item_id: s.itemId, student_id: s.studentId, score: s.score })),
+      { onConflict: 'item_id,student_id' },
+    )
+    if (error) throw error
+  })
+}
+
+/**
+ * Un-mark cells — NOT the same as setting them to zero.
+ *
+ * With no row, the item leaves that student's "so far" denominator and counts
+ * as a zero in the official grade. With a row holding 0, it counts as a zero in
+ * both. That difference is the whole point of storing the absence.
+ */
+export async function clearGradeScores(cells: Array<Pick<GradeScore, 'itemId' | 'studentId'>>) {
+  if (cells.length === 0) return
+
+  // Group by column, then ONE delete per column per chunk. A pasted column with
+  // forty blanks used to fire forty sequential DELETEs inside a single flush —
+  // while the writes beside it were already one coalesced upsert.
+  const byItem = new Map<string, string[]>()
+  for (const cell of cells) {
+    const list = byItem.get(cell.itemId)
+    if (list) list.push(cell.studentId)
+    else byItem.set(cell.itemId, [cell.studentId])
+  }
+
+  for (const [itemId, studentIds] of byItem) {
+    for (let i = 0; i < studentIds.length; i += CHUNK) {
+      const chunk = studentIds.slice(i, i + CHUNK)
+      await withAuthRetry(async () => {
+        const { error } = await supabase
+          .from('grade_scores')
+          .delete()
+          .eq('item_id', itemId)
+          .in('student_id', chunk)
+        if (error) throw error
+      })
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Absent marks and attendance (migration 0063)
+//
+// Every call here fails on a database without 0063, so each caller fetches in its
+// OWN try/catch: a missing function must cost the A marks or the Recitation
+// figure, never the grid (the 0034 SectionGrid precedent).
+// ----------------------------------------------------------------------------
+
+/**
+ * Every Absent mark in a scope — the ones typed by hand AND the ones derived
+ * from attendance for columns tied to a class. One jsonb array, because a
+ * section-term can hold ~800 cells, past PostgREST's silent 1000-row cap.
+ */
+export async function getGradeAbsences(
+  sectionId: string,
+  subjectId: string,
+  term?: TermKey,
+): Promise<GradeAbsence[]> {
+  const raw = await rpc<GradeAbsence[] | null>('get_grade_absences', {
+    p_section_id: sectionId,
+    p_subject_id: subjectId,
+    p_term: term ?? null,
+  })
+  return (raw ?? []).map((a) => ({
+    itemId: a.itemId,
+    studentId: a.studentId,
+    source: a.source === 'auto' ? 'auto' : 'manual',
+  }))
+}
+
+/**
+ * Mark cells Absent. The server removes any mark in the same cell (a trigger, so
+ * no code path can leave a cell saying both).
+ */
+export async function saveGradeAbsences(cells: Array<Pick<GradeScore, 'itemId' | 'studentId'>>) {
+  if (cells.length === 0) return
+  await withAuthRetry(async () => {
+    const { error } = await supabase.from('grade_absences').upsert(
+      cells.map((c) => ({ item_id: c.itemId, student_id: c.studentId })),
+      { onConflict: 'item_id,student_id' },
+    )
+    if (error) throw error
+  })
+}
+
+/** Take the typed Absent mark off cells. A derived one (from attendance) stays. */
+export async function clearGradeAbsences(cells: Array<Pick<GradeScore, 'itemId' | 'studentId'>>) {
+  if (cells.length === 0) return
+  const byItem = new Map<string, string[]>()
+  for (const cell of cells) {
+    const list = byItem.get(cell.itemId)
+    if (list) list.push(cell.studentId)
+    else byItem.set(cell.itemId, [cell.studentId])
+  }
+  for (const [itemId, studentIds] of byItem) {
+    for (let i = 0; i < studentIds.length; i += CHUNK) {
+      const chunk = studentIds.slice(i, i + CHUNK)
+      await withAuthRetry(async () => {
+        const { error } = await supabase
+          .from('grade_absences')
+          .delete()
+          .eq('item_id', itemId)
+          .in('student_id', chunk)
+        if (error) throw error
+      })
+    }
+  }
+}
+
+/**
+ * Each student's attendance COUNTS for one subject and term — the inputs to the
+ * Recitation grade. Counts only: the rate is computed by `grading.ts`, the one
+ * definition. A student with no classes in the term is simply absent from the map.
+ */
+export async function getGradeAttendance(
+  sectionId: string,
+  subjectId: string,
+  term: TermKey,
+): Promise<Map<string, GradeAttendance>> {
+  const rows = await rpc<
+    Array<{ student_id: string; showed: number | string; counted: number | string }>
+  >('get_grade_attendance', {
+    p_section_id: sectionId,
+    p_subject_id: subjectId,
+    p_term: term,
+  })
+  const out = new Map<string, GradeAttendance>()
+  for (const r of rows ?? []) {
+    out.set(r.student_id, { showed: num(r.showed) ?? 0, counted: num(r.counted) ?? 0 })
+  }
+  return out
+}
+
+// ----------------------------------------------------------------------------
+// Aggregate — for the overall sheet, where raw cells would not fit
+// ----------------------------------------------------------------------------
+
+type SumsRow = {
+  student_id: string
+  full_name: string
+  term: TermKey
+  pt_score: number | string
+  pt_max: number | string
+  pt_marked: number | string
+  quiz_score: number | string
+  quiz_max: number | string
+  quiz_marked: number | string
+  recit_score: number | string
+  recit_max: number | string
+  recit_marked: number | string
+  exam_score: number | string
+  exam_max: number | string
+  exam_marked: number | string
+}
+
+function mapSums(row: SumsRow): GradeSumsRow {
+  const sums: TermSums = {
+    performance_task: {
+      sumScore: num(row.pt_score) ?? 0,
+      sumMax: num(row.pt_max) ?? 0,
+      sumMaxMarked: num(row.pt_marked) ?? 0,
+    },
+    quiz: {
+      sumScore: num(row.quiz_score) ?? 0,
+      sumMax: num(row.quiz_max) ?? 0,
+      sumMaxMarked: num(row.quiz_marked) ?? 0,
+    },
+    recitation: {
+      sumScore: num(row.recit_score) ?? 0,
+      sumMax: num(row.recit_max) ?? 0,
+      sumMaxMarked: num(row.recit_marked) ?? 0,
+    },
+    exam: {
+      sumScore: num(row.exam_score) ?? 0,
+      sumMax: num(row.exam_max) ?? 0,
+      sumMaxMarked: num(row.exam_marked) ?? 0,
+    },
+  }
+  return { studentId: row.student_id, fullName: row.full_name, term: row.term, sums }
+}
+
+/**
+ * Raw component totals, one row per student per term.
+ *
+ * This is what the overall sheet reads. The grid does NOT use it — it already
+ * has every cell on screen and computes its own totals with `sumsFromScores`,
+ * which applies the identical non-archived filter so the two cannot disagree.
+ *
+ * Omitting `term` returns all three, which is ~120 rows for a section: the
+ * reason the RPC aggregates per (student, term) rather than per component is
+ * that the per-component shape would be 2,496 rows for a whole subject, past
+ * the 1000-row cap.
+ */
+export async function getSectionGradeSums(
+  sectionId: string,
+  subjectId: string,
+  term?: TermKey,
+): Promise<GradeSumsRow[]> {
+  const rows = await rpc<SumsRow[]>('get_section_grade_sums', {
+    p_section_id: sectionId,
+    p_subject_id: subjectId,
+    p_term: term ?? null,
+  })
+  return (rows ?? []).map(mapSums)
+}
+
+// ----------------------------------------------------------------------------
+// Import (migration 0058)
+// ----------------------------------------------------------------------------
+
+export interface GradeImportColumn {
+  component: GradeItem['component']
+  name: string
+  maxScore: number
+}
+
+export interface GradeImportMark {
+  component: GradeItem['component']
+  studentId: string
+  score: number
+}
+
+export interface GradeImportResult {
+  itemsCreated: number
+  scoresWritten: number
+  scoresOverwritten: number
+}
+
+/**
+ * Write a whole term from a spreadsheet, in ONE transaction.
+ *
+ * All of it lands or none of it does — an import is four columns and ~160
+ * marks, and a half-written one leaves real columns with some marks in them
+ * and nothing on screen saying which half is missing. The RPC also refuses a
+ * mark for a student outside the section, which aborts the whole run rather
+ * than quietly attaching one mark to a stranger.
+ *
+ * Marks that are NOT sent stay unmarked. Null is never sent as 0.
+ */
+export async function importGradeTerm(
+  sectionId: string,
+  subjectId: string,
+  term: TermKey,
+  columns: GradeImportColumn[],
+  marks: GradeImportMark[],
+): Promise<GradeImportResult> {
+  const data = await rpc<{
+    items_created: number
+    scores_written: number
+    scores_overwritten: number
+  }>('import_grade_term', {
+    p_section_id: sectionId,
+    p_subject_id: subjectId,
+    p_term: term,
+    p_components: columns.map((c) => ({
+      component: c.component,
+      name: c.name,
+      max_score: c.maxScore,
+    })),
+    p_scores: marks.map((m) => ({
+      component: m.component,
+      student_id: m.studentId,
+      score: m.score,
+    })),
+  })
+
+  return {
+    itemsCreated: num(data?.items_created) ?? 0,
+    scoresWritten: num(data?.scores_written) ?? 0,
+    scoresOverwritten: num(data?.scores_overwritten) ?? 0,
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Student grades and boosts (migration 0062)
+//
+// ⚠ STILL NO ARITHMETIC HERE. A boost raises the ordinary `grade_scores.score`,
+// so nothing downstream — grading.ts, the aggregate RPC, exports, print — needs
+// to know it happened. These calls move data; the receipt only draws the
+// indicator and lets the instructor undo one.
+// ----------------------------------------------------------------------------
+
+/** The student-grades switch. Seeded OFF — a re-paste never flips it back. */
+export async function getStudentGradesEnabled(): Promise<boolean> {
+  return (await rpc<boolean>('cp_student_grades_flag')) === true
+}
+
+/**
+ * Turn the student Grades screen on or off.
+ *
+ * Opening it also notifies every student whose class has marks — once: the
+ * server only pushes on the OFF → ON transition, so a double tap or a retry
+ * reports `notified: 0` rather than telling the class twice. The count is what
+ * actually happened, not a prediction.
+ */
+export async function setStudentGradesEnabled(
+  enabled: boolean,
+): Promise<{ enabled: boolean; notified: number }> {
+  const data = await rpc<{ enabled: boolean; notified: number }>('set_student_grades_enabled', {
+    p_enabled: enabled,
+  })
+  return { enabled: data?.enabled === true, notified: num(data?.notified) ?? 0 }
+}
+
+/**
+ * Receipts for these columns.
+ *
+ * Instructor-only (RLS), and the table does not exist before 0062 — so every
+ * caller fetches this in its OWN try/catch. A missing table must cost the corner
+ * marks, never the grid.
+ */
+export async function listGradeBoosts(itemIds: string[]): Promise<GradeBoost[]> {
+  if (itemIds.length === 0) return []
+  const out: GradeBoost[] = []
+  for (let i = 0; i < itemIds.length; i += CHUNK) {
+    const chunk = itemIds.slice(i, i + CHUNK)
+    const rows = await fetchAllPages<{
+      item_id: string
+      student_id: string
+      score_before: number | string
+      score_after: number | string
+      marks_granted: number | string
+      points_spent: number
+      applied_at: string
+    }>((from, to) =>
+      supabase
+        .from('grade_boosts')
+        .select('item_id, student_id, score_before, score_after, marks_granted, points_spent, applied_at')
+        .in('item_id', chunk)
+        .order('item_id')
+        .order('student_id')
+        .range(from, to),
+    )
+    for (const r of rows) {
+      out.push({
+        itemId: r.item_id,
+        studentId: r.student_id,
+        scoreBefore: num(r.score_before) ?? 0,
+        scoreAfter: num(r.score_after) ?? 0,
+        marksGranted: num(r.marks_granted) ?? 0,
+        pointsSpent: r.points_spent,
+        appliedAt: r.applied_at,
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * Instructor: undo an approved boost.
+ *
+ * Returns the points, removes the receipt, frees the column. The mark goes back
+ * to what it was ONLY if it is still what the boost wrote — a cell the
+ * instructor has retyped since is left alone, and `markRestored` says so, so the
+ * screen can tell them rather than letting them assume.
+ */
+export async function reverseGradeBoost(
+  itemId: string,
+  studentId: string,
+): Promise<ReverseBoostResult> {
+  const data = await rpc<{
+    mark_restored: boolean
+    points_refunded: number
+    score_now: number | string | null
+  }>('reverse_grade_boost', { p_item_id: itemId, p_student_id: studentId })
+  return {
+    markRestored: data?.mark_restored === true,
+    pointsRefunded: num(data?.points_refunded) ?? 0,
+    scoreNow: num(data?.score_now),
+  }
+}
+
+type MyGradesRaw = {
+  enabled: boolean
+  /** 0065. Absent on a database without it — then "enabled" meant "figures shown". */
+  figures?: boolean
+  subjects: Array<{
+    subjectId: string
+    code: string
+    name: string
+    policies: Array<Omit<GradePolicy, 'subjectId'>>
+    /** 0063 — absent on a database without it. */
+    attendance?: Partial<Record<TermKey, { showed?: number | string; counted?: number | string }>>
+    items: MyGradeItem[]
+  }>
+}
+
+/**
+ * The calling student's OWN marks — the only door to grades a student has.
+ *
+ * `enabled: false` is an answer, not an error: the instructor has grades
+ * switched off, or the account is archived. The screen says "not open yet"
+ * instead of showing a failure. Never contains another student's mark.
+ */
+export async function getMyGrades(): Promise<MyGrades> {
+  const raw = await rpc<MyGradesRaw>('get_my_grades')
+  return {
+    enabled: raw?.enabled === true,
+    figures: raw?.figures === undefined ? raw?.enabled === true : raw.figures === true,
+    subjects: (raw?.subjects ?? []).map((s) => ({
+      subjectId: s.subjectId,
+      code: s.code,
+      name: s.name,
+      // jsonb numbers arrive as real numbers, but `num` is cheap insurance
+      // against a weight ever being sent as text.
+      policies: (s.policies ?? []).map((p) => ({
+        subjectId: s.subjectId,
+        term: p.term,
+        ptWeight: num(p.ptWeight) ?? 0,
+        quizWeight: num(p.quizWeight) ?? 0,
+        recitWeight: num(p.recitWeight) ?? 0,
+        csWeight: num(p.csWeight) ?? 0,
+        examWeight: num(p.examWeight) ?? 0,
+        finalWeight: num(p.finalWeight) ?? 0,
+        transmuteBase: num(p.transmuteBase) ?? 0,
+        transmuteSpan: num(p.transmuteSpan) ?? 0,
+      })),
+      attendance: Object.fromEntries(
+        (['prelim', 'midterm', 'finals'] as TermKey[]).map((t) => [
+          t,
+          {
+            showed: num(s.attendance?.[t]?.showed) ?? 0,
+            counted: num(s.attendance?.[t]?.counted) ?? 0,
+          },
+        ]),
+      ) as Record<TermKey, GradeAttendance>,
+      items: (s.items ?? []).map((i) => ({
+        ...i,
+        maxScore: num(i.maxScore) ?? 0,
+        score: num(i.score),
+        offered: i.offered === true,
+        absent: i.absent === true,
+        boost: i.boost
+          ? {
+              marks: num(i.boost.marks) ?? 0,
+              points: i.boost.points,
+              before: num(i.boost.before) ?? 0,
+            }
+          : null,
+        pending: i.pending === true,
+      })),
+    })),
+  }
+}
+
+/**
+ * Use points on a grade column (points assist). 1 point = 1 mark and the student
+ * chooses how many, so the client sends WHICH column and HOW MANY points. The
+ * server re-checks everything — the column is open, the student was not absent,
+ * the mark is in, the amount does not pass the maximum, the balance covers it —
+ * so a modified client gains nothing by lying about the amount.
+ */
+export async function requestGradeBoost(itemId: string, points: number): Promise<string> {
+  return await rpc<string>('request_grade_boost', { p_item_id: itemId, p_points: points })
+}

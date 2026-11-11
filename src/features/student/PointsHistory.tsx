@@ -26,7 +26,7 @@ const CATEGORY_META: Record<PointCategory, { label: string; dot: string; text: s
   // Gold, like recitations: an event payout is points you earned.
   event: { label: 'Events', dot: TONE.reward.dot, text: TONE.reward.text },
   // 0055 — a global-event check-in award; earned points, so gold too.
-  event_attend: { label: 'Event check-in', dot: TONE.reward.dot, text: TONE.reward.text },
+  event_attend: { label: 'Event attendance', dot: TONE.reward.dot, text: TONE.reward.text },
 }
 
 /**
@@ -112,14 +112,25 @@ export function PointsHistory() {
 
   const netTotal = useMemo(() => events.reduce((s, e) => s + e.points, 0), [events])
 
+  /**
+   * Declared once and rendered in all four branches.
+   *
+   * It used to be written out in full in each of them, which is three chances
+   * for the copy, the subtitle or the back fallback to drift apart depending on
+   * whether the screen happened to be loading, empty, failed or populated.
+   */
+  const header = (
+    <PageHeader
+      title="Points history"
+      subtitle="Everything you’ve earned and spent this semester."
+      fallback="/app"
+    />
+  )
+
   if (loading) {
     return (
       <div className="space-y-5">
-        <PageHeader
-          title="Points history"
-          subtitle="Everything you’ve earned and spent this semester."
-          fallback="/app"
-        />
+        {header}
         <ListSkeleton />
       </div>
     )
@@ -128,11 +139,7 @@ export function PointsHistory() {
   if (error && events.length === 0) {
     return (
       <div className="space-y-5">
-        <PageHeader
-          title="Points history"
-          subtitle="Everything you’ve earned and spent this semester."
-          fallback="/app"
-        />
+        {header}
         <ErrorState onRetry={() => void load()}>{error}</ErrorState>
       </div>
     )
@@ -141,11 +148,7 @@ export function PointsHistory() {
   if (events.length === 0) {
     return (
       <div className="space-y-5">
-        <PageHeader
-          title="Points history"
-          subtitle="Everything you’ve earned and spent this semester."
-          fallback="/app"
-        />
+        {header}
         <EmptyState>No points yet. They'll appear here the moment your instructor awards them.</EmptyState>
       </div>
     )
@@ -154,11 +157,7 @@ export function PointsHistory() {
   return (
     <PullToRefresh onRefresh={load}>
       <div className="space-y-5">
-        <PageHeader
-          title="Points history"
-          subtitle="Everything you’ve earned and spent this semester."
-          fallback="/app"
-        />
+        {header}
 
         {/* Per-week bars. Height is scaled against the biggest week so the
             shape reads even when the numbers are small — which they are early

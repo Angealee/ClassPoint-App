@@ -39,7 +39,7 @@ function SpaceHeader({ state }: { state: 'open' | 'paused' | 'locked' }) {
   const chip = spaceChip(state)
   return (
     <div className="flex items-center gap-3">
-      <h1 className="font-display text-2xl font-bold">Student Space</h1>
+      <h1 className="font-display text-xl font-bold">Student Space</h1>
       <Chip tone={chip.tone} size="sm">
         {chip.label}
       </Chip>

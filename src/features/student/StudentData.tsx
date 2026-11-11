@@ -18,6 +18,7 @@ import {
   getMyEventStatus,
   getLeaderboardSnapshot,
   getMyAchievements,
+  getMyGrades,
   getMySessionStatus,
   getMyStudent,
   getUnreadNotificationCount,
@@ -55,6 +56,7 @@ import type {
   EventSession,
   LeaderboardEntry,
   MyAttendanceEntry,
+  MyGrades,
   PointEvent,
   Section,
   StudentSelf,
@@ -159,6 +161,21 @@ interface StudentDataValue {
    */
   attendance: MyAttendanceEntry[]
   attendanceLoading: boolean
+  /**
+   * The student's own marks (0062), loaded off the critical path like
+   * achievements and attendance. Shared by the Home card and the Grades screen,
+   * which fire no query of their own.
+   *
+   * `null` until the first answer. `enabled: false` is an ANSWER (the
+   * instructor has grades switched off), not an error — `gradesError` is the
+   * failure. The Home card renders nothing for either; the Grades screen says
+   * which.
+   */
+  grades: MyGrades | null
+  gradesLoading: boolean
+  gradesError: boolean
+  /** Re-read the marks — pull-to-refresh, and after a boost request. */
+  reloadGrades: () => Promise<void>
   /** Raw metric values behind locked achievements' progress bars. */
   achievementProgress: AchievementProgress | null
   /** The achievement to celebrate with the unlock burst right now, or null. */
@@ -240,6 +257,10 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   // Attendance history, shared by the Dashboard teaser and the stats screen.
   const [attendance, setAttendance] = useState<MyAttendanceEntry[]>([])
   const [attendanceLoading, setAttendanceLoading] = useState(true)
+  // The student's own marks (0062) — off the critical path, like the above.
+  const [grades, setGrades] = useState<MyGrades | null>(null)
+  const [gradesLoading, setGradesLoading] = useState(true)
+  const [gradesError, setGradesError] = useState(false)
   const [achievementProgress, setAchievementProgress] = useState<AchievementProgress | null>(null)
   // Achievements queued to celebrate, shown one at a time (oldest first).
   const [unlockQueue, setUnlockQueue] = useState<Achievement[]>([])
@@ -341,6 +362,24 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       /* keep whatever we had */
     } finally {
       setAttendanceLoading(false)
+    }
+  }, [])
+
+  /**
+   * The student's own marks. A failure is REMEMBERED, not hidden: the Grades
+   * screen must be able to tell "your instructor has not opened grades"
+   * (`enabled: false`) from "we could not reach the server", because the first
+   * is a sentence and the second is a retry button. The last good answer stays
+   * in place meanwhile, so a flaky connection does not blank a screen of marks.
+   */
+  const loadGrades = useCallback(async () => {
+    setGradesError(false)
+    try {
+      setGrades(await getMyGrades())
+    } catch {
+      setGradesError(true)
+    } finally {
+      setGradesLoading(false)
     }
   }, [])
 
@@ -507,6 +546,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         // case as soon as they're ready without delaying the dashboard.
         void loadAchievements(mine.id).finally(() => setAchievementsLoading(false))
         void loadAttendance(mine.id)
+        void loadGrades()
         void runAchievementSync(mine.id)
       }
     } catch {
@@ -517,7 +557,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     })()
     inFlightRef.current = run
     return run
-  }, [userId, considerLevelUp, considerRankChange, loadAchievements, loadAttendance, runAchievementSync])
+  }, [userId, considerLevelUp, considerRankChange, loadAchievements, loadAttendance, loadGrades, runAchievementSync])
 
   // Always call the freshest `load` from listeners/callbacks without making the
   // realtime channel re-subscribe when `load`'s identity changes.
@@ -703,6 +743,22 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         },
         () => setUnreadCount((c) => c + 1),
       )
+      // A boost request being decided, reversed or filed (0062). A student has
+      // NO select on `grade_scores`, so a typed mark is invisible to realtime —
+      // marks refresh on open, on a return after two minutes away, and on
+      // pull-to-refresh. A request's status, though, lives on `point_redemptions`
+      // (already published, and readable by its owner), and a decision changes
+      // the column's state, so that is the one event worth re-reading for.
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'point_redemptions',
+          filter: `student_id=eq.${studentId}`,
+        },
+        () => void loadGrades(),
+      )
       // Catches instructor-granted achievements live (self-triggered unlocks
       // already celebrate synchronously from syncAchievements' own return
       // value — `celebrate()` dedupes so this never double-fires for those).
@@ -746,6 +802,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     toast,
     celebrate,
     loadAchievements,
+    loadGrades,
   ])
 
   /**
@@ -998,7 +1055,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   const [achSeenBump, setAchSeenBump] = useState(0)
   const hasUnseenAchievements = useMemo(() => {
     if (!me) return false
-    let seen: string[] = []
+    let seen: string[]
     try {
       seen = JSON.parse(localStorage.getItem(seenAchKey(me.id)) ?? '[]')
     } catch {
@@ -1113,6 +1170,10 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       semesterEnded,
       attendance,
       attendanceLoading,
+      grades,
+      gradesLoading,
+      gradesError,
+      reloadGrades: loadGrades,
       achievementProgress,
       unlockedAchievement,
       clearUnlockedAchievement,
@@ -1125,8 +1186,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       markAllRead,
       spaceAccess,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loading, error, me, sections, leaderboard, capturedAt, events, awayEvents, clearAwayRecap, live, rank, sectionName, load, saveProfile, saveAvatar, clearAvatar, saveBanner, saveHeader, clearHeader, saveHeaderPos, removeBanner, levelUp, clearLevelUp, achievements, achievementsLoading, achievementsError, retryAchievements, attendanceTick, liveSession, liveStatus, liveEvent, liveEventChecked, noteEventCheckedIn, semesterEnded, attendance, attendanceLoading, achievementProgress, unlockedAchievement, clearUnlockedAchievement, syncMyAchievements, hasUnseenAchievements, markAchievementsSeen, setDisplayTitleField, setPinnedAchievementsField, unreadCount, markAllRead, spaceAccess],
+    [loading, error, me, sections, leaderboard, capturedAt, events, awayEvents, clearAwayRecap, live, rank, sectionName, load, saveProfile, saveAvatar, clearAvatar, saveBanner, saveHeader, clearHeader, saveHeaderPos, removeBanner, levelUp, clearLevelUp, achievements, achievementsLoading, achievementsError, retryAchievements, attendanceTick, liveSession, liveStatus, liveEvent, liveEventChecked, noteEventCheckedIn, semesterEnded, attendance, attendanceLoading, grades, gradesLoading, gradesError, loadGrades, achievementProgress, unlockedAchievement, clearUnlockedAchievement, syncMyAchievements, hasUnseenAchievements, markAchievementsSeen, setDisplayTitleField, setPinnedAchievementsField, unreadCount, markAllRead, spaceAccess],
   )
 
   return (

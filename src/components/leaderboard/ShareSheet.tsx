@@ -1,6 +1,7 @@
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { Sheet } from '@/components/ui/Sheet'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { DownloadIcon } from '@/components/ui/icons'
@@ -188,9 +189,7 @@ export function ShareSheet({
             </div>
           </div>
         ) : (
-          <p className="py-8 text-center text-sm text-muted">
-            Nothing to share yet — the board settles twice a day.
-          </p>
+          <EmptyState compact>Nothing to share yet — the board settles twice a day.</EmptyState>
         )}
 
         <Button size="lg" className="w-full" onClick={onShare} disabled={busy || !hasEntries}>

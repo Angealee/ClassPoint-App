@@ -206,7 +206,7 @@ function RoundAction({
       >
         {icon}
       </span>
-      <span className="truncate">{label}</span>
+      <span className="max-w-full truncate">{label}</span>
     </button>
   )
 }

@@ -49,7 +49,7 @@ export const DRAFT_EVENTS: ChangelogEntry = {
   title: 'Big events, one scan',
   sections: [
     {
-      heading: 'Check in to a school-wide event',
+      heading: 'School-wide event attendance',
       major: true,
       items: [
         'When a big event kicks off, a gold banner lights up your home screen — tap it, scan the QR, and you are in from wherever you are sitting.',
@@ -66,6 +66,125 @@ export const DRAFT_EVENTS: ChangelogEntry = {
   ],
 }
 
+/**
+ * DRAFT — Era 7.0, the material layer. NOT in CHANGELOG yet, so it is invisible
+ * to users (LATEST_VERSION reads CHANGELOG[0]). Move it into the array with a
+ * bumped version once the instructor says to announce it. Version/date are
+ * placeholders until then.
+ *
+ * Deliberately SHORT, and student-facing only. Most of Era 7.0 was a token and
+ * primitive layer plus instructor screens, none of which belongs in a student's
+ * "What's new" — that is the 4.0.0 lesson, which was cut from 19 sections and 72
+ * bullets to 6 and 19 before it shipped. Three sections, seven bullets.
+ *
+ * The flash fix leads because it is the only item here a student would have
+ * NOTICED as a problem; the rest is polish they feel rather than read about.
+ */
+export const DRAFT_7_0_0: ChangelogEntry = {
+  version: '5.0.0',
+  date: '2026-11-04',
+  title: 'Easier on the eyes',
+  sections: [
+    {
+      heading: 'No more white flash when you open the app',
+      major: true,
+      items: [
+        'Opening ClassPoint in dark mode used to blind you with a white screen for a moment first. It does not any more — it opens dark, from the very first frame.',
+        'Your phone’s status bar now matches whichever theme you are in, instead of always sitting there in red.',
+      ],
+    },
+    {
+      heading: 'A warmer, deeper look',
+      items: [
+        'Corners are a touch softer across the whole app, and there is a very fine grain over everything so the big dark areas feel like a surface instead of a void.',
+        'The things that matter on a screen now sit slightly above it — your points balance, your attendance summary, the live QR card — so your eye lands on them first.',
+      ],
+    },
+    {
+      heading: 'Smoother on the way in',
+      items: [
+        'Loading placeholders now shimmer the same way everywhere, instead of three screens blinking on their own schedule.',
+        'Sheets, toasts, switches and tapped buttons all move on one shared set of timings, so the app feels like one thing rather than a pile of screens.',
+        'Nothing new runs in the background while you are reading. All of this is paint, not animation.',
+      ],
+    },
+  ],
+}
+
+
+/**
+ * DRAFT — Era 8.0: closing a semester, and the revision batch. NOT in CHANGELOG
+ * yet, so it is invisible to users (LATEST_VERSION reads CHANGELOG[0]). Move it
+ * into the array with a bumped version once the instructor says to announce it.
+ * Version/date are placeholders until then.
+ *
+ * ⚠ Keep ADDING to this entry's sections as Era 8.0 phases land, rather than
+ *   starting a new draft per phase. Phases 3–6 (the grade admin rebuild, the
+ *   student grade screen, the tour) belong here too.
+ *
+ * Student-facing only, and short — the 4.0.0 lesson, which was cut from 19
+ * sections and 72 bullets to 6 and 19 before it shipped. Nothing here about the
+ * close-a-semester panel, the farewell editor, the restore-into-a-section flow or
+ * the `@layer` fix: that is instructor work and plumbing, and a student reading
+ * their "What's new" does not care which cascade layer a rule sits in.
+ *
+ * Five sections, thirteen bullets.
+ */
+export const DRAFT_8_0_0: ChangelogEntry = {
+  version: '6.0.0',
+  date: '2026-11-08',
+  title: 'A clean slate',
+  sections: [
+    {
+      heading: 'A new semester starts properly',
+      major: true,
+      items: [
+        'When a semester ends, the leaderboard goes quiet instead of showing everyone sitting on zero — and it wakes up the moment the first points of the new one are awarded.',
+        'If your semester is over, signing in now shows you a note from your instructor and how you finished — your rank, your points, your badges, your attendance — instead of an app full of buttons that no longer do anything.',
+        'Your record is kept either way. Take a class with the same instructor again and your badges and all-time points come back with you.',
+      ],
+    },
+    {
+      heading: 'Your grades, and what your points can buy',
+      major: true,
+      items: [
+        'A new Grades screen shows every mark you have, part by part, with a “so far” figure for each term. It fills in as your instructor enters marks.',
+        'Spend points to add marks to a quiz, task or exam mark you already have: 1 point adds 1 mark, you choose how many, and a mark can never go past its maximum. You see exactly what you would gain before you send the request, and nothing is spent until your instructor approves it. If you were absent for a column, points can’t be used on it.',
+        'It is a real trade. Spending points lowers your XP, level and rank like any other spend, and the screen says so before you commit.',
+      ],
+    },
+    {
+      heading: 'Comments float up the side now',
+      items: [
+        'Classmates’ comments used to fly across the middle of the leaderboard, over the podium and everything else. They drift up one side instead, so you can read the board and the banter at the same time.',
+        'Longer comments get the room to be read, and there is a counter so you can see how much of your 120 characters is left before you run out.',
+      ],
+    },
+    {
+      heading: 'The board stops wobbling',
+      items: [
+        'The top three used to change width depending on how long the names were, so the podium reshaped itself every time the board settled. The three stands are fixed now, and roomier.',
+        'Picking a section is a proper full-width control rather than a squeezed box that cut every section name in half.',
+      ],
+    },
+    {
+      heading: 'A quick tour when you start',
+      items: [
+        'New here? A short, animated walkthrough shows the four things that matter: earning points, recording attendance, the leaderboard and spending what you earn.',
+        'It plays your first three times opening the app, so nothing slips past you. From the second time you can skip it.',
+      ],
+    },
+    {
+      heading: 'Attendance and scanning',
+      items: [
+        'Your attendance summary has a Prelim / Midterm / Finals switch, so you can see how one term actually went instead of only the whole semester.',
+        'The camera is in the middle of the screen when you scan, not tucked down by the button you just tapped.',
+        'Tap Show on any PIN box to check what you typed — a wrong character is the usual reason a sign-in fails, and there was no way to see it.',
+        'The app says “attendance recorded” now rather than “checked in”. You are in a class, not a hotel.',
+      ],
+    },
+  ],
+}
 // Newest first. Prepend a new entry for every user-facing change.
 export const CHANGELOG: ChangelogEntry[] = [
   {

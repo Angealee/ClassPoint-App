@@ -849,15 +849,15 @@ export async function listRecentEvents(limit = 20): Promise<EventSession[]> {
  * Everyone who checked in to an event (newest first) — the instructor's live
  * monitor list and the read-only review of a finished event.
  *
- * Goes through `get_event_attendees` (0057), a SECURITY DEFINER RPC that reads
+ * Goes through `get_event_attendees` (0066), a SECURITY DEFINER RPC that reads
  * the SAME rows get_event_stats counts, under the same RLS bypass — so the list
  * can never show fewer than the number (the 2026-09-21 "2 checked in, 1 shows"
  * bug, where a definer count disagreed with an RLS'd embed select). `limit` caps
  * it for the live monitor/feed; the review omits it for the full roster.
  *
- * Falls back to the pre-0057 embed select if the RPC isn't in the database yet,
+ * Falls back to the pre-0066 embed select if the RPC isn't in the database yet,
  * so the list keeps working during the paste window (it just carries the old
- * discrepancy until 0057 lands).
+ * discrepancy until 0066 lands).
  */
 export async function getEventAttendees(eventId: string, limit?: number): Promise<EventAttendee[]> {
   const { data, error } = await supabase.rpc('get_event_attendees', {
@@ -884,7 +884,7 @@ export async function getEventAttendees(eventId: string, limit?: number): Promis
       points: Number(r.points) || 0,
     }))
   }
-  // RPC missing (pre-0057) → the old embed select. Any other error rethrows.
+  // RPC missing (pre-0066) → the old embed select. Any other error rethrows.
   const code = (error as { code?: string }).code ?? ''
   if (!code.startsWith('PGRST2') && code !== '42883') throw error
   type EmbedRow = {

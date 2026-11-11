@@ -72,6 +72,7 @@ const MUST_BE_LINKED = [
   '/app/achievements',
   '/app/attendance/stats',
   '/app/settings',
+  '/app/grades',
   '/app/peer',
   '/app/spenders',
   // 0055 — the global event scan screen; linked from the "Event is starting"
@@ -86,6 +87,11 @@ const MUST_BE_LINKED = [
   '/teach/semesters',
   // 0055 — the global event console; linked from the Attendance tab header.
   '/teach/event',
+  // 0057 — grades. This one IS a bottom tab, unlike the rest of this list, and
+  // is here anyway: the nav array is an ordinary source file, so the literal
+  // satisfies the check, and it guards against the tab being dropped in a
+  // future nav rework while the screen stays in the router.
+  '/teach/grades',
 ]
 
 describe('route reachability', () => {

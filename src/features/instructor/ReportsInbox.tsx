@@ -101,6 +101,7 @@ export function ReportsInbox() {
     if (!item?.authorId) return
     setBusyKey(keyOf(item))
     try {
+      // eslint-disable-next-line react-hooks/purity -- runs from a click handler, never during render
       const until = new Date(Date.now() + hours * 3600_000)
       await timeoutStudent(item.authorId, until, `Reported ${item.context.toLowerCase()}`)
       toast(`${item.authorName ?? 'They'} are muted for ${hours}h.`, 'success')

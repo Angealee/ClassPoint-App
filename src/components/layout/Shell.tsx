@@ -6,6 +6,7 @@ import { Logo } from '@/components/ui/Logo'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { RouteFallback } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { tap } from '@/lib/motion'
 
 /**
  * The routed screen, with a subtle enter-only fade+rise on each navigation.
@@ -86,6 +87,7 @@ function NavBody({
   isActive,
   surface,
   reduce,
+  compact,
 }: {
   Icon: NavIcon
   label: string
@@ -94,6 +96,8 @@ function NavBody({
   isActive: boolean
   surface: 'sidebar' | 'tab'
   reduce: boolean | null
+  /** Icon rail: the label is hidden from sight but still announced. */
+  compact?: boolean
 }) {
   const sidebar = surface === 'sidebar'
   const glyph = (
@@ -124,20 +128,31 @@ function NavBody({
           className="relative"
           // Springy squish on tap — skipped for reduced-motion.
           whileTap={reduce ? undefined : { scale: 0.82 }}
-          transition={{ type: 'spring', stiffness: 600, damping: 20 }}
+          transition={tap}
         >
           {glyph}
         </motion.span>
       )}
-      {sidebar ? <span className="min-w-0 flex-1 truncate">{label}</span> : label}
-      {sidebar && badge}
+      {sidebar ? (
+        compact ? (
+          // Still announced, and still the accessible name of the link — the
+          // rail hides the label from sight, not from a screen reader.
+          <span className="sr-only">{label}</span>
+        ) : (
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+        )
+      ) : (
+        label
+      )}
+      {sidebar && !compact && badge}
     </>
   )
 }
 
-const sidebarClasses = (isActive: boolean) =>
+const sidebarClasses = (isActive: boolean, compact = false) =>
   cn(
-    'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+    'flex items-center rounded-xl text-sm font-medium transition-colors',
+    compact ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5',
     isActive ? 'bg-accent-solid/10 text-accent' : 'text-muted hover:bg-card-2 hover:text-ink',
   )
 
@@ -158,7 +173,7 @@ export function Shell({
   badge,
   actions,
   accountSlot,
-  wide = false,
+  width = 'reading',
 }: {
   /** The desktop sidebar's nav. Also the mobile tab bar's, unless `tabNav` overrides. */
   nav: NavItem[]
@@ -192,20 +207,33 @@ export function Shell({
    * ⚠ The mobile tab bar keeps `max-w-2xl` regardless — it is `md:hidden` and a
    * phone has no room to widen into.
    */
-  wide?: boolean
+  width?: 'reading' | 'wide' | 'full'
 }) {
   const reduce = useReducedMotion()
+  const wide = width !== 'reading'
+  const full = width === 'full'
   return (
     <div
       className={cn(
-        'flex min-h-[100dvh]',
-        wide
-          ? // `w-auto`, NOT `w-full`: with a left margin, `width: 100%` measures
-            // the FULL viewport and then gets pushed right by the margin, which
-            // overflowed the page by exactly that margin. Auto width lets the
-            // margin box fill what is left.
-            'ml-[max(0rem,calc((100%-72rem)/2))] mr-0 w-auto max-w-none'
-          : 'mx-auto w-full max-w-6xl',
+        'flex',
+        // `full` PINS the viewport height on desktop so a screen can hand its
+        // scrolling to one child — that is what lets the grade grid fill the
+        // window instead of being capped at a guessed fraction of it. Mobile
+        // keeps `min-h`, where the page scrolling normally and the by-item
+        // editor being a long list are both the right behaviour.
+        full ? 'min-h-[100dvh] md:h-[100dvh] md:overflow-hidden' : 'min-h-[100dvh]',
+        full
+          ? // No gutter at all: every pixel goes to the screen. Safe here and
+            // not for `wide` because the rail does not move when you navigate,
+            // so there is nothing for the old centred margin to stop jumping.
+            'w-full max-w-none'
+          : wide
+            ? // `w-auto`, NOT `w-full`: with a left margin, `width: 100%`
+              // measures the FULL viewport and then gets pushed right by the
+              // margin, which overflowed the page by exactly that margin. Auto
+              // width lets the margin box fill what is left.
+              'ml-[max(0rem,calc((100%-72rem)/2))] mr-0 w-auto max-w-none'
+            : 'mx-auto w-full max-w-6xl',
       )}
     >
       {/* Desktop sidebar.
@@ -213,11 +241,26 @@ export function Shell({
           pixel of slack beside its BETA chip (label box 97px, text 98px) and
           truncated to "Student Spa…". One pixel is not a margin — it fails on
           any font fallback or browser zoom. 256px leaves 15px. */}
-      <aside className="theme-transition sticky top-0 hidden h-[100dvh] w-64 shrink-0 flex-col border-r border-line bg-canvas/60 px-4 py-5 backdrop-blur-md md:flex">
-        <div className="flex items-center gap-2 px-2">
-          <Logo className="h-8 w-8" />
-          <span className="font-display text-lg font-bold tracking-tight">ClassPoint</span>
-          {badge}
+      <aside className={cn(
+          'theme-transition sticky top-0 hidden h-[100dvh] shrink-0 flex-col border-r border-line bg-canvas/60 py-5 backdrop-blur-md md:flex',
+          full ? 'w-16 px-2' : 'w-64 px-4',
+        )}>
+        {/* ⚠ In the icon rail (`full`) the sidebar is 64px wide, and this row used
+            to print the wordmark and the badge anyway — "ClassPoint" and the
+            "Instructor" pill overflowed the rail and painted straight over the
+            screen title beside it. The rail shows the mark alone; the words stay
+            in the DOM for a screen reader and as a tooltip. */}
+        <div
+          className={cn('flex items-center gap-2', full ? 'justify-center' : 'px-2')}
+          title={full ? 'ClassPoint' : undefined}
+        >
+          <Logo className="h-8 w-8 shrink-0" />
+          <span
+            className={cn('font-display text-lg font-bold tracking-tight', full && 'sr-only')}
+          >
+            ClassPoint
+          </span>
+          <span className={cn(full && 'sr-only')}>{badge}</span>
         </div>
 
         {/* The nav SCROLLS and the footer is pinned. Measured at 800x560 with the
@@ -235,7 +278,7 @@ export function Shell({
                 onClick={item.onClick}
                 aria-expanded={item.active}
                 aria-haspopup="menu"
-                className={cn(sidebarClasses(!!item.active), 'text-left')}
+                className={cn(sidebarClasses(!!item.active, full), 'text-left')}
               >
                 <NavBody
                   Icon={item.Icon}
@@ -244,6 +287,7 @@ export function Shell({
                   isActive={!!item.active}
                   surface="sidebar"
                   reduce={reduce}
+                  compact={full}
                 />
               </button>
             ) : (
@@ -251,7 +295,7 @@ export function Shell({
                 key={navKey(item)}
                 to={item.to}
                 end={item.end}
-                className={({ isActive }) => sidebarClasses(isActive)}
+                className={({ isActive }) => sidebarClasses(isActive, full)}
               >
                 {({ isActive }) => (
                   <NavBody
@@ -262,6 +306,7 @@ export function Shell({
                     isActive={isActive}
                     surface="sidebar"
                     reduce={reduce}
+                    compact={full}
                   />
                 )}
               </NavLink>
@@ -272,9 +317,18 @@ export function Shell({
         {/* Controls row first, then the account block flush to the bottom edge,
             so the menu expands UP into empty sidebar space and never into these. */}
         <div className="shrink-0 space-y-3 pt-3">
-          <div className="flex items-center justify-between px-1">
-            <ThemeToggle />
-            {actions}
+          <div className={cn('flex items-center', full ? 'flex-col gap-2' : 'justify-between px-1')}>
+            {/* The rail has 48px of usable width: the 64px pill overflowed it and
+                was cut off at the screen edge. A 40px pill keeps the knob
+                travelling. */}
+            <ThemeToggle className={full ? 'w-10' : undefined} />
+            {/* `actions` is a ROW of round buttons owned by the layout (about
+                170px wide). In the rail it has to be a column, and the layout's
+                own classes cannot be changed from here — so its direct child is
+                flipped with a variant selector, which outranks a plain `flex`. */}
+            <div className={cn(full && 'flex flex-col items-center [&>div]:flex-col')}>
+              {actions}
+            </div>
           </div>
           {accountSlot}
         </div>
@@ -283,12 +337,28 @@ export function Shell({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
         <header className="theme-transition sticky top-0 z-20 flex items-center justify-between border-b border-line bg-canvas/80 px-4 py-3 backdrop-blur-md md:hidden">
-          <div className="flex items-center gap-2">
-            <Logo className="h-7 w-7" />
-            <span className="font-display text-lg font-bold tracking-tight">ClassPoint</span>
-            {badge}
+          {/* ⚠ The instructor's header is the crowded one: the mark, the wordmark,
+              the "Instructor" badge, the theme switch AND four round buttons
+              (Requests, Peer, Ops, Sign out) came to about 440px against the
+              343 a 375px phone has. Nothing wrapped, so the right-hand buttons
+              were pushed past the screen edge — and `body { overflow-x: clip }`
+              hid the evidence, leaving Ops and Sign out simply unreachable.
+              When a badge is passed (only the instructor passes one) the words
+              wait until there is room for them; the student's header, which has
+              one small button, keeps its wordmark at every width. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <Logo className="h-7 w-7 shrink-0" />
+            <span
+              className={cn(
+                'font-display text-lg font-bold tracking-tight',
+                !!badge && 'hidden min-[480px]:inline',
+              )}
+            >
+              ClassPoint
+            </span>
+            {badge && <span className="hidden min-[480px]:contents">{badge}</span>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <ThemeToggle />
             {actions}
           </div>
@@ -306,6 +376,12 @@ export function Shell({
           className={cn(
             'flex-1 px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-8',
             wide && 'flex flex-col',
+            // `min-h-0` is what turns the pinned viewport height above into a
+            // real ceiling: a flex item defaults to `min-height: auto` and
+            // refuses to shrink below its content, so without it the column
+            // grows to the table and the child's `flex-1` means nothing — the
+            // exact reason an earlier attempt at this did not work.
+            full && 'md:min-h-0 md:overflow-hidden md:pb-6',
           )}
         >
           <div
@@ -314,6 +390,7 @@ export function Shell({
               wide
                 ? 'flex max-w-none flex-1 flex-col [&>.cp-route-in]:flex [&>.cp-route-in]:flex-1 [&>.cp-route-in]:flex-col'
                 : 'max-w-2xl',
+              full && 'md:min-h-0 [&>.cp-route-in]:md:min-h-0',
             )}
           >
             <Suspense fallback={<RouteFallback />}>

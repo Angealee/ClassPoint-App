@@ -55,10 +55,18 @@ export function Stat({
           {value}
         </span>
       </span>
-      <span className="truncate text-2xs font-medium uppercase tracking-wide text-muted">
+      {/* ⚠ `max-w-full` IS WHAT MAKES `truncate` WORK HERE, and without it the
+          truncation silently did nothing. `items-center` sizes a flex child to
+          its CONTENT, not to the parent, so the span simply grew: measured at
+          375px with a long label it rendered 422px wide and ran 153px off the
+          left edge of the screen. Nothing looked broken only because `body`
+          carries `overflow-x: clip`, which cropped it without a scrollbar.
+          `min-w-0` on the parent is not enough — that lets a child shrink, and
+          this child was never being asked to. */}
+      <span className="max-w-full truncate text-2xs font-medium uppercase tracking-wide text-muted">
         {label}
       </span>
-      {hint && <span className="truncate text-2xs text-muted">{hint}</span>}
+      {hint && <span className="max-w-full truncate text-2xs text-muted">{hint}</span>}
     </div>
   )
 }

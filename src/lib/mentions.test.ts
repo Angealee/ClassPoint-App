@@ -82,9 +82,10 @@ describe('mentionQuery', () => {
     expect(mentionQuery('koby@dct.edu.ph')).toBeNull()
   })
 
-  it('allows one space, so a two-word name keeps matching', () => {
+  it('allows up to two spaces, so three-word names keep matching', () => {
     expect(mentionQuery('@Maria S')?.query).toBe('Maria S')
-    expect(mentionQuery('@Maria Santos said hi')).toBeNull()
+    expect(mentionQuery('@Juan Dela C')?.query).toBe('Juan Dela C')
+    expect(mentionQuery('@Juan Dela Cruz said hi')).toBeNull()
   })
 
   it('closes on a second @ or a newline', () => {

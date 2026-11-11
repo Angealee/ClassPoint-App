@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { Input } from '@/components/ui/Input'
@@ -125,7 +126,7 @@ function EventSetup({
           maxLength={80}
         />
         <Input
-          label="Points per check-in"
+          label="Points per scan"
           type="number"
           inputMode="numeric"
           min={0}
@@ -222,7 +223,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
   const { toast } = useToast()
   const [payload, setPayload] = useState('')
   const [rotateIn, setRotateIn] = useState(QR_STEP_SECONDS)
-  const [nowMs, setNowMs] = useState(Date.now())
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const [stats, setStats] = useState<EventStats | null>(null)
   const [attendees, setAttendees] = useState<EventAttendee[]>([])
   const [attLoaded, setAttLoaded] = useState(false)
@@ -325,9 +326,9 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
 
   return (
     <div className="space-y-5">
-      <PageHeader title={event.name} subtitle="Live event check-in" fallback="/teach/attendance" />
+      <PageHeader title={event.name} subtitle="Live event attendance" fallback="/teach/attendance" />
 
-      <Card pad="roomy" className="relative flex flex-col items-center gap-3">
+      <Card pad="roomy" elevation="raised" className="relative flex flex-col items-center gap-3">
         <IconButton
           label="Present QR fullscreen"
           variant="outline"
@@ -340,7 +341,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
           {payload ? (
             <QrCode value={payload} size={232} />
           ) : (
-            <div className="h-[232px] w-[232px] animate-pulse rounded-xl bg-card-2" />
+            <Skeleton className="h-[232px] w-[232px] rounded-xl" />
           )}
         </div>
         <div className="w-full max-w-[248px]">
@@ -363,7 +364,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
         <p className="font-display text-5xl font-bold tabular-nums text-reward">
           {stats?.total ?? 0}
         </p>
-        <p className="text-xs text-muted">checked in</p>
+        <p className="text-xs text-muted">recorded</p>
       </Card>
 
       {/* Per-section turnout */}
@@ -430,16 +431,13 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
             >
               <div className="text-center">
                 <p className="font-display text-2xl font-bold">{event.name}</p>
-                <p className="text-sm text-muted">Scan to check in</p>
+                <p className="text-sm text-muted">Scan to record attendance</p>
               </div>
               <div className="rounded-3xl bg-white p-5 shadow-lg">
                 {payload ? (
                   <QrCode value={payload} size={bigSize} />
                 ) : (
-                  <div
-                    className="animate-pulse rounded-xl bg-card-2"
-                    style={{ height: bigSize, width: bigSize }}
-                  />
+                  <Skeleton className="rounded-xl" style={{ height: bigSize, width: bigSize }} />
                 )}
               </div>
               <div className="text-center">
@@ -447,7 +445,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
                   {stats?.total ?? 0}
                 </p>
                 <p className="text-sm text-muted">
-                  checked in · code refreshes in <span className="tabular-nums">{rotateIn}s</span>
+                  recorded · code refreshes in <span className="tabular-nums">{rotateIn}s</span>
                   {event.pointsPerScan > 0 ? ` · +${event.pointsPerScan} pts each` : ''}
                 </p>
               </div>
@@ -473,7 +471,7 @@ function EventMonitor({ event, onEnded }: { event: EventSession; onEnded: () => 
       <ConfirmDialog
         open={confirmEnd}
         title="End this event?"
-        message="Students can no longer check in. Points already earned stay. This can't be undone."
+        message="Students can no longer record attendance. Points already earned stay. This can't be undone."
         confirmLabel="End event"
         variant="danger"
         onConfirm={() => void onEnd()}
@@ -517,7 +515,7 @@ function PresentFeed({
           <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-reward-solid" />
         </span>
         <p className="font-display text-lg font-bold">
-          Checked in <span className="tabular-nums text-reward">{total}</span>
+          Recorded <span className="tabular-nums text-reward">{total}</span>
         </p>
       </div>
 
@@ -525,7 +523,7 @@ function PresentFeed({
         {loaded && ordered.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted">
             <BoltIcon className="h-8 w-8 text-reward/60" />
-            <p className="text-sm">Waiting for the first check-in…</p>
+            <p className="text-sm">Waiting for the first scan…</p>
           </div>
         ) : (
           <AnimatePresence initial={false}>
@@ -580,7 +578,7 @@ function AttendeeListView({
   return (
     <div>
       <p className="mb-2 px-1 text-sm font-semibold text-muted">
-        Checked in{n > 0 ? ` · ${n}` : ''}
+        Recorded{n > 0 ? ` · ${n}` : ''}
       </p>
       <Card pad="none" className="divide-y divide-line">
         {!loaded ? (
@@ -671,7 +669,7 @@ function EventReview({ event, onBack }: { event: EventSession; onBack: () => voi
           {stats?.total ?? 0}
         </p>
         <p className="text-xs text-muted">
-          checked in{event.pointsPerScan > 0 ? ` · +${event.pointsPerScan} pts each` : ''}
+          recorded{event.pointsPerScan > 0 ? ` · +${event.pointsPerScan} pts each` : ''}
         </p>
       </Card>
 
@@ -699,7 +697,7 @@ function EventReview({ event, onBack }: { event: EventSession; onBack: () => voi
 
       <AttendeeList eventId={event.id} />
 
-      {stats?.total === 0 && <EmptyState>Nobody checked in to this event.</EmptyState>}
+      {stats?.total === 0 && <EmptyState>Nobody attended this event.</EmptyState>}
     </div>
   )
 }
@@ -789,7 +787,7 @@ function ManualAddSheet({
           {loadingRoster ? (
             <p className="p-6 text-center text-sm text-muted">Loading…</p>
           ) : visible.length === 0 ? (
-            <p className="p-6 text-center text-sm text-muted">No students match.</p>
+            <EmptyState compact>No students match.</EmptyState>
           ) : (
             visible.map((p) => (
               <button

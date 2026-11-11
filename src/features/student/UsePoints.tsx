@@ -1,8 +1,10 @@
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { GradeColumns } from '@/components/points/GradeColumns'
 import { motion } from 'framer-motion'
+import { settle } from '@/lib/motion'
 import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -52,6 +54,8 @@ const STATUS_META: Record<RedemptionStatus, { label: string; cls: string }> = {
   approved: { label: 'Approved', cls: TONE.success.chip },
   rejected: { label: 'Declined', cls: TONE.danger.chip },
   cancelled: { label: 'Cancelled', cls: TONE.neutral.chip },
+  // 0062 — an approved grade boost the instructor undid. The points came back.
+  reversed: { label: 'Reversed', cls: TONE.neutral.chip },
 }
 
 function errorText(e: unknown, fallback: string): string {
@@ -62,6 +66,9 @@ function errorText(e: unknown, fallback: string): string {
 /** Put your class points toward a grade — request, instructor decides. */
 export function UsePoints() {
   const navigate = useNavigate()
+  // ?column=<id> — the grade column the student came from on /app/grades.
+  const [params] = useSearchParams()
+  const highlightId = params.get('column')
   const { me, refresh } = useStudentData()
   const { toast } = useToast()
   const studentId = me?.id
@@ -187,7 +194,7 @@ export function UsePoints() {
     <div className="space-y-4 pb-4">
       <PageHeader
         title="Use points"
-        subtitle="Put your points toward a quiz or activity grade."
+        subtitle="Choose where your points go."
         fallback="/app"
         actions={
           // The permanent entry to the full ledger. It belongs on the points
@@ -204,7 +211,7 @@ export function UsePoints() {
       />
 
       {/* Balance + the spent gauge */}
-      <Card className="p-5">
+      <Card elevation="raised" className="p-5">
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="text-xs text-muted">Available to spend</p>
@@ -244,7 +251,7 @@ export function UsePoints() {
               className="h-full rounded-full bg-gradient-to-r from-gold-600 via-gold-500 to-gold-300"
               initial={{ width: 0 }}
               animate={{ width: `${gaugePct}%` }}
-              transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+              transition={settle}
             />
           </div>
           <p className="mt-1.5 text-xs text-muted">
@@ -270,11 +277,26 @@ export function UsePoints() {
         )}
       </Card>
 
+      {/* THE MAIN SCREEN: the student's own grade columns, and where their points
+          can go. Boostable ones first; the rest one collapsed list that says why.
+          Spending a boost is requested HERE and nowhere else — /app/grades only
+          links in. */}
+      <GradeColumns
+        available={available}
+        tooMany={tooMany}
+        highlightId={highlightId}
+        onRequested={() => void load()}
+      />
+
+      {/* Everything below is for what is NOT one of your grade columns: the
+          instructor's price list, and a free-form request. Unchanged on the server. */}
+      <SectionLabel>Something else</SectionLabel>
+
       {/* The shop (0032). Without a price list a student has no way to know what
           10 points is worth — this is the whole point of the catalog. */}
       {catalog.length > 0 && (
         <div>
-          <SectionLabel>What you can get</SectionLabel>
+          <p className="mb-2 px-1 text-xs text-muted">What you can get</p>
           <div className="grid grid-cols-2 gap-3">
             {catalog.map((item) => {
               const affordable = item.points <= available
@@ -326,7 +348,7 @@ export function UsePoints() {
           </span>
           <div>
             <p className="font-display font-bold">
-              {catalog.length > 0 ? 'Something else' : 'New request'}
+              {catalog.length > 0 ? 'Something not listed' : 'New request'}
             </p>
             <p className="text-xs text-muted">Up to {MAX_REDEEM_POINTS} points at a time.</p>
           </div>
@@ -357,7 +379,7 @@ export function UsePoints() {
                 type="button"
                 onClick={() => setKind(k.value)}
                 className={cn(
-                  'h-9 rounded-lg text-sm font-semibold transition-colors',
+                  'cp-tap-y h-9 rounded-lg text-sm font-semibold transition-colors',
                   kind === k.value
                     ? 'bg-accent-solid text-white'
                     : 'bg-card-2 text-muted hover:text-ink',

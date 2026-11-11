@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/cn'
+import { snap } from '@/lib/motion'
 
 /** Sun/moon theme switch with a sliding knob. */
 export function ThemeToggle({ className }: { className?: string }) {
@@ -14,14 +15,14 @@ export function ThemeToggle({ className }: { className?: string }) {
       aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
       aria-pressed={isDark}
       className={cn(
-        'relative inline-flex h-9 w-16 items-center rounded-full border border-line',
+        'cp-tap-y inline-flex h-9 w-16 items-center rounded-full border border-line',
         'bg-card-2 px-1 transition-colors',
         className,
       )}
     >
       <motion.span
         layout
-        transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+        transition={snap}
         className={cn(
           'flex h-7 w-7 items-center justify-center rounded-full text-sm shadow-sm',
           isDark ? 'ml-auto bg-accent-solid text-white' : 'mr-auto bg-gold-400 text-brand-950',

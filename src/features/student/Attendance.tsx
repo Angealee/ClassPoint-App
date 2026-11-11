@@ -2,13 +2,16 @@ import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { pop } from '@/lib/motion'
 import { Card, Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { Sheet } from '@/components/ui/Sheet'
+import { Spinner } from '@/components/ui/Spinner'
+import { ScreenTitle } from '@/components/ui/ScreenTitle'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ScanIcon, CheckIcon, WarningIcon } from '@/components/ui/icons'
-import { QrScanner } from '@/components/attendance/QrScanner'
+import { ScanStage } from '@/components/attendance/ScanStage'
 import { StudentEventHistory } from '@/components/attendance/StudentEventHistory'
 import { StatusChip, STATUS_META } from '@/components/attendance/StatusChip'
 import { useStudentData } from '@/features/student/StudentData'
@@ -23,7 +26,8 @@ import {
   syncOfflineScans,
   type OfflineScanEntry,
 } from '@/lib/offline-scans'
-import { groupByTerm } from '@/lib/term'
+import { groupByTerm, termLabel, termOf, termRanges, type TermName } from '@/lib/term'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { rateTone, tally } from '@/lib/attendance'
 import { TONE } from '@/lib/tone'
 import { OfflineScanCards } from './OfflineScanCards'
@@ -32,6 +36,14 @@ import { LiveClassBanner } from './LiveClassBanner'
 import { SemesterEndedBanner } from './SemesterEndedBanner'
 import { StreakFlame } from './StreakFlame'
 import type { MyAttendanceEntry, ScanResult } from '@/lib/types'
+
+/**
+ * What the summary card is scoped to: one term, or the whole semester.
+ *
+ * `'all'` rather than `null` so it can be a `SegmentedControl` value — that
+ * primitive is a real radiogroup and every option needs a string.
+ */
+type TermScope = TermName | 'all'
 
 const entryDate = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''
@@ -43,7 +55,7 @@ const clockTime = (iso: string) =>
 function errorText(e: unknown): string {
   const m = (e as { message?: string } | null)?.message
   if (m && m.length <= 160) return m
-  return 'Could not check in — scan the current QR and try again.'
+  return 'Could not record your attendance — scan the current QR and try again.'
 }
 
 /**
@@ -197,17 +209,50 @@ export function Attendance() {
     [syncMyAchievements, refreshQueue],
   )
 
-  const stats = useMemo(() => tally(history), [history])
+  /**
+   * Which slice of the semester the summary card is reporting on.
+   *
+   * `all` is the default, so a student who never touches the control sees
+   * exactly what this card has always shown.
+   */
+  const [scope, setScope] = useState<TermScope>('all')
+
+  /**
+   * Only the terms that actually exist AND have classes in them.
+   *
+   * `termRanges()` reads the instructor's stored dates (0027) — this is its
+   * first real caller; until now it was exercised only by its own test. The
+   * `has` filter matters at the start of a semester: offering Midterm and
+   * Finals tabs in week two gives a student two ways to be told "nothing yet",
+   * and three empty tabs is a worse answer than one.
+   */
+  const scopeOptions = useMemo(() => {
+    const seen = new Set(history.map((h) => termOf(h.startedAt)).filter(Boolean))
+    const terms = termRanges()
+      .filter((r) => seen.has(r.term))
+      .map((r) => ({ value: r.term as TermScope, label: termLabel(r.term) }))
+    // One term's worth of classes makes the picker a label, not a choice.
+    return terms.length > 1 ? [{ value: 'all' as TermScope, label: 'Overall' }, ...terms] : []
+  }, [history])
+
+  /**
+   * The card's rows. THE WHOLE CARD follows the scope — counts and rate alike
+   * (the instructor's call): the card is one answer to "how was my Midterm?",
+   * and three lifetime counts above a per-term percentage would be two scopes
+   * stacked in one box.
+   */
+  const scoped = useMemo(
+    () => (scope === 'all' ? history : history.filter((h) => termOf(h.startedAt) === scope)),
+    [history, scope],
+  )
+  const stats = useMemo(() => tally(scoped), [scoped])
 
   return (
     // Pull-to-refresh: this is the screen where a student most wants to force a
     // re-check ("did my check-in actually land?").
     <PullToRefresh onRefresh={load}>
     <div className="space-y-5">
-      <div>
-        <h1 className="font-display text-xl font-bold">Attendance</h1>
-        <p className="text-sm text-muted">Scan your instructor’s QR to check in.</p>
-      </div>
+      <ScreenTitle title="Attendance" subtitle="Scan your instructor’s QR to record your attendance." />
 
       {/* Read-only, because their semester is over (0035). */}
       <SemesterEndedBanner />
@@ -244,7 +289,27 @@ export function Attendance() {
           figure. It's still here (it's the number that matters for a grade) but
           as a calm footer line: the counts are what you act on. */}
       {history.length > 0 && (
-        <Card className="p-0">
+        <Card elevation="raised" className="p-0">
+          {/* Which term. QUIET, not accent: the primary action on this screen
+              is the Scan button above, and a second filled strip in the same
+              column reads as a competing control — the exact misreading
+              `tone="quiet"` was added for on the grade sheet.
+              Rendered only when there is more than one term to choose between
+              (see `scopeOptions`), so it does not appear in week two offering
+              two ways to see nothing. */}
+          {scopeOptions.length > 0 && (
+            <div className="border-b border-line p-3">
+              <SegmentedControl
+                label="Which term"
+                tone="quiet"
+                size="sm"
+                value={scope}
+                onChange={setScope}
+                options={scopeOptions}
+              />
+            </div>
+          )}
+
           <div className="grid grid-cols-3 divide-x divide-line">
             {(['present', 'late', 'absent'] as const).map((k) => (
               <div key={k} className="flex flex-col items-center justify-center py-4">
@@ -268,7 +333,7 @@ export function Attendance() {
             onClick={() => navigate('/app/attendance/stats')}
             className="flex w-full items-baseline justify-between border-t border-line px-4 py-3 text-left transition-colors hover:bg-card-2"
           >
-            <span className="text-sm text-muted">Show-up rate</span>
+            <span className="text-sm text-muted">Attendance rate</span>
             <span className="flex items-baseline gap-1.5">
               <span
                 className={cn(
@@ -276,7 +341,12 @@ export function Attendance() {
                   TONE[rateTone(stats.rate)].text,
                 )}
               >
-                {stats.rate}%
+                {/* A term with nothing counted yet has no rate, and `rateOf`
+                    answers 0 there — which on this screen reads as "you
+                    attended none of them". A dash is the honest answer, and
+                    it matches what the grade sheet does for an unmarked
+                    component. */}
+                {stats.counted === 0 ? <span className="text-muted/50">—</span> : `${stats.rate}%`}
               </span>
               <span className="text-sm font-semibold text-accent">Stats ›</span>
             </span>
@@ -301,7 +371,7 @@ export function Attendance() {
           Couldn’t load your attendance.
         </ErrorState>
       ) : history.length === 0 ? (
-        <EmptyState>No classes yet. When your instructor starts a class, scan the QR to check in.</EmptyState>
+        <EmptyState>No classes yet. When your instructor starts a class, scan the QR to record your attendance.</EmptyState>
       ) : (
         /* Grouped by term (0027 dates, now configured for the student area
            too). The changelog promised this; until Phase F the history was one
@@ -335,7 +405,7 @@ export function Attendance() {
                           .join(' · ')}
                         {h.syncedLate && (
                           <span className="rounded-full bg-card-2 px-2 py-0.5 text-xs font-medium">
-                            Offline check-in
+                            Recorded offline
                           </span>
                         )}
                       </p>
@@ -354,12 +424,18 @@ export function Attendance() {
           attendance). Renders nothing when the student has no events. */}
       {me && <StudentEventHistory studentId={me.id} />}
 
-      {/* Scan sheet */}
-      <Sheet open={scanOpen} onClose={closeScan} title="Scan attendance">
+      {/* Scan sheet.
+          `variant="screen"`, not the default bottom sheet: a camera belongs in
+          the middle of the screen, and a sheet that rises from the bottom edge
+          put the viewfinder in the bottom third, right above the button that
+          opened it. The screen variant brings its own sticky back bar, which is
+          why ScanStage needs no footer here. Additive, so the other ~21 sheets
+          in the app are untouched. */}
+      <Sheet open={scanOpen} onClose={closeScan} variant="screen" title="Scan attendance">
         {submitting ? (
           <div className="flex flex-col items-center gap-3 py-10 text-sm text-muted">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-accent-solid" />
-            Checking you in…
+            <Spinner className="h-8 w-8" />
+            Recording your attendance…
           </div>
         ) : result ? (
           <ResultView result={result} onDone={closeScan} />
@@ -368,13 +444,13 @@ export function Attendance() {
             <motion.div
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+              transition={pop}
               className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-success-solid/12 text-success"
             >
               <CheckIcon className="h-10 w-10" />
             </motion.div>
             <div className="space-y-1">
-              <p className="font-display text-xl font-bold">Saved — you're checked in</p>
+              <p className="font-display text-xl font-bold">Saved — your attendance is recorded</p>
               <p className="mx-auto max-w-xs text-sm text-muted">
                 You scanned at {savedOffline}. It'll sync automatically when you're back online —
                 and your status counts from when you scanned, not when it syncs.
@@ -400,12 +476,11 @@ export function Attendance() {
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            <QrScanner key={scanKey} onDetect={onDetect} />
-            <p className="text-center text-xs text-muted">
-              Center the QR your instructor is showing inside the frame.
-            </p>
-          </div>
+          <ScanStage
+            scanKey={scanKey}
+            onDetect={onDetect}
+            caption="Point your camera at the QR your instructor is showing."
+          />
         )}
       </Sheet>
     </div>
@@ -417,16 +492,16 @@ function ResultView({ result, onDone }: { result: ScanResult; onDone: () => void
   const meta = STATUS_META[result.status]
   const headline =
     result.status === 'present'
-      ? 'You’re checked in!'
+      ? 'Attendance recorded'
       : result.status === 'late'
-        ? 'Checked in — a bit late'
+        ? 'Recorded — a bit late'
         : 'Marked absent'
   return (
     <div className="space-y-5 py-2 text-center">
       <motion.div
         initial={{ scale: 0.5, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+        transition={pop}
         className={cn('mx-auto flex h-20 w-20 items-center justify-center rounded-full', meta.chip)}
       >
         <CheckIcon className="h-10 w-10" />

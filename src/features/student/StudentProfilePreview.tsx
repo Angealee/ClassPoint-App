@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Sheet } from '@/components/ui/Sheet'
 import { CoverPhoto } from '@/components/profile/CoverPhoto'
 import { Avatar } from '@/components/ui/Avatar'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { XpBar } from '@/components/ui/XpBar'
 import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
 import { ProfileBanner } from '@/components/profile/ProfileBanner'
@@ -241,7 +242,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
             <div>
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">About</p>
               {loading && !profile ? (
-                <div className="h-12 animate-pulse rounded-xl bg-card-2" />
+                <Skeleton className="h-12 rounded-xl" />
               ) : (
                 <p className="rounded-xl bg-card-2 px-4 py-3 text-sm leading-relaxed text-ink">
                   {profile?.bio}
@@ -272,7 +273,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
             ) : loading && !profile ? (
               <div className="space-y-2">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-14 animate-pulse rounded-xl bg-card-2" />
+                  <Skeleton key={i} className="h-14 rounded-xl" />
                 ))}
               </div>
             ) : profile && profile.events.length > 0 ? (

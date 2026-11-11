@@ -104,3 +104,17 @@ export async function fetchAllPages<T>(
     if (rows.length < PAGE) return out
   }
 }
+
+/**
+ * Coerce a PostgREST `numeric` to a number.
+ *
+ * ⚠ Postgres sends `numeric` over the wire as a STRING, to preserve precision
+ * that JSON's double cannot. It is easy to miss because the arithmetic still
+ * works — `'48.25' * 1` is 48.25 — and the first thing that actually breaks is
+ * `.toFixed()`, usually in a render, a long way from the query.
+ */
+export function num(v: number | string | null | undefined): number | null {
+  if (v === null || v === undefined) return null
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}

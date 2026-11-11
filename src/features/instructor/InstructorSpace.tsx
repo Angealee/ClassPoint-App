@@ -6,6 +6,7 @@ import { SectionLabel } from '@/components/ui/SectionLabel'
 import { ErrorState, EmptyState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Toggle } from '@/components/ui/Toggle'
 import { useToast } from '@/components/ui/Toast'
 import { AstronautArt } from '@/components/space/AstronautArt'
 import { EventComposer } from './EventComposer'
@@ -20,7 +21,6 @@ import {
 } from '@/lib/api'
 import { errorText } from '@/lib/errors'
 import type { SpaceAdminSection, SpaceTimeout } from '@/lib/types'
-import { cn } from '@/lib/cn'
 
 /**
  * `/teach/space` — the Student Space control room.
@@ -34,41 +34,6 @@ import { cn } from '@/lib/cn'
  * report queue to /teach/redemptions. The timeout list is here now because the
  * enforcement it drives ships in 0041.
  */
-
-/** The pill-shaped on/off used by both gates. Not a native checkbox: it needs a busy state. */
-function Toggle({
-  on,
-  busy,
-  onChange,
-  label,
-}: {
-  on: boolean
-  busy?: boolean
-  onChange: (next: boolean) => void
-  label: string
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      disabled={busy}
-      onClick={() => onChange(!on)}
-      className={cn(
-        'relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50',
-        on ? 'bg-success-solid' : 'bg-card-2 ring-1 ring-line',
-      )}
-    >
-      <span
-        className={cn(
-          'absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-[left]',
-          on ? 'left-6' : 'left-1',
-        )}
-      />
-    </button>
-  )
-}
 
 export function InstructorSpace() {
   const { toast } = useToast()

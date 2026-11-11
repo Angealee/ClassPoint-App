@@ -233,6 +233,16 @@ export function KeyIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+/** A padlock — something that exists but is not open yet. */
+export function LockIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="5" y="11" width="14" height="9.5" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  )
+}
+
 export function TicketIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>
@@ -436,6 +446,22 @@ export function ClipboardIcon(props: SVGProps<SVGSVGElement>) {
       <path d="M9 4h6v3H9z" />
       <path d="M9 5.5H6.5A1.5 1.5 0 0 0 5 7v12.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V7a1.5 1.5 0 0 0-1.5-1.5H15" />
       <path d="m9 13.5 2 2 4-4" />
+    </svg>
+  )
+}
+
+/**
+ * A grade sheet: a table with its header row and name column picked out.
+ *
+ * Stroked like every other icon here. The two interior lines are the frozen
+ * header and name column the grid itself has, so the glyph says "spreadsheet"
+ * rather than "generic grid".
+ */
+export function TableIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18M9 9v11" />
     </svg>
   )
 }

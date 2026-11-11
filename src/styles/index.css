@@ -51,6 +51,27 @@
   --color-plate: #14141c;
   --color-plate-2: #1e1e2b;
 
+  /* RADIUS LADDER. These override Tailwind's own values for the SAME utility
+     names, which is the whole trick: all 275 existing rounded-lg/xl/2xl sites
+     pick the new geometry up with no call site edited, and tailwind-merge keeps
+     working because no new class name is introduced.
+
+     Inventing a name here instead (rounded-card, say) would be silently broken:
+     cn() is bare twMerge with no extendTailwindMerge, so it classifies an
+     unknown word after rounded- as a COLOUR and drops the size. See cn.ts.
+
+       lg  10px  inline chips, small controls
+       xl  14px  buttons, inputs, selects, segmented controls
+       2xl 18px  cards, the shared surface
+       3xl 24px  sheets and the hero (unchanged from Tailwind's default)
+
+     rounded-full is not a token (it compiles to an effectively infinite radius)
+     and is therefore untouched by any of this. */
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
+  --radius-3xl: 1.5rem;
+
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
@@ -119,6 +140,46 @@
   --reward-solid: #ffba1f;
   --accent-solid: #e11d2a;
 
+  /* ── MATERIAL: elevation, lit edge, texture ──────────────────────────────
+     The two themes carry depth by DIFFERENT means, and that is measured rather
+     than stylistic. In light mode a card is #ffffff on a #f3f3f6 canvas, so a
+     shadow has something to darken and a white top highlight would be
+     invisible. In dark mode the reverse is true: canvas to card is only
+     ΔL* 6.3 and a black shadow on #08080b has almost nothing to darken, which
+     is exactly why 41 shadow utilities across the whole app never added up to
+     an elevation language.
+
+     So: light leans on --elev-shadow-*, dark leans on --lit. Both tokens exist
+     in both themes so a component never has to branch. */
+  --elev-shadow-1: 0 1px 2px rgb(16 16 24 / 0.06);
+  --elev-shadow-2: 0 2px 4px rgb(16 16 24 / 0.07), 0 8px 16px -4px rgb(16 16 24 / 0.08);
+  --elev-shadow-3: 0 4px 8px rgb(16 16 24 / 0.08), 0 16px 32px -8px rgb(16 16 24 / 0.12);
+
+  /* Transparent in light on purpose: a white hairline on a white card is not a
+     subtle effect, it is no effect, and shipping one would just be a pseudo
+     element painted for nothing on every surface. */
+  --lit: transparent;
+  --lit-wash: transparent;
+
+  --grid-dot: rgb(16 16 24 / 0.07);
+  --grain-opacity: 0.02;
+
+  /* ── Z LADDER ────────────────────────────────────────────────────────────
+     Documented so the next overlay does not pick another number out of the air.
+     These match what the app already does (Shell 20, Sheet 40, Toast 50,
+     SuccessTick 60, AuthTransition 100); only --z-grain is new.
+     The 20 remaining arbitrary z-[...] sites are deliberately NOT swept here:
+     most sit on authenticated screens that cannot be verified in this
+     environment, and a wrong z-index is invisible until it is catastrophic.
+     They are migrated per screen, where each one can actually be looked at. */
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-sheet: 40;
+  --z-toast: 50;
+  --z-burst: 60;
+  --z-transition: 100;
+  --z-grain: 200;
+
   /* ⚠ Never write a Tailwind glob with a star inside a CSS comment here. The
      star-slash sequence closes the comment EARLY and silently swallows the
      declarations that follow it — doing exactly that once gutted this whole
@@ -157,6 +218,23 @@
   --streak: #fb923c;
   --reward: #ffba1f;
   --accent: #f76a72;
+
+  /* Darker and further than the light values: on a near-black canvas a shadow
+     has to work harder to register at all. */
+  --elev-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --elev-shadow-2: 0 2px 6px rgb(0 0 0 / 0.45), 0 10px 20px -6px rgb(0 0 0 / 0.5);
+  --elev-shadow-3: 0 4px 10px rgb(0 0 0 / 0.5), 0 20px 40px -10px rgb(0 0 0 / 0.6);
+
+  /* The lit edge IS dark-mode elevation. A 1px highlight where a real surface
+     would catch light reads as a raised object far more reliably than a shadow
+     that has nothing to darken. */
+  --lit: rgb(255 255 255 / 0.10);
+  --lit-wash: rgb(255 255 255 / 0.045);
+
+  --grid-dot: rgb(255 255 255 / 0.055);
+  /* Higher than light mode: noise is far more visible on white, where the same
+     value reads as dirt rather than texture. */
+  --grain-opacity: 0.035;
 }
 
 @theme inline {
@@ -219,6 +297,27 @@
      * guarantees is that the NEXT one cannot crop a student's screen.
      */
     overflow-x: clip;
+    /*
+     * A long unbreakable string must wrap rather than escape its card.
+     * Measured at 375px: a 90-character token in an ordinary <p> inside a
+     * Card overflowed that card by 444px and took the document scroll width
+     * 406px past the viewport - text running out of the card and under the
+     * screen edge, with the clip above merely hiding where it went. The
+     * default is overflow-wrap: normal, which breaks at spaces only, and just
+     * 14 call sites (lounge posts, chat messages, reports) already carry
+     * break-words of their own.
+     *
+     * break-word, NOT anywhere: it breaks a word only when that word would
+     * otherwise overflow, so nothing that already fits is re-wrapped and no
+     * short word is ever chopped. It also cannot disturb truncate, which is
+     * white-space: nowrap - wrapping rules never apply to a line that does
+     * not wrap. The per-site [overflow-wrap:anywhere] on chat links stays: a
+     * URL has to break mid-token, which is stronger than this backstop.
+     *
+     * Same discipline as the clip above: the backstop, not the fix. A string
+     * that needs breaking is usually one that wanted truncate.
+     */
+    overflow-wrap: break-word;
   }
 
   h1, h2, h3, h4, .font-display {
@@ -235,6 +334,187 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+}
+
+/* ── TOUCH TARGETS ─────────────────────────────────────────────────────────
+ *
+ * Two invisible tap regions. Both keep the control's VISUAL size and grow only
+ * the thumb target, so neither moves a single pixel of layout — making every
+ * small control bigger was considered and rejected when `IconButton` was
+ * built, because it thickens every header and roster row.
+ *
+ * There are two because small controls come in two shapes and one rule serves
+ * neither well:
+ *
+ *   `.cp-tap-44` — a centred 44×44 box, for SQUARE icon-shaped controls.
+ *   `.cp-tap-y`  — 44px tall across the element's own width, for WIDE controls
+ *                  (a labelled button, a segmented tab, a switch). HEIGHT ONLY:
+ *                  these are already wider than 44px, so expanding sideways
+ *                  would reach into a horizontal neighbour and buy nothing.
+ *
+ * ⚠ THE ADJACENCY RULE DECIDES DATA CORRECTNESS HERE, NOT COMFORT.
+ * Two expanded regions overlap when their centres are closer than 44px, and in
+ * the overlap the LATER element in DOM order wins — so a tap near the seam
+ * activates the wrong control. For `.cp-tap-44`, a row of 36px buttons needs at
+ * least `gap-2` (36 + 8 = 44, exactly touching, never overlapping) and 32px
+ * needs `gap-3`. For `.cp-tap-y` only VERTICAL neighbours can collide, so a
+ * stack of 36px controls needs `gap-2`.
+ *
+ * A group tighter than that must NOT take these classes. The live-attendance
+ * status squares and the award bar's point chips sit at `gap-1` and are
+ * deliberately left small: there, an overlapping region does not mis-tap a
+ * button, it marks the wrong student or awards the wrong number of points.
+ */
+/* ⚠ `@layer components`, AND IT HAS TO BE — this rule was UNLAYERED and that
+   was a real, shipped bug.
+
+   Per the CSS cascade, UNLAYERED styles beat every layered style regardless of
+   specificity or source order. `@import 'tailwindcss'` puts `.absolute` in the
+   `utilities` layer, so an unlayered `position: relative` here silently won
+   against it: any element carrying BOTH `cp-tap-*` and `absolute` was pinned
+   to `position: relative` and fell back into the document flow.
+   Exactly one call site did that — `Input`'s password reveal control — and it
+   therefore rendered BELOW the field, left-aligned, pushing the field's
+   wrapper from 44px to 76px, on all four auth screens. (Measured: the button
+   sat at x=8 with `position: relative` where it should have been at x≈303.)
+   It is also why the Era 7.0 verification missed it: the check was
+   `button.right <= field.right`, which passes vacuously for a button sitting
+   at the LEFT of the field.
+
+   In `components` the rule still gives every ordinary icon button its
+   positioning context, while a `utilities` class — which is what a call site
+   reaches for when it needs something else — now wins, as it always should
+   have. The pseudo-elements below stay unlayered: nothing competes for
+   `::before` on these, and layering them would be change for its own sake. */
+@layer components {
+  .cp-tap-44,
+  .cp-tap-y {
+    position: relative;
+  }
+}
+
+/* The pseudo-element is a child of the control, so a tap on it is a tap on the
+   control. `disabled:pointer-events-none` at the call sites covers it too. */
+.cp-tap-44::before,
+.cp-tap-y::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  height: 2.75rem;
+}
+
+.cp-tap-44::before {
+  left: 50%;
+  width: 2.75rem;
+  transform: translate(-50%, -50%);
+}
+
+.cp-tap-y::before {
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+}
+
+/* ── MATERIAL SURFACES ──────────────────────────────────────────────────────
+ *
+ * Three utilities, all STATIC PAINT. Nothing here animates, nothing here runs a
+ * filter, and nothing here costs a frame once drawn. That is deliberate: the
+ * app already runs several permanent CSS loops and three permanently mounted
+ * backdrop-filter layers in Shell, and perceived depth is much cheaper to buy
+ * with a correctly placed gradient than with another blurred layer.
+ */
+
+/* Elevation. One class, one shadow.
+ *
+ * ⚠ DO NOT STACK THESE. twMerge does not recognise cp-* names, so it passes
+ * both through and CSS source order decides the winner rather than the author,
+ * which is the same class of bug the plain-join cn() used to cause app-wide.
+ * A component must emit exactly one. */
+.cp-elev-1 { box-shadow: var(--elev-shadow-1); }
+.cp-elev-2 { box-shadow: var(--elev-shadow-2); }
+.cp-elev-3 { box-shadow: var(--elev-shadow-3); }
+
+/* The lit edge: a 1px highlight along the top of a surface, plus a very soft
+ * wash below it, as if the surface were catching light from above.
+ *
+ * border-radius: inherit is what makes this work on a rounded card. The pseudo
+ * element takes the parent's own radius, so the hairline is CLIPPED BY THE
+ * CURVE and stops short of each corner instead of cutting across it. Verified
+ * in the browser: a 16px parent gives a 16px pseudo.
+ *
+ * Deliberately NOT the mask-composite "gradient border" trick, whose failure
+ * mode on an engine that does not support it is the element disappearing
+ * outright. Nothing here can fail worse than rendering no highlight, which is
+ * exactly what light mode does on purpose (--lit is transparent there).
+ *
+ * inset: 0 resolves against the PADDING box, so on a bordered card the
+ * hairline sits just inside the border rather than on top of it.
+ *
+ * ⚠ This sets position: relative. That is harmless for fixed descendants (only
+ * transform, filter, will-change and contain create a containing block for
+ * those, so every Sheet backdrop is unaffected) but it DOES become the offset
+ * parent for absolutely positioned children. Only add it to a checked surface. */
+.cp-lit {
+  position: relative;
+}
+
+.cp-lit::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, var(--lit) 22%, var(--lit) 78%, transparent)
+      top / 100% 1px no-repeat,
+    linear-gradient(180deg, var(--lit-wash), transparent 42%);
+}
+
+/* Dot field, for "stage" surfaces only: the home scoreboard plate, empty
+ * states, the QR card, the auth and landing heroes.
+ *
+ * ⚠ Put this on a DECORATIVE ABSOLUTELY POSITIONED CHILD, never on a container
+ * that holds content. It carries a mask, and a mask applies to the element's
+ * content as well as its background, so on a content box it would fade the
+ * text out along with the dots. Aurora is the pattern to copy.
+ *
+ * Explicitly not used behind scrolling lists, and not on the leaderboard board
+ * area, where it would compete with the flying comment pills and the podium. */
+.cp-grid {
+  background-image: radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0);
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(ellipse at 50% 0%, #000 45%, transparent 100%);
+  mask-image: radial-gradient(ellipse at 50% 0%, #000 45%, transparent 100%);
+}
+
+/* Fine grain over the whole app.
+ *
+ * One tiled 160x160 raster, painted once and composited thereafter, so it costs
+ * nothing per frame. It sits ABOVE everything (--z-grain is the top of the
+ * ladder) so a sheet or a celebration burst wears the same film as the page
+ * underneath; at 2 to 3.5% that reads as material rather than as an overlay.
+ *
+ * Verified: body carries overflow-x: clip, and a fixed pseudo element still
+ * lays out at full viewport size inside it, because body creates no containing
+ * block (no transform, filter, will-change or contain).
+ *
+ * stitchTiles='stitch' is load-bearing. Without it feTurbulence restarts its
+ * noise field at every tile edge and the seams show as a visible 160px grid. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--z-grain);
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+/* Paper has no grain of ours, and the two print routes render their own
+ * namespaced light-only stylesheets. */
+@media print {
+  body::after { display: none; }
 }
 
 /* XP bar shimmer — CSS-driven so it doesn't keep the JS render loop busy. */
@@ -257,16 +537,6 @@
   animation: cp-skel 1.5s ease-in-out infinite;
 }
 
-/* Leaderboard podium — breathing gold glow around the champion card. */
-@keyframes cp-podium-glow {
-  0%, 100% { box-shadow: 0 0 20px -6px rgba(255, 186, 31, 0.45); }
-  50% { box-shadow: 0 0 34px -2px rgba(255, 186, 31, 0.75); }
-}
-
-.cp-podium-glow {
-  animation: cp-podium-glow 2.8s ease-in-out infinite;
-}
-
 /* Crown bob — a gentle float above the champion. */
 @keyframes cp-bob {
   0%, 100% { transform: translateY(0); }
@@ -275,28 +545,6 @@
 
 .cp-bob {
   animation: cp-bob 2.6s ease-in-out infinite;
-}
-
-/* Champion sparkles — small motes drifting up and fading out. */
-@keyframes cp-sparkle {
-  0% { transform: translateY(8px) scale(0.5); opacity: 0; }
-  25% { opacity: 1; }
-  100% { transform: translateY(-26px) scale(1); opacity: 0; }
-}
-
-.cp-sparkle {
-  animation: cp-sparkle var(--cp-dur, 2.4s) ease-in-out infinite;
-  animation-delay: var(--cp-delay, 0s);
-}
-
-/* Arena spotlight — a soft gold radial that breathes behind the podium. */
-@keyframes cp-arena-glow {
-  0%, 100% { opacity: 0.55; transform: translateX(-50%) scale(1); }
-  50% { opacity: 0.85; transform: translateX(-50%) scale(1.06); }
-}
-
-.cp-arena-glow {
-  animation: cp-arena-glow 5s ease-in-out infinite;
 }
 
 /* Enter-only page transition — a subtle fade + rise on each route.
@@ -324,28 +572,69 @@
   animation: cp-route-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Flying leaderboard comments (danmaku). A pure transform animation so it runs
-   on the compositor — a JS-driven equivalent would jank on low-end phones with
-   several pills in flight. `--cp-fly-dur` is set per pill from its length, so
-   longer comments travel slower and stay readable. Reduced-motion users get a
-   static list instead (see CommentsOverlay), never this.
+/* Floating leaderboard comments — a RISING COLUMN (the instructor's call,
+   2026-11-08; this replaced `cp-fly`, which flew them right-to-left across up
+   to five horizontal lanes).
 
-   The pill is parked at `left: 100%` (just past the deck's right edge) and
-   travels the deck's width PLUS its own, so it enters and exits fully
-   off-screen. `cqw` measures the DECK, which is what keeps this correct
-   whatever the deck happens to be: it was a centred content column above the
-   podium, and is now a full-screen overlay in front of the whole board. Either
-   way the pill travels exactly the deck's width plus its own.
-   Requires `container-type: inline-size` on the deck. */
-@keyframes cp-fly {
-  from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(calc(-100cqw - 100%), 0, 0); }
+   Why the direction changed: a pill crossing the board horizontally passes over
+   the podium, the picker and the rank rows, and at five lanes the whole board
+   was behind moving text. A single column up one side covers one narrow strip,
+   leaves the board readable, and lets a comment be two or three lines wide
+   without colliding with anything.
+
+   A pure transform + opacity animation, so it runs on the compositor — a
+   JS-driven equivalent would jank on a low-end phone with six pills in flight.
+   `--cp-rise-dur` is set per pill from its measured height, so a three-line
+   comment is on screen proportionally longer. Reduced-motion users get a static
+   list instead (see CommentsOverlay), never this.
+
+   ⚠ `cqh` REQUIRES `container-type: size`, NOT `inline-size`, AND THE FAILURE
+     IS NOT THE ONE YOU WOULD GUESS. `inline-size` establishes a query
+     container on the INLINE axis only, so `cqh` skips the track entirely and
+     falls back to the SMALL VIEWPORT. Measured in this app: a 206px track with
+     a 38px pill travels -244px correctly, and -849px under `inline-size` —
+     i.e. the full 812px viewport plus the pill.
+
+     The pill does not sit still (the obvious guess, and what this comment
+     claimed before it was measured). It flies roughly four times too far in
+     the duration `flightDurationMs` computed from the TRACK's height, so every
+     pill moves four times too fast and the lane-hold arithmetic — which
+     assumes SPEED_PX_PER_SEC — stops preventing overlap. The symptom is a
+     stream that looks merely "fast" while the one guarantee lib/danmaku exists
+     to provide is silently void.
+
+     `size` needs a definite height, which the track has because it is
+     positioned against both edges of a `fixed inset-0` deck.
+
+   The pill is parked at `top: 100%` (just below the track's bottom edge) and
+   travels the track's height PLUS its own, so it enters and leaves fully
+   outside. The track is inset from the header and the tab bar, so a comment
+   never crosses the app's own chrome — which is what the old TOP_INSET /
+   BOTTOM_INSET lane positions bought, now expressed as the track's geometry
+   instead of as arithmetic per lane. */
+@keyframes cp-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  /* Fade in over the first slice, hold, then fade out before the top edge, so
+     a pill dissolves rather than being clipped by the track's boundary. */
+  12% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, calc(-100cqh - 100%), 0);
+  }
 }
 
-.cp-fly {
-  left: 100%;
-  animation: cp-fly var(--cp-fly-dur, 9s) linear forwards;
-  will-change: transform;
+.cp-rise {
+  top: 100%;
+  animation: cp-rise var(--cp-rise-dur, 14s) linear forwards;
+  will-change: transform, opacity;
 }
 
 /* Flame flicker for the streak markers (FlameIcon).
@@ -370,6 +659,27 @@
   animation: cp-flicker 1.7s ease-in-out infinite;
   will-change: transform;
 }
+
+/* The empty leaderboard's three stands, breathing (SilentBoard).
+
+   A CSS keyframe rather than framer-motion for the reason the flame already
+   documents: it is decorative, and the reduced-motion block below switches it
+   off with everything else — so there is no second rule to remember and no
+   useReducedMotion guard in the component.
+
+   OPACITY ONLY. Three <rect>s inside one <svg> are cheap to re-composite, but
+   animating a transform on an SVG child means a layout-relative origin and the
+   stands would drift off their shared floor. The stagger is what makes it read
+   as "waiting" rather than as a loading state. */
+@keyframes cp-silent {
+  0%,
+  100% { opacity: 0.55; }
+  50%  { opacity: 1; }
+}
+
+.cp-silent-1 { animation: cp-silent 4.4s ease-in-out infinite; }
+.cp-silent-2 { animation: cp-silent 4.4s ease-in-out 0.5s infinite; }
+.cp-silent-3 { animation: cp-silent 4.4s ease-in-out 1s infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   *,

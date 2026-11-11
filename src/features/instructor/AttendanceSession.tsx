@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Card, Rows } from '@/components/ui/Card'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Avatar } from '@/components/ui/Avatar'
@@ -76,7 +77,7 @@ export function AttendanceSession({
   const { toast } = useToast()
   const [payload, setPayload] = useState('')
   const [rotateIn, setRotateIn] = useState(QR_STEP_SECONDS)
-  const [nowMs, setNowMs] = useState(Date.now())
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const [roster, setRoster] = useState<AttendanceRosterRow[]>([])
   // Students the instructor checked in by hand this session (for the "manual" tag).
   const [manualIds, setManualIds] = useState<Set<string>>(new Set())
@@ -457,8 +458,8 @@ export function AttendanceSession({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <IconButton
-            label={soundOn ? 'Mute check-in chime' : 'Play a chime on check-in'}
-            title={soundOn ? 'Check-in chime on' : 'Check-in chime off'}
+            label={soundOn ? 'Mute scan chime' : 'Play a chime on each scan'}
+            title={soundOn ? 'Scan chime on' : 'Scan chime off'}
             variant="outline"
             size="sm"
             round
@@ -475,13 +476,13 @@ export function AttendanceSession({
       </div>
 
       {/* Rotating QR — or a closed state once the check-in window ends */}
-      <Card className="relative flex flex-col items-center gap-3 p-6">
+      <Card elevation="raised" className="relative flex flex-col items-center gap-3 p-6">
         {closed ? (
           <div className="flex flex-col items-center gap-2 py-4 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-solid/10 text-accent">
               <ClockIcon className="h-7 w-7" />
             </span>
-            <p className="font-display text-lg font-bold">Check-in closed</p>
+            <p className="font-display text-lg font-bold">Attendance closed</p>
             <p className="max-w-[260px] text-xs text-muted">
               The QR stopped after {session.absentAfterMin} minutes. You can still mark students by
               hand below, then end the class to review.
@@ -501,7 +502,7 @@ export function AttendanceSession({
               {payload ? (
                 <QrCode value={payload} size={232} />
               ) : (
-                <div className="h-[232px] w-[232px] animate-pulse rounded-xl bg-card-2" />
+                <Skeleton className="h-[232px] w-[232px] rounded-xl" />
               )}
             </div>
             <div className="w-full max-w-[248px]">
@@ -655,7 +656,7 @@ export function AttendanceSession({
                     <p className="truncate text-sm font-semibold">{r.fullName}</p>
                     {r.scannedAt ? (
                       <p className="text-xs text-muted">
-                        {isManual ? 'marked' : 'checked in'} at{' '}
+                        {isManual ? 'marked' : 'recorded'} at{' '}
                         <span className="tabular-nums">{scanTime(r.scannedAt)}</span>
                         <span className="text-muted/60"> · {timeAgo(r.scannedAt)}</span>
                       </p>
@@ -761,17 +762,14 @@ export function AttendanceSession({
               icon={<XIcon className="h-6 w-6" />}
             />
             <div className="text-center">
-              <p className="font-display text-2xl font-bold">{session.topic || 'Scan to check in'}</p>
+              <p className="font-display text-2xl font-bold">{session.topic || 'Scan to record attendance'}</p>
               <p className="text-sm text-muted">{sectionName}</p>
             </div>
             <div className="rounded-3xl bg-white p-5 shadow-lg">
               {payload ? (
                 <QrCode value={payload} size={bigSize} />
               ) : (
-                <div
-                  className="animate-pulse rounded-xl bg-card-2"
-                  style={{ height: bigSize, width: bigSize }}
-                />
+                <Skeleton className="rounded-xl" style={{ height: bigSize, width: bigSize }} />
               )}
             </div>
             <p className="text-center text-sm text-muted">
@@ -792,13 +790,13 @@ export function AttendanceSession({
         message={
           bulkConfirm === 'absent' ? (
             <>
-              Everyone who hasn’t checked in yet is marked{' '}
+              Everyone without a scan yet is marked{' '}
               <span className="font-semibold text-ink">Absent</span>. Penalties only apply when you
               finalise the review.
             </>
           ) : (
             <>
-              Everyone who hasn’t checked in yet is marked{' '}
+              Everyone without a scan yet is marked{' '}
               <span className="font-semibold text-ink">Present</span>. You can still correct
               individuals afterwards.
             </>

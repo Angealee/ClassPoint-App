@@ -78,6 +78,11 @@ export interface Database {
         section_id: UUID
         full_name: string
         display_name: string
+        /** 0059 — structured name fields. NULL for students created before 0059. */
+        last_name: string | null
+        first_name: string | null
+        middle_name: string | null
+        suffix: string | null
         avatar_url: string | null
         /** Career total. Achievements read this (badges are lifetime). */
         lifetime_points: number
@@ -244,12 +249,16 @@ export interface Database {
         points: number
         kind: 'quiz' | 'activity' | 'exam' | 'other'
         note: string | null
-        status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+        status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'reversed'
         requested_at: Timestamp
         decided_at: Timestamp | null
         decided_by: UUID | null
         decision_note: string | null
         point_event_id: UUID | null
+        /** 0062 — set when the request is a grade boost. */
+        grade_item_id: UUID | null
+        /** 0062 — the bonus the student agreed to, snapshotted at request time. */
+        grade_bonus: number | null
       }>
 
       absence_excuses: Row<{
@@ -282,6 +291,8 @@ export interface Database {
         name: string
         starts_on: string
         is_active: boolean
+        /** 0060 — read by an archived student on their way out. Max 400 chars. */
+        farewell_message: string | null
         created_at: Timestamp
       }>
 
@@ -649,6 +660,100 @@ export interface Database {
         /** 0054 — the banned-word filter matched at submit. Permanent. */
         flagged: boolean
         created_at: Timestamp
+      }>
+
+      /**
+       * PENDING 0057 — the weights, per subject per term.
+       *
+       * Every weight is a PROPORTION (0.5000, never 50), and `numeric`, so it
+       * arrives over PostgREST as a STRING — api/grades.ts coerces each one.
+       * No arithmetic is done with these in SQL: grading.ts is the only place
+       * in the codebase that multiplies by a weight.
+       */
+      grade_policies: Row<{
+        subject_id: UUID
+        term: 'prelim' | 'midterm' | 'finals'
+        pt_weight: number
+        quiz_weight: number
+        recit_weight: number
+        cs_weight: number
+        exam_weight: number
+        /** This term's share of the final grade. The three must sum to 1. */
+        final_weight: number
+        transmute_base: number
+        transmute_span: number
+        updated_at: Timestamp
+      }>
+
+      /** PENDING 0057 — one score column ("Quiz 1", out of 20). Per SECTION. */
+      grade_items: Row<{
+        id: UUID
+        section_id: UUID
+        subject_id: UUID
+        term: 'prelim' | 'midterm' | 'finals'
+        component: 'performance_task' | 'quiz' | 'recitation' | 'exam'
+        name: string
+        max_score: number
+        position: number
+        /** Retired: leaves the denominator, keeps its scores. */
+        archived_at: Timestamp | null
+        created_at: Timestamp
+        /** 0062 — "spend this many points…" */
+        points_cost: number | null
+        /** 0062 — "…to add this many marks". Both set or both null. */
+        points_bonus: number | null
+        /** 0063 — switched off even though its part is offered. */
+        assist_off: boolean
+        /** 0063 — the class this column was held in (absent there = Absent here). */
+        session_id: UUID | null
+      }>
+
+      /** 0063 — the subject's points-assist terms for one PART. */
+      grade_assist_defaults: Row<{
+        subject_id: UUID
+        component: 'performance_task' | 'quiz' | 'exam'
+        points_cost: number
+        points_bonus: number
+        updated_at: Timestamp
+      }>
+
+      /**
+       * 0063 — an Absent mark typed by hand. A cell is a mark OR this, never both
+       * (a trigger enforces it). Absence DERIVED from attendance has no row.
+       */
+      grade_absences: Row<{
+        item_id: UUID
+        student_id: UUID
+        created_at: Timestamp
+      }>
+
+      /**
+       * 0062 — the receipt for a boost. Instructor-select only; writes go
+       * through the definer functions.
+       */
+      grade_boosts: Row<{
+        item_id: UUID
+        student_id: UUID
+        redemption_id: UUID
+        score_before: number
+        score_after: number
+        marks_granted: number
+        points_spent: number
+        applied_at: Timestamp
+      }>
+
+      /**
+       * PENDING 0057 — one student's mark on one item.
+       *
+       * THE ABSENCE OF A ROW IS MEANINGFUL: it means "not marked yet", which is
+       * what lets the app show an honest in-progress figure beside the official
+       * blanks-count-as-zero one. A student who scored nothing gets score 0.
+       */
+      grade_scores: Row<{
+        item_id: UUID
+        student_id: UUID
+        score: number
+        updated_at: Timestamp
       }>
     }
 

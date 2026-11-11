@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0057 · get_event_attendees() — the checked-in list, read like the count
+-- 0066 · get_event_attendees() — the checked-in list, read like the count
 --
 -- THE BUG (reported live, 2026-09-21): the monitor said "2 checked in" but the
 -- list showed only 1. The count comes from get_event_stats (0055), a SECURITY

@@ -97,7 +97,7 @@ export function AttendanceStats() {
       {attendanceLoading ? (
         <ListSkeleton rows={5} />
       ) : attendance.length === 0 ? (
-        <EmptyState>No classes yet. Once you have checked in a few times, your stats appear here.</EmptyState>
+        <EmptyState>No classes yet. Once a few classes are recorded, your stats appear here.</EmptyState>
       ) : (
         <>
           {/* Headline */}
@@ -111,7 +111,7 @@ export function AttendanceStats() {
               {overall}%
             </p>
             <p className="mt-1 text-sm text-muted">
-              Show-up rate across {counted(attendance)} classes
+              Attendance rate across {counted(attendance)} classes
               {streak !== null && streak > 0 && ` · ${streak} in a row`}
             </p>
             {/* Moved here from the Attendance tab, where it sat as a loose line
@@ -148,7 +148,7 @@ export function AttendanceStats() {
                       value={sub.rate}
                       tone={rateTone(sub.rate)}
                       size="sm"
-                      label={`${sub.label} show-up rate`}
+                      label={`${sub.label} attendance rate`}
                       className="mt-2"
                     />
                     <p className="mt-1.5 text-sm text-muted">
@@ -180,7 +180,7 @@ export function AttendanceStats() {
                       value={t.rate}
                       tone={rateTone(t.rate)}
                       size="sm"
-                      label={`${t.label} show-up rate`}
+                      label={`${t.label} attendance rate`}
                       className="mt-2"
                     />
                     <p className="mt-1.5 text-sm text-muted">
@@ -250,7 +250,7 @@ export function AttendanceStats() {
                   </div>
                 </div>
                 <p className="border-t border-line px-4 py-3 text-sm text-muted">
-                  Measured from {punctuality.total} scanned check-in
+                  Measured from {punctuality.total} scan
                   {punctuality.total === 1 ? '' : 's'}. Classes your instructor marked by hand are
                   not counted — there is no scan time to measure.
                 </p>

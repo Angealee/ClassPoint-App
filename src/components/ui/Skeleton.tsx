@@ -1,10 +1,17 @@
 import { Rows } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
+import type { CSSProperties } from 'react'
 
-/** A single shimmering placeholder block. */
-export function Skeleton({ className }: { className?: string }) {
+/**
+ * A single shimmering placeholder block.
+ *
+ * `style` exists for the one case a class cannot cover: the live-class and
+ * event QR placeholders are sized from a measured viewport value, so their
+ * dimensions are only known at runtime.
+ */
+export function Skeleton({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
-    <span className={cn('relative block overflow-hidden rounded-lg bg-card-2', className)}>
+    <span style={style} className={cn('relative block overflow-hidden rounded-lg bg-card-2', className)}>
       <span className="cp-skel absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent dark:via-white/5" />
     </span>
   )

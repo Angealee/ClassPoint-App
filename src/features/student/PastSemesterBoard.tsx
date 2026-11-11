@@ -1,4 +1,4 @@
-import { ErrorState } from '@/components/ui/EmptyState'
+import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useState } from 'react'
 import { Sheet } from '@/components/ui/Sheet'
 import { Select } from '@/components/ui/Select'
@@ -63,9 +63,7 @@ export function PastSemesterBoard({ open, onClose }: { open: boolean; onClose: (
   return (
     <Sheet open={open} onClose={onClose} title="Past semesters">
       {semesters.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted">
-          No past semesters yet — this is the first one.
-        </p>
+        <EmptyState compact>No past semesters yet — this is the first one.</EmptyState>
       ) : (
         <div className="space-y-4">
           <Select
@@ -98,9 +96,7 @@ export function PastSemesterBoard({ open, onClose }: { open: boolean; onClose: (
               {error}
             </ErrorState>
           ) : rows.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted">
-              No points were recorded that semester.
-            </p>
+            <EmptyState compact>No points were recorded that semester.</EmptyState>
           ) : (
             <ul className="max-h-96 divide-y divide-line overflow-y-auto">
               {rows.map((r) => (

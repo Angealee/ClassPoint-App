@@ -89,9 +89,11 @@ export function IconButton({
         SIZES[size],
         VARIANTS[variant],
         // 44x44 invisible tap region, centred. `lg` is already 44.
-        expandHitArea &&
-          size !== 'lg' &&
-          'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+        // `.cp-tap-44` in index.css is the one definition of this geometry and
+        // carries the adjacency rule; three hand-rolled square buttons that
+        // never came through this primitive (the notification bell, the mobile
+        // menu's close, the instructor's requests button) use the same class.
+        expandHitArea && size !== 'lg' && 'cp-tap-44',
         className,
       )}
       {...props}

@@ -5,7 +5,9 @@
  * rank change). Designed to be safe and silent-by-default:
  *
  *  - Browsers block audio until the user has interacted with the page once, so
- *    we "unlock" on the first pointer/key/touch and lazily preload the clips.
+ *    we "unlock" on the first pointer/key/touch and preload the small clips. The
+ *    large one (`levelup`) is unlocked with a silent placeholder and fetched on
+ *    first use — see LAZY below.
  *  - If a file is missing or playback is rejected, we no-op (never throw) — the
  *    visual toast still carries the message.
  *  - A per-user mute flag is persisted in localStorage so students can silence
@@ -30,6 +32,35 @@ const SOUND_FILES: Record<SoundKey, string> = {
 }
 
 const MUTE_KEY = 'cp_sound_muted'
+
+/**
+ * Clips too large to be worth fetching on the first tap.
+ *
+ * `levelup.mp3` is 888KB — about forty times the other clips combined — and the
+ * unlock below used to prime EVERY clip with a muted `play()` on the first tap
+ * anywhere in the app, which made each student's phone download it whether or
+ * not they ever levelled up. (It is not precached by the service worker, so this
+ * was a real network cost on every cold launch.)
+ *
+ * A lazy clip is unlocked with a tiny SILENT clip instead, and its real file is
+ * attached the first time it is actually played.
+ *
+ * ⚠ IT HAS TO BE THE SAME ELEMENT. iOS Safari lets an audio element play only
+ *   once that element has been started inside a user gesture, so creating the
+ *   element later — at the moment of the level-up, which is not a gesture —
+ *   would leave the sound silently blocked on exactly the phones most students
+ *   have. Changing `src` on an element that was already unlocked keeps it
+ *   unlocked, which is the whole trick.
+ *
+ * The cost is that the FIRST level-up plays a moment late on a slow connection,
+ * while the file arrives. That was the instructor's call (2026-11-09) against
+ * re-encoding the clip, which would have changed how it sounds.
+ */
+const LAZY: ReadonlySet<SoundKey> = new Set<SoundKey>(['levelup'])
+
+/** A valid, empty WAV — 44 bytes of header. Enough to unlock an element. */
+const SILENCE =
+  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
 
 const cache = new Map<SoundKey, HTMLAudioElement>()
 /** Keys whose mp3 failed to load — they use the synthesized fallback instead. */
@@ -122,15 +153,29 @@ function getAudio(key: SoundKey): HTMLAudioElement | null {
   if (typeof Audio === 'undefined') return null
   let el = cache.get(key)
   if (!el) {
-    el = new Audio(SOUND_FILES[key])
-    el.preload = 'auto'
-    el.volume = key === 'levelup' ? 0.9 : 0.7
+    const lazy = LAZY.has(key)
+    const audio = new Audio(lazy ? SILENCE : SOUND_FILES[key])
+    audio.preload = lazy ? 'none' : 'auto'
+    audio.volume = key === 'levelup' ? 0.9 : 0.7
     // If the file can't be loaded (e.g. not shipped), remember it and use the
-    // synthesized fallback from then on.
-    el.addEventListener('error', () => failed.add(key))
-    cache.set(key, el)
+    // synthesized fallback from then on. A lazy clip is only "missing" once its
+    // REAL file has been attached — the silent placeholder cannot fail.
+    audio.addEventListener('error', () => {
+      if (!lazy || audio.dataset.real === '1') failed.add(key)
+    })
+    cache.set(key, audio)
+    el = audio
   }
   return el
+}
+
+/** Attach a lazy clip's real file, once, the first time it is wanted. */
+function attachReal(key: SoundKey, el: HTMLAudioElement): void {
+  if (!LAZY.has(key) || el.dataset.real === '1') return
+  el.dataset.real = '1'
+  el.src = SOUND_FILES[key]
+  el.preload = 'auto'
+  el.load()
 }
 
 /**
@@ -153,8 +198,13 @@ export function initSound(): void {
       el.muted = true
       el.play()
         .then(() => {
-          el.pause()
-          el.currentTime = 0
+          // A lazy clip may have had its real file attached while this was in
+          // flight (a level-up in the first moments after the first tap). Do not
+          // pause that — it is meant to be playing.
+          if (el.dataset.real !== '1') {
+            el.pause()
+            el.currentTime = 0
+          }
           el.muted = prevMuted
         })
         .catch(() => {
@@ -181,6 +231,7 @@ export function playSound(key: SoundKey): void {
     return
   }
   try {
+    attachReal(key, el)
     el.currentTime = 0
     // play() rejects if the file can't load or autoplay is still blocked. Only
     // synthesize when the file genuinely failed (el.error is set on a load
