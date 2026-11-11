@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { PointsPicker, useBoostRequest, useSpendBudget } from '@/components/points/BoostSpend'
 import { Card, Rows } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
@@ -10,13 +10,14 @@ import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { Meter } from '@/components/ui/Meter'
 import { ChevronDownIcon, LockIcon, TableIcon, TicketIcon } from '@/components/ui/icons'
-import { boostState, formatMarks } from '@/lib/grade-boost'
+import { boostState, formatMarks, pointsGain } from '@/lib/grade-boost'
 import { rateTone } from '@/lib/attendance'
 import { displayGrade } from '@/lib/grading'
 import { TONE } from '@/lib/tone'
 import {
   TERM_TITLE,
-  boostableCount,
+  type AvailableBoost,
+  type BoostColumn,
   sortItems,
   explainTerm,
   latestSoFar,
@@ -24,12 +25,14 @@ import {
   termsWithItems,
 } from '@/lib/student-grades'
 import { cn } from '@/lib/cn'
-import type { MyGradeItem, TermKey } from '@/lib/types'
+import type { MyGradeItem, MyGradeSubject, TermKey } from '@/lib/types'
 import { useStudentData } from './StudentData'
 
 export function StudentGrades() {
-  const { me, grades, gradesLoading, gradesError, reloadGrades, refresh, semesterEnded } =
-    useStudentData()
+  const { grades, gradesLoading, gradesError, reloadGrades, refresh, semesterEnded } = useStudentData()
+  const budget = useSpendBudget()
+  const { ask, dialog } = useBoostRequest(() => void budget.reload())
+  const [openId, setOpenId] = useState<string | null>(null)
 
   const subjects = useMemo(() => grades?.subjects ?? [], [grades])
 
@@ -107,7 +110,6 @@ export function StudentGrades() {
   const summary = summarizeTerm(subject, term)
   const figures = grades.figures
   const explanation = figures ? explainTerm(subject, term) : null
-  const boostable = boostableCount(subjects)
 
   return (
     <PullToRefresh onRefresh={onRefresh}>
@@ -220,29 +222,6 @@ export function StudentGrades() {
           </div>
         )}
 
-        <Link to="/app/points" className="block">
-          <Card interactive>
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-400/15 text-reward">
-                <TicketIcon className="h-5.5 w-5.5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-display text-sm font-bold">Use your points</span>
-                <span className="block text-xs text-muted">
-                  {me?.semester_points ?? 0} point{(me?.semester_points ?? 0) === 1 ? "" : "s"}
-                  {" · "}
-                  {semesterEnded
-                    ? "points assist is closed this semester"
-                    : boostable > 0
-                      ? boostable + " column" + (boostable === 1 ? "" : "s") + " open for points assist"
-                      : "no column is open for points assist yet"}
-                </span>
-              </span>
-              <span className="shrink-0 text-lg text-muted">›</span>
-            </div>
-          </Card>
-        </Link>
-
                 <SegmentedControl
           label="Order the scores"
           tone="quiet"
@@ -300,8 +279,14 @@ export function StudentGrades() {
                 ).map((item) => (
                     <ItemRow
                       key={item.id}
+                      subject={subject}
                       item={item}
                       locked={semesterEnded}
+                      open={openId === item.id}
+                      onToggle={() => setOpenId((cur) => (cur === item.id ? null : item.id))}
+                      available={budget.available}
+                      tooMany={budget.tooMany}
+                      onPick={ask}
                     />
                   ))}
               </Rows>
@@ -309,19 +294,44 @@ export function StudentGrades() {
             ),
           )}
       </div>
-
+      {dialog}
     </PullToRefresh>
   )
 }
 
-function ItemRow({ item, locked }: { item: MyGradeItem; locked: boolean }) {
+function ItemRow({
+  subject,
+  item,
+  locked,
+  open,
+  onToggle,
+  available,
+  tooMany,
+  onPick,
+}: {
+  subject: MyGradeSubject
+  item: MyGradeItem
+  locked: boolean
+  open: boolean
+  onToggle: () => void
+  available: number
+  tooMany: boolean
+  onPick: (column: BoostColumn<AvailableBoost>, points: number) => void
+}) {
   const state = boostState(item)
+  const [chosen, setChosen] = useState<number | null>(null)
+  const cap = state.kind === 'available' ? Math.min(state.maxPoints, available) : 0
+  const gain =
+    open && state.kind === 'available' && item.score !== null
+      ? pointsGain(Math.max(0, Math.min(chosen ?? cap, cap)), item.score, item.maxScore)
+      : 0
 
   const pct = item.score !== null && item.maxScore > 0 ? (item.score / item.maxScore) * 100 : null
   const tone = pct === null ? null : rateTone(pct)
 
   return (
-    <div className="flex items-center gap-3 p-3.5">
+    <div className="p-3.5">
+    <div className="flex items-center gap-3">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium" title={item.name}>
           {item.name}
@@ -333,7 +343,13 @@ function ItemRow({ item, locked }: { item: MyGradeItem; locked: boolean }) {
             <>
               <span className={cn('font-semibold', tone && TONE[tone].text)}>
                 {formatMarks(item.score)}
-              </span>{' '}
+              </span>
+              {gain > 0 && item.score !== null && (
+                <>
+                  <span className="px-1">→</span>
+                  <span className="font-semibold text-ink">{formatMarks(item.score + gain)}</span>
+                </>
+              )}{' '}
               / {formatMarks(item.maxScore)}
             </>
           )}
@@ -371,14 +387,27 @@ function ItemRow({ item, locked }: { item: MyGradeItem; locked: boolean }) {
       )}
 
       {state.kind === 'available' && !locked && (
-        <Link
-          to={'/app/points?column=' + item.id}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
           className="cp-tap-y inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-accent underline-offset-2 hover:underline"
         >
           <TicketIcon className="h-4 w-4" aria-hidden />
-          Use points
-        </Link>
+          {open ? 'Close' : 'Use points'}
+        </button>
       )}
+    </div>
+    {open && state.kind === 'available' && !locked && (
+      <PointsPicker
+        column={{ subject, item, state }}
+        available={available}
+        tooMany={tooMany}
+        locked={locked}
+        onPick={(points) => onPick({ subject, item, state }, points)}
+        onChosen={setChosen}
+      />
+    )}
     </div>
   )
 }

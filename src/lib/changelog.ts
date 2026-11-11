@@ -73,62 +73,63 @@ export const DRAFT_7_0_0: ChangelogEntry = {
   ],
 }
 
-export const DRAFT_8_0_0: ChangelogEntry = {
-  version: '6.0.0',
-  date: '2026-11-08',
-  title: 'A clean slate',
-  sections: [
-    {
-      heading: 'A new semester starts properly',
-      major: true,
-      items: [
-        'When a semester ends, the leaderboard goes quiet instead of showing everyone sitting on zero — and it wakes up the moment the first points of the new one are awarded.',
-        'If your semester is over, signing in now shows you a note from your instructor and how you finished — your rank, your points, your badges, your attendance — instead of an app full of buttons that no longer do anything.',
-        'Your record is kept either way. Take a class with the same instructor again and your badges and all-time points come back with you.',
-      ],
-    },
-    {
-      heading: 'Your grades, and what your points can buy',
-      major: true,
-      items: [
-        'A new Grades screen shows every mark you have, part by part, with a “so far” figure for each term. It fills in as your instructor enters marks.',
-        'Spend points to add marks to a quiz, task or exam mark you already have: 1 point adds 1 mark, you choose how many, and a mark can never go past its maximum. You see exactly what you would gain before you send the request, and nothing is spent until your instructor approves it. If you were absent for a column, points can’t be used on it.',
-        'It is a real trade. Spending points lowers your XP, level and rank like any other spend, and the screen says so before you commit.',
-      ],
-    },
-    {
-      heading: 'Comments float up the side now',
-      items: [
-        'Classmates’ comments used to fly across the middle of the leaderboard, over the podium and everything else. They drift up one side instead, so you can read the board and the banter at the same time.',
-        'Longer comments get the room to be read, and there is a counter so you can see how much of your 120 characters is left before you run out.',
-      ],
-    },
-    {
-      heading: 'The board stops wobbling',
-      items: [
-        'The top three used to change width depending on how long the names were, so the podium reshaped itself every time the board settled. The three stands are fixed now, and roomier.',
-        'Picking a section is a proper full-width control rather than a squeezed box that cut every section name in half.',
-      ],
-    },
-    {
-      heading: 'A quick tour when you start',
-      items: [
-        'New here? A short, animated walkthrough shows the four things that matter: earning points, recording attendance, the leaderboard and spending what you earn.',
-        'It plays your first three times opening the app, so nothing slips past you. From the second time you can skip it.',
-      ],
-    },
-    {
-      heading: 'Attendance and scanning',
-      items: [
-        'Your attendance summary has a Prelim / Midterm / Finals switch, so you can see how one term actually went instead of only the whole semester.',
-        'The camera is in the middle of the screen when you scan, not tucked down by the button you just tapped.',
-        'Tap Show on any PIN box to check what you typed — a wrong character is the usual reason a sign-in fails, and there was no way to see it.',
-        'The app says “attendance recorded” now rather than “checked in”. You are in a class, not a hotel.',
-      ],
-    },
-  ],
-}
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '6.0.0',
+    date: '2026-11-11',
+    title: 'A clean slate',
+    sections: [
+      {
+        heading: 'A new semester starts properly',
+        major: true,
+        items: [
+          'When a semester ends, the leaderboard goes quiet instead of showing everyone sitting on zero — and it wakes up the moment the first points of the new one are awarded.',
+          'If your semester is over, signing in now shows you a note from your instructor and how you finished — your rank, your points, your badges, your attendance — instead of an app full of buttons that no longer do anything.',
+          'Your record is kept either way. Take a class with the same instructor again and your badges and all-time points come back with you.',
+        ],
+      },
+      {
+        heading: 'Your grades, and what your points can buy',
+        major: true,
+        items: [
+          'A new Grades screen shows every mark you have, part by part, with a “so far” figure for each term. It fills in as your instructor enters marks.',
+          'Spend points right on a score you already have: tap Use points on the row, pick how many, and watch the mark change as you go. 1 point adds 1 mark, and a mark can never go past its maximum.',
+          'Nothing is spent until your instructor approves it. If approved, your points, level and rank drop like any other spend. If you were absent for a column, points can’t be used on it.',
+          'The Use points screen got a cleaner look too, with the same rows and the same one-tap spending.',
+        ],
+      },
+      {
+        heading: 'Comments float up the side now',
+        items: [
+          'Classmates’ comments used to fly across the middle of the leaderboard, over the podium and everything else. They drift up one side instead, so you can read the board and the banter at the same time.',
+          'Longer comments get the room to be read, and there is a counter so you can see how much of your 120 characters is left before you run out.',
+        ],
+      },
+      {
+        heading: 'The board stops wobbling',
+        items: [
+          'The top three used to change width depending on how long the names were, so the podium reshaped itself every time the board settled. The three stands are fixed now, and roomier.',
+          'Picking a section is a proper full-width control rather than a squeezed box that cut every section name in half.',
+        ],
+      },
+      {
+        heading: 'A quick tour when you start',
+        items: [
+          'New here? A short, animated walkthrough shows the four things that matter: earning points, recording attendance, the leaderboard and spending what you earn.',
+          'It plays your first three times opening the app, so nothing slips past you. From the second time you can skip it.',
+        ],
+      },
+      {
+        heading: 'Attendance and scanning',
+        items: [
+          'Your attendance summary has a Prelim / Midterm / Finals switch, so you can see how one term actually went instead of only the whole semester.',
+          'The camera is in the middle of the screen when you scan, not tucked down by the button you just tapped.',
+          'Tap Show on any PIN box to check what you typed — a wrong character is the usual reason a sign-in fails, and there was no way to see it.',
+          'The app says “attendance recorded” now rather than “checked in”. You are in a class, not a hotel.',
+        ],
+      },
+    ],
+  },
   {
     version: '4.1.0',
     date: '2026-08-31',

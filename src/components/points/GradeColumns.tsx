@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button } from '@/components/ui/Button'
+import { PointsPicker, useBoostRequest } from '@/components/points/BoostSpend'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Meter } from '@/components/ui/Meter'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { ListSkeleton } from '@/components/ui/Skeleton'
-import { useToast } from '@/components/ui/Toast'
-import { ChevronDownIcon, TableIcon } from '@/components/ui/icons'
+import { ChevronDownIcon, TableIcon, TicketIcon } from '@/components/ui/icons'
 import { useStudentData } from '@/features/student/StudentData'
-import { requestGradeBoost } from '@/lib/api'
+import { rateTone } from '@/lib/attendance'
 import { cn } from '@/lib/cn'
-import { errorText } from '@/lib/errors'
 import { formatMarks, pointsGain } from '@/lib/grade-boost'
 import {
   TERM_TITLE,
@@ -21,7 +19,7 @@ import {
   type BoostColumn,
 } from '@/lib/student-grades'
 import { COMPONENT_LABEL } from '@/lib/grading'
-import { MAX_PENDING_REDEMPTIONS } from '@/lib/types'
+import { TONE } from '@/lib/tone'
 
 export function GradeColumns({
   available,
@@ -35,19 +33,13 @@ export function GradeColumns({
   highlightId: string | null
   onRequested: () => void
 }) {
-  const { me, grades, gradesLoading, gradesError, reloadGrades, semesterEnded } = useStudentData()
-  const { toast } = useToast()
+  const { grades, gradesLoading, gradesError, reloadGrades, semesterEnded } = useStudentData()
+  const { ask, dialog } = useBoostRequest(onRequested)
 
   const subjects = useMemo(() => grades?.subjects ?? [], [grades])
   const { actionable, other } = useMemo(() => boostColumns(subjects), [subjects])
 
   const [otherOpen, setOtherOpen] = useState(false)
-  const [target, setTarget] = useState<{
-    column: BoostColumn<AvailableBoost>
-    points: number
-  } | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-
   const highlightInOther = highlightId !== null && other.some((c) => c.item.id === highlightId)
   const showOther = otherOpen || highlightInOther
 
@@ -61,24 +53,6 @@ export function GradeColumns({
     scrolledFor.current = highlightId
     el.scrollIntoView({ block: 'center' })
   }, [highlightId, grades, showOther])
-
-  async function onConfirm() {
-    if (!target) return
-    setSubmitting(true)
-    try {
-      await requestGradeBoost(target.column.item.id, target.points)
-      toast('Request sent — your instructor will decide.', 'success')
-      setTarget(null)
-      await reloadGrades()
-      onRequested()
-    } catch (e) {
-      toast(errorText(e, 'Could not send that request. Try again.'), 'error')
-      setTarget(null)
-      void reloadGrades()
-    } finally {
-      setSubmitting(false)
-    }
-  }
 
   const register = (id: string) => (el: HTMLElement | null) => {
     if (el) rowRefs.current.set(id, el)
@@ -130,7 +104,7 @@ export function GradeColumns({
               locked={semesterEnded}
               highlightId={highlightId}
               register={register}
-              onPick={(column, points) => setTarget({ column, points })}
+              onPick={ask}
             />
           )}
 
@@ -164,53 +138,7 @@ export function GradeColumns({
         </div>
       )}
 
-      <ConfirmDialog
-        open={!!target}
-        variant="danger"
-        title={target ? `Use ${target.points} point${target.points === 1 ? '' : 's'} on ${target.column.item.name}?` : ''}
-        message={
-          target ? (
-            <>
-              You’re asking to spend{' '}
-              <span className="font-semibold text-ink">
-                {target.points} point{target.points === 1 ? '' : 's'}
-              </span>{' '}
-              to add{' '}
-              <span className="font-semibold text-ink">
-                {formatMarks(
-                  pointsGain(target.points, target.column.state.score, target.column.item.maxScore),
-                )}{' '}
-                mark
-                {pointsGain(target.points, target.column.state.score, target.column.item.maxScore) === 1
-                  ? ''
-                  : 's'}
-              </span>
-              :{' '}
-              <span className="font-semibold text-ink">
-                {formatMarks(target.column.state.score)}
-              </span>{' '}
-              becomes{' '}
-              <span className="font-semibold text-ink">
-                {formatMarks(
-                  target.column.state.score +
-                    pointsGain(target.points, target.column.state.score, target.column.item.maxScore),
-                )}
-              </span>{' '}
-              out of {formatMarks(target.column.item.maxScore)}. Nothing is spent until your
-              instructor approves it.
-            </>
-          ) : null
-        }
-        detail={
-          target
-            ? `If approved, your total drops to ${Math.max(0, (me?.semester_points ?? 0) - target.points)} — your level and leaderboard rank drop with it, and you climb the spend board. You can’t undo it yourself.`
-            : undefined
-        }
-        confirmLabel="Send request"
-        busy={submitting}
-        onConfirm={onConfirm}
-        onClose={() => setTarget(null)}
-      />
+      {dialog}
     </div>
   )
 }
@@ -232,165 +160,138 @@ function ActionableList({
   register: (id: string) => (el: HTMLElement | null) => void
   onPick: (c: BoostColumn<AvailableBoost>, points: number) => void
 }) {
-  const groups: Array<{ key: string; title: string; items: Array<BoostColumn<AvailableBoost>> }> = []
+  const [openId, setOpenId] = useState<string | null>(() =>
+    highlightId && columns.some((c) => c.item.id === highlightId) ? highlightId : null,
+  )
+
+  const scopes: Array<{
+    key: string
+    title: string
+    parts: Array<{ key: string; label: string; items: Array<BoostColumn<AvailableBoost>> }>
+  }> = []
   for (const c of columns) {
-    const key = `${c.subject.subjectId}:${c.item.term}`
-    const last = groups[groups.length - 1]
-    if (last && last.key === key) last.items.push(c)
-    else
-      groups.push({
-        key,
-        title: `${c.subject.code} · ${TERM_TITLE[c.item.term]}`,
-        items: [c],
-      })
+    const scopeKey = `${c.subject.subjectId}:${c.item.term}`
+    let scope = scopes[scopes.length - 1]
+    if (!scope || scope.key !== scopeKey) {
+      scope = { key: scopeKey, title: `${c.subject.code} · ${TERM_TITLE[c.item.term]}`, parts: [] }
+      scopes.push(scope)
+    }
+    const part = scope.parts[scope.parts.length - 1]
+    if (part && part.key === c.item.component) part.items.push(c)
+    else scope.parts.push({ key: c.item.component, label: COMPONENT_LABEL[c.item.component], items: [c] })
   }
 
   return (
-    <div className="space-y-4">
-      {groups.map((g) => (
-        <div key={g.key} className="space-y-2">
-          <p className="px-1 text-xs font-semibold text-muted">{g.title}</p>
-          {g.items.map((c) => (
-            <BoostCard
-              key={c.item.id}
-              column={c}
-              available={available}
-              tooMany={tooMany}
-              locked={locked}
-              highlighted={c.item.id === highlightId}
-              register={register(c.item.id)}
-              onPick={(points) => onPick(c, points)}
-            />
+    <div className="space-y-6">
+      {scopes.map((s) => (
+        <section key={s.key} className="space-y-3">
+          <p className="px-1 text-2xs font-semibold uppercase tracking-widest text-muted">{s.title}</p>
+          {s.parts.map((p) => (
+            <div key={p.key}>
+              <h3 className="mb-2 px-1 text-sm font-semibold">{p.label}</h3>
+              <Card pad="none" className="divide-y divide-line">
+                {p.items.map((c) => (
+                  <BoostRow
+                    key={c.item.id}
+                    column={c}
+                    available={available}
+                    tooMany={tooMany}
+                    locked={locked}
+                    open={openId === c.item.id}
+                    highlighted={c.item.id === highlightId}
+                    register={register(c.item.id)}
+                    onToggle={() => setOpenId((cur) => (cur === c.item.id ? null : c.item.id))}
+                    onPick={(points) => onPick(c, points)}
+                  />
+                ))}
+              </Card>
+            </div>
           ))}
-        </div>
+        </section>
       ))}
     </div>
   )
 }
 
-function BoostCard({
+function BoostRow({
   column,
   available,
   tooMany,
   locked,
+  open,
   highlighted,
   register,
+  onToggle,
   onPick,
 }: {
   column: BoostColumn<AvailableBoost>
   available: number
   tooMany: boolean
   locked: boolean
+  open: boolean
   highlighted: boolean
   register: (el: HTMLElement | null) => void
+  onToggle: () => void
   onPick: (points: number) => void
 }) {
   const { item, state } = column
-
-  const limit = Math.max(0, Math.min(state.maxPoints, available))
-  const [points, setPoints] = useState(limit)
-  const [draft, setDraft] = useState<string | null>(null)
-
-  const clamp = (n: number) => Math.max(1, Math.min(limit, Math.round(n) || 1))
-  const chosen = limit === 0 ? 0 : Math.min(Math.max(points, 1), limit)
-  const gain = pointsGain(chosen, state.score, item.maxScore)
-  const reachesFull = chosen > 0 && state.score + gain >= item.maxScore
-  const blocked = locked || tooMany || limit === 0
-
-  function step(delta: number) {
-    setDraft(null)
-    setPoints(clamp(chosen + delta))
-  }
+  const pct = item.maxScore > 0 ? (state.score / item.maxScore) * 100 : 0
+  const tone = rateTone(pct)
+  const [chosen, setChosen] = useState<number | null>(null)
+  const shown = Math.max(0, Math.min(chosen ?? Math.min(state.maxPoints, available), state.maxPoints, available))
+  const gain = open ? pointsGain(shown, state.score, item.maxScore) : 0
 
   return (
-    <div ref={register}>
-    <Card
-      pad="tight"
-      className={cn(
-        'space-y-3',
-        highlighted && 'ring-2 ring-[var(--color-ring)]',
-      )}
+    <div
+      ref={register}
+      className={cn('p-3.5', highlighted && 'bg-accent-solid/8 ring-2 ring-inset ring-[var(--color-ring)]')}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold" title={item.name}>
+          <p className="truncate text-sm font-medium" title={item.name}>
             {item.name}
           </p>
-          <p className="text-xs text-muted">{COMPONENT_LABEL[item.component]}</p>
+          <p className="text-xs tabular-nums text-muted">
+            <span className={cn('font-semibold', TONE[tone].text)}>{formatMarks(state.score)}</span>
+            {gain > 0 && (
+              <>
+                <span className="px-1">→</span>
+                <span className="font-semibold text-ink">{formatMarks(state.score + gain)}</span>
+              </>
+            )}{' '}
+            / {formatMarks(item.maxScore)}
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          className="cp-tap-y inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-accent underline-offset-2 hover:underline"
+        >
+          <TicketIcon className="h-4 w-4" aria-hidden />
+          {open ? 'Close' : 'Use points'}
+        </button>
       </div>
 
-      <p className="text-sm tabular-nums">
-        <span className="text-muted">{formatMarks(state.score)}</span>
-        <span className="px-1.5 text-muted">→</span>
-        <span className="font-semibold">{formatMarks(state.score + gain)}</span>
-        <span className="text-muted"> / {formatMarks(item.maxScore)}</span>
-        {reachesFull && <span className="block text-xs text-muted">That’s full marks.</span>}
-      </p>
+      <Meter
+        value={pct}
+        max={100}
+        size="sm"
+        tone={tone}
+        label={`${item.name}: ${Math.round(pct)}%`}
+        className="mt-1.5"
+      />
 
-      <div
-        role="group"
-        aria-label={`Points to use on ${item.name}`}
-        className="flex items-center justify-between gap-3"
-      >
-        <span className="text-xs text-muted">Points to use</span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="One fewer point"
-            disabled={blocked || chosen <= 1}
-            onClick={() => step(-1)}
-            className="h-11 w-11 rounded-xl border border-line text-lg font-semibold disabled:opacity-40"
-          >
-            −
-          </button>
-          <input
-            // text-base: below 16px iOS Safari zooms the page on focus.
-            className="h-11 w-14 rounded-xl border border-line bg-canvas text-center text-base tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)] disabled:opacity-60"
-            inputMode="numeric"
-            aria-label="Number of points"
-            disabled={blocked}
-            value={draft ?? String(chosen)}
-            onChange={(e) => setDraft(e.target.value.replace(/\D/g, '').slice(0, 2))}
-            onBlur={() => {
-              if (draft !== null) setPoints(clamp(Number(draft)))
-              setDraft(null)
-            }}
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <button
-            type="button"
-            aria-label="One more point"
-            disabled={blocked || chosen >= limit}
-            onClick={() => step(1)}
-            className="h-11 w-11 rounded-xl border border-line text-lg font-semibold disabled:opacity-40"
-          >
-            +
-          </button>
-        </div>
-      </div>
-      {limit > 0 && (
-        <p className="text-2xs text-muted">
-          You can use up to {limit} point{limit === 1 ? '' : 's'} here
-          {limit < state.maxPoints ? ' — that’s all you have free' : ' — that reaches full marks'}.
-        </p>
+      {open && (
+        <PointsPicker
+          column={column}
+          available={available}
+          tooMany={tooMany}
+          locked={locked}
+          onPick={onPick}
+          onChosen={setChosen}
+        />
       )}
-
-      <Button
-        className="w-full"
-        variant={blocked ? 'outline' : 'primary'}
-        disabled={blocked}
-        onClick={() => onPick(draft !== null ? clamp(Number(draft)) : chosen)}
-      >
-        {locked
-          ? 'Closed'
-          : tooMany
-            ? `${MAX_PENDING_REDEMPTIONS} requests waiting`
-            : limit === 0
-              ? 'You have no free points'
-              : `Use ${chosen} point${chosen === 1 ? '' : 's'}`}
-      </Button>
-    </Card>
     </div>
   )
 }

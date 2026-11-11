@@ -1,3 +1,4 @@
+import { LATEST_VERSION } from '@/lib/changelog'
 import { useRef, useState } from 'react'
 import { AnimatePresence, motion, useMotionValueEvent, useTransform } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
@@ -11,14 +12,11 @@ import { ScoreboardDemo } from '@/components/landing/ScoreboardDemo'
 import { BoardPreview } from '@/components/landing/BoardPreview'
 import { LandingScrollProvider, useLandingScroll } from '@/components/landing/scroll'
 import {
-  BoltIcon,
   ChevronDownIcon,
   FlameIcon,
-  KeyIcon,
   ScanIcon,
   StarIcon,
   TicketIcon,
-  TrophyIcon,
 } from '@/components/ui/icons'
 import { spring } from '@/lib/motion'
 import { cn } from '@/lib/cn'
@@ -31,17 +29,14 @@ const HEADER_H = 56
 
 const STEPS = [
   {
-    Icon: KeyIcon,
     title: 'Claim mo muna account mo',
     body: 'If wala ka pang account, contact your instructor to claim a token for account creation.',
   },
   {
-    Icon: BoltIcon,
     title: 'Grind kang points sa class yah',
     body: 'Recitations and activities can gain you points, it can beawarded live while class is running.',
   },
   {
-    Icon: TrophyIcon,
     title: 'Tignan mo sa leaderboard kung gaano ka kalakas',
     body: 'Points are XP. Fill the bar, level up, and watch your rank move on the rankings.',
   },
@@ -222,7 +217,7 @@ function LandingPage() {
             </Reveal>
 
             <ol className="mt-10 grid gap-4 sm:grid-cols-3">
-              {STEPS.map(({ Icon, title, body }, i) => (
+              {STEPS.map(({ title, body }, i) => (
                 <Reveal key={title} delay={i * 0.08} className="h-full">
                   <motion.li
                     whileHover={{ y: -4 }}
@@ -234,10 +229,6 @@ function LandingPage() {
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-solid text-sm font-bold text-white">
                         {i + 1}
                       </span>
-
-                      <motion.span variants={revealIconVariants} className="inline-flex">
-                        <Icon className="h-5 w-5 text-accent" />
-                      </motion.span>
                     </div>
                     <p className="mt-3 font-display font-semibold">{title}</p>
                     <p className="mt-1 text-sm text-muted">{body}</p>
@@ -319,7 +310,7 @@ function LandingPage() {
           aria-label="ClassPoint"
           className="cursor-default select-none bg-transparent text-xs text-muted focus:outline-none"
         >
-          ClassPoint · Version 6.0
+          ClassPoint · Version {LATEST_VERSION}
         </button>
       </footer>
       
