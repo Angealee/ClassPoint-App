@@ -252,7 +252,22 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   window (it just carries the old discrepancy until 0066 lands). Depends only on 0055;
   independent of everything laptop-side, paste in any order. **If the PC's 0057 was ever
   pasted under its old name, nothing breaks** — it is `create or replace` and idempotent.
-  **Next number: 0067.** (0063 is pasted; 0064 and 0065 are written — see their sections below.)
+  **0067 is WRITTEN AND NOT YET APPLIED** — the 2026-11-11 security review. Paste it AFTER
+  everything else, twice, then run its footer VERIFY block. It (1) rewrites
+  `cp_guard_student_update` from a denylist to an ALLOWLIST — the denylist never gained
+  0029's `semester_points` or 0023's `archived_at`, so any student could set their own
+  spendable balance from the console and spend it on points-assist grade requests, or
+  un-archive themselves; (2) hides `lounge_events.answer_key` with a column-level grant;
+  (3) revokes PUBLIC/anon EXECUTE on every public function except `cp_level` and
+  `replace_push_subscription`, and authenticated on `refresh_leaderboard_snapshot` /
+  `cp_achievement_metrics`. ⚠ **Supabase's schema DEFAULT PRIVILEGES grant every new table
+  and function to anon AND authenticated** (confirmed by live probe) — a migration comment
+  saying "not granted" is FALSE unless the file says `revoke`. ⚠ **Any new `students` column
+  a student must edit has to be added to `c_allowed` in that guard**, or profile saves fail
+  with "You can only update your photo…". Dashboard step: turn OFF "Allow new users to sign
+  up" (it was ON; claim-token uses the admin API and is unaffected). Redeploy `claim-token`
+  (atomic token reservation, display name 2–40, PIN ≤72).
+  **Next number: 0068.** (0063 is pasted; 0064 and 0065 are written — see their sections below.)
   ⚠ **EVERY "WRITTEN AND NOT YET APPLIED" CLAIM IN THE BLOCK ABOVE IS NOW
   UNVERIFIED PROSE — ASK THE DATABASE INSTEAD.** It was written file by file
   over months, nobody could check it without reading every migration and

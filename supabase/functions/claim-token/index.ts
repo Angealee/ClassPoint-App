@@ -29,7 +29,12 @@ Deno.serve(async (req) => {
   const token = String(payload.token ?? '').trim().toUpperCase()
   const username = String(payload.username ?? '').trim().toLowerCase()
   const pin = String(payload.pin ?? '')
-  const displayName = payload.display_name ? String(payload.display_name).trim() : null
+  // Written through the service role, so the students guard never sees it —
+  // validate here with the same 2–40 rule the profile editor enforces.
+  const rawName = payload.display_name
+    ? String(payload.display_name).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim()
+    : ''
+  const displayName = rawName || null
 
   if (!token) return json(req, { ok: false, error: 'Enter your token.' })
   if (!USERNAME_RE.test(username)) {
@@ -40,6 +45,10 @@ Deno.serve(async (req) => {
     })
   }
   if (pin.length < 6) return json(req, { ok: false, error: 'PIN must be at least 6 characters.' })
+  if (pin.length > 72) return json(req, { ok: false, error: 'PIN must be at most 72 characters.' })
+  if (displayName && (displayName.length < 2 || displayName.length > 40)) {
+    return json(req, { ok: false, error: 'Display name must be 2–40 characters.' })
+  }
 
   const admin = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -103,6 +112,28 @@ Deno.serve(async (req) => {
     return json(req, { ok: false, error: 'That username is taken. Pick another.' })
   }
 
+  // 2b. Reserve the token ATOMICALLY. Two concurrent claims of one token both
+  // passed the claimed_at check above; without this conditional update both
+  // would create an auth user and the second would silently overwrite the
+  // first's link. Only the request whose update matched a still-unclaimed row
+  // continues; the reservation is released on every failure path below.
+  const { data: reserved, error: reserveErr } = await admin
+    .from('student_secrets')
+    .update({ claimed_at: new Date().toISOString() })
+    .eq('student_id', secret.student_id)
+    .is('claimed_at', null)
+    .select('student_id')
+  if (reserveErr) {
+    await log(false, 'lookup_failed', secret.student_id as string)
+    return json(req, { ok: false, error: 'Lookup failed. Please try again.' }, 500)
+  }
+  if (!reserved || reserved.length === 0) {
+    await log(false, 'token_used', secret.student_id as string)
+    return json(req, { ok: false, error: BAD_TOKEN })
+  }
+  const release = () =>
+    admin.from('student_secrets').update({ claimed_at: null }).eq('student_id', secret.student_id)
+
   // 3. Create the auth account.
   const email = `${username}@${STUDENT_DOMAIN}`
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
@@ -112,6 +143,7 @@ Deno.serve(async (req) => {
     user_metadata: { role: 'student', student_id: secret.student_id, username },
   })
   if (createErr || !created?.user) {
+    await release()
     const nameTaken = createErr?.message?.toLowerCase().includes('already')
     await log(false, nameTaken ? 'username_taken' : 'create_failed', secret.student_id as string)
     return json(req, {
@@ -129,12 +161,14 @@ Deno.serve(async (req) => {
 
   const linkSecret = await admin
     .from('student_secrets')
-    .update({ username, claimed_at: new Date().toISOString() })
+    .update({ username })
     .eq('student_id', secret.student_id)
 
   if (linkStudent.error || linkSecret.error) {
     // Roll back the orphaned auth user so the student can retry.
     await admin.auth.admin.deleteUser(userId)
+    await admin.from('students').update({ user_id: null }).eq('id', secret.student_id).eq('user_id', userId)
+    await release()
     await log(false, 'link_failed', secret.student_id as string)
     return json(req, { ok: false, error: 'Could not finish setup. Please try again.' }, 500)
   }
