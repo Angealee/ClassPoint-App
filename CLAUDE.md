@@ -3538,17 +3538,17 @@ the work in dark and the stroke does it in light. Its animation is a **CSS keyfr
 the stands would drift off their shared floor), so the global reduced-motion block covers
 it with no `useReducedMotion` guard.
 
-**`ArchivedFarewell` follows `AuthTransition`'s single-timer pattern**, for the reason
-that component records: three sub-animations finish at three moments and
-`reducedMotion="user"` changes which, so one `setTimeout` is the only clock that cannot
-disagree with itself. Duration is **reading time, clamped** (3.6–9s) rather than fixed —
-4s yanks a four-line send-off away mid-sentence and 9s on an empty message is a student
-staring at a logo. `onDone` lives in a ref so the timer effect depends on nothing that
-changes (an inline-arrow callback is a new identity every render — the Sheet focus-trap
-bug that cost 21 sheets their keystrokes). **`TAP_GUARD_MS` 700 is load-bearing**: this
-screen appears immediately after the student taps "Sign in", and without it the tap
-already in flight would dismiss the farewell before it drew a frame — the same lesson
-`LevelUpBurst` records. z-[90]: above Sheet (40) and the bursts (50), below
+**`ArchivedFarewell` WAITS FOR THE STUDENT (instructor, 2026-11-11).** It used to follow
+`AuthTransition`'s single-timer pattern — a clamped reading time (3.6–9s) and then a fade-out
+by itself. That is gone: it fades IN (opacity only) and holds until a tap, click, or
+Enter / Space / Escape. A send-off that leaves while someone is still reading it is worse than one
+that waits, and nothing is in its way (the screen behind it is a read-only recap). So there is **no
+end timer at all**; the only timer left is `TAP_GUARD_MS` 700, which is still load-bearing: this
+screen appears immediately after the student taps "Sign in", and without it the tap already in
+flight would dismiss the farewell before it drew a frame — the same lesson `LevelUpBurst`
+records. `onDone` lives in a ref (an inline-arrow callback is a new identity every render — the
+Sheet focus-trap bug that cost 21 sheets their keystrokes). The layer takes focus on mount so the
+keyboard can dismiss it. z-[90]: above Sheet (40) and the bursts (50), below
 `AuthTransitionOverlay` (100), which is still fading out over the top of it.
 
 ⚠ **`material.test.ts`' PLATE GUARD WAS MISSING HALF ITS CALL SITES, and it was only
