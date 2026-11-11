@@ -7,6 +7,7 @@ import {
   boostableCount,
   explainTerm,
   latestSoFar,
+  sortItems,
   summarizeTerm,
   termsWithItems,
 } from './student-grades'
@@ -378,5 +379,32 @@ describe('Recitation from attendance (0063)', () => {
     expect(actionable).toHaveLength(0)
     expect(other[0].state.kind).toBe('absent')
     expect(boostableCount([s])).toBe(0)
+  })
+})
+
+describe('sortItems (Lowest first)', () => {
+  const q = (id: string, score: number | null, maxScore: number) => it_({ id, score, maxScore })
+
+  it('keeps the instructor’s order when asked for "In order"', () => {
+    const items = [q('a', 18, 20), q('b', 5, 20)]
+    expect(sortItems(items, 'order')).toBe(items)
+  })
+
+  it('puts the weakest SHARE of the maximum first, not the lowest raw mark', () => {
+    // 30/50 = 60% is weaker than 15/20 = 75%, though 30 is the bigger number.
+    const out = sortItems([q('strong', 15, 20), q('weak', 30, 50), q('mid', 9, 10)], 'lowest')
+    expect(out.map((i) => i.id)).toEqual(['weak', 'strong', 'mid'])
+  })
+
+  it('puts unmarked columns last — there is nothing to compare', () => {
+    const out = sortItems([q('none', null, 20), q('low', 2, 20), q('high', 19, 20)], 'lowest')
+    expect(out.map((i) => i.id)).toEqual(['low', 'high', 'none'])
+  })
+
+  it('is stable on ties and never mutates its input', () => {
+    const items = [q('x', 10, 20), q('y', 10, 20), q('z', 5, 20)]
+    const before = items.map((i) => i.id)
+    expect(sortItems(items, 'lowest').map((i) => i.id)).toEqual(['z', 'x', 'y'])
+    expect(items.map((i) => i.id)).toEqual(before)
   })
 })

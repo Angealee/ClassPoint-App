@@ -264,3 +264,18 @@ export function boostableCount(subjects: MyGradeSubject[]): number {
   }
   return n
 }
+
+/**
+ * The scores inside a part, as entered or weakest first.
+ *
+ * "Weakest" is the share of the column's maximum, not the raw mark — a 15/20 is
+ * stronger than a 30/50. An unmarked column has no share to compare and goes last,
+ * and the sort is stable, so ties keep the instructor's order. Never mutates its
+ * input.
+ */
+export function sortItems(items: MyGradeItem[], order: 'order' | 'lowest'): MyGradeItem[] {
+  if (order === 'order') return items
+  const share = (i: MyGradeItem) =>
+    i.score === null || !(i.maxScore > 0) ? Number.POSITIVE_INFINITY : i.score / i.maxScore
+  return [...items].sort((a, b) => share(a) - share(b))
+}

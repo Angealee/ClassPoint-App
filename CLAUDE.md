@@ -4461,6 +4461,18 @@ Turning the switch ON still pushes "Your grades are open", which is now exactly 
 no longer promise an amount: the maximum depends on the student's balance and the column, so a
 number on a row read as a price. The amount is on the card's picker, where it is the student's choice.
 
+**Grades screen polish (instructor's picks, 2026-11-11):** every score row has a thin progress bar
+and a score coloured by `rateTone` (the same 70 / 85 bands attendance uses — one threshold
+app-wide); the row action is a QUIET text link with a ticket icon ("Use points"), shown ONLY on a
+column that can still gain (a perfect score has none, and neither does an absent, waiting or
+unmarked one); a "In order / Lowest first" control sorts within each part (`sortItems` — weakest
+SHARE of the maximum, not lowest raw mark; unmarked last; stable; pinned by tests); and while grades
+are hidden the top card is a lock and one line ("Grades open soon — your scores are below"), not a
+"0 of N marked" that reads as a failure. **Declined:** a balance chip in the header and two columns
+on wide screens. Verified by probe (removed, residue-checked) at 320px: 23/40 reads 57% in danger,
+38/40 and 20/20 in success, the link has no border and carries the column id, no link on the
+perfect score, zero overflow.
+
 Since 0064 (Points assist is AUTOMATIC — Era 8.0 Phase 8). Decisions (instructor, 2026-11-11):
 **no terms to set** · **1 point = 1 mark** · **the student chooses how many points** ·
 **never past the column's maximum** · **still approved by hand** · **only a per-column Off

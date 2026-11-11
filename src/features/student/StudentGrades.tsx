@@ -8,12 +8,16 @@ import { ScreenTitle } from '@/components/ui/ScreenTitle'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
-import { ChevronDownIcon, TableIcon, TicketIcon } from '@/components/ui/icons'
+import { Meter } from '@/components/ui/Meter'
+import { ChevronDownIcon, LockIcon, TableIcon, TicketIcon } from '@/components/ui/icons'
 import { boostState, formatMarks } from '@/lib/grade-boost'
+import { rateTone } from '@/lib/attendance'
 import { displayGrade } from '@/lib/grading'
+import { TONE } from '@/lib/tone'
 import {
   TERM_TITLE,
   boostableCount,
+  sortItems,
   explainTerm,
   latestSoFar,
   summarizeTerm,
@@ -58,6 +62,9 @@ export function StudentGrades() {
   const [pickedSubject, setPickedSubject] = useState<string | null>(null)
   const [pickedTerm, setPickedTerm] = useState<TermKey | null>(null)
   const [explainOpen, setExplainOpen] = useState(false)
+  // How the scores are listed inside each part: as entered, or weakest first so the
+  // columns with the most room to gain are on top.
+  const [order, setOrder] = useState<'order' | 'lowest'>('order')
 
   const subject = subjects.find((s) => s.subjectId === pickedSubject) ?? subjects[0] ?? null
   const terms = useMemo(() => (subject ? termsWithItems(subject) : []), [subject])
@@ -204,15 +211,14 @@ export function StudentGrades() {
         ) : (
           // Grades are not open yet (0065): the scores below are the student's own
           // and stay visible, and so does using points on them. Only the GRADE waits.
-          <Card className="p-5">
-            <p className="text-xs text-muted">{TERM_TITLE[term]} · your scores</p>
-            <p className="mt-0.5 font-display text-2xl font-bold tabular-nums">
-              {summary.marked} of {summary.total}{' '}
-              <span className="text-base font-semibold text-muted">marked</span>
-            </p>
-            <p className="mt-2 text-xs text-muted">
-              Your instructor hasn’t opened grades yet. You can see your scores and use your
-              points on them now — the grade itself shows up once it’s opened.
+          // One calm line — no big number, no "0 of N marked" to read as a failure.
+          <Card pad="tight" className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card-2 text-muted">
+              <LockIcon className="h-5 w-5" />
+            </span>
+            <p className="min-w-0 flex-1 text-sm">
+              <span className="font-semibold">Grades open soon.</span>{' '}
+              <span className="text-muted">Your scores are below, and you can use points on them now.</span>
             </p>
           </Card>
         )}
@@ -281,7 +287,20 @@ export function StudentGrades() {
           </Card>
         </Link>
 
-                {summary.components
+                <SegmentedControl
+          label="Order the scores"
+          tone="quiet"
+          size="sm"
+          value={order}
+          onChange={setOrder}
+          options={[
+            { value: 'order', label: 'In order' },
+            { value: 'lowest', label: 'Lowest first' },
+          ]}
+          className="w-full sm:w-64"
+        />
+
+        {summary.components
           .filter((c) =>
             c.component === 'recitation'
               ? c.possible > 0
@@ -321,9 +340,10 @@ export function StudentGrades() {
                 )}
               </div>
               <Rows>
-                {summary.items
-                  .filter((i) => i.component === c.component)
-                  .map((item) => (
+                {sortItems(
+                  summary.items.filter((i) => i.component === c.component),
+                  order,
+                ).map((item) => (
                     <ItemRow
                       key={item.id}
                       item={item}
@@ -343,12 +363,10 @@ export function StudentGrades() {
 function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has ended — no new requests, whatever the column says. */ locked: boolean }) {
   const state = boostState(item)
 
-  const scoreLine =
-    item.score === null
-      ? item.absent
-        ? 'Absent'
-        : 'Not marked yet'
-      : `${formatMarks(item.score)} / ${formatMarks(item.maxScore)}`
+  // How well they did on this one, in the same 70 / 85 bands attendance uses — one
+  // threshold app-wide, so a "red" here means what a red means everywhere.
+  const pct = item.score !== null && item.maxScore > 0 ? (item.score / item.maxScore) * 100 : null
+  const tone = pct === null ? null : rateTone(pct)
 
   return (
     <div className="flex items-center gap-3 p-3.5">
@@ -357,10 +375,29 @@ function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has end
           {item.name}
         </p>
         <p className="text-xs tabular-nums text-muted">
-          {scoreLine}
+          {item.score === null ? (
+            item.absent ? 'Absent' : 'Not marked yet'
+          ) : (
+            <>
+              <span className={cn('font-semibold', tone && TONE[tone].text)}>
+                {formatMarks(item.score)}
+              </span>{' '}
+              / {formatMarks(item.maxScore)}
+            </>
+          )}
           {state.kind === 'boosted' && ` · was ${formatMarks(state.before)}`}
           {state.kind === 'unmarked' && !locked && ' · points assist opens once it’s marked'}
         </p>
+        {pct !== null && tone && (
+          <Meter
+            value={pct}
+            max={100}
+            size="sm"
+            tone={tone}
+            label={`${item.name}: ${Math.round(pct)}%`}
+            className="mt-1.5"
+          />
+        )}
       </div>
 
       {state.kind === 'boosted' && (
@@ -386,17 +423,18 @@ function ItemRow({ item, locked }: { item: MyGradeItem; /** The semester has end
       )}
 
       {state.kind === 'available' && !locked && (
-        // A LINK, not a button: the request is made on /app/points, once, and
-        // this carries the column with it so it is brought into view there. The
-        // same 44px tap region as a small button (`cp-tap-y`), and the gain is
-        // the REAL one after the cap, so the row never promises more than it
-        // delivers.
+        // A QUIET LINK, only on a column that can still gain (a perfect score has no
+        // link at all). The old outlined red pill, repeated down every row, competed
+        // with the grade and with itself. A LINK, not a button: the request is made
+        // on /app/points, once, and this carries the column with it so it is brought
+        // into view there. The same 44px tap region as a small button (`cp-tap-y`),
+        // and it names no amount — the amount is the student's choice, on that screen.
         <Link
           to={'/app/points?column=' + item.id}
-          className="cp-tap-y inline-flex h-9 shrink-0 items-center gap-1 rounded-xl border border-line px-3 text-sm font-semibold text-accent transition-colors hover:bg-card-2"
+          className="cp-tap-y inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-accent underline-offset-2 hover:underline"
         >
-          use points
-          <span aria-hidden>›</span>
+          <TicketIcon className="h-4 w-4" aria-hidden />
+          Use points
         </Link>
       )}
     </div>
