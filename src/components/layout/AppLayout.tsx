@@ -31,13 +31,15 @@ import {
   TableIcon,
   TrophyIcon,
   UserIcon,
+  UsersIcon,
 } from '@/components/ui/icons'
 
 const LEGACY_ONBOARDED_KEY = 'cp_onboarded'
 
 const SIDEBAR_NAV = [
   { to: '/app', label: 'Home', Icon: HomeIcon, end: true },
-  { to: '/app/space', label: 'Student Space', Icon: SaturnIcon },
+  { to: '/app/space', label: 'Student Space', Icon: SaturnIcon, exclude: '/app/space/people' },
+  { to: '/app/space/people', label: 'People', Icon: UsersIcon },
   { to: '/app/leaderboard', label: 'Ranks', Icon: TrophyIcon },
   { to: '/app/attendance', label: 'Attend', Icon: ScanIcon },
   { to: '/app/grades', label: 'Grades', Icon: TableIcon },

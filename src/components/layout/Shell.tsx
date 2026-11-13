@@ -25,6 +25,12 @@ export interface NavLinkItem {
   label: string
   Icon: NavIcon
   end?: boolean
+  /**
+   * A path prefix that should NOT light this item up even though `to` matches it.
+   * '/app/space/people' sits under '/app/space', and without this both would be
+   * highlighted at once.
+   */
+  exclude?: string
   dot?: boolean
   badge?: ReactNode
 }
@@ -41,6 +47,14 @@ export interface NavButtonItem {
 }
 
 export type NavItem = NavLinkItem | NavButtonItem
+
+/** NavLink's own isActive, minus any sibling route the item says it does not own. */
+export function useNavActive() {
+  const { pathname } = useLocation()
+  return (isActive: boolean, item: NavLinkItem) =>
+    isActive &&
+    !(item.exclude && (pathname === item.exclude || pathname.startsWith(item.exclude + '/')))
+}
 
 const navKey = (item: NavItem) => (item.kind === 'button' ? item.id : item.to)
 
@@ -72,7 +86,8 @@ function NavBody({
           isActive && 'drop-shadow-[0_0_6px_var(--color-accent-solid)]',
         )}
       />
-      {dot && (
+      {/* In the icon rail there is no room for a count, so a badge becomes a dot. */}
+      {(dot || (compact && !!badge)) && (
         <span
           className={cn(
             'absolute -right-1 h-2 w-2 rounded-full bg-accent-solid ring-2 ring-canvas',
@@ -129,6 +144,7 @@ export function Shell({
   tabNav = nav,
   badge,
   actions,
+  sidebarActions,
   accountSlot,
   width = 'reading',
 }: {
@@ -136,10 +152,13 @@ export function Shell({
   tabNav?: NavItem[]
   badge?: ReactNode
   actions?: ReactNode
+  /** Desktop sidebar footer only; falls back to `actions`. Lets items that live in the sidebar nav leave the footer row. */
+  sidebarActions?: ReactNode
   accountSlot?: ReactNode
   width?: 'reading' | 'wide' | 'full'
 }) {
   const reduce = useReducedMotion()
+  const navActive = useNavActive()
   const wide = width !== 'reading'
   const full = width === 'full'
   return (
@@ -199,15 +218,15 @@ export function Shell({
                 key={navKey(item)}
                 to={item.to}
                 end={item.end}
-                className={({ isActive }) => sidebarClasses(isActive, full)}
+                className={({ isActive }) => sidebarClasses(navActive(isActive, item), full)}
               >
-                {({ isActive }) => (
+                {({ isActive: active }) => (
                   <NavBody
                     Icon={item.Icon}
                     label={item.label}
                     dot={item.dot}
                     badge={item.badge}
-                    isActive={isActive}
+                    isActive={navActive(active, item)}
                     surface="sidebar"
                     reduce={reduce}
                     compact={full}
@@ -222,7 +241,7 @@ export function Shell({
           <div className={cn('flex items-center', full ? 'flex-col gap-2' : 'justify-between px-1')}>
             <ThemeToggle className={full ? 'w-10' : undefined} />
             <div className={cn(full && 'flex flex-col items-center [&>div]:flex-col')}>
-              {actions}
+              {sidebarActions ?? actions}
             </div>
           </div>
           {accountSlot}

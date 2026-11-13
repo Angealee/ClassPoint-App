@@ -3,6 +3,7 @@ import type {
   LoungePost,
   LoungeQuota,
   LoungeReply,
+  PostW,
   PulseKind,
   ShoutoutReceived,
   SpacePerson,
@@ -90,6 +91,9 @@ interface ReplyRow {
   can_delete: boolean
   hidden_at: string | null
   created_at: string
+  parent_reply_id?: string | null
+  reply_to_id?: string | null
+  reply_to_name?: string | null
 }
 
 export async function getLoungeReplies(postId: string): Promise<LoungeReply[]> {
@@ -103,6 +107,10 @@ export async function getLoungeReplies(postId: string): Promise<LoungeReply[]> {
     canDelete: !!r.can_delete,
     hiddenAt: r.hidden_at,
     createdAt: r.created_at,
+    // Optional until 0068 is applied: an older database simply has no threads.
+    parentReplyId: r.parent_reply_id ?? null,
+    replyToId: r.reply_to_id ?? null,
+    replyToName: r.reply_to_name ?? null,
   }))
 }
 
@@ -126,8 +134,41 @@ export async function postShoutout(targetStudentId: string, body: string): Promi
   return await rpc<string>('post_shoutout', { p_target: targetStudentId, p_body: body })
 }
 
-export async function replyToPost(postId: string, body: string): Promise<string> {
-  return await rpc<string>('reply_to_post', { p_post_id: postId, p_body: body })
+/**
+ * `parentId` is the comment being answered (omit for a top-level reply). It is
+ * OMITTED rather than sent as null when absent, so a plain reply still resolves
+ * against a database that has not had 0068 pasted yet.
+ */
+export async function replyToPost(
+  postId: string,
+  body: string,
+  parentId?: string,
+): Promise<string> {
+  return await rpc<string>('reply_to_post', {
+    p_post_id: postId,
+    p_body: body,
+    ...(parentId ? { p_parent_id: parentId } : {}),
+  })
+}
+
+/** Who gave a W on this post (0068). Visible to everyone in Student Space. */
+export async function getPostWs(postId: string): Promise<PostW[]> {
+  const rows = await rpc<
+    {
+      student_id: string
+      display_name: string
+      avatar_url: string | null
+      section_id: string | null
+      created_at: string
+    }[]
+  >('get_post_ws', { p_post_id: postId })
+  return (rows ?? []).map((r) => ({
+    studentId: r.student_id,
+    displayName: r.display_name,
+    avatarUrl: r.avatar_url,
+    sectionId: r.section_id,
+    createdAt: r.created_at,
+  }))
 }
 
 export async function giveW(

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { spring } from '@/lib/motion'
 import { useNavigate } from 'react-router-dom'
@@ -6,7 +7,15 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { Avatar } from '@/components/ui/Avatar'
-import { BoltIcon, CheckIcon, TableIcon, TicketIcon } from '@/components/ui/icons'
+import { IconButton } from '@/components/ui/IconButton'
+import {
+  BoltIcon,
+  CheckIcon,
+  EyeIcon,
+  EyeOffIcon,
+  TableIcon,
+  TicketIcon,
+} from '@/components/ui/icons'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { Meter } from '@/components/ui/Meter'
 import { BadgeArt } from '@/components/achievements/BadgeArt'
@@ -229,6 +238,8 @@ function GradesCard({
   boostEnabled: boolean
   onOpen: () => void
 }) {
+  // Hidden on every visit: the Home card never shows a grade until the eye is tapped.
+  const [reveal, setReveal] = useState(false)
   if (!grades?.enabled || !grades.figures) return null
 
   const rows: Array<{ subject: MyGradeSubject; latest: TermSummary }> = []
@@ -242,7 +253,17 @@ function GradesCard({
   const boostable = boostEnabled ? boostableCount(grades.subjects) : 0
 
   return (
-    <motion.div variants={item}>
+    <motion.div variants={item} className="relative">
+      <IconButton
+        label={reveal ? 'Hide grades' : 'Show grades'}
+        aria-pressed={reveal}
+        size="sm"
+        className="absolute right-9 top-4 z-10"
+        onClick={() => setReveal((v) => !v)}
+        icon={
+          reveal ? <EyeIcon className="h-4.5 w-4.5" /> : <EyeOffIcon className="h-4.5 w-4.5" />
+        }
+      />
       <button type="button" onClick={onOpen} className="block w-full text-left">
         <Card interactive>
           <div className="flex items-center gap-3">
@@ -273,7 +294,7 @@ function GradesCard({
                   <span className="text-muted"> · {TERM_TITLE[latest.term]} so far</span>
                 </p>
                 <span className="shrink-0 font-display text-lg font-bold tabular-nums">
-                  {displayGrade(latest.soFar)}
+                  {reveal ? displayGrade(latest.soFar) : '•••'}
                 </span>
               </div>
             ))}

@@ -160,7 +160,7 @@ export function Sheet({ open, onClose, title, children, variant = 'sheet' }: She
                 <div className="mx-auto h-1.5 w-10 rounded-full bg-line" />
               </div>
             )}
-            <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
               {title && !screen && (
                 <h2 id={titleId} className="mb-4 font-display text-lg font-bold">
                   {title}

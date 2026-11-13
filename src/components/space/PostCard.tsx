@@ -13,7 +13,11 @@ function KindHeader({ post }: { post: LoungePost }) {
   if (post.kind === 'pulse') {
     return (
       <Chip tone="reward" size="sm">
-        {post.pulseKind === 'podium' ? 'New #1' : `Level ${post.pulseValue ?? ''}`.trim()}
+        {post.pulseKind === 'podium'
+          ? 'New #1'
+          : post.pulseKind === 'event'
+            ? 'Event'
+            : `Level ${post.pulseValue ?? ''}`.trim()}
       </Chip>
     )
   }
@@ -32,6 +36,7 @@ export function PostCard({
   onToggleW,
   onDelete,
   onReport,
+  onShowWs,
   wDisabled,
   detail = false,
 }: {
@@ -39,6 +44,8 @@ export function PostCard({
   onToggleW: (post: LoungePost) => void
   onDelete?: (post: LoungePost) => void
   onReport?: (post: LoungePost) => void
+  /** Open the "who gave a W" list. */
+  onShowWs?: (post: LoungePost) => void
   wDisabled?: boolean
   detail?: boolean
 }) {
@@ -118,6 +125,15 @@ export function PostCard({
               disabled={wDisabled}
               onToggle={() => onToggleW(post)}
             />
+            {post.wCount > 0 && onShowWs && (
+              <button
+                type="button"
+                onClick={() => onShowWs(post)}
+                className="cp-tap-y text-xs font-semibold text-muted transition-colors hover:text-ink"
+              >
+                See who
+              </button>
+            )}
 
             {detail ? null : (
               <Link

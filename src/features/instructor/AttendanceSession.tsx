@@ -543,7 +543,7 @@ export function AttendanceSession({
       {roster.length > SEARCH_THRESHOLD && (
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+            <SearchIcon className="pointer-events-none absolute z-10 left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}

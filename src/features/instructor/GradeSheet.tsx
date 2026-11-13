@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
+import { Sheet } from '@/components/ui/Sheet'
+import { DownloadIcon, MoreIcon, UploadIcon } from '@/components/ui/icons'
 import { Card } from '@/components/ui/Card'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { ScreenTitle } from '@/components/ui/ScreenTitle'
@@ -101,6 +104,7 @@ export function GradeSheet() {
   const [itemsOpen, setItemsOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
   const [noteOpen, setNoteOpen] = useState(false)
   const [allSums, setAllSums] = useState<GradeSumsRow[]>([])
 
@@ -492,28 +496,39 @@ export function GradeSheet() {
                 Print
               </Button>
             ) : (
-              <>
-                <Button size="sm" variant="outline" onClick={() => setItemsOpen(true)}>
-                  Set up
-                </Button>
+              <Button size="sm" variant="outline" onClick={() => setItemsOpen(true)}>
+                Set up
+              </Button>
+            )}
+            {/* Import / Export are occasional jobs: one ⋯ button on a phone, inline from sm up. */}
+            <div className="hidden items-center gap-2 sm:flex">
+              {!isOverall && (
                 <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
                   Import
                 </Button>
-              </>
-            )}
-            <Button size="sm" variant="outline" loading={exporting} onClick={() => void onExport()}>
-              Export
-            </Button>
+              )}
+              <Button size="sm" variant="outline" loading={exporting} onClick={() => void onExport()}>
+                Export
+              </Button>
+            </div>
+            <IconButton
+              className="sm:hidden"
+              label="More grade tools"
+              variant="outline"
+              onClick={() => setToolsOpen(true)}
+              icon={<MoreIcon className="h-5 w-5" />}
+            />
           </div>
         }
       />
 
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="grid w-full grid-cols-[5.5rem_minmax(0,1fr)] gap-2 sm:flex sm:w-auto sm:items-center sm:gap-3">
         <Select
           aria-label="Section"
           value={sectionId}
           onChange={(e) => goTo(e.target.value, subjectId, tab)}
-          wrapperClassName="w-full sm:w-auto sm:min-w-40 sm:max-w-72"
+          wrapperClassName="min-w-0 sm:w-auto sm:min-w-40 sm:max-w-72"
           className="md:h-9 md:text-sm"
         >
           {sections.map((s) => (
@@ -527,7 +542,7 @@ export function GradeSheet() {
           aria-label="Subject"
           value={subjectId}
           onChange={(e) => goTo(sectionId, e.target.value, tab)}
-          wrapperClassName="w-full sm:w-auto sm:min-w-48 sm:max-w-80"
+          wrapperClassName="min-w-0 sm:w-auto sm:min-w-48 sm:max-w-80"
           className="md:h-9 md:text-sm"
         >
           {subjectChoices.map((s) => (
@@ -536,6 +551,7 @@ export function GradeSheet() {
             </option>
           ))}
         </Select>
+        </div>
 
         <SegmentedControl
           label="Term"
@@ -562,7 +578,7 @@ export function GradeSheet() {
               { value: 'soFar', label: 'So far' },
               { value: 'official', label: 'Official' },
             ]}
-            className="w-full sm:w-44"
+            className="w-44 shrink-0"
           />
         )}
         <button
@@ -717,8 +733,51 @@ export function GradeSheet() {
         </StickyBar>
       )}
 
+      <Sheet open={toolsOpen} onClose={() => setToolsOpen(false)} title="Grade tools">
+        <div className="-mx-1 divide-y divide-line">
+          {(
+            [
+              ...(isOverall
+                ? []
+                : [
+                    {
+                      label: 'Import marks',
+                      hint: 'Bring in a term from your spreadsheet',
+                      Icon: UploadIcon,
+                      run: () => setImportOpen(true),
+                    },
+                  ]),
+              {
+                label: 'Export',
+                hint: isOverall ? 'Download the whole subject as a workbook' : 'Download this term as a workbook',
+                Icon: DownloadIcon,
+                run: () => void onExport(),
+              },
+            ] as Array<{ label: string; hint: string; Icon: typeof UploadIcon; run: () => void }>
+          ).map(({ label, hint, Icon, run }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => {
+                setToolsOpen(false)
+                run()
+              }}
+              className="flex w-full items-center gap-3 px-1 py-3 text-left"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card-2 text-muted">
+                <Icon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">{label}</span>
+                <span className="block text-xs text-muted">{hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </Sheet>
+
       {section && subject && (
-        <GradeImportSheet
+      <GradeImportSheet
           open={importOpen}
           onClose={() => setImportOpen(false)}
           sectionId={sectionId}

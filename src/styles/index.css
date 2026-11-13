@@ -378,3 +378,27 @@ body::after {
 }
 
 .cp-sheen { animation: cp-sheen 9s ease-in-out infinite; }
+
+/* Native feel on phones: no visible scrollbars (real phones overlay them; DevTools
+   device emulation and narrow desktop windows draw fat ones), and no sideways
+   rubber-banding. Scrolling itself still works everywhere. */
+@media (max-width: 767px), (pointer: coarse) {
+  * {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
+  /* A phone app does not pan sideways or rubber-band. ⚠ Do NOT put overflow on
+     html here: it stops the viewport being the scroller, so every position: sticky
+     header (Shell, AwardBar, the roster) loses its scroll container and scrolls away
+     with the page. Sideways overflow is already contained by body's overflow-x: clip.
+     Pinch-zoom stays allowed — it is an accessibility feature. */
+  html {
+    overscroll-behavior: none;
+    touch-action: pan-y pinch-zoom;
+  }
+  body {
+    touch-action: pan-y pinch-zoom;
+  }
+}

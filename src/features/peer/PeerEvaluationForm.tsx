@@ -275,7 +275,7 @@ export function PeerEvaluationForm() {
 
               {!locked && (
                 <div
-                  className="mt-3 flex gap-3 overflow-x-auto px-1 pb-1"
+                  className="mt-3 flex flex-wrap gap-x-3 gap-y-2 px-1"
                   role="group"
                   aria-label="Jump to a classmate"
                 >

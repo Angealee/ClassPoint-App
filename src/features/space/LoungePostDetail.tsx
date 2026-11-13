@@ -10,6 +10,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { PostCard } from '@/components/space/PostCard'
 import { ReportSheet } from '@/components/space/ReportSheet'
+import { PostWsSheet } from '@/components/space/PostWsSheet'
 import { useStudentData } from '@/features/student/StudentData'
 import {
   deleteLoungePost,
@@ -41,6 +42,10 @@ export function LoungePostDetail() {
   const [deleteReply, setDeleteReply] = useState<LoungeReply | null>(null)
   const [busy, setBusy] = useState(false)
   const [reportTarget, setReportTarget] = useState<LoungePost | null>(null)
+  const [wsPostId, setWsPostId] = useState<string | null>(null)
+  // The comment the composer is answering, and which threads are unfolded.
+  const [replyingTo, setReplyingTo] = useState<LoungeReply | null>(null)
+  const [openThreads, setOpenThreads] = useState<Set<string>>(new Set())
   const areaRef = useRef<HTMLTextAreaElement>(null)
 
   const canPost = canPostNow(spaceAccess)
@@ -78,7 +83,13 @@ export function LoungePostDetail() {
     if (!text || sending || text.length > MAX_POST_LENGTH) return
     setSending(true)
     try {
-      await replyToPost(postId, text)
+      await replyToPost(postId, text, replyingTo?.id)
+      if (replyingTo) {
+        // Unfold the thread the answer landed in so it is not lost off-screen.
+        const root = replyingTo.parentReplyId ?? replyingTo.id
+        setOpenThreads((cur) => new Set(cur).add(root))
+      }
+      setReplyingTo(null)
       setBody('')
       setReplies(await getLoungeReplies(postId))
       setPost(await getLoungePost(postId))
@@ -117,8 +128,16 @@ export function LoungePostDetail() {
     setBusy(true)
     try {
       await deleteLoungeReply(deleteReply.id)
-      setReplies((rs) => rs.filter((r) => r.id !== deleteReply.id))
-      setPost((cur) => (cur ? { ...cur, replyCount: Math.max(0, cur.replyCount - 1) } : cur))
+      // A thread root takes its answers with it (0068), so count them all.
+      const gone = replies.filter(
+        (r) => r.id === deleteReply.id || r.parentReplyId === deleteReply.id,
+      ).length
+      setReplies((rs) =>
+        rs.filter((r) => r.id !== deleteReply.id && r.parentReplyId !== deleteReply.id),
+      )
+      setPost((cur) =>
+        cur ? { ...cur, replyCount: Math.max(0, cur.replyCount - Math.max(1, gone)) } : cur,
+      )
       setDeleteReply(null)
     } catch (e) {
       toast(errorText(e, 'Could not delete that.'), 'error')
@@ -128,6 +147,63 @@ export function LoungePostDetail() {
   }
 
   const over = body.length > MAX_POST_LENGTH
+
+  // One level of threading: roots in time order, each with its answers beneath.
+  const roots = replies.filter((r) => !r.parentReplyId)
+  const answersOf = (rootId: string) => replies.filter((r) => r.parentReplyId === rootId)
+
+  function startReply(r: LoungeReply) {
+    setReplyingTo(r)
+    areaRef.current?.focus()
+    areaRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }
+
+  function renderReply(r: LoungeReply, root: LoungeReply, nested: boolean) {
+    // Inside a thread, say whose comment this answers when it is not the root's.
+    const showWho = nested && r.replyToName && r.replyToId !== root.id
+    return (
+      <div key={r.id} className="flex items-start gap-3">
+        <Avatar
+          name={r.displayName}
+          url={r.avatarUrl}
+          className={nested ? 'h-7 w-7' : 'h-8 w-8'}
+          textClassName="text-2xs"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 truncate text-sm font-semibold">{r.displayName}</span>
+            <span className="shrink-0 text-2xs text-muted">{timeAgo(r.createdAt)}</span>
+            {r.canDelete && (
+              <button
+                type="button"
+                onClick={() => setDeleteReply(r)}
+                className="ml-auto shrink-0 text-2xs font-semibold text-muted transition-colors hover:text-danger"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+          {r.hiddenAt && r.body === null ? (
+            <p className="mt-1 text-sm font-medium text-danger">Hidden — reported</p>
+          ) : (
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-ink">
+              {showWho && <span className="font-semibold text-accent">@{r.replyToName} </span>}
+              {r.body}
+            </p>
+          )}
+          {canPost && !(r.hiddenAt && r.body === null) && (
+            <button
+              type="button"
+              onClick={() => startReply(r)}
+              className="cp-tap-y mt-0.5 text-2xs font-semibold text-muted transition-colors hover:text-ink"
+            >
+              Reply
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -147,11 +223,27 @@ export function LoungePostDetail() {
             onToggleW={toggleW}
             onDelete={setDeletePost}
             onReport={post.canDelete ? undefined : setReportTarget}
+            onShowWs={(p) => setWsPostId(p.id)}
             wDisabled={!canPost}
           />
 
           {canPost && (
             <Card pad="roomy">
+              {replyingTo && (
+                <div className="mb-2 flex items-center gap-2 rounded-lg bg-card-2 px-3 py-1.5 text-xs">
+                  <span className="min-w-0 flex-1 truncate text-muted">
+                    Replying to{' '}
+                    <span className="font-semibold text-ink">{replyingTo.displayName}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setReplyingTo(null)}
+                    className="cp-tap-y shrink-0 font-semibold text-muted hover:text-ink"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
               <textarea
                 ref={areaRef}
                 value={body}
@@ -163,7 +255,7 @@ export function LoungePostDetail() {
                   }
                 }}
                 rows={2}
-                placeholder="Reply…"
+                placeholder={replyingTo ? `Reply to ${replyingTo.displayName}…` : 'Reply…'}
                 className={cn(
                   'w-full resize-none overflow-y-auto rounded-xl border bg-card px-3.5 py-2.5 text-base text-ink',
                   'placeholder:text-muted/70 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30',
@@ -198,48 +290,47 @@ export function LoungePostDetail() {
             <EmptyState>No replies yet.</EmptyState>
           ) : (
             <div className="space-y-2">
-              {replies.map((r) => (
-                <Card key={r.id} pad="default">
-                  <div className="flex items-start gap-3">
-                    <Avatar
-                      name={r.displayName}
-                      url={r.avatarUrl}
-                      className="h-8 w-8"
-                      textClassName="text-2xs"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="min-w-0 truncate text-sm font-semibold">
-                          {r.displayName}
-                        </span>
-                        <span className="shrink-0 text-2xs text-muted">
-                          {timeAgo(r.createdAt)}
-                        </span>
-                        {r.canDelete && (
-                          <button
-                            type="button"
-                            onClick={() => setDeleteReply(r)}
-                            className="ml-auto shrink-0 text-2xs font-semibold text-muted transition-colors hover:text-danger"
-                          >
-                            Delete
-                          </button>
+              {roots.map((r) => {
+                const answers = answersOf(r.id)
+                const open = openThreads.has(r.id)
+                return (
+                  <Card key={r.id} pad="default">
+                    {renderReply(r, r, false)}
+                    {answers.length > 0 && (
+                      <div className="ml-11 mt-1">
+                        <button
+                          type="button"
+                          aria-expanded={open}
+                          onClick={() =>
+                            setOpenThreads((cur) => {
+                              const next = new Set(cur)
+                              if (next.has(r.id)) next.delete(r.id)
+                              else next.add(r.id)
+                              return next
+                            })
+                          }
+                          className="cp-tap-y text-xs font-semibold text-accent"
+                        >
+                          {open
+                            ? 'Hide replies'
+                            : `View ${answers.length} ${answers.length === 1 ? 'reply' : 'replies'}`}
+                        </button>
+                        {open && (
+                          <div className="mt-1 space-y-3 border-l border-line pl-3">
+                            {answers.map((a) => renderReply(a, r, true))}
+                          </div>
                         )}
                       </div>
-                      {r.hiddenAt && r.body === null ? (
-                        <p className="mt-1 text-sm font-medium text-danger">Hidden — reported</p>
-                      ) : (
-                        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-ink">
-                          {r.body}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              ))}
+                    )}
+                  </Card>
+                )
+              })}
             </div>
           )}
         </>
       )}
+
+      <PostWsSheet postId={wsPostId} onClose={() => setWsPostId(null)} />
 
       <ReportSheet
         open={!!reportTarget}

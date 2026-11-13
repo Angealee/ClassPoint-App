@@ -256,18 +256,6 @@ export interface Database {
       /** 0027 — which sections take which subject. */
       section_subjects: Row<{ section_id: UUID; subject_id: UUID }>
 
-      /** 0032 — the instructor's price list. Ships empty. */
-      reward_catalog_items: Row<{
-        id: UUID
-        label: string
-        /** Capped at 50 to match request_point_redemption's own limit. */
-        points: number
-        kind: 'quiz' | 'activity' | 'exam' | 'other'
-        sort_order: number
-        archived_at: Timestamp | null
-        created_at: Timestamp
-      }>
-
       push_subscriptions: Row<{
         id: UUID
         student_id: UUID

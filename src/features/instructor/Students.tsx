@@ -1,6 +1,12 @@
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -17,6 +23,7 @@ import {
   CopyIcon,
   DownloadIcon,
   KeyIcon,
+  MoreIcon,
   PencilIcon,
   PlusIcon,
   SearchIcon,
@@ -58,7 +65,15 @@ export function Students() {
   const [searchParams, setSearchParams] = useSearchParams()
   const importRef = useRef<HTMLInputElement>(null)
 
-  const [openId, setOpenId] = useState<string | null>(null)
+  // The open section lives in the URL (?section=), NOT component state: a student
+  // record opened from this roster must come back to THIS roster on Back, and a
+  // plain useState here sent every Back to the section grid.
+  const openId = searchParams.get('section')
+  const setOpenId = useCallback(
+    (id: string | null, replace = true) =>
+      setSearchParams(id ? { section: id } : {}, { replace }),
+    [setSearchParams],
+  )
 
   const [students, setStudents] = useState<SectionStudent[]>([])
   const [loading, setLoading] = useState(true)
@@ -99,7 +114,6 @@ export function Students() {
   const studentParam = searchParams.get('student')
   useEffect(() => {
     if (!studentParam) return
-    setSearchParams({}, { replace: true })
     getStudent(studentParam)
       .then((s) => {
         if (!s) return
@@ -128,6 +142,9 @@ export function Students() {
 
   const [recognitions, setRecognitions] = useState<Achievement[]>([])
   const [grantTarget, setGrantTarget] = useState<SectionStudent>()
+  // Phone only: the row's four secondary actions live behind one ⋯ button.
+  const [menuTarget, setMenuTarget] = useState<SectionStudent | null>(null)
+  const [toolsOpen, setToolsOpen] = useState(false)
   const [granting, setGranting] = useState<string | null>(null)
 
   useEffect(() => {
@@ -196,7 +213,8 @@ export function Students() {
     setQuery('')
     setSelected(new Set())
     setLastAwarded([])
-    setOpenId(id)
+    // From the grid: push, so Back returns to the grid. From the picker: replace.
+    setOpenId(id, !openId ? false : true)
   }
 
   const filtered = useMemo(() => {
@@ -420,72 +438,64 @@ export function Students() {
         <ArrowLeftIcon className="h-4 w-4" /> Sections
       </button>
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Select
-            aria-label="Section"
-            value={openId}
-            onChange={(e) => openSection(e.target.value)}
-            className="max-w-40 font-display font-bold"
-          >
-            {sections.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </Select>
-          <span className="whitespace-nowrap text-muted">· {students.length}</span>
-          {archivedCount > 0 && (
+      {/* Header: pick a section, add a student. Everything else is one row below. */}
+      <div className="flex items-center gap-3">
+        <Select
+          aria-label="Section"
+          value={openId}
+          onChange={(e) => openSection(e.target.value)}
+          className="font-display font-bold"
+          wrapperClassName="min-w-0 flex-1 sm:max-w-xs"
+        >
+          {sections.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </Select>
+        <Button onClick={() => setAddOpen(true)} className="shrink-0">
+          <PlusIcon className="h-5 w-5" /> Add
+        </Button>
+      </div>
+
+      <p className="-mt-2 flex items-center gap-2 px-1 text-sm text-muted">
+        <span>
+          {students.length} student{students.length === 1 ? '' : 's'}
+        </span>
+        {archivedCount > 0 && (
+          <>
+            <span aria-hidden="true">·</span>
             <button
               type="button"
               onClick={() => setArchivedOpen(true)}
-              className="shrink-0 rounded-full bg-card-2 px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:text-ink"
+              className="cp-tap-y font-semibold text-accent hover:underline"
             >
-              Archived ({archivedCount})
+              {archivedCount} archived
             </button>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {students.length > 0 && (
-            <button
-              type="button"
-              onClick={copyAll}
-              className="text-sm font-medium text-accent hover:underline"
-            >
-              Copy unclaimed tokens
-            </button>
-          )}
-          <Button onClick={() => setAddOpen(true)} size="sm">
-            <PlusIcon className="h-5 w-5" /> Add
-          </Button>
-        </div>
-      </div>
+          </>
+        )}
+      </p>
 
-      {/* Toolbar: search + import/export */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[10rem] flex-1">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+      {/* Search + tools: one row. Import / Export / Backup live behind Tools. */}
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <SearchIcon className="pointer-events-none absolute z-10 left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search name or @username"
-            className="pl-9"
+            aria-label="Search students"
+            className="pl-10"
           />
         </div>
-        <Button variant="outline" onClick={openImport} className="shrink-0">
-          <UploadIcon className="h-5 w-5" /> Import
-        </Button>
-        <Button variant="outline" onClick={onExport} className="shrink-0">
-          <DownloadIcon className="h-5 w-5" /> Export
-        </Button>
         <Button
           variant="outline"
-          onClick={() => void onBackupAll()}
-          disabled={backingUp}
+          onClick={() => setToolsOpen(true)}
+          aria-label="Roster tools"
           className="shrink-0"
-          title="Everything — all sections, points, attendance, sessions and requests — in one workbook"
         >
-          <DownloadIcon className="h-5 w-5" /> {backingUp ? 'Backing up…' : 'Backup all'}
+          <MoreIcon className="h-5 w-5" />
+          <span className="hidden sm:inline">Tools</span>
         </Button>
       </div>
 
@@ -512,7 +522,8 @@ export function Students() {
         <EmptyState>No students match “{query}”.</EmptyState>
       ) : (
         <>
-        <div className="flex flex-wrap items-center gap-2 px-1">
+        <div className="flex flex-wrap items-center gap-2 px-1 [&>button]:whitespace-nowrap">
+          <span className="shrink-0 text-xs font-medium text-muted">Select</span>
           <button
             type="button"
             onClick={() =>
@@ -520,7 +531,7 @@ export function Students() {
             }
             className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-accent-solid hover:text-accent"
           >
-            {allFilteredSelected ? 'Clear all' : `Select all (${filtered.length})`}
+            {allFilteredSelected ? 'Clear all' : `All (${filtered.length})`}
           </button>
           {unclaimedIds.length > 0 && (
             <button
@@ -528,7 +539,7 @@ export function Students() {
               onClick={() => setSelected(new Set(unclaimedIds))}
               className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-accent-solid hover:text-accent"
             >
-              Select unclaimed ({unclaimedIds.length})
+              Unclaimed ({unclaimedIds.length})
             </button>
           )}
           {lastSessionIds.length > 0 && (
@@ -538,7 +549,7 @@ export function Students() {
               title="Everyone marked Present or Late in this section's most recent class"
               className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-accent-solid hover:text-accent"
             >
-              Select from last class ({lastSessionIds.length})
+              Last class ({lastSessionIds.length})
             </button>
           )}
         </div>
@@ -549,7 +560,7 @@ export function Students() {
               <div
                 key={s.id}
                 className={cn(
-                  'flex items-center gap-3 p-3.5 transition-colors',
+                  'flex items-center gap-2 p-3.5 transition-colors sm:gap-3',
                   selected.has(s.id) && 'bg-accent-solid/8',
                 )}
               >
@@ -574,7 +585,7 @@ export function Students() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{s.full_name}</span>
-                    <span className="flex items-center gap-1.5 text-xs text-muted">
+                    <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted [&>svg]:shrink-0">
                       {s.claimed_at ? (
                         <>
                           <CheckIcon className="h-3.5 w-3.5 text-gold-500" />@{s.username} · Lv{' '}
@@ -589,7 +600,8 @@ export function Students() {
                     </span>
                   </span>
                 </button>
-                                <IconButton
+                <div className="hidden items-center gap-2 sm:flex">
+                <IconButton
                   label={`Grant ${s.full_name} an achievement`}
                   onClick={() => setGrantTarget(s)}
                   title="Grant achievement"
@@ -630,6 +642,21 @@ export function Students() {
                 >
                   View ›
                 </button>
+                </div>
+                <IconButton
+                  className="sm:hidden"
+                  label={`More actions for ${s.full_name}`}
+                  onClick={() => setMenuTarget(s)}
+                  icon={<MoreIcon className="h-5 w-5" />}
+                />
+                <button
+                  type="button"
+                  onClick={() => navigate(`/teach/student/${s.id}`)}
+                  aria-label={`View ${s.full_name}'s record`}
+                  className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent-solid/10 sm:hidden"
+                >
+                  View ›
+                </button>
               </div>
             )
           })}
@@ -647,7 +674,7 @@ export function Students() {
         </button>
       )}
 
-      {selected.size > 0 && <div aria-hidden className="h-32" />}
+      {selected.size > 0 && <div aria-hidden className="h-44" />}
 
       <AwardBar
         selectedIds={[...selected]}
@@ -658,6 +685,109 @@ export function Students() {
           void refresh()
         }}
       />
+
+      {/* Roster tools */}
+      <Sheet open={toolsOpen} onClose={() => setToolsOpen(false)} title="Roster tools">
+        <div className="-mx-1 divide-y divide-line">
+          {(
+            [
+              { label: 'Import a list', hint: 'Add many students from a spreadsheet', Icon: UploadIcon, run: openImport },
+              { label: 'Export this section', hint: 'Names, points and tokens as a file', Icon: DownloadIcon, run: onExport },
+              {
+                label: backingUp ? 'Backing up…' : 'Backup everything',
+                hint: 'All sections, points, attendance and requests in one workbook',
+                Icon: DownloadIcon,
+                run: () => void onBackupAll(),
+                disabled: backingUp,
+              },
+              ...(students.length > 0
+                ? [{ label: 'Copy unclaimed tokens', hint: 'Claim codes for students who have not signed up', Icon: CopyIcon, run: copyAll }]
+                : []),
+            ] as Array<{
+              label: string
+              hint: string
+              Icon: typeof UploadIcon
+              run: () => void
+              disabled?: boolean
+            }>
+          ).map(({ label, hint, Icon, run, disabled }) => (
+            <button
+              key={label}
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                setToolsOpen(false)
+                run()
+              }}
+              className="flex w-full items-center gap-3 px-1 py-3 text-left disabled:opacity-50"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card-2 text-muted">
+                <Icon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">{label}</span>
+                <span className="block text-xs text-muted">{hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </Sheet>
+
+      {/* Phone: per-student actions */}
+      <Sheet
+        open={!!menuTarget}
+        onClose={() => setMenuTarget(null)}
+        title={menuTarget?.full_name ?? 'Student'}
+      >
+        {menuTarget && (
+          <div className="-mx-1 divide-y divide-line">
+            {(
+              [
+                {
+                  label: 'Grant achievement',
+                  Icon: TrophyIcon,
+                  run: () => setGrantTarget(menuTarget),
+                },
+                menuTarget.claimed_at
+                  ? { label: 'Reset PIN', Icon: KeyIcon, run: () => openReset(menuTarget) }
+                  : {
+                      label: 'Copy token',
+                      Icon: CopyIcon,
+                      run: () => copy(menuTarget.claim_token, 'Token copied'),
+                    },
+                { label: 'Edit name', Icon: PencilIcon, run: () => openEditName(menuTarget) },
+                {
+                  label: 'Archive (restorable)',
+                  Icon: TrashIcon,
+                  run: () => setDeleteTarget(menuTarget),
+                  danger: true,
+                },
+              ] as Array<{
+                label: string
+                Icon: typeof TrophyIcon
+                run: () => void
+                danger?: boolean
+              }>
+            ).map(({ label, Icon, run, danger }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  setMenuTarget(null)
+                  run()
+                }}
+                className={cn(
+                  'flex h-14 w-full items-center gap-3 px-1 text-left text-sm font-medium',
+                  danger ? 'text-danger' : 'text-ink',
+                )}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </Sheet>
 
       {/* Add student / show token */}
       <Sheet

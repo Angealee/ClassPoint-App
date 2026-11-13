@@ -28,6 +28,7 @@ const MUST_BE_LINKED = [
   '/app/space',
   '/app/space/lounge',
   '/app/space/chats',
+  '/app/space/people',
   '/app/profile',
   '/app/history',
   '/app/achievements',

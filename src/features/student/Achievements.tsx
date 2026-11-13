@@ -176,7 +176,7 @@ export function Achievements() {
 
       {!achievementsLoading && achievements.length > 0 && (
         <div className="space-y-2">
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          <div className="flex flex-wrap gap-2">
             <FilterChip active={catFilter === 'all'} onClick={() => setCatFilter('all')}>
               All
             </FilterChip>

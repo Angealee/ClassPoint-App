@@ -36,6 +36,9 @@ const Lounge = lazy(() =>
 const LoungePostDetail = lazy(() =>
   import('@/features/space/LoungePostDetail').then((m) => ({ default: m.LoungePostDetail })),
 )
+const People = lazy(() =>
+  import('@/features/space/People').then((m) => ({ default: m.People })),
+)
 const StudentSpace = lazy(() =>
   import('@/features/space/StudentSpace').then((m) => ({ default: m.StudentSpace })),
 )
@@ -192,6 +195,7 @@ export const router = createBrowserRouter([
           { path: 'space', element: <StudentSpace /> },
           { path: 'space/lounge', element: <Lounge /> },
           { path: 'space/chats', element: <Chats /> },
+          { path: 'space/people', element: <People /> },
           { path: 'space/chat/:roomId', element: <ChatRoom /> },
           { path: 'space/post/:postId', element: <LoungePostDetail /> },
         { path: 'achievements', element: <Achievements /> },

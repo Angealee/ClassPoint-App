@@ -9,7 +9,15 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { Meter } from '@/components/ui/Meter'
-import { ChevronDownIcon, LockIcon, TableIcon, TicketIcon } from '@/components/ui/icons'
+import { IconButton } from '@/components/ui/IconButton'
+import {
+  ChevronDownIcon,
+  EyeIcon,
+  EyeOffIcon,
+  LockIcon,
+  TableIcon,
+  TicketIcon,
+} from '@/components/ui/icons'
 import { boostState, formatMarks, pointsGain } from '@/lib/grade-boost'
 import { rateTone } from '@/lib/attendance'
 import { displayGrade } from '@/lib/grading'
@@ -40,6 +48,10 @@ export function StudentGrades() {
   const [pickedTerm, setPickedTerm] = useState<TermKey | null>(null)
   const [explainOpen, setExplainOpen] = useState(false)
   const [order, setOrder] = useState<'order' | 'lowest'>('order')
+  // Grade FIGURES start hidden on every visit (instructor's call): plain component
+  // state on purpose, so leaving and returning hides them again.
+  const [reveal, setReveal] = useState(false)
+  const mask = (v: string) => (reveal ? v : '•••')
 
   const subject = subjects.find((s) => s.subjectId === pickedSubject) ?? subjects[0] ?? null
   const terms = useMemo(() => (subject ? termsWithItems(subject) : []), [subject])
@@ -109,7 +121,7 @@ export function StudentGrades() {
 
   const summary = summarizeTerm(subject, term)
   const figures = grades.figures
-  const explanation = figures ? explainTerm(subject, term) : null
+  const explanation = figures && reveal ? explainTerm(subject, term) : null
 
   return (
     <PullToRefresh onRefresh={onRefresh}>
@@ -161,17 +173,35 @@ export function StudentGrades() {
 
         {figures ? (
           <Card elevation="raised" className="p-5">
-            <p className="text-xs text-muted">{TERM_TITLE[term]} · so far</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted">{TERM_TITLE[term]} · so far</p>
+              <IconButton
+                label={reveal ? 'Hide grades' : 'Show grades'}
+                aria-pressed={reveal}
+                size="sm"
+                className="-mr-1 -mt-1"
+                onClick={() => setReveal((v) => !v)}
+                icon={
+                  reveal ? (
+                    <EyeIcon className="h-4.5 w-4.5" />
+                  ) : (
+                    <EyeOffIcon className="h-4.5 w-4.5" />
+                  )
+                }
+              />
+            </div>
             <div className="mt-0.5 flex items-end justify-between gap-3">
               <p className="font-display text-4xl font-bold tabular-nums">
-                {displayGrade(summary.soFar)}
+                {mask(displayGrade(summary.soFar))}
               </p>
               <p className="pb-1 text-right text-xs tabular-nums text-muted">
                 {summary.marked} of {summary.total} marked
               </p>
             </div>
             <p className="mt-2 text-xs text-muted">
-              {summary.soFar === null
+              {!reveal
+                ? 'Grades are hidden. Tap the eye to show them.'
+                : summary.soFar === null
                 ? `Nothing in ${TERM_TITLE[term]} has been marked yet.`
                 : 'Based on what’s marked so far. Parts your instructor hasn’t marked yet count at the 60 minimum, so this moves as marks come in.'}
             </p>
@@ -248,7 +278,7 @@ export function StudentGrades() {
                   <h2 className="text-sm font-semibold">{c.label}</h2>
                   {figures && (
                     <span className="text-xs tabular-nums text-muted">
-                      {c.score === null ? '—' : displayGrade(c.score)}
+                      {c.score === null ? '—' : mask(displayGrade(c.score))}
                     </span>
                   )}
                 </div>
@@ -268,7 +298,7 @@ export function StudentGrades() {
                 <h2 className="text-sm font-semibold">{c.label}</h2>
                 {figures && (
                   <span className="text-xs tabular-nums text-muted">
-                    {c.score === null ? '—' : displayGrade(c.score)}
+                    {c.score === null ? '—' : mask(displayGrade(c.score))}
                   </span>
                 )}
               </div>

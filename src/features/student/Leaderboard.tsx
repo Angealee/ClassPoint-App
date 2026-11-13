@@ -1,6 +1,7 @@
 import { RankDeltaValue, rankDelta } from '@/components/leaderboard/RankSignals'
 import { BoardSwitcher } from '@/components/leaderboard/BoardSwitcher'
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Select } from '@/components/ui/Select'
 import { Avatar } from '@/components/ui/Avatar'
 import { ListSkeleton } from '@/components/ui/Skeleton'
@@ -32,7 +33,11 @@ export function Leaderboard() {
   const [shareOpen, setShareOpen] = useState(false)
   const [pastOpen, setPastOpen] = useState(false)
   const [shareMounted, setShareMounted] = useState(false)
-  const [view, setView] = useState<string>(GLOBAL)
+  // In the URL so coming back from the spend board keeps the section you were on.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = searchParams.get('view') ?? GLOBAL
+  const setView = (v: string) =>
+    setSearchParams(v === GLOBAL ? {} : { view: v }, { replace: true })
 
   const isGlobal = view === GLOBAL
 

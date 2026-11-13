@@ -54,7 +54,7 @@ export function IdentityBlock({
 }
 
 const ROW =
-  'flex h-14 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors'
+  'flex h-[clamp(2.75rem,6.4dvh,3.5rem)] w-full items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors'
 
 export function SettingsRow({
   onNavigate,

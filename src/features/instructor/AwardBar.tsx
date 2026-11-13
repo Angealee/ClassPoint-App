@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Sheet } from '@/components/ui/Sheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { SuccessTick } from '@/components/ui/SuccessTick'
 import { useToast } from '@/components/ui/Toast'
@@ -36,7 +37,9 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
   const [customError, setCustomError] = useState<string>()
   const [category, setCategory] = useState<PointCategory>('recitation')
   const [note, setNote] = useState('')
-  const [expanded, setExpanded] = useState(false)
+  // Custom points / category / note live in a sheet, NOT in the docked bar: expanding
+  // the bar in place covered the roster the instructor is ticking names from.
+  const [moreOpen, setMoreOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [celebrate, setCelebrate] = useState(false)
@@ -45,6 +48,7 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
   const count = selectedIds.length
   const ready = points !== null && count > 0
 
+  const customised = custom !== '' || note.trim() !== '' || (!penalty && category !== 'recitation')
   const needsConfirm = penalty && ready && (count > 1 || (points ?? 0) > BIG_PENALTY)
 
   const actionLabel = ready
@@ -124,10 +128,16 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setExpanded((v) => !v)}
-                    className="rounded-lg px-2 py-1 text-xs font-medium text-muted transition-colors hover:text-ink"
+                    onClick={() => setMoreOpen(true)}
+                    className="relative rounded-lg px-2 py-1 text-xs font-medium text-muted transition-colors hover:text-ink"
                   >
-                    {expanded ? 'Less' : 'More'}
+                    More
+                    {customised && (
+                      <span
+                        aria-label="Custom options set"
+                        className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-accent-solid"
+                      />
+                    )}
                   </button>
                   <button
                     type="button"
@@ -162,7 +172,7 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
                   ))}
                 </div>
 
-                <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+                <div className="flex min-w-0 flex-1 gap-1">
                   {POINTS.map((p) => (
                     <button
                       key={p}
@@ -174,7 +184,7 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
                         setCustomError(undefined)
                       }}
                       className={cn(
-                        'h-9 w-9 shrink-0 rounded-lg border text-sm font-bold tabular-nums transition-colors',
+                        'h-9 min-w-0 max-w-11 flex-1 rounded-lg border text-sm font-bold tabular-nums transition-colors',
                         points === p && !custom
                           ? 'border-accent-solid bg-accent-solid/10 text-accent'
                           : 'border-line text-muted hover:text-ink',
@@ -185,51 +195,6 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
                   ))}
                 </div>
               </div>
-
-              {!penalty && (
-                <div className="mt-2 flex gap-1.5">
-                  {CATEGORIES.map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      aria-pressed={category === c.value}
-                      onClick={() => setCategory(c.value)}
-                      className={cn(
-                        'rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors',
-                        category === c.value
-                          ? 'border-accent-solid bg-accent-solid/10 text-accent'
-                          : 'border-line text-muted hover:text-ink',
-                      )}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {expanded && (
-                <div className="mt-2 space-y-2">
-                  <Input
-                    label="Custom points"
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={MAX_POINTS}
-                    value={custom}
-                    onChange={(e) => onCustomChange(e.target.value)}
-                    placeholder={`1–${MAX_POINTS}`}
-                    error={customError}
-                  />
-                  <Input
-                    label="Note (optional)"
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder={
-                      penalty ? 'Reason — e.g. late, disruptive' : 'e.g. answered the bonus question'
-                    }
-                  />
-                </div>
-              )}
 
               <Button
                 size="md"
@@ -243,6 +208,56 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="Award options">
+        <div className="space-y-4">
+          {!penalty && (
+            <div>
+              <p className="mb-1.5 text-sm font-medium">Category</p>
+              <div className="flex gap-2">
+                {CATEGORIES.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    aria-pressed={category === c.value}
+                    onClick={() => setCategory(c.value)}
+                    className={cn(
+                      'h-11 flex-1 rounded-xl border text-sm font-semibold transition-colors',
+                      category === c.value
+                        ? 'border-accent-solid bg-accent-solid/10 text-accent'
+                        : 'border-line text-muted hover:text-ink',
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <Input
+            label="Custom points"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={MAX_POINTS}
+            value={custom}
+            onChange={(e) => onCustomChange(e.target.value)}
+            placeholder={`1–${MAX_POINTS}`}
+            error={customError}
+          />
+          <Input
+            label="Note (optional)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={
+              penalty ? 'Reason — e.g. late, disruptive' : 'e.g. answered the bonus question'
+            }
+          />
+          <Button className="w-full" onClick={() => setMoreOpen(false)}>
+            Done
+          </Button>
+        </div>
+      </Sheet>
 
       <ConfirmDialog
         open={confirming}

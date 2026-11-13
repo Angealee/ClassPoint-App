@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Button } from '@/components/ui/Button'
@@ -11,6 +12,7 @@ import { BetaBanner } from '@/components/space/BetaBanner'
 import { PostCard } from '@/components/space/PostCard'
 import { EventCard } from '@/components/space/EventCard'
 import { ReportSheet } from '@/components/space/ReportSheet'
+import { PostWsSheet } from '@/components/space/PostWsSheet'
 import { PostComposer, type ClassmateOption } from '@/components/space/PostComposer'
 import { AstronautArt } from '@/components/space/AstronautArt'
 import { useStudentData } from '@/features/student/StudentData'
@@ -38,7 +40,11 @@ export function Lounge() {
   const { me, spaceAccess, sections } = useStudentData()
   const { toast } = useToast()
 
-  const [mode, setMode] = useState<FeedMode>('latest')
+  // In the URL so Back from a post returns to the same feed (Latest / Trending).
+  const [searchParams, setSearchParams] = useSearchParams()
+  const mode: FeedMode = searchParams.get('mode') === 'trending' ? 'trending' : 'latest'
+  const setMode = (m: FeedMode) =>
+    setSearchParams(m === 'latest' ? {} : { mode: m }, { replace: true })
   const [posts, setPosts] = useState<LoungePost[]>([])
   const [pinned, setPinned] = useState<LoungePost[]>([])
   const [quota, setQuota] = useState<LoungeQuota | null>(null)
@@ -53,6 +59,7 @@ export function Lounge() {
   const [deleteTarget, setDeleteTarget] = useState<LoungePost | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [reportTarget, setReportTarget] = useState<LoungePost | null>(null)
+  const [wsPostId, setWsPostId] = useState<string | null>(null)
 
   const canPost = canPostNow(spaceAccess)
 
@@ -294,6 +301,7 @@ export function Lounge() {
                 post={p}
                 wDisabled={wDisabled}
                 onToggleW={toggleW}
+                onShowWs={(post) => setWsPostId(post.id)}
                 onDelete={setDeleteTarget}
                 onReport={p.canDelete ? undefined : setReportTarget}
               />
@@ -317,6 +325,7 @@ export function Lounge() {
                   post={p}
                   wDisabled={wDisabled}
                   onToggleW={toggleW}
+                onShowWs={(post) => setWsPostId(post.id)}
                   onDelete={setDeleteTarget}
                   onReport={p.canDelete ? undefined : setReportTarget}
                 />
@@ -336,6 +345,8 @@ export function Lounge() {
           </div>
         </PullToRefresh>
       )}
+
+      <PostWsSheet postId={wsPostId} onClose={() => setWsPostId(null)} />
 
       <ReportSheet
         open={!!reportTarget}

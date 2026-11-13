@@ -244,6 +244,28 @@ export function InstructorLayout() {
     [sections, selectedSectionId, semester, subjects, sectionSubjects, subjectsForSection],
   )
 
+  // Desktop sidebar carries Requests and Peer evaluation as real nav items; the
+  // phone keeps them as header buttons (and its bottom tabs stay at five).
+  const requestsCount = pendingRedemptions + pendingExcuses + pendingReports
+  const sidebarNav = useMemo<NavItem[]>(
+    () => [
+      ...nav,
+      {
+        to: '/teach/redemptions',
+        label: 'Requests',
+        Icon: TicketIcon,
+        badge:
+          requestsCount > 0 ? (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-solid px-1.5 text-2xs font-bold tabular-nums text-white">
+              {requestsCount > 9 ? '9+' : requestsCount}
+            </span>
+          ) : undefined,
+      },
+      { to: '/teach/peer', label: 'Peer evaluation', Icon: ClipboardIcon },
+    ],
+    [requestsCount],
+  )
+
   if (loading) return <Splash />
 
   return (
@@ -251,12 +273,25 @@ export function InstructorLayout() {
       value={contextValue}
     >
       <Shell
-        nav={nav}
+        nav={sidebarNav}
+        tabNav={nav}
         width={routeWidth(pathname)}
         badge={
           <span className="ml-1 rounded-lg bg-accent-solid/10 px-2 py-0.5 text-xs font-semibold text-accent">
             Instructor
           </span>
+        }
+        sidebarActions={
+          <div className="flex items-center gap-2">
+            <OpsButton />
+            <IconButton
+              label="Sign out"
+              variant="outline"
+              round
+              onClick={onSignOut}
+              icon={<LogOutIcon className="h-5 w-5" />}
+            />
+          </div>
         }
         actions={
           <div className="flex items-center gap-2">

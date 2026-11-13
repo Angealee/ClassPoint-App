@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { glide } from '@/lib/motion'
 import { NavLink } from 'react-router-dom'
-import type { NavItem } from '@/components/layout/Shell'
+import { useNavActive, type NavItem } from '@/components/layout/Shell'
 import { IdentityBlock, SettingsRow, SignOutRow, type AccountActions } from './AccountMenu'
 import { XIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
@@ -24,6 +24,7 @@ export function MobileMenu({
   nav: NavItem[]
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const navActive = useNavActive()
 
   const onCloseRef = useRef(onClose)
   useEffect(() => {
@@ -108,7 +109,7 @@ export function MobileMenu({
             </button>
           </header>
 
-          <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
             <div className="rounded-2xl border border-line bg-card p-4">
               <IdentityBlock onNavigate={onNavigate} size="lg" />
             </div>
@@ -123,8 +124,8 @@ export function MobileMenu({
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       cn(
-                        'flex h-14 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors',
-                        isActive
+                        'flex h-[clamp(2.75rem,6.4dvh,3.5rem)] items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors',
+                        navActive(isActive, item)
                           ? 'bg-accent-solid/10 text-accent'
                           : 'text-ink hover:bg-card-2',
                       )
@@ -135,7 +136,7 @@ export function MobileMenu({
                         <item.Icon
                           className={cn(
                             'h-5 w-5 shrink-0',
-                            isActive && 'drop-shadow-[0_0_6px_var(--color-accent-solid)]',
+                            navActive(isActive, item) && 'drop-shadow-[0_0_6px_var(--color-accent-solid)]',
                           )}
                         />
                         <span className="min-w-0 flex-1 truncate">{item.label}</span>

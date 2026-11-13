@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
+import { UsersIcon } from '@/components/ui/icons'
 import { AstronautArt } from '@/components/space/AstronautArt'
 import { BetaBanner } from '@/components/space/BetaBanner'
 import { useStudentData } from '@/features/student/StudentData'
@@ -200,6 +201,21 @@ function OpenView() {
               ) : (
                 <p className="text-sm text-muted">Post, give a W, shout out a classmate.</p>
               )}
+            </div>
+            <span className="shrink-0 text-lg text-muted">›</span>
+          </div>
+        </Card>
+      </Link>
+
+      <Link to="/app/space/people" className="block">
+        <Card pad="roomy" interactive>
+          <div className="flex items-center gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-card-2 text-muted">
+              <UsersIcon className="h-6 w-6" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-lg font-bold">People</p>
+              <p className="text-sm text-muted">Your classmates and the rest of the batch.</p>
             </div>
             <span className="shrink-0 text-lg text-muted">›</span>
           </div>

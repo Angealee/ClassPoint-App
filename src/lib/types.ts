@@ -241,15 +241,6 @@ export type RedemptionStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
 export const MAX_REDEEM_POINTS = 50
 export const MAX_PENDING_REDEMPTIONS = 3
 
-export interface RewardCatalogItem {
-  id: string
-  label: string
-  points: number
-  kind: RedemptionKind
-  sortOrder: number
-  archivedAt: string | null
-}
-
 /** One request to spend points on a grade. */
 export interface Redemption {
   id: string
@@ -578,6 +569,8 @@ export type NotificationType =
   /** An instructor announcement sent via send_broadcast (0034). */
   | 'broadcast'
   | 'space_shoutout'
+  /** Someone answered your comment in the Lounge (0068). */
+  | 'space_reply'
   | 'space_mention'
   /** A direct message (0043). */
   | 'space_dm'
@@ -720,7 +713,7 @@ export interface SpaceTimeout {
 export type LoungePostKind = 'text' | 'shoutout' | 'pulse'
 
 /** Which milestone a Class Pulse card announces. */
-export type PulseKind = 'level' | 'podium'
+export type PulseKind = 'level' | 'podium' | 'event'
 
 export interface LoungePost {
   id: string
@@ -752,6 +745,20 @@ export interface LoungeReply {
   body: string | null
   canDelete: boolean
   hiddenAt: string | null
+  createdAt: string
+  /** The thread ROOT this answers (always a top-level comment), or null if it IS one (0068). */
+  parentReplyId: string | null
+  /** The comment actually answered — may be inside the thread — and its author's name. */
+  replyToId: string | null
+  replyToName: string | null
+}
+
+/** One student who gave a W (0068). */
+export interface PostW {
+  studentId: string
+  displayName: string
+  avatarUrl: string | null
+  sectionId: string | null
   createdAt: string
 }
 

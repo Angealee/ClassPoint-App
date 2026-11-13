@@ -1,4 +1,5 @@
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { useSearchParams } from 'react-router-dom'
 import { ReportsInbox } from './ReportsInbox'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -28,7 +29,6 @@ import { cn } from '@/lib/cn'
 import { TONE } from '@/lib/tone'
 import { useInstructor } from './InstructorLayout'
 import { ExcusesInbox } from './ExcusesInbox'
-import { RewardsCatalog } from './RewardsCatalog'
 import type {
   GradeBoost,
   RedemptionKind,
@@ -37,7 +37,7 @@ import type {
   SpenderStat,
 } from '@/lib/types'
 
-type RequestsTab = 'points' | 'excuses' | 'rewards' | 'reports'
+type RequestsTab = 'points' | 'excuses' | 'reports'
 
 const KIND_LABEL: Record<RedemptionKind, string> = {
   quiz: 'Quiz',
@@ -73,7 +73,12 @@ export function Redemptions() {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [tick, setTick] = useState(false)
-  const [tab, setTab] = useState<RequestsTab>('points')
+  // The tab lives in the URL so Back from a student record returns to the SAME tab.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const tab: RequestsTab = tabParam === 'excuses' || tabParam === 'reports' ? tabParam : 'points'
+  const setTab = (next: RequestsTab) =>
+    setSearchParams(next === 'points' ? {} : { tab: next }, { replace: true })
   const [reversing, setReversing] = useState<RedemptionRequest | null>(null)
   const [boosts, setBoosts] = useState<RedemptionRequest[]>([])
   const [receipts, setReceipts] = useState<Map<string, GradeBoost>>(() => new Map())
@@ -176,7 +181,7 @@ export function Redemptions() {
             ? 'Students asking to put points toward a grade. Nothing is spent until you approve.'
             : tab === 'excuses'
               ? 'Absence excuses. Tap Excuse once the student presents their admission slip.'
-              : 'Your price list — what students can spend points on.'
+              : 'Posts and messages students reported in Student Space.'
         }
         fallback="/teach"
       />
@@ -188,14 +193,11 @@ export function Redemptions() {
         options={[
           { value: 'points', label: 'Points' },
           { value: 'excuses', label: 'Excuses' },
-          { value: 'rewards', label: 'Rewards' },
           { value: 'reports', label: 'Reports' },
         ]}
       />
 
       {tab === 'excuses' && <ExcusesInbox />}
-
-      {tab === 'rewards' && <RewardsCatalog />}
 
       {tab === 'reports' && <ReportsInbox />}
 

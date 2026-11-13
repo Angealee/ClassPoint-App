@@ -267,7 +267,35 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   with "You can only update your photo…". Dashboard step: turn OFF "Allow new users to sign
   up" (it was ON; claim-token uses the admin API and is unaffected). Redeploy `claim-token`
   (atomic token reservation, display name 2–40, PIN ≤72).
-  **Next number: 0068.** (0063 is pasted; 0064 and 0065 are written — see their sections below.)
+  **0068 is WRITTEN AND NOT YET APPLIED** — Lounge threads + the W list (2026-11-13). Paste it
+  (twice) BEFORE deploying the client, though the client degrades: `getLoungeReplies` defaults the
+  new fields, and `replyToPost` OMITS `p_parent_id` when there is none, so a plain reply still works
+  against the old function. Replies thread ONE LEVEL (instructor's call): `parent_reply_id` is the
+  thread ROOT (always a top-level comment, so answering a reply joins its thread) and `reply_to_id`
+  is the comment actually answered, shown as "@Name" inside a thread. `reply_to_post`'s signature
+  grew, so the exact old `(uuid, text)` is dropped first (the 0028 overload lesson);
+  `get_lounge_replies` grew its return type (drop-first); `delete_lounge_reply` soft-deletes a root's
+  answers with it. Answering a comment pushes its author (`space_reply`, never yourself).
+  `get_post_ws(post)` is the W list — visible to EVERYONE in Space; `PostWsSheet` owns its own
+  profile preview and closes the list before opening it (no Sheet inside a Sheet).
+  **People** (`/app/space/people`, ONE route, also a sidebar/menu entry and a hub card) reuses
+  `get_space_people()`; "My class" is exactly the viewer's section and is EMPTY, never everyone, when
+  the section is unknown (`lib/people.ts`, 7 tests). `NavLinkItem.exclude` stops Space and People
+  both lighting up. **Grades eye:** grade FIGURES (term figure, part scores, "how it is worked out",
+  Home card) are hidden on every visit and revealed with an eye; plain component state, so it
+  resets by design. Per-column scores stay visible. NOT verified on a real login.
+  **0069 is WRITTEN AND NOT YET APPLIED** — repairs found in use (2026-11-14). (1) Closing a Random
+  Event with winners failed on `lounge_posts_pulse_kind_check`: 0042 was EDITED after being pasted to
+  list `'event'`, so the live constraint was still `('level','podium')` and the whole close rolled
+  back — the 0047 rename lesson again. (2) `get_event_answers` and (3) `read_dm_thread` both used a bare
+  `where id = …` while `id` is an OUT column (42702 "column reference is ambiguous"); the second is the
+  DM break-glass path, never yet exercised. **In a plpgsql function with RETURNS TABLE, EVERY column
+  reference in its body must be alias-qualified.** (4) The **reward catalog was REMOVED** by the
+  instructor: `0032_rewards_catalog.sql`, `api/rewards.ts`, `RewardsCatalog.tsx`, the Requests "Rewards"
+  tab and the student shop grid are deleted (0032 was never applied); 0069 drops the table if it exists.
+  `cp_nightly_backup`'s lists in 0051–0063 still name `reward_catalog_items` — harmless, it tolerates a
+  missing source. ESLint cap is now **94**.
+  **Next number: 0070.** (0063 is pasted; 0064 and 0065 are written — see their sections below.)
   ⚠ **EVERY "WRITTEN AND NOT YET APPLIED" CLAIM IN THE BLOCK ABOVE IS NOW
   UNVERIFIED PROSE — ASK THE DATABASE INSTEAD.** It was written file by file
   over months, nobody could check it without reading every migration and
