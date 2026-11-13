@@ -295,7 +295,14 @@ bullets, so the next era gets trimmed rather than allowed to sprawl.
   tab and the student shop grid are deleted (0032 was never applied); 0069 drops the table if it exists.
   `cp_nightly_backup`'s lists in 0051–0063 still name `reward_catalog_items` — harmless, it tolerates a
   missing source. ESLint cap is now **94**.
-  **Next number: 0070.** (0063 is pasted; 0064 and 0065 are written — see their sections below.)
+  **0070 is WRITTEN AND NOT YET APPLIED** — give a classmate a W (2026-11-14). `person_ws`
+  (giver, receiver, Manila `given_on`) is the PK: one W per classmate per DAY, taken back by setting
+  `revoked_at` (never deleted) so a same-day re-give reuses the row and does NOT push twice. The
+  table has RLS on, no policy and no grant — `give_person_w` (toggle, gated by `cp_lounge_author`,
+  pushes `space_person_w` on the first W of the day), `get_people_ws` (public COUNT + "you gave today")
+  and `list_my_person_ws` (who gave — RECEIVER ONLY) are the only doors. Social only, never points.
+  People fails soft without it: no W buttons, no "Your W's" card.
+  **Next number: 0071.** (0063 is pasted; 0064 and 0065 are written — see their sections below.)
   ⚠ **EVERY "WRITTEN AND NOT YET APPLIED" CLAIM IN THE BLOCK ABOVE IS NOW
   UNVERIFIED PROSE — ASK THE DATABASE INSTEAD.** It was written file by file
   over months, nobody could check it without reading every migration and

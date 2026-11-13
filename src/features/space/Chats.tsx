@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { SpaceGlow } from '@/components/space/SpaceGlow'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { Card } from '@/components/ui/Card'
+import { Rows } from '@/components/ui/Card'
+import { IconButton } from '@/components/ui/IconButton'
+import { PencilIcon } from '@/components/ui/icons'
 import { Avatar } from '@/components/ui/Avatar'
 import { Chip } from '@/components/ui/Chip'
 import { Input } from '@/components/ui/Input'
 import { Sheet } from '@/components/ui/Sheet'
-import { SectionLabel } from '@/components/ui/SectionLabel'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
@@ -139,8 +141,8 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
       <Link
         to={`${basePath}/chat/${room.id}`}
         className={cn(
-          'group flex items-center gap-3 rounded-2xl border p-3 transition-colors',
-          unread ? 'border-accent-solid/35 bg-accent-solid/6' : 'border-line bg-card hover:bg-card-2',
+          'group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-card-2',
+          unread && 'bg-accent-solid/5',
         )}
       >
         <span className="relative shrink-0">
@@ -172,6 +174,7 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
                 Announce
               </Chip>
             )}
+            {room.muted && <span className="shrink-0 text-2xs text-muted">muted</span>}
           </div>
 
           {typing ? (
@@ -180,29 +183,20 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
               {typing}
             </p>
           ) : (
-            <p className="truncate text-xs text-muted">
+            <p className={cn('truncate text-sm', unread ? 'font-medium text-ink' : 'text-muted')}>
               {room.lastMessageBody
                 ? `${room.lastMessageBy}: ${room.lastMessageBody}`
                 : 'No messages yet'}
             </p>
           )}
 
-          <p className="mt-0.5 flex items-center gap-1.5 text-2xs text-muted">
-            <span>
-              {room.memberCount} {room.memberCount === 1 ? 'person' : 'people'}
-            </span>
-            {room.muted && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>muted</span>
-              </>
-            )}
-          </p>
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           {room.lastMessageAt && (
-            <span className="text-2xs text-muted">{timeAgo(room.lastMessageAt)}</span>
+            <span className={cn('text-2xs', unread ? 'font-semibold text-accent' : 'text-muted')}>
+              {timeAgo(room.lastMessageAt)}
+            </span>
           )}
           {unread && (
             <span className="h-2.5 w-2.5 rounded-full bg-accent-solid" aria-label="Unread" />
@@ -213,8 +207,21 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
   }
 
   return (
-    <div className="space-y-4">
-      <PageHeader title="Chats" fallback={basePath} />
+    <div className="relative space-y-4">
+      <SpaceGlow />
+      <PageHeader
+        title="Chats"
+        fallback={basePath}
+        actions={
+          <IconButton
+            label="New message"
+            variant="outline"
+            round
+            onClick={() => setPickerOpen(true)}
+            icon={<PencilIcon className="h-4.5 w-4.5" />}
+          />
+        }
+      />
       <BetaBanner />
 
       {loading ? (
@@ -223,60 +230,37 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
         <ErrorState onRetry={() => void load()}>Could not load your chats.</ErrorState>
       ) : (
         <>
-          <div>
-            <SectionLabel>Rooms</SectionLabel>
+          <section>
+            <h2 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
+              Rooms
+            </h2>
             {groups.length === 0 ? (
-              <EmptyState>No rooms yet.</EmptyState>
+              <EmptyState compact>No rooms yet.</EmptyState>
             ) : (
-              <div className="space-y-2">
+              <Rows>
                 {groups.map((r) => (
                   <RoomCard key={r.id} room={r} />
                 ))}
-              </div>
+              </Rows>
             )}
-          </div>
+          </section>
 
-          <div>
-            <SectionLabel
-              action={
-                <button
-                  type="button"
-                  onClick={() => setPickerOpen(true)}
-                  className="shrink-0 text-xs font-semibold text-accent"
-                >
-                  New
-                </button>
-              }
-            >
+          <section>
+            <h2 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
               Direct messages
-            </SectionLabel>
+            </h2>
             {dms.length === 0 ? (
-              <EmptyState description="Start one from someone's profile, or with New above.">
-                No direct messages yet.
+              <EmptyState compact>
+                No direct messages yet. Tap the pencil to start one.
               </EmptyState>
             ) : (
-              <div className="space-y-2">
+              <Rows>
                 {dms.map((r) => (
                   <RoomCard key={r.id} room={r} />
                 ))}
-              </div>
+              </Rows>
             )}
-          </div>
-
-          {isStudentView && (
-            <Card interactive pad="roomy" onClick={() => void openDm(null)} className="cursor-pointer">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-solid/12 text-xs font-bold text-accent">
-                  IN
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">Message your instructor</p>
-                  <p className="text-xs text-muted">Private, and always available.</p>
-                </div>
-                <span className="shrink-0 text-lg text-muted">›</span>
-              </div>
-            </Card>
-          )}
+          </section>
         </>
       )}
 
@@ -288,6 +272,22 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
             onChange={(e) => setSearch(e.target.value)}
           />
           <div className="max-h-72 divide-y divide-line overflow-y-auto rounded-xl border border-line">
+            {isStudentView && !search.trim() && (
+              <button
+                type="button"
+                disabled={starting}
+                onClick={() => void openDm(null)}
+                className="flex w-full items-center gap-3 bg-accent-solid/5 px-4 py-3 text-left transition-colors hover:bg-card-2 disabled:opacity-60"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-solid/15 text-2xs font-bold text-accent">
+                  IN
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">Instructor</span>
+                  <span className="block text-2xs text-muted">Private, always available</span>
+                </span>
+              </button>
+            )}
             {filtered.length === 0 ? (
               <EmptyState compact>Nobody by that name.</EmptyState>
             ) : (

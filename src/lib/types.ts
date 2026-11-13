@@ -571,6 +571,8 @@ export type NotificationType =
   | 'space_shoutout'
   /** Someone answered your comment in the Lounge (0068). */
   | 'space_reply'
+  /** A classmate gave you a W (0070). */
+  | 'space_person_w'
   | 'space_mention'
   /** A direct message (0043). */
   | 'space_dm'
@@ -751,6 +753,12 @@ export interface LoungeReply {
   /** The comment actually answered — may be inside the thread — and its author's name. */
   replyToId: string | null
   replyToName: string | null
+}
+
+/** A person's W standing (0070): public count, and whether YOU gave one today. */
+export interface PersonWs {
+  total: number
+  iGaveToday: boolean
 }
 
 /** One student who gave a W (0068). */

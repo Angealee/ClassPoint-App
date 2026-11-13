@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { SpaceGlow } from '@/components/space/SpaceGlow'
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { Card } from '@/components/ui/Card'
+import { Avatar } from '@/components/ui/Avatar'
+import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
@@ -60,6 +63,7 @@ export function Lounge() {
   const [deleting, setDeleting] = useState(false)
   const [reportTarget, setReportTarget] = useState<LoungePost | null>(null)
   const [wsPostId, setWsPostId] = useState<string | null>(null)
+  const [composeOpen, setComposeOpen] = useState(false)
 
   const canPost = canPostNow(spaceAccess)
 
@@ -234,10 +238,12 @@ export function Lounge() {
     [sections, me?.section_id],
   )
 
+  const myFirstName = me?.display_name?.split(' ')[0] ?? ''
   const wDisabled = !canPost || (quota?.wsLeft ?? 0) === 0
 
   return (
-    <div className="space-y-4">
+    <div className="relative space-y-4">
+      <SpaceGlow />
       <PageHeader
         title="Student Lounge"
         subtitle={sectionName ? `Everyone in the beta · ${sectionName}` : 'Everyone in the beta'}
@@ -247,13 +253,50 @@ export function Lounge() {
       <BetaBanner />
 
       {canPost ? (
-        <PostComposer
-          quota={quota}
-          classmates={classmates}
-          busy={posting}
-          onPost={submitPost}
-          onShoutout={submitShoutout}
-        />
+        composeOpen ? (
+          <div className="space-y-2">
+            <PostComposer
+              quota={quota}
+              classmates={classmates}
+              busy={posting}
+              onPost={async (b) => {
+                const ok = await submitPost(b)
+                if (ok) setComposeOpen(false)
+                return ok
+              }}
+              onShoutout={async (t, b) => {
+                const ok = await submitShoutout(t, b)
+                if (ok) setComposeOpen(false)
+                return ok
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setComposeOpen(false)}
+              className="cp-tap-y w-full text-center text-xs font-semibold text-muted hover:text-ink"
+            >
+              Close
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setComposeOpen(true)}
+            className="block w-full text-left"
+          >
+            <Card interactive className="flex items-center gap-3">
+              <Avatar
+                name={me?.display_name ?? ''}
+                url={me?.avatar_url ?? null}
+                className="h-10 w-10 shrink-0"
+                textClassName="text-xs"
+              />
+              <span className="min-w-0 flex-1 truncate rounded-full border border-line bg-card-2 px-4 py-2.5 text-sm text-muted">
+                What's on your mind{myFirstName ? `, ${myFirstName}` : ''}?
+              </span>
+            </Card>
+          </button>
+        )
       ) : (
         <p className="rounded-xl border border-warn-solid/30 bg-warn-solid/8 px-3 py-2 text-sm text-warn">
           You&apos;re muted right now — you can still read everything.
@@ -268,15 +311,34 @@ export function Lounge() {
         />
       )}
 
-      <SegmentedControl
-        label="Feed view"
-        value={mode}
-        onChange={setMode}
-        options={[
-          { value: 'latest', label: 'Latest' },
-          { value: 'trending', label: 'Trending' },
-        ]}
-      />
+      <div
+        role="tablist"
+        aria-label="Feed view"
+        className="sticky top-[61px] z-10 -mx-4 flex gap-6 border-b border-line bg-canvas/85 px-4 backdrop-blur-md md:top-0 md:-mx-8 md:px-8"
+      >
+        {(
+          [
+            { value: 'latest', label: 'Latest' },
+            { value: 'trending', label: 'Trending' },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            role="tab"
+            aria-selected={mode === t.value}
+            onClick={() => setMode(t.value)}
+            className={cn(
+              'cp-tap-y -mb-px border-b-2 px-0.5 pb-2.5 pt-2.5 text-sm font-semibold transition-colors',
+              mode === t.value
+                ? 'border-accent-solid text-ink'
+                : 'border-transparent text-muted hover:text-ink',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
       {pendingNew > 0 && (
         <button

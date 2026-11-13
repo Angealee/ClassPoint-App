@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { StickyBar } from '@/components/ui/StickyBar'
+import { SpaceGlow } from '@/components/space/SpaceGlow'
 import { useToast } from '@/components/ui/Toast'
 import { PostCard } from '@/components/space/PostCard'
 import { ReportSheet } from '@/components/space/ReportSheet'
@@ -166,22 +167,13 @@ export function LoungePostDetail() {
         <Avatar
           name={r.displayName}
           url={r.avatarUrl}
-          className={nested ? 'h-7 w-7' : 'h-8 w-8'}
+          className={nested ? 'h-7 w-7' : 'h-9 w-9'}
           textClassName="text-2xs"
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="min-w-0 truncate text-sm font-semibold">{r.displayName}</span>
             <span className="shrink-0 text-2xs text-muted">{timeAgo(r.createdAt)}</span>
-            {r.canDelete && (
-              <button
-                type="button"
-                onClick={() => setDeleteReply(r)}
-                className="ml-auto shrink-0 text-2xs font-semibold text-muted transition-colors hover:text-danger"
-              >
-                Delete
-              </button>
-            )}
           </div>
           {r.hiddenAt && r.body === null ? (
             <p className="mt-1 text-sm font-medium text-danger">Hidden — reported</p>
@@ -191,22 +183,34 @@ export function LoungePostDetail() {
               {r.body}
             </p>
           )}
-          {canPost && !(r.hiddenAt && r.body === null) && (
-            <button
-              type="button"
-              onClick={() => startReply(r)}
-              className="cp-tap-y mt-0.5 text-2xs font-semibold text-muted transition-colors hover:text-ink"
-            >
-              Reply
-            </button>
-          )}
+          <div className="mt-0.5 flex items-center gap-4">
+            {canPost && !(r.hiddenAt && r.body === null) && (
+              <button
+                type="button"
+                onClick={() => startReply(r)}
+                className="cp-tap-y text-xs font-semibold text-muted transition-colors hover:text-ink"
+              >
+                Reply
+              </button>
+            )}
+            {r.canDelete && (
+              <button
+                type="button"
+                onClick={() => setDeleteReply(r)}
+                className="cp-tap-y text-xs font-semibold text-muted transition-colors hover:text-danger"
+              >
+                Delete
+              </button>
+            )}
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="relative space-y-4">
+      <SpaceGlow />
       <PageHeader title="Post" fallback="/app/space/lounge" />
 
       {loading ? (
@@ -227,74 +231,19 @@ export function LoungePostDetail() {
             wDisabled={!canPost}
           />
 
-          {canPost && (
-            <Card pad="roomy">
-              {replyingTo && (
-                <div className="mb-2 flex items-center gap-2 rounded-lg bg-card-2 px-3 py-1.5 text-xs">
-                  <span className="min-w-0 flex-1 truncate text-muted">
-                    Replying to{' '}
-                    <span className="font-semibold text-ink">{replyingTo.displayName}</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setReplyingTo(null)}
-                    className="cp-tap-y shrink-0 font-semibold text-muted hover:text-ink"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-              <textarea
-                ref={areaRef}
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault()
-                    void send()
-                  }
-                }}
-                rows={2}
-                placeholder={replyingTo ? `Reply to ${replyingTo.displayName}…` : 'Reply…'}
-                className={cn(
-                  'w-full resize-none overflow-y-auto rounded-xl border bg-card px-3.5 py-2.5 text-base text-ink',
-                  'placeholder:text-muted/70 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30',
-                  over ? 'border-danger' : 'border-line',
-                )}
-              />
-              <div className="mt-2 flex items-center gap-2">
-                <span
-                  className={cn(
-                    'min-w-0 flex-1 truncate text-2xs',
-                    over ? 'font-semibold text-danger' : 'text-muted',
-                  )}
-                >
-                  {body.length > MAX_POST_LENGTH - 100 || over
-                    ? `${body.length}/${MAX_POST_LENGTH}`
-                    : 'Replies are not rate-limited.'}
-                </span>
-                <Button
-                  size="sm"
-                  className="shrink-0"
-                  loading={sending}
-                  disabled={body.trim().length === 0 || over || sending}
-                  onClick={() => void send()}
-                >
-                  Reply
-                </Button>
-              </div>
-            </Card>
-          )}
+          <h2 className="px-1 pt-1 text-sm font-semibold">
+            Replies{replies.length > 0 ? ` (${replies.length})` : ''}
+          </h2>
 
           {replies.length === 0 ? (
-            <EmptyState>No replies yet.</EmptyState>
+            <EmptyState compact>No replies yet. Start the conversation.</EmptyState>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-5 px-1">
               {roots.map((r) => {
                 const answers = answersOf(r.id)
                 const open = openThreads.has(r.id)
                 return (
-                  <Card key={r.id} pad="default">
+                  <div key={r.id}>
                     {renderReply(r, r, false)}
                     {answers.length > 0 && (
                       <div className="ml-11 mt-1">
@@ -322,10 +271,70 @@ export function LoungePostDetail() {
                         )}
                       </div>
                     )}
-                  </Card>
+                  </div>
                 )
               })}
             </div>
+          )}
+
+          {canPost && (
+            <StickyBar className="-mx-1">
+              <div className="rounded-2xl border border-line bg-card p-2 shadow-lg shadow-black/20">
+                {replyingTo && (
+                  <div className="mb-2 flex items-center gap-2 rounded-lg bg-card-2 px-3 py-1.5 text-xs">
+                    <span className="min-w-0 flex-1 truncate text-muted">
+                      Replying to{' '}
+                      <span className="font-semibold text-ink">{replyingTo.displayName}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setReplyingTo(null)}
+                      className="cp-tap-y shrink-0 font-semibold text-muted hover:text-ink"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-end gap-2">
+                  <textarea
+                    ref={areaRef}
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                        e.preventDefault()
+                        void send()
+                      }
+                    }}
+                    rows={1}
+                    placeholder={replyingTo ? `Reply to ${replyingTo.displayName}…` : 'Add a reply…'}
+                    className={cn(
+                      'min-w-0 flex-1 resize-none overflow-y-auto rounded-xl border bg-canvas px-3.5 py-2.5 text-base text-ink',
+                      'placeholder:text-muted/70 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30',
+                      over ? 'border-danger' : 'border-line',
+                    )}
+                  />
+                  <Button
+                    className="shrink-0"
+                    loading={sending}
+                    disabled={body.trim().length === 0 || over || sending}
+                    onClick={() => void send()}
+                  >
+                    Send
+                  </Button>
+                </div>
+                {(body.length > MAX_POST_LENGTH - 100 || over) && (
+                  <p
+                    className={cn(
+                      'mt-1 px-1 text-2xs',
+                      over ? 'font-semibold text-danger' : 'text-muted',
+                    )}
+                  >
+                    {body.length}/{MAX_POST_LENGTH}
+                  </p>
+                )}
+              </div>
+            </StickyBar>
           )}
         </>
       )}

@@ -3,6 +3,7 @@ import type {
   LoungePost,
   LoungeQuota,
   LoungeReply,
+  PersonWs,
   PostW,
   PulseKind,
   ShoutoutReceived,
@@ -149,6 +150,40 @@ export async function replyToPost(
     p_body: body,
     ...(parentId ? { p_parent_id: parentId } : {}),
   })
+}
+
+/** Give / take back today's W to a classmate (0070). */
+export async function givePersonW(targetId: string): Promise<{ givenToday: boolean; total: number }> {
+  const rows = await rpc<{ given_today: boolean; total: number }[]>('give_person_w', {
+    p_target: targetId,
+  })
+  const r = rows?.[0]
+  return { givenToday: !!r?.given_today, total: r?.total ?? 0 }
+}
+
+/** Everyone's public W count plus whether you gave them one today (0070). */
+export async function getPeopleWs(): Promise<Map<string, PersonWs>> {
+  const rows = await rpc<{ student_id: string; total: number; i_gave_today: boolean }[]>(
+    'get_people_ws',
+  )
+  return new Map(
+    (rows ?? []).map((r) => [r.student_id, { total: r.total ?? 0, iGaveToday: !!r.i_gave_today }]),
+  )
+}
+
+/** Who gave YOU a W — only the receiver can read this (0070). */
+export async function listMyPersonWs(): Promise<
+  { studentId: string; displayName: string; avatarUrl: string | null; givenOn: string }[]
+> {
+  const rows = await rpc<
+    { student_id: string; display_name: string; avatar_url: string | null; given_on: string }[]
+  >('list_my_person_ws')
+  return (rows ?? []).map((r) => ({
+    studentId: r.student_id,
+    displayName: r.display_name,
+    avatarUrl: r.avatar_url,
+    givenOn: r.given_on,
+  }))
 }
 
 /** Who gave a W on this post (0068). Visible to everyone in Student Space. */

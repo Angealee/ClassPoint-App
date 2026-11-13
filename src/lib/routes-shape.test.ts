@@ -64,10 +64,14 @@ describe('routeWidth', () => {
     expect(routeWidth('/teach/space/chat/abc-123')).toBe('wide')
   })
 
+  it('gives the Student Space home the wide two-column layout', () => {
+    expect(routeWidth('/app/space')).toBe('wide')
+    expect(routeWidth('/app/space/')).toBe('wide')
+  })
+
   it('leaves every other screen in the reading column', () => {
     for (const p of [
       '/app',
-      '/app/space',
       '/app/space/lounge',
       '/app/space/chats',
       '/teach',

@@ -402,3 +402,24 @@ body::after {
     touch-action: pan-y pinch-zoom;
   }
 }
+
+/* ── Student Space ambience ────────────────────────────────────────────────
+   All opacity/transform only (compositor), and the global reduced-motion
+   block above flattens every one of them. */
+@keyframes cp-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-6px) rotate(2deg); }
+}
+.cp-float { animation: cp-float 6s ease-in-out infinite; }
+
+@keyframes cp-twinkle {
+  0%, 100% { opacity: 0.15; transform: scale(0.8); }
+  50%      { opacity: 0.9;  transform: scale(1); }
+}
+.cp-twinkle { animation: cp-twinkle 3.2s ease-in-out infinite; }
+
+@keyframes cp-pulse-twice {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.15); }
+}
+.cp-pulse-twice { animation: cp-pulse-twice 0.9s ease-in-out 2; }
