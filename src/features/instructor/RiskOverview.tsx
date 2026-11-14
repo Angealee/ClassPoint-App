@@ -45,7 +45,7 @@ export function RiskOverview() {
   return (
     <Card className="p-4">
       <div className="mb-1 flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-semibold">Needs attention</h2>
+        <h2 className="text-sm font-semibold">Absence risk</h2>
         <Button variant="ghost" size="sm" onClick={() => void load()}>
           Refresh
         </Button>
@@ -59,7 +59,7 @@ export function RiskOverview() {
         <ListSkeleton rows={4} />
       ) : error ? (
         <div className="flex items-center gap-3">
-          <p className="min-w-0 flex-1 text-sm text-accent">{error}</p>
+          <p className="min-w-0 flex-1 text-sm text-danger">{error}</p>
           <Button variant="outline" size="sm" onClick={() => void load()}>
             Try again
           </Button>

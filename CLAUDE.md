@@ -4755,6 +4755,24 @@ results** · **plate summary + ledger rows on every peer list** · **badges firs
   (`supabase.rest.fetch` can be overridden in a probe; the client captures the global `fetch` at creation, so patching
   `window.fetch` is too late). **Not seen:** the instructor console/board themselves, any real login, the photo upload.
 
+Ops & trust makeover (2026-11-14, no migration). Decisions (user): **four tabs** (Attention / Tools / Setup / Health,
+mirrored to `?tab=`) · **a needs-attention plate on top** · **wide like Student Space** (`isOpsScreen` in routes-shape, pinned) ·
+**switches card, quick actions, security summary, audit filters** · **ledger rows with icons**. `Ops.tsx` is now a shell that reads
+four sources ONCE (`ops/useSource.ts`: section overview, absence risk, backups, 300 auth events) and hands them down, so the plate
+and the rows beneath it are computed from the same numbers (`lib/ops-signals.ts`, 10 tests). A source that fails drops out of the
+plate and says so on its own card. Pending-request counts moved into `InstructorContext.pending`.
+- Attention is a STABLE checklist (a row stays at zero as "Clear"). Tools = four quick actions + Broadcast + Workbook side by side.
+  Setup = the one real switch (Student grades) + links. Health = sign-in summary (24h figures, 7-day bars, hot addresses) + backups
+  + audit log. Only Student grades is a live toggle: there is no API for the Space or peer-eval switches, so those are links.
+- **The audit filter is SERVER-side** (`listAuditLog` gained `{action, search}`): the log is paged, a client filter would search 25 rows.
+  The list is keyed on the filter so each filter mounts a fresh loader. Search text is cleaned by `cleanSearch` before it goes into
+  a PostgREST `or(...)`.
+- ⚠ A grid with no explicit column count is `grid-template-columns: none`, and its items default to `min-width: auto`: one long row
+  made the whole page 338px wide at 320. Use `grid-cols-1` (= `minmax(0,1fr)`) under every `lg:grid-cols-N`.
+- A fetch-on-mount hook stays lint-clean when its first setState happens AFTER the await (`useSource`); ESLint cap is now **93**.
+- Verified by probe at 320 and 1440 with a faked `supabase.rest.fetch`: no overflow on any tab, inputs 16px. **Not seen** on a real
+  login; the Shell's wide layout was assumed from the Space hub, not rendered.
+
 ## DB map (migrations 0001–0016 are the source of truth)
 
 Tables: `sections`, `students` (cached `lifetime_points` = trigger-maintained

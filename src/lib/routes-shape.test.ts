@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isChatRoom, isGradeGrid, routeWidth } from './routes-shape'
+import { isChatRoom, isGradeGrid, isOpsScreen, routeWidth } from './routes-shape'
 
 describe('isChatRoom', () => {
   it('matches a room under BOTH mounts', () => {
@@ -82,5 +82,15 @@ describe('routeWidth', () => {
     ]) {
       expect(routeWidth(p), p).toBe('reading')
     }
+  })
+})
+
+describe('isOpsScreen', () => {
+  it('widens Ops and nothing near it', () => {
+    expect(isOpsScreen('/teach/ops')).toBe(true)
+    expect(isOpsScreen('/teach/ops/')).toBe(true)
+    expect(routeWidth('/teach/ops')).toBe('wide')
+    expect(isOpsScreen('/teach/semesters')).toBe(false)
+    expect(isOpsScreen('/teach/ops/extra')).toBe(false)
   })
 })

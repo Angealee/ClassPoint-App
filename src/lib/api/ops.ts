@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { cleanSearch } from '@/lib/ops-signals'
 import { rpc } from './_internal'
 import type {
   AbsenceRisk,
@@ -22,12 +23,21 @@ export async function getBackupHealth(): Promise<BackupHealth[]> {
   }))
 }
 
-export async function listAuditLog(limit = 30, offset = 0): Promise<AuditEntry[]> {
-  const { data, error } = await supabase
+export async function listAuditLog(
+  limit = 30,
+  offset = 0,
+  filter: { action?: string; search?: string } = {},
+): Promise<AuditEntry[]> {
+  // Filtered on the server: the log is paged, so filtering what has been downloaded would only
+  // ever search the first page.
+  let q = supabase
     .from('audit_log')
     .select('id, at, actor, action, table_name, row_id, student_id, summary, row_data')
     .order('at', { ascending: false })
-    .range(offset, offset + limit - 1)
+  if (filter.action) q = q.eq('action', filter.action)
+  const term = cleanSearch(filter.search ?? '')
+  if (term) q = q.or(`summary.ilike.%${term}%,table_name.ilike.%${term}%`)
+  const { data, error } = await q.range(offset, offset + limit - 1)
   if (error) throw error
   return (data ?? []).map((r) => ({
     id: Number(r.id),

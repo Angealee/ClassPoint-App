@@ -53,6 +53,8 @@ interface InstructorContextValue {
   sectionSubjects: Record<string, string[]>
   subjectsForSection: (sectionId: string) => Subject[]
   refreshSemester: () => Promise<void>
+  /** Waiting-on-you counts, hoisted here once so the header badge and Ops agree. */
+  pending: { redemptions: number; excuses: number; reports: number }
 }
 
 const InstructorContext = createContext<InstructorContextValue | undefined>(undefined)
@@ -256,9 +258,10 @@ export function InstructorLayout() {
       sectionSubjects,
       subjectsForSection,
       refreshSemester,
+      pending: { redemptions: pendingRedemptions, excuses: pendingExcuses, reports: pendingReports },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sections, selectedSectionId, semester, subjects, sectionSubjects, subjectsForSection],
+    [sections, selectedSectionId, semester, subjects, sectionSubjects, subjectsForSection, pendingRedemptions, pendingExcuses, pendingReports],
   )
 
   // Desktop sidebar carries Requests and Peer evaluation as real nav items; the
