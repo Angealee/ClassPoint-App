@@ -122,7 +122,7 @@ export function PlayerCard({
         style={{
           opacity: 'calc(0.35 + var(--foil, 0) * 0.65)',
           background:
-            'radial-gradient(circle at var(--fx, 25%) var(--fy, 12%), rgba(255,255,255,0.16), transparent 42%), linear-gradient(115deg, transparent 22%, rgba(255,255,255,0.07) 44%, rgba(150,200,255,0.08) 56%, transparent 78%)',
+            'radial-gradient(circle 110px at var(--fx, 25%) var(--fy, 12%), rgba(255,255,255,0.2), transparent 100%), linear-gradient(115deg, transparent 22%, rgba(255,255,255,0.07) 44%, rgba(150,200,255,0.08) 56%, transparent 78%)',
         }}
       />
 

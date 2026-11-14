@@ -330,9 +330,8 @@ export function Profile() {
         </>
       )}
 
-      <Sheet open={editOpen} onClose={() => setEditOpen(false)} variant="screen" title="Edit profile">
+      <Sheet open={editOpen} onClose={() => setEditOpen(false)} title="Edit profile">
         <form onSubmit={onSave} className="space-y-4 pb-2">
-          <h2 className="font-display text-xl font-bold">Edit profile</h2>
           <Input
             label="Display name"
             value={name}

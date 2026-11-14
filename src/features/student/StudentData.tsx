@@ -267,16 +267,19 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   const loadAchievements = useCallback(async (studentId: string) => {
     setAchievementsError(false)
-    try {
-      const [list, progress] = await Promise.all([
-        getMyAchievements(studentId),
-        getAchievementProgress(studentId),
-      ])
-      setAchievements(list)
-      setAchievementProgress(progress)
-    } catch {
+    // The catalog is what the screen is FOR; the progress numbers only decorate it. A failing
+    // progress call must not hide every badge, so the two are settled separately.
+    const [list, progress] = await Promise.allSettled([
+      getMyAchievements(studentId),
+      getAchievementProgress(studentId),
+    ])
+    if (list.status === 'fulfilled') setAchievements(list.value)
+    else {
+      console.error('Achievements failed to load', list.reason)
       setAchievementsError(true)
     }
+    if (progress.status === 'fulfilled') setAchievementProgress(progress.value)
+    else console.error('Achievement progress failed to load', progress.reason)
   }, [])
 
   const retryAchievements = useCallback(() => {
