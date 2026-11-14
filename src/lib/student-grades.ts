@@ -89,6 +89,78 @@ export function summarizeTerm(subject: MyGradeSubject, term: TermKey): TermSumma
   }
 }
 
+/** One part of the term, drawn as one segment of the breakdown bar. */
+export interface BreakdownSegment {
+  component: GradeComponent
+  label: string
+  /** Short enough for a segment a few dozen pixels wide. */
+  short: string
+  /** This part's share of the TERM, 0-100 (30 / 15 / 15 / 40 on the default policy). */
+  weightPct: number
+  /** The part's score as the term counts it (so far), or null when nothing is marked in it. */
+  score: number | null
+  /** 0-1 of what the part could still have earned; null when there is no score to draw. */
+  fill: number | null
+}
+
+const SHORT_LABEL: Record<GradeComponent, string> = {
+  performance_task: 'Perf',
+  quiz: 'Quiz',
+  recitation: 'Recit',
+  exam: 'Exam',
+}
+
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
+
+/**
+ * The weighted breakdown behind the hero bar. Every figure is read from grading.ts (the one
+ * place the weights and the transmutation live); this only turns them into widths and fills.
+ *
+ * The fill is the share of the part's ATTAINABLE range, not the score over 100: a transmuted
+ * part can never score below the 60 floor, so score / 100 would draw every part at least 60%
+ * full and hide the difference between a weak and a strong one. Recitation is the attendance
+ * rate as-is (no floor), so it is drawn as rate / 100.
+ */
+export function breakdownSegments(
+  subject: MyGradeSubject,
+  term: TermKey,
+): BreakdownSegment[] | null {
+  const policy = policyFor(subject, term)
+  if (policy === null || policyError(policy) !== null) return null
+
+  const summary = summarizeTerm(subject, term)
+  const floor = policy.transmuteBase * 100
+  const span = policy.transmuteSpan * 100
+
+  return weightedComponents(policy).map((component) => {
+    const part = summary.components.find((c) => c.component === component)
+    const score = part?.score ?? null
+    let fill: number | null = null
+    if (score !== null) {
+      fill = component === 'recitation' ? clamp01(score / 100) : span > 0 ? clamp01((score - floor) / span) : 0
+    }
+    return {
+      component,
+      label: COMPONENT_LABEL[component],
+      short: SHORT_LABEL[component],
+      weightPct: Math.round(componentShare(policy, component) * 1000) / 10,
+      score,
+      fill,
+    }
+  })
+}
+
+/**
+ * Colour for a single mark. Neutral in the middle on purpose: the app's 70 / 85 bands are the
+ * instructor's at-risk line for ATTENDANCE, and applying them to every quiz painted a perfectly
+ * ordinary 65 / 100 red. Colour is kept for the two ends only; red is never used for a mark.
+ */
+export function markTone(pct: number): 'success' | 'warn' | null {
+  if (pct >= 100) return 'success'
+  if (pct < 50) return 'warn'
+  return null
+}
+
 export interface TermExplanation {
   parts: Array<{ component: GradeComponent; label: string; sharePct: number }>
   floor: number

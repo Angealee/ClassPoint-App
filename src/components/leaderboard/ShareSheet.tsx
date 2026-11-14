@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/Toast'
 import { DownloadIcon } from '@/components/ui/icons'
 import { CARD_H, CARD_W, ShareCard, type ShareVariant } from './ShareCard'
 import { biggestClimber } from './RankSignals'
+import { renderJpeg, shareOrDownload } from '@/lib/share-image'
 import type { LeaderboardEntry } from '@/lib/types'
 
 const PREVIEW_W = 190
@@ -44,65 +45,17 @@ export function ShareSheet({
     if (open) void import('modern-screenshot')
   }, [open])
 
-  async function render(): Promise<Blob | null> {
-    const node = cardRef.current
-    if (!node) return null
-    const { domToBlob } = await import('modern-screenshot')
-
-    // Everything must be paint-ready before the clone is taken.
-    try {
-      await document.fonts.ready
-    } catch {
-      /* not fatal — worst case the export uses a fallback face */
-    }
-    await Promise.all(
-      [...node.querySelectorAll('img')].map((img) =>
-        img.decode().catch(() => undefined),
-      ),
-    )
-
-    return domToBlob(node, {
-      width: CARD_W,
-      height: CARD_H,
-      scale: 1,
-      backgroundColor: '#0d0d10',
-      type: 'image/jpeg',
-      quality: 0.92,
-    })
-  }
-
-  function download(blob: Blob, filename: string) {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   async function onShare() {
     setBusy(true)
     try {
-      const blob = await render()
+      const node = cardRef.current
+      const blob = node
+        ? await renderJpeg(node, { width: CARD_W, height: CARD_H, background: '#0d0d10' })
+        : null
       if (!blob) throw new Error('no blob')
       const filename = `classpoint-leaderboard-${new Date().toISOString().slice(0, 10)}.jpg`
-      const file = new File([blob], filename, { type: 'image/jpeg' })
-
-      if (navigator.canShare?.({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file] })
-          setBusy(false)
-          return
-        } catch (err) {
-          // The user tapping "cancel" in the OS sheet is not an error.
-          if ((err as Error)?.name === 'AbortError') {
-            setBusy(false)
-            return
-          }
-        }
-      }
-      download(blob, filename)
-      toast('Saved to your downloads.', 'success')
+      const how = await shareOrDownload(blob, filename)
+      if (how === 'saved') toast('Saved to your downloads.', 'success')
     } catch {
       toast('Could not create the image. Try again.', 'error')
     } finally {

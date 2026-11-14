@@ -5,8 +5,10 @@ import {
   boostColumns,
   boostReason,
   boostableCount,
+  breakdownSegments,
   explainTerm,
   latestSoFar,
+  markTone,
   sortItems,
   summarizeTerm,
   termsWithItems,
@@ -272,6 +274,9 @@ describe('a student is never shown the official grade', () => {
     'src/features/student/Dashboard.tsx',
     'src/features/student/UsePoints.tsx',
     'src/components/points/GradeColumns.tsx',
+    'src/components/grades/ReportPlate.tsx',
+    'src/components/grades/GradeShareCard.tsx',
+    'src/components/grades/GradeShareSheet.tsx',
   ]
 
   it.each(STUDENT_FILES)('%s has no path to the official view', (file) => {
@@ -365,5 +370,112 @@ describe('sortItems (Lowest first)', () => {
     const before = items.map((i) => i.id)
     expect(sortItems(items, 'lowest').map((i) => i.id)).toEqual(['z', 'x', 'y'])
     expect(items.map((i) => i.id)).toEqual(before)
+  })
+})
+
+describe('breakdownSegments', () => {
+  // Default policy: PT 30% · Quiz 15% · Recitation 15% · Exam 40% of the term; scores run 60-100.
+  const marked = () => ({
+    ...subject([
+      it_({ id: 'pt', component: 'performance_task', maxScore: 20, score: 10 }),
+      it_({ id: 'q1', component: 'quiz', maxScore: 20, score: 18 }),
+      it_({ id: 'ex', component: 'exam', maxScore: 50, score: 50 }),
+    ]),
+    attendance: {
+      prelim: { showed: 9, counted: 10 },
+      midterm: { showed: 0, counted: 0 },
+      finals: { showed: 0, counted: 0 },
+    },
+  })
+
+  it('reads each part’s share of the term from the policy', () => {
+    const segs = breakdownSegments(marked(), 'prelim')!
+    expect(segs.map((s) => [s.component, s.weightPct])).toEqual([
+      ['performance_task', 30],
+      ['quiz', 15],
+      ['recitation', 15],
+      ['exam', 40],
+    ])
+    expect(segs.reduce((n, s) => n + s.weightPct, 0)).toBe(100)
+  })
+
+  it('fills by the attainable range, not score / 100 (hand-checked)', () => {
+    const by = Object.fromEntries(breakdownSegments(marked(), 'prelim')!.map((s) => [s.component, s]))
+    // PT 10/20 -> (0.5 * 0.4 + 0.6) * 100 = 80 -> (80 - 60) / 40 = 0.5, not 0.8
+    expect(by.performance_task.score).toBeCloseTo(80, 6)
+    expect(by.performance_task.fill).toBeCloseTo(0.5, 6)
+    // Quiz 18/20 -> 96 -> 0.9
+    expect(by.quiz.fill).toBeCloseTo(0.9, 6)
+    // Exam full marks -> 100 -> 1
+    expect(by.exam.fill).toBe(1)
+  })
+
+  it('draws recitation as the attendance rate, with no floor', () => {
+    const rec = breakdownSegments(marked(), 'prelim')!.find((s) => s.component === 'recitation')!
+    expect(rec.score).toBeCloseTo(90, 6)
+    expect(rec.fill).toBeCloseTo(0.9, 6)
+  })
+
+  it('has no fill for a part nothing is marked in (not an empty-looking 60)', () => {
+    const s = subject([it_({ id: 'q1', component: 'quiz', maxScore: 20, score: 18 })])
+    const by = Object.fromEntries(breakdownSegments(s, 'prelim')!.map((x) => [x.component, x]))
+    expect(by.exam.score).toBeNull()
+    expect(by.exam.fill).toBeNull()
+    expect(by.quiz.fill).toBeCloseTo(0.9, 6)
+  })
+
+  it('returns null when the policy cannot be trusted, so no bar is drawn for it', () => {
+    const bad = { ...defaultPolicy('s1', 'prelim'), ptWeight: 0.9 }
+    expect(breakdownSegments(subject([it_({ id: 'q1', score: 5 })], [bad]), 'prelim')).toBeNull()
+  })
+})
+
+describe('markTone', () => {
+  it('keeps the middle neutral and never uses red for a mark', () => {
+    expect(markTone(65)).toBeNull()
+    expect(markTone(68)).toBeNull()
+    expect(markTone(50)).toBeNull()
+    expect(markTone(100)).toBe('success')
+    expect(markTone(49.9)).toBe('warn')
+    expect(markTone(0)).toBe('warn')
+    for (const pct of [0, 20, 49, 50, 69, 70, 84, 99, 100]) {
+      expect(markTone(pct)).not.toBe('danger')
+    }
+  })
+})
+
+describe('the grade card is private by default', () => {
+  const CARD = 'src/components/grades/GradeShareCard.tsx'
+  const SHEET = 'src/components/grades/GradeShareSheet.tsx'
+  const PLATE = 'src/components/grades/ReportPlate.tsx'
+
+  it('stamps "so far, not final" on the image itself', () => {
+    expect(code(CARD)).toMatch(/SO FAR · NOT FINAL/)
+  })
+
+  it('starts with the name and the subject OFF, and resets them each time it opens', () => {
+    const src = code(SHEET)
+    expect(src).toMatch(/const \[showName, setShowName\] = useState\(false\)/)
+    expect(src).toMatch(/const \[showSubject, setShowSubject\] = useState\(false\)/)
+    expect(src).toMatch(/setShowName\(false\)/)
+    expect(src).toMatch(/setShowSubject\(false\)/)
+  })
+
+  it('asks once before it renders a card with marks on it', () => {
+    const src = code(SHEET)
+    expect(src).toContain('confirming')
+    expect(src).toMatch(/Share your marks\?/)
+    // The render is only ever called from the confirm button, never from the first press.
+    expect(src).toMatch(/onClick=\{\(\) => setConfirming\(true\)\}/)
+  })
+
+  it('only offers a card when the figure is revealed, switched on and there is one to show', () => {
+    const src = code('src/features/student/StudentGrades.tsx')
+    expect(src).toMatch(/const canShare = figures && reveal && summary\.soFar !== null/)
+  })
+
+  it('draws every colour on the plate as a literal, never a themed token', () => {
+    expect(code(CARD)).not.toMatch(/var\(--/)
+    expect(code(PLATE)).not.toMatch(/bg-card|text-ink|border-line/)
   })
 })

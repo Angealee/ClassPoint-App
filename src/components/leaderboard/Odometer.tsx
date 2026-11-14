@@ -8,6 +8,36 @@ import { cn } from '@/lib/cn'
  */
 const ROLL = [0.22, 1, 0.36, 1] as const
 
+/** One drum of 0-9 that rolls to `digit`. */
+export function DigitDrum({
+  digit,
+  index = 0,
+  reduced,
+  delay = 0,
+}: {
+  digit: number
+  index?: number
+  reduced: boolean
+  delay?: number
+}) {
+  return (
+    <span className="relative inline-block h-[1.1em] w-[0.62em] overflow-hidden text-center leading-[1.1em]">
+      <motion.span
+        className="flex flex-col"
+        initial={reduced ? false : { y: '0%' }}
+        animate={{ y: `${-digit * 10}%` }}
+        transition={{ duration: 0.85 + index * 0.12, ease: ROLL, delay }}
+      >
+        {Array.from({ length: 10 }, (_, n) => (
+          <span key={n} className="block h-[1.1em]">
+            {n}
+          </span>
+        ))}
+      </motion.span>
+    </span>
+  )
+}
+
 export function Odometer({
   value,
   reduced,
@@ -27,23 +57,7 @@ export function Odometer({
       <span className="sr-only">{text}</span>
       <span aria-hidden className="inline-flex">
         {digits.map((d, i) => (
-          <span
-            key={i}
-            className="relative inline-block h-[1.1em] w-[0.62em] overflow-hidden text-center leading-[1.1em]"
-          >
-            <motion.span
-              className="flex flex-col"
-              initial={reduced ? false : { y: '0%' }}
-              animate={{ y: `${-d * 10}%` }}
-              transition={{ duration: 0.85 + i * 0.12, ease: ROLL, delay }}
-            >
-              {Array.from({ length: 10 }, (_, n) => (
-                <span key={n} className="block h-[1.1em]">
-                  {n}
-                </span>
-              ))}
-            </motion.span>
-          </span>
+          <DigitDrum key={i} digit={d} index={i} reduced={reduced} delay={delay} />
         ))}
       </span>
     </span>

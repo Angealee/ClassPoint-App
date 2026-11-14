@@ -84,3 +84,50 @@ export function bySubject(
     .filter((g) => g.counted > 0)
     .sort((a, b) => a.label.localeCompare(b.label))
 }
+
+export type TrailKind = 'present' | 'late' | 'absent' | 'neutral'
+
+/** How a class is drawn in the trail: excused and irregular are NEUTRAL (a ring, not a colour). */
+export function trailKind(status: AttendanceStatus): TrailKind {
+  if (status === 'present' || status === 'late' || status === 'absent') return status
+  return 'neutral'
+}
+
+/**
+ * The last `n` classes, OLDEST first so the newest sits on the right. Ties on the start time
+ * (two subjects in one day) fall back to the record id, so the order never shuffles between
+ * renders.
+ */
+export function trailOf(
+  items: readonly MyAttendanceEntry[],
+  n = 10,
+): Array<{ recordId: string; status: AttendanceStatus; startedAt: string }> {
+  return [...items]
+    .sort((a, b) => {
+      const d = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()
+      return d !== 0 ? d : a.recordId.localeCompare(b.recordId)
+    })
+    .slice(-n)
+    .map((h) => ({ recordId: h.recordId, status: h.status, startedAt: h.startedAt }))
+}
+
+const DAY_MS = 86_400_000
+
+const localDay = (ms: number) => {
+  const d = new Date(ms)
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+}
+
+/**
+ * When an absence stops being excusable, as the real DATE. Never "N days left": the window
+ * runs from the class start, so an evening class caught late in the window has barely a day,
+ * and a relative count would be a lie at the edge (the same rule the nudge notification keeps).
+ */
+export function excuseClosesLabel(startedAt: string, now: number = Date.now(), days = 7): string {
+  const closes = new Date(startedAt).getTime() + days * DAY_MS
+  if (closes < now) return 'closed'
+  const diff = Math.round((localDay(closes) - localDay(now)) / DAY_MS)
+  if (diff <= 0) return 'closes today'
+  if (diff === 1) return 'closes tomorrow'
+  return `closes ${new Date(closes).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+}

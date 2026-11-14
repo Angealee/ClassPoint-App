@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/Button'
 import { Sheet } from '@/components/ui/Sheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
-import { WarningIcon } from '@/components/ui/icons'
 import {
   cancelAbsenceExcuse,
   listMyExcuses,
   requestAbsenceExcuse,
   setExcuseSlipStatus,
 } from '@/lib/api'
+import { excuseClosesLabel } from '@/lib/attendance'
 import { supabase, uniqueChannel } from '@/lib/supabase'
 import {
   EXCUSE_DEADLINE_DAYS,
@@ -29,13 +29,6 @@ const sessionDate = (iso: string) =>
 /** Is this absence still inside the 7-day request window? */
 function withinWindow(startedAt: string): boolean {
   return Date.now() - new Date(startedAt).getTime() <= EXCUSE_DEADLINE_DAYS * DAY_MS
-}
-
-function deadlineLabel(startedAt: string): string {
-  const msLeft = EXCUSE_DEADLINE_DAYS * DAY_MS - (Date.now() - new Date(startedAt).getTime())
-  if (msLeft <= 0) return 'Window closed'
-  const days = Math.ceil(msLeft / DAY_MS)
-  return days === 1 ? 'Last day to excuse' : `${days} days left to excuse`
 }
 
 function errorText(e: unknown, fallback: string): string {
@@ -55,6 +48,8 @@ export function AbsenceExcuses({
   const { toast } = useToast()
   const [excuses, setExcuses] = useState<AbsenceExcuse[]>([])
   const [guideOpen, setGuideOpen] = useState(false)
+  // One clock reading per visit: the label is a date, so it need not tick.
+  const [nowMs] = useState(() => Date.now())
   const [requestFor, setRequestFor] = useState<MyAttendanceEntry | null>(null)
   const [reason, setReason] = useState('')
   const [hasSlip, setHasSlip] = useState(false)
@@ -162,18 +157,6 @@ export function AbsenceExcuses({
 
   return (
     <div className="space-y-3">
-      <button
-        type="button"
-        onClick={() => setGuideOpen(true)}
-        className="flex w-full items-center gap-2.5 rounded-xl border border-line px-4 py-3 text-left transition-colors hover:bg-card-2"
-      >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-info-solid/12 text-info">
-          <WarningIcon className="h-4 w-4" />
-        </span>
-        <span className="min-w-0 flex-1 text-sm font-medium">How excuses work</span>
-        <span className="shrink-0 text-lg text-muted">›</span>
-      </button>
-
       <Sheet open={guideOpen} onClose={() => setGuideOpen(false)} title="How excuses work">
         <ol className="space-y-3">
           {[
@@ -201,8 +184,20 @@ export function AbsenceExcuses({
 
       {/* Actionable absences */}
       <div>
-        <SectionLabel>Absences to resolve</SectionLabel>
-        <Rows>
+        <SectionLabel
+          action={
+            <button
+              type="button"
+              onClick={() => setGuideOpen(true)}
+              className="cp-tap-y inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-accent"
+            >
+              How excuses work <span aria-hidden>›</span>
+            </button>
+          }
+        >
+          Needs action
+        </SectionLabel>
+        <Rows className="border-warn-solid/30">
           {actionable.map((h) => {
             const excuse = excuseByRecord.get(h.recordId)
             return (
@@ -214,7 +209,7 @@ export function AbsenceExcuses({
                     </p>
                     <p className="text-sm text-muted">
                       {h.topic ? `${sessionDate(h.startedAt)} · ` : ''}
-                      {deadlineLabel(h.startedAt)}
+                      {excuse ? 'Request filed' : excuseClosesLabel(h.startedAt, nowMs, EXCUSE_DEADLINE_DAYS)}
                     </p>
                   </div>
                   {!excuse && withinWindow(h.startedAt) && (

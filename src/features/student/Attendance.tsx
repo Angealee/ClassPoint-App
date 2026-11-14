@@ -1,9 +1,9 @@
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { pop } from '@/lib/motion'
-import { Card, Rows } from '@/components/ui/Card'
+import { Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { Sheet } from '@/components/ui/Sheet'
@@ -13,6 +13,7 @@ import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ScanIcon, CheckIcon, WarningIcon } from '@/components/ui/icons'
 import { ScanStage } from '@/components/attendance/ScanStage'
 import { StudentEventHistory } from '@/components/attendance/StudentEventHistory'
+import { AttendancePlate } from '@/components/attendance/AttendancePlate'
 import { StatusChip, STATUS_META } from '@/components/attendance/StatusChip'
 import { useStudentData } from '@/features/student/StudentData'
 import { listMyAttendance, scanAttendance } from '@/lib/api'
@@ -26,25 +27,25 @@ import {
   syncOfflineScans,
   type OfflineScanEntry,
 } from '@/lib/offline-scans'
-import { groupByTerm, termLabel, termOf, termRanges, type TermName } from '@/lib/term'
+import { groupByWeek, termLabel, termOf, termRanges, type TermName } from '@/lib/term'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { rateTone, tally } from '@/lib/attendance'
-import { TONE } from '@/lib/tone'
+import { tally, trailKind, trailOf } from '@/lib/attendance'
 import { OfflineScanCards } from './OfflineScanCards'
 import { AbsenceExcuses } from './AbsenceExcuses'
 import { LiveClassBanner } from './LiveClassBanner'
 import { SemesterEndedBanner } from './SemesterEndedBanner'
-import { StreakFlame } from './StreakFlame'
+import { LiveScanBar } from './LiveScanBar'
 import type { MyAttendanceEntry, ScanResult } from '@/lib/types'
 
 type TermScope = TermName | 'all'
 
-const entryDate = (iso: string) =>
-  iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''
-
 /** Check-in time, e.g. "9:04 AM". */
 const clockTime = (iso: string) =>
   iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : ''
+
+/** "Thu, Nov 12": the weekday matters in a log grouped by week. */
+const dayLabel = (iso: string) =>
+  iso ? new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : ''
 
 function errorText(e: unknown): string {
   const m = (e as { message?: string } | null)?.message
@@ -62,7 +63,17 @@ function isOffline(e: unknown): boolean {
 }
 
 export function Attendance() {
-  const { me, syncMyAchievements, attendanceTick, semesterEnded } = useStudentData()
+  const {
+    me,
+    syncMyAchievements,
+    attendanceTick,
+    semesterEnded,
+    liveSession,
+    liveStatus,
+    achievementProgress,
+  } = useStudentData()
+  const reduced = useReducedMotion() ?? false
+  const [flashId, setFlashId] = useState<string | null>(null)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [history, setHistory] = useState<MyAttendanceEntry[]>([])
@@ -195,20 +206,27 @@ export function Attendance() {
   )
   const stats = useMemo(() => tally(scoped), [scoped])
 
+  const liveScanning = !!liveSession && liveStatus === null
+
+  function jumpToClass(recordId: string) {
+    const el = document.getElementById(`rec-${recordId}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' })
+    setFlashId(recordId)
+    window.setTimeout(() => setFlashId((cur) => (cur === recordId ? null : cur)), 1600)
+  }
+
   return (
     <PullToRefresh onRefresh={load}>
-    <div className="space-y-5">
+    <div className={cn('space-y-5', liveScanning && !semesterEnded && 'pb-20 md:pb-0')}>
       <ScreenTitle title="Attendance" subtitle="Scan your instructor’s QR to record your attendance." />
 
       <SemesterEndedBanner />
 
-      <LiveClassBanner onScan={openScan} />
-
-      {!semesterEnded && (
-        <Button size="lg" className="w-full" onClick={openScan}>
-          <ScanIcon className="h-5 w-5" /> Scan attendance
-        </Button>
-      )}
+      {/* A class that is live and not yet scanned gets the thumb-zone bar; once you are in, the
+          plain "you're in" banner takes its place. */}
+      {liveSession && liveStatus !== null && <LiveClassBanner onScan={openScan} />}
+      {!semesterEnded && <LiveScanBar onScan={openScan} />}
 
       <OfflineScanCards
         entries={queue}
@@ -218,57 +236,29 @@ export function Attendance() {
         }}
       />
 
-      {history.length > 0 && <StreakFlame />}
-
       {history.length > 0 && (
-        <Card elevation="raised" className="p-0">
+        <div className="space-y-2">
           {scopeOptions.length > 0 && (
-            <div className="border-b border-line p-3">
-              <SegmentedControl
-                label="Which term"
-                tone="quiet"
-                size="sm"
-                value={scope}
-                onChange={setScope}
-                options={scopeOptions}
-              />
-            </div>
+            <SegmentedControl
+              label="Which term"
+              tone="quiet"
+              size="sm"
+              value={scope}
+              onChange={setScope}
+              options={scopeOptions}
+            />
           )}
-
-          <div className="grid grid-cols-3 divide-x divide-line">
-            {(['present', 'late', 'absent'] as const).map((k) => (
-              <div key={k} className="flex flex-col items-center justify-center py-4">
-                <p
-                  className={cn(
-                    'font-display text-3xl font-bold tabular-nums',
-                    STATUS_META[k].text,
-                  )}
-                >
-                  {stats[k]}
-                </p>
-                <p className="mt-0.5 text-sm text-muted">{STATUS_META[k].label}</p>
-              </div>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate('/app/attendance/stats')}
-            className="flex w-full items-baseline justify-between border-t border-line px-4 py-3 text-left transition-colors hover:bg-card-2"
-          >
-            <span className="text-sm text-muted">Attendance rate</span>
-            <span className="flex items-baseline gap-1.5">
-              <span
-                className={cn(
-                  'font-display text-lg font-bold tabular-nums',
-                  TONE[rateTone(stats.rate)].text,
-                )}
-              >
-                {stats.counted === 0 ? <span className="text-muted/50">-</span> : `${stats.rate}%`}
-              </span>
-              <span className="text-sm font-semibold text-accent">Stats ›</span>
-            </span>
-          </button>
-        </Card>
+          <AttendancePlate
+            scopeLabel={scope === 'all' ? 'Overall' : termLabel(scope)}
+            stats={stats}
+            trail={trailOf(scoped, 10)}
+            streak={achievementProgress?.present_streak ?? null}
+            reduced={reduced}
+            onPickClass={jumpToClass}
+            onStats={() => navigate('/app/attendance/stats')}
+            onScan={!semesterEnded && !liveScanning ? openScan : undefined}
+          />
+        </div>
       )}
 
       {!loading && me && (
@@ -286,43 +276,18 @@ export function Attendance() {
           Couldn’t load your attendance.
         </ErrorState>
       ) : history.length === 0 ? (
-        <EmptyState>No classes yet. When your instructor starts a class, scan the QR to record your attendance.</EmptyState>
-      ) : (
-        <div className="space-y-4">
-          {groupByTerm(history, (h) => h.startedAt).map((g) => (
-            <div key={g.label}>
-              <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted/80">
-                {g.label}
-              </p>
-              <Rows>
-                {g.items.map((h) => (
-                  <div key={h.recordId} className="flex items-center gap-3 p-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">
-                        {h.topic || entryDate(h.startedAt) || 'Class'}
-                      </p>
-                      <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-muted">
-                        {[
-                          h.subjectCode,
-                          h.topic ? entryDate(h.startedAt) : null,
-                          h.scannedAt ? `in at ${clockTime(h.scannedAt)}` : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                        {h.syncedLate && (
-                          <span className="rounded-full bg-card-2 px-2 py-0.5 text-xs font-medium">
-                            Recorded offline
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <StatusChip status={h.status} />
-                  </div>
-                ))}
-              </Rows>
-            </div>
-          ))}
+        <div className="space-y-3">
+          <EmptyState>
+            No classes yet. When your instructor starts a class, scan the QR to record your attendance.
+          </EmptyState>
+          {!semesterEnded && !liveScanning && (
+            <Button size="lg" className="w-full" onClick={openScan}>
+              <ScanIcon className="h-5 w-5" /> Scan attendance
+            </Button>
+          )}
         </div>
+      ) : (
+        <WeekLog history={history} flashId={flashId} />
       )}
 
       {me && <StudentEventHistory studentId={me.id} />}
@@ -384,7 +349,74 @@ export function Attendance() {
   )
 }
 
+/** The log, grouped by week, with a dot per class. Newest week first. */
+function WeekLog({ history, flashId }: { history: MyAttendanceEntry[]; flashId: string | null }) {
+  const groups = groupByWeek(history, (h) => h.startedAt)
+  return (
+    <div className="space-y-4">
+      {groups.map((g, i) => {
+        const newTerm = i === 0 || groups[i - 1].term !== g.term
+        return (
+          <div key={g.week}>
+            {newTerm && (
+              <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
+                {g.term ? termLabel(g.term) : 'Earlier'}
+              </p>
+            )}
+            <p className="mb-1.5 px-1 text-xs text-muted">{g.label}</p>
+            <Rows>
+              {g.items.map((h) => {
+                const kind = trailKind(h.status)
+                const meta = STATUS_META[h.status]
+                const timed = (h.status === 'present' || h.status === 'late') && h.scannedAt
+                return (
+                  <div
+                    key={h.recordId}
+                    id={`rec-${h.recordId}`}
+                    className={cn(
+                      'flex items-center gap-3 px-3.5 py-3 transition-colors',
+                      flashId === h.recordId && 'bg-accent-solid/10',
+                    )}
+                  >
+                    <span
+                      aria-hidden
+                      className={cn(
+                        'h-2.5 w-2.5 shrink-0 rounded-full',
+                        kind === 'neutral' ? 'border-2 border-muted' : meta.dot,
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">
+                        {h.topic || h.subjectCode || 'Class'}
+                      </p>
+                      <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
+                        {[h.topic ? h.subjectCode : null, dayLabel(h.startedAt)]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        {h.syncedLate && (
+                          <span className="rounded-full bg-card-2 px-2 py-0.5 text-2xs font-medium">
+                            Recorded offline
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right text-xs tabular-nums">
+                      <p className={cn('font-semibold', meta.text)}>{meta.label}</p>
+                      {timed && <p className="text-muted">{clockTime(h.scannedAt as string)}</p>}
+                    </div>
+                  </div>
+                )
+              })}
+            </Rows>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function ResultView({ result, onDone }: { result: ScanResult; onDone: () => void }) {
+  const reduced = useReducedMotion() ?? false
   const meta = STATUS_META[result.status]
   const headline =
     result.status === 'present'
@@ -394,14 +426,25 @@ function ResultView({ result, onDone }: { result: ScanResult; onDone: () => void
         : 'Marked absent'
   return (
     <div className="space-y-5 py-2 text-center">
-      <motion.div
-        initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={pop}
-        className={cn('mx-auto flex h-20 w-20 items-center justify-center rounded-full', meta.chip)}
-      >
-        <CheckIcon className="h-10 w-10" />
-      </motion.div>
+      <div className={cn('relative mx-auto h-20 w-20', meta.text)}>
+        {!reduced && (
+          <motion.span
+            aria-hidden
+            initial={{ scale: 0.7, opacity: 0.8 }}
+            animate={{ scale: 2.2, opacity: 0 }}
+            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+            className="absolute inset-0 rounded-full border-2 border-current"
+          />
+        )}
+        <motion.div
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={pop}
+          className={cn('relative flex h-20 w-20 items-center justify-center rounded-full', meta.chip)}
+        >
+          <CheckIcon className="h-10 w-10" />
+        </motion.div>
+      </div>
       <div className="space-y-1">
         <p className="font-display text-xl font-bold">{headline}</p>
         <div className="flex items-center justify-center gap-2">
