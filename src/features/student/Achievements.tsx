@@ -201,12 +201,12 @@ export function Achievements() {
       ) : achievementsError ? (
         <ErrorState
           onRetry={retryAchievements}
-          detail="Nothing is lost — this is just the connection."
+          detail="Nothing is lost, this is just the connection."
         >
           Couldn’t load your badges.
         </ErrorState>
       ) : filtered.length === 0 ? (
-        <EmptyState>Nothing here — try a different filter.</EmptyState>
+        <EmptyState>Nothing here, try a different filter.</EmptyState>
       ) : (
         CATEGORY_ORDER.map((cat) => {
           const list = grouped.get(cat)

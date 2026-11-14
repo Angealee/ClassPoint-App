@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
     await log(false, 'archived', secret.student_id as string)
     return json(req, {
       ok: false,
-      error: 'This account has been archived — talk to your instructor.',
+      error: 'This account has been archived, talk to your instructor.',
     })
   }
 

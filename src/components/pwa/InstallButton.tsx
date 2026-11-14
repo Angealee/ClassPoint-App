@@ -87,7 +87,7 @@ function guideSteps(guide: Guide | null, isIos: boolean): ReactNode[] {
         Choose <strong>Add to Home Screen</strong>.
       </>,
       <>
-        Tap <strong>Add</strong> — ClassPoint now opens like an app.
+        Tap <strong>Add</strong>. ClassPoint now opens like an app.
       </>,
     ]
   }

@@ -13,11 +13,11 @@ export function parseScoreInput(raw: string): ParsedScore {
   if (/^(a|ab|abs|absent)$/i.test(s)) return { ok: true, value: null, absent: true }
 
   if (!/^(\d+(\.\d+)?|\.\d+)$/.test(s)) {
-    return { ok: false, reason: 'Only a number, like 18 or 18.5 — or A for absent.' }
+    return { ok: false, reason: 'Only a number, like 18 or 18.5, or A for absent.' }
   }
 
   const n = Number(s)
-  if (!Number.isFinite(n)) return { ok: false, reason: 'Only a number, like 18 or 18.5 — or A for absent.' }
+  if (!Number.isFinite(n)) return { ok: false, reason: 'Only a number, like 18 or 18.5, or A for absent.' }
   if (n > SCORE_MAX) return { ok: false, reason: `That is above the largest score, ${SCORE_MAX}.` }
 
   const f = 10 ** SCORE_DECIMALS

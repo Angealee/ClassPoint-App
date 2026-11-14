@@ -248,7 +248,7 @@ export function GradeImportSheet({
           <div>
             <h2 className="font-display text-xl font-bold">Import {TERM_LABEL[term]}</h2>
             <p className="text-sm text-muted">
-              {subjectCode} · {sectionName}. Marks go into one column per component — your
+              {subjectCode} · {sectionName}. Marks go into one column per component, your
               sheet records a total per component, not a maximum per quiz, so there is no
               per-item detail to recover.
             </p>
@@ -292,7 +292,7 @@ export function GradeImportSheet({
                   </Select>
                 )}
                 <p className="text-xs text-warn">
-                  These were guessed from the sheet&rsquo;s own headers. Check every one — a
+                  These were guessed from the sheet&rsquo;s own headers. Check every one, a
                   wrong total rescales the whole class.
                 </p>
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -348,12 +348,12 @@ export function GradeImportSheet({
                     </div>
                     {plan.range && (
                       <p className="text-2xs text-muted">
-                        Header reads &ldquo;{sheet.rows[0]?.[plan.range.from] || '—'}&rdquo;. First
+                        Header reads &ldquo;{sheet.rows[0]?.[plan.range.from] || '-'}&rdquo;. First
                         student&rsquo;s cells:{' '}
                         {sheet.rows[structure.firstDataRow]
                           ?.slice(plan.range.from, plan.range.to + 1)
                           .map((v) => v || '·')
-                          .join('  ') || '—'}
+                          .join('  ') || '-'}
                       </p>
                     )}
                   </Card>
@@ -501,7 +501,7 @@ function MatchStage({
 
       {buckets.ambiguous.length > 0 && (
         <Group
-          label="Ambiguous — pick one"
+          label="Ambiguous, pick one"
           tone="danger"
           note="These names match more than one student, and two real people can share a name. Nothing here is ticked for you."
           items={buckets.ambiguous}

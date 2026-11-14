@@ -28,7 +28,7 @@ export function OfflineBanner() {
           role="status"
         >
           <span className="h-2 w-2 rounded-full bg-warn-solid" />
-          <span className="text-xs font-medium">You're offline — showing saved data</span>
+          <span className="text-xs font-medium">You're offline, showing saved data</span>
         </motion.div>
       )}
     </AnimatePresence>

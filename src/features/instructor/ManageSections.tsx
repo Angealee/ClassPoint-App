@@ -46,7 +46,7 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
       await refreshSections()
       setEditingId(undefined)
     } catch {
-      toast('Could not rename — is that name already taken?', 'error')
+      toast('Could not rename, is that name already taken?', 'error')
     } finally {
       setBusy(false)
     }
@@ -57,7 +57,7 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
     const name = newName.trim()
     if (!name) return
     if (!semester) {
-      toast('No active semester — set one up first.', 'error')
+      toast('No active semester, set one up first.', 'error')
       return
     }
     setBusy(true)
@@ -68,7 +68,7 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
       setNewName('')
       toast(`Section ${name} added.`, 'success')
     } catch {
-      toast('Could not add — is that name already taken?', 'error')
+      toast('Could not add, is that name already taken?', 'error')
     } finally {
       setBusy(false)
     }
@@ -94,7 +94,7 @@ export function ManageSections({ open, onClose }: { open: boolean; onClose: () =
     <Sheet open={open} onClose={onClose} title="Manage sections">
       <div className="space-y-2">
         {sections.length === 0 && (
-          <p className="py-2 text-sm text-muted">No sections yet — add your first below.</p>
+          <p className="py-2 text-sm text-muted">No sections yet, add your first below.</p>
         )}
         {sections.map((s) => {
           const count = counts[s.id] ?? 0

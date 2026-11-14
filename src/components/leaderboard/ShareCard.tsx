@@ -1,4 +1,7 @@
 import { forwardRef } from 'react'
+import { CelestialFrame } from '@/components/leaderboard/CelestialFrame'
+import { BODY, SKY, type Place } from '@/components/leaderboard/podiumPalette'
+import { makeStars } from '@/lib/starfield'
 import type { LeaderboardEntry } from '@/lib/types'
 
 export const CARD_W = 1080
@@ -16,11 +19,10 @@ const C = {
   brandDeep: '#8f0f18',
   gold: '#ffba1f',
   goldDeep: '#b97d00',
-  silver: '#c8ccd4',
-  bronze: '#cd7f45',
+  goldSoft: '#fde08a',
+  plate: '#14141c',
+  plate2: '#1e1e2b',
 }
-
-const RANK_COLOR = [C.gold, C.silver, C.bronze]
 
 interface ShareCardProps {
   variant: ShareVariant
@@ -74,12 +76,12 @@ function Face({ url, name, size }: { url: string | null; name: string; size: num
         height: size,
         borderRadius: '50%',
         border: `${ring}px solid ${C.bgSoft}`,
-        background: `linear-gradient(145deg, ${C.brand}, ${C.brandDeep})`,
-        color: C.ink,
+        background: `linear-gradient(145deg, ${C.goldSoft}, ${C.gold})`,
+        color: '#3d2600',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: '"Space Grotesk", sans-serif',
+        fontFamily: '"Bricolage Grotesque", "Inter", sans-serif',
         fontWeight: 700,
         fontSize: Math.round(size * 0.36),
         lineHeight: 1,
@@ -103,7 +105,7 @@ function Header({ scopeLabel, capturedAt }: { scopeLabel: string; capturedAt?: s
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontFamily: '"Space Grotesk", sans-serif',
+            fontFamily: '"Bricolage Grotesque", "Inter", sans-serif',
             fontWeight: 700,
             fontSize: 30,
             color: C.ink,
@@ -113,7 +115,7 @@ function Header({ scopeLabel, capturedAt }: { scopeLabel: string; capturedAt?: s
         </div>
         <span
           style={{
-            fontFamily: '"Space Grotesk", sans-serif',
+            fontFamily: '"Bricolage Grotesque", "Inter", sans-serif',
             fontWeight: 700,
             fontSize: 36,
             color: C.ink,
@@ -136,15 +138,12 @@ function Title({ sub }: { sub: string }) {
     <div style={{ marginTop: 44 }}>
       <div
         style={{
-          fontFamily: '"Space Grotesk", sans-serif',
+          fontFamily: '"Bricolage Grotesque", "Inter", sans-serif',
           fontWeight: 700,
           fontSize: 78,
           lineHeight: 1,
           letterSpacing: '-0.03em',
-          background: `linear-gradient(100deg, ${C.gold}, #fff 55%, ${C.gold})`,
-          WebkitBackgroundClip: 'text',
-          backgroundClip: 'text',
-          color: 'transparent',
+          color: C.ink,
         }}
       >
         LEADERBOARD
@@ -163,8 +162,8 @@ function YouChip({ pos, points }: { pos: number; points: number | null }) {
         justifyContent: 'space-between',
         padding: '28px 36px',
         borderRadius: 26,
-        background: `linear-gradient(100deg, rgba(225,29,42,0.22), rgba(225,29,42,0.06))`,
-        border: `2px solid rgba(225,29,42,0.45)`,
+        background: 'rgba(255,255,255,0.07)',
+        border: '2px solid rgba(253,224,138,0.35)',
       }}
     >
       <div>
@@ -184,7 +183,7 @@ function YouChip({ pos, points }: { pos: number; points: number | null }) {
       </div>
       <div
         style={{
-          fontFamily: '"Space Grotesk", sans-serif',
+          fontFamily: '"Bricolage Grotesque", "Inter", sans-serif',
           fontWeight: 700,
           fontSize: 72,
           lineHeight: 1,
@@ -215,26 +214,6 @@ function Footer() {
   )
 }
 
-function Crown() {
-  return (
-    <svg
-      width={72}
-      height={56}
-      viewBox="0 0 24 18"
-      fill="none"
-      style={{ display: 'block', marginBottom: 10 }}
-    >
-      <path
-        d="M2 4.5 L6.2 9 L12 2 L17.8 9 L22 4.5 L20.2 15.5 H3.8 Z"
-        fill="#ffba1f"
-        stroke="#b97d00"
-        strokeWidth={0.9}
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 function ClimberBanner({ climber }: { climber: { name: string; places: number } }) {
   return (
     <div
@@ -256,7 +235,7 @@ function ClimberBanner({ climber }: { climber: { name: string; places: number } 
         </div>
         <div
           style={{
-            fontFamily: '"Space Grotesk", sans-serif',
+            fontFamily: '"Bricolage Grotesque", "Inter", sans-serif',
             fontWeight: 700,
             fontSize: 34,
             color: C.ink,
@@ -273,129 +252,61 @@ function ClimberBanner({ climber }: { climber: { name: string; places: number } 
   )
 }
 
-function Podium({ entries }: { entries: LeaderboardEntry[] }) {
-  const [first, second, third] = entries
-  const cols = [
-    { e: second, place: 2, h: 132, face: 176 },
-    { e: first, place: 1, h: 186, face: 232 },
-    { e: third, place: 3, h: 104, face: 176 },
-  ].filter((c) => c.e)
+type Size = 'roomy' | 'compact'
 
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'flex-end',
-        justifyContent: 'center',
-        gap: 22,
-        marginTop: 48,
-      }}
-    >
-      {cols.map(({ e, place, h, face }) => (
-        <div
-          key={e!.student_id}
-          style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-        >
-          {place === 1 && <Crown />}
-          <Face url={e!.avatar_url} name={e!.display_name} size={face} />
-          <div
-            style={{
-              fontFamily: '"Space Grotesk", sans-serif',
-              fontWeight: 700,
-              fontSize: place === 1 ? 38 : 30,
-              color: C.ink,
-              marginTop: 14,
-              maxWidth: '100%',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {e!.display_name}
-          </div>
-          <div
-            style={{
-              fontSize: place === 1 ? 34 : 28,
-              fontWeight: 700,
-              color: RANK_COLOR[place - 1],
-              marginTop: 4,
-            }}
-          >
-            {e!.points}
-          </div>
-          <div
-            style={{
-              width: '100%',
-              height: h,
-              marginTop: 16,
-              borderRadius: '18px 18px 0 0',
-              background:
-                place === 1
-                  ? `linear-gradient(180deg, ${C.gold}, ${C.goldDeep})`
-                  : `linear-gradient(180deg, ${C.bgSoft}, rgba(255,255,255,0.03))`,
-              border: `1px solid ${place === 1 ? 'rgba(255,186,31,0.6)' : C.line}`,
-              borderBottom: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontFamily: '"Space Grotesk", sans-serif',
-              fontWeight: 700,
-              fontSize: place === 1 ? 68 : 52,
-              color: place === 1 ? '#3d2600' : C.muted,
-            }}
-          >
-            {place}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
+const SIZE: Record<Size, { padY: number; num: number; numW: number; face: number; name: number; pts: number; bar: number }> = {
+  roomy: { padY: 20, num: 48, numW: 60, face: 80, name: 34, pts: 40, bar: 4 },
+  compact: { padY: 12, num: 36, numW: 54, face: 56, name: 30, pts: 34, bar: 3 },
 }
 
-function RankRow({
+const FONT = '"Bricolage Grotesque", "Inter", sans-serif'
+
+function Row({
   e,
   pos,
   isMe,
-  density = 'compact',
+  size,
+  share,
 }: {
   e: LeaderboardEntry
   pos: number
   isMe: boolean
-  density?: 'compact' | 'roomy'
+  size: Size
+  share: number
 }) {
-  const medal = pos <= 3 ? RANK_COLOR[pos - 1] : null
-  const roomy = density === 'roomy'
+  const z = SIZE[size]
   return (
     <div
       style={{
+        position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        gap: roomy ? 24 : 20,
-        padding: roomy ? '18px 22px' : '11px 20px',
-        borderRadius: 18,
-        background: isMe ? 'rgba(225,29,42,0.16)' : 'transparent',
-        border: `2px solid ${isMe ? 'rgba(225,29,42,0.5)' : 'transparent'}`,
+        gap: 24,
+        padding: `${z.padY}px 40px`,
+        background: isMe ? 'rgba(255,255,255,0.07)' : 'transparent',
+        boxShadow: isMe ? 'inset 0 0 0 2px rgba(253,224,138,0.35)' : 'none',
       }}
     >
       <div
         style={{
-          width: roomy ? 54 : 46,
-          fontFamily: '"Space Grotesk", sans-serif',
+          width: z.numW,
+          fontFamily: FONT,
           fontWeight: 700,
-          fontSize: roomy ? 38 : 32,
-          color: medal ?? C.muted,
+          fontSize: z.num,
+          lineHeight: 1,
           textAlign: 'center',
+          color: C.muted,
         }}
       >
         {pos}
       </div>
-      <Face url={e.avatar_url} name={e.display_name} size={roomy ? 76 : 56} />
+      <Face url={e.avatar_url} name={e.display_name} size={z.face} />
       <div
         style={{
           flex: 1,
           minWidth: 0,
-          fontWeight: isMe ? 700 : 600,
-          fontSize: roomy ? 34 : 30,
+          fontWeight: 600,
+          fontSize: z.name,
           color: C.ink,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -403,18 +314,259 @@ function RankRow({
         }}
       >
         {e.display_name}
-        {isMe && <span style={{ color: C.brand, fontWeight: 700 }}> · you</span>}
+        {isMe && <span style={{ color: C.goldSoft, fontWeight: 700 }}> · you</span>}
       </div>
       <div
         style={{
-          fontFamily: '"Space Grotesk", sans-serif',
+          fontFamily: FONT,
           fontWeight: 700,
-          fontSize: roomy ? 34 : 30,
-          color: medal ?? C.ink,
+          fontSize: z.pts,
+          lineHeight: 1,
+          color: C.goldSoft,
         }}
       >
         {e.points}
       </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: z.bar,
+          background: C.line,
+        }}
+      >
+        <div style={{ width: `${Math.round(share * 100)}%`, height: '100%', background: C.gold }} />
+      </div>
+    </div>
+  )
+}
+
+function Plate({
+  rows,
+  startPos,
+  leader,
+  meId,
+  size,
+}: {
+  rows: LeaderboardEntry[]
+  startPos: number
+  leader: number
+  meId?: string | null
+  size: Size
+}) {
+  return (
+    <div
+      style={{
+        borderRadius: 36,
+        overflow: 'hidden',
+        background: `linear-gradient(145deg, ${C.plate2}, ${C.plate})`,
+        border: `2px solid ${C.line}`,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          padding: '16px 40px',
+          fontSize: 20,
+          fontWeight: 700,
+          letterSpacing: '0.14em',
+          color: C.muted,
+          borderBottom: `1px solid ${C.line}`,
+        }}
+      >
+        <span>RANK</span>
+        <span>POINTS</span>
+      </div>
+      {rows.map((e, i) => (
+        <Row
+          key={e.student_id}
+          e={e}
+          pos={startPos + i}
+          isMe={e.student_id === meId}
+          size={size}
+          share={e.points / leader}
+        />
+      ))}
+    </div>
+  )
+}
+
+/* The space podium, drawn statically at story size. Same bodies, palettes and risers as the
+   live board (podiumPalette.ts), so a screenshot and the app agree. */
+const STARS = makeStars(5, 70, 1, 2.8, 0.3, 0.9)
+const COL_W = 277
+const RISER: Record<Place, number> = { 1: 118, 2: 86, 3: 60 }
+
+function StageColumn({
+  e,
+  place,
+  isMe,
+}: {
+  e: LeaderboardEntry
+  place: Place
+  isMe: boolean
+}) {
+  const body = BODY[place]
+  const champ = place === 1
+  const frameW = Math.round((COL_W - 36) * (champ ? 1 : 0.88))
+  return (
+    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          position: 'relative',
+          overflow: 'hidden',
+          borderRadius: 28,
+          border: `2px solid ${body.border}`,
+          background: `linear-gradient(170deg, ${body.cardTop}, ${body.cardBot})`,
+          padding: '16px 16px 20px',
+          textAlign: 'center',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            opacity: body.foilRest + 0.1,
+            background: `radial-gradient(circle at 28% 18%, rgba(255,255,255,0.4), transparent 42%), ${body.foil}`,
+          }}
+        />
+        {isMe && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 14,
+              top: 14,
+              padding: '3px 12px',
+              borderRadius: 10,
+              background: 'rgba(255,255,255,0.15)',
+              fontSize: 20,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              color: C.ink,
+            }}
+          >
+            YOU
+          </div>
+        )}
+        <div style={{ width: frameW, margin: '0 auto' }}>
+          <CelestialFrame place={place} reduced>
+            <Face url={e.avatar_url} name={e.display_name} size={Math.round(frameW * 0.56)} />
+          </CelestialFrame>
+        </div>
+        <div
+          style={{
+            position: 'relative',
+            marginTop: 6,
+            fontWeight: 700,
+            fontSize: champ ? 34 : 29,
+            color: C.ink,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {e.display_name}
+        </div>
+        <div
+          style={{
+            position: 'relative',
+            marginTop: 4,
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'center',
+            gap: 8,
+            fontFamily: FONT,
+            fontWeight: 700,
+            lineHeight: 1,
+            fontSize: champ ? 68 : 54,
+            color: body.ink,
+          }}
+        >
+          {e.points}
+          <span style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 22, fontWeight: 500, color: C.muted }}>
+            pts
+          </span>
+        </div>
+      </div>
+      <div
+        style={{
+          position: 'relative',
+          height: RISER[place],
+          borderRadius: '14px 14px 0 0',
+          border: `2px solid ${body.border}`,
+          borderBottom: 'none',
+          background: `linear-gradient(180deg, ${body.standTop}, ${body.standBot})`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: FONT,
+          fontWeight: 700,
+          fontSize: champ ? 60 : 48,
+          color: body.ink,
+          boxShadow: `inset 0 2px 0 ${body.ink}66`,
+        }}
+      >
+        <span style={{ position: 'absolute', left: 12, top: 12, width: 8, height: 8, borderRadius: 4, background: body.ink, opacity: 0.45 }} />
+        <span style={{ position: 'absolute', right: 12, top: 12, width: 8, height: 8, borderRadius: 4, background: body.ink, opacity: 0.45 }} />
+        {place}
+      </div>
+    </div>
+  )
+}
+
+function SpaceStage({ entries, meId }: { entries: LeaderboardEntry[]; meId?: string | null }) {
+  const [first, second, third] = entries
+  const slots: Array<{ e: LeaderboardEntry; place: Place } | null> = [
+    second ? { e: second, place: 2 } : null,
+    first ? { e: first, place: 1 } : null,
+    third ? { e: third, place: 3 } : null,
+  ]
+  return (
+    <div
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: 36,
+        background: SKY,
+        border: `2px solid ${C.line}`,
+      }}
+    >
+      {STARS.map((st, i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute',
+            left: `${st.x}%`,
+            top: `${st.y}%`,
+            width: st.r * 2,
+            height: st.r * 2,
+            borderRadius: '50%',
+            background: '#fff',
+            opacity: st.o,
+          }}
+        />
+      ))}
+      <div
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 22,
+          padding: '40px 36px 0',
+        }}
+      >
+        {slots.map((slot, i) =>
+          slot ? (
+            <StageColumn key={slot.e.student_id} e={slot.e} place={slot.place} isMe={slot.e.student_id === meId} />
+          ) : (
+            <div key={i} style={{ flex: 1 }} />
+          ),
+        )}
+      </div>
+      <div style={{ height: 14, borderTop: '2px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)' }} />
     </div>
   )
 }
@@ -425,7 +577,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
 ) {
   const top = entries.slice(0, 10)
   const meInTop = !!meId && top.some((e) => e.student_id === meId)
-  const rest = variant === 'podium' ? top.slice(3) : []
+  const leader = Math.max(1, ...top.map((e) => e.points))
 
   return (
     <div
@@ -437,7 +589,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
         padding: 64,
         display: 'flex',
         flexDirection: 'column',
-        background: `radial-gradient(1000px 620px at 78% -8%, rgba(225,29,42,0.30), transparent 62%), radial-gradient(760px 520px at 8% 104%, rgba(255,186,31,0.18), transparent 60%), ${C.bg}`,
+        background: C.bg,
         fontFamily: 'Inter, system-ui, sans-serif',
         color: C.ink,
       }}
@@ -445,30 +597,20 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
       <Header scopeLabel={scopeLabel} capturedAt={capturedAt} />
       <Title sub={`Top ${top.length} this settle`} />
 
-      {variant === 'podium' ? (
-        <>
-          <Podium entries={top.slice(0, 3)} />
-          {rest.length > 0 && (
-            <div style={{ marginTop: 30, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {rest.map((e, i) => (
-                <RankRow key={e.student_id} e={e} pos={i + 4} isMe={e.student_id === meId} />
-              ))}
-            </div>
-          )}
-        </>
-      ) : (
-        <div style={{ marginTop: 34, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {top.map((e, i) => (
-            <RankRow
-              key={e.student_id}
-              e={e}
-              pos={i + 1}
-              isMe={e.student_id === meId}
-              density="roomy"
-            />
-          ))}
-        </div>
-      )}
+      <div style={{ marginTop: 36 }}>
+        {variant === 'podium' ? (
+          <>
+            <SpaceStage entries={top.slice(0, 3)} meId={meId} />
+            {top.length > 3 && (
+              <div style={{ marginTop: 24 }}>
+                <Plate rows={top.slice(3)} startPos={4} leader={leader} meId={meId} size="compact" />
+              </div>
+            )}
+          </>
+        ) : (
+          <Plate rows={top} startPos={1} leader={leader} meId={meId} size="roomy" />
+        )}
+      </div>
 
       <div style={{ flex: 1 }} />
 

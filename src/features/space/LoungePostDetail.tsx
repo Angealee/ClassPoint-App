@@ -176,7 +176,7 @@ export function LoungePostDetail() {
             <span className="shrink-0 text-2xs text-muted">{timeAgo(r.createdAt)}</span>
           </div>
           {r.hiddenAt && r.body === null ? (
-            <p className="mt-1 text-sm font-medium text-danger">Hidden — reported</p>
+            <p className="mt-1 text-sm font-medium text-danger">Hidden, reported</p>
           ) : (
             <p className="mt-1 whitespace-pre-wrap break-words text-sm text-ink">
               {showWho && <span className="font-semibold text-accent">@{r.replyToName} </span>}
@@ -297,6 +297,7 @@ export function LoungePostDetail() {
                 )}
                 <div className="flex items-end gap-2">
                   <textarea
+                    aria-label="Reply"
                     ref={areaRef}
                     value={body}
                     onChange={(e) => setBody(e.target.value)}

@@ -207,7 +207,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
         // App backgrounded but alive — let the OS pop + buzz it.
         void showLocalNotification({
           title: `Level ${level}! ⭐`,
-          body: 'You leveled up — well done!',
+          body: 'You leveled up, well done!',
           tag: 'cp-level',
         })
       }
@@ -295,7 +295,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     } else {
       void showLocalNotification({
         title: `Achievement unlocked: ${a.name} 🏆`,
-        body: a.titleText ? `New title: "${a.titleText}"` : 'Nice work — check it out!',
+        body: a.titleText ? `New title: "${a.titleText}"` : 'Nice work, check it out!',
         tag: 'cp-achievement',
       })
     }
@@ -499,7 +499,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
             } else {
               void showLocalNotification({
                 title: positive ? `${amount} points 🎉` : `${amount} points`,
-                body: ev.note?.trim() || (positive ? 'Nice work — keep it up!' : 'Points deducted.'),
+                body: ev.note?.trim() || (positive ? 'Nice work, keep it up!' : 'Points deducted.'),
                 tag: 'cp-points',
               })
             }
@@ -645,7 +645,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   const saveProfile = useCallback(
     async (fields: { displayName: string; bio: string; interests: string }) => {
-      if (!me) return { error: 'Still loading — try again in a moment.' }
+      if (!me) return { error: 'Still loading, try again in a moment.' }
       const name = fields.displayName.trim()
       if (name.length < 2) return { error: 'Use at least 2 characters for your display name.' }
       if (name.length > 40) return { error: 'Keep your display name under 40 characters.' }
@@ -677,7 +677,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   const saveAvatar = useCallback(
     async (file: File) => {
-      if (!me || !user) return { error: 'Still loading — try again in a moment.' }
+      if (!me || !user) return { error: 'Still loading, try again in a moment.' }
       if (!file.type.startsWith('image/')) return { error: 'Please choose an image file.' }
       if (file.size > MAX_AVATAR_BYTES) return { error: 'Image is too large (max 5 MB).' }
       try {
@@ -693,7 +693,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   )
 
   const clearAvatar = useCallback(async () => {
-    if (!me) return { error: 'Still loading — try again in a moment.' }
+    if (!me) return { error: 'Still loading, try again in a moment.' }
     try {
       await removeAvatar(me.id)
       setMe((m) => (m ? { ...m, avatar_url: null } : m))
@@ -705,7 +705,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   const saveHeader = useCallback(
     async (file: File) => {
-      if (!me || !user) return { error: 'Still loading — try again in a moment.' }
+      if (!me || !user) return { error: 'Still loading, try again in a moment.' }
       if (!file.type.startsWith('image/')) return { error: 'Please choose an image file.' }
       if (file.size > MAX_AVATAR_BYTES) return { error: 'Image is too large (max 5 MB).' }
       try {
@@ -722,7 +722,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   const saveHeaderPos = useCallback(
     async (pos: number) => {
-      if (!me) return { error: 'Still loading — try again in a moment.' }
+      if (!me) return { error: 'Still loading, try again in a moment.' }
       const clamped = Math.max(0, Math.min(100, Math.round(pos)))
       const previous = me.header_pos
       setMe((m) => (m ? { ...m, header_pos: clamped } : m))
@@ -738,7 +738,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
   )
 
   const clearHeader = useCallback(async () => {
-    if (!me) return { error: 'Still loading — try again in a moment.' }
+    if (!me) return { error: 'Still loading, try again in a moment.' }
     try {
       await setHeaderUrl(me.id, null)
       setMe((m) => (m ? { ...m, header_url: null, header_pos: 50 } : m))
@@ -750,7 +750,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   const saveBanner = useCallback(
     async (file: File) => {
-      if (!me || !user) return { error: 'Still loading — try again in a moment.' }
+      if (!me || !user) return { error: 'Still loading, try again in a moment.' }
       if (!file.type.startsWith('image/')) return { error: 'Please choose an image file.' }
       if (file.size > MAX_AVATAR_BYTES) return { error: 'Image is too large (max 5 MB).' }
       const current = me.banner_urls ?? []
@@ -771,7 +771,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   const removeBanner = useCallback(
     async (url: string) => {
-      if (!me) return { error: 'Still loading — try again in a moment.' }
+      if (!me) return { error: 'Still loading, try again in a moment.' }
       const next = (me.banner_urls ?? []).filter((u) => u !== url)
       try {
         await setBannerUrls(me.id, next)
@@ -819,7 +819,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   const setDisplayTitleField = useCallback(
     async (title: string | null) => {
-      if (!me) return { error: 'Still loading — try again in a moment.' }
+      if (!me) return { error: 'Still loading, try again in a moment.' }
       try {
         await apiSetDisplayTitle(me.id, title)
         setMe((m) => (m ? { ...m, display_title: title } : m))
@@ -833,7 +833,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
 
   const setPinnedAchievementsField = useCallback(
     async (codes: string[]) => {
-      if (!me) return { error: 'Still loading — try again in a moment.' }
+      if (!me) return { error: 'Still loading, try again in a moment.' }
       try {
         await apiSetPinnedAchievements(me.id, codes)
         setMe((m) => (m ? { ...m, pinned_achievements: codes.length ? codes : null } : m))

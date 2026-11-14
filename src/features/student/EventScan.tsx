@@ -19,7 +19,7 @@ import { useStudentData } from './StudentData'
 function errorText(e: unknown): string {
   const m = (e as { message?: string } | null)?.message
   if (m && m.length <= 160) return m
-  return 'Could not record your attendance — scan the current QR and try again.'
+  return 'Could not record your attendance, scan the current QR and try again.'
 }
 
 export function EventScan() {
@@ -62,7 +62,7 @@ export function EventScan() {
     if (detectedRef.current) return
     const parsed = parseEventPayload(text)
     if (!parsed) {
-      setError('That is not an event QR — scan the code the event is showing.')
+      setError('That is not an event QR, scan the code the event is showing.')
       setScanning(false)
       return
     }

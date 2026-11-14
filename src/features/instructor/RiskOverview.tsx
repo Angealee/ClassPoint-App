@@ -52,7 +52,7 @@ export function RiskOverview() {
       </div>
       <p className="mb-3 text-xs text-muted">
         Unexcused absences across every section. “Can still excuse” means the
-        7-day window is open — those are the ones worth chasing today.
+        7-day window is open, those are the ones worth chasing today.
       </p>
 
       {loading ? (

@@ -40,7 +40,7 @@ export function LevelUpBurst({ level, onDone }: { level: number | null; onDone: 
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={() => armed && onDone()}
-          className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/75 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/80"
           role="alertdialog"
           aria-label={`Level up! You reached level ${level}. Tap to continue.`}
         >

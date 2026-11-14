@@ -17,7 +17,7 @@ export function RouteError() {
       <div>
         <h1 className="font-display text-xl font-bold text-ink">Something broke on our side</h1>
         <p className="mt-1 max-w-sm text-sm text-muted">
-          Your data is fine. This usually happens right after an update — reloading almost always
+          Your data is fine. This usually happens right after an update, reloading almost always
           fixes it.
         </p>
       </div>

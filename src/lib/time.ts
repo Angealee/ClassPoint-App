@@ -26,7 +26,7 @@ export function countdownTo(target: Date, from: Date = new Date()): string {
 
 /** "7:30 AM" — the clock time a snapshot was captured. */
 export function snapshotLabel(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   return new Date(iso).toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',

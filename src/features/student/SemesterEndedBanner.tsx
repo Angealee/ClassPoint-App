@@ -11,7 +11,7 @@ export function SemesterEndedBanner() {
         This semester has ended
       </p>
       <p className="mt-1 text-xs text-muted">
-        Your points, badges and attendance record are all still here — they just
+        Your points, badges and attendance record are all still here, they just
         don't change any more. If you're continuing next semester, your
         instructor will move you across and you'll start fresh.
       </p>

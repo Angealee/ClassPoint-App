@@ -140,7 +140,7 @@ export function UsePoints() {
     setSubmitting(true)
     try {
       await requestRedemption({ points, kind, note })
-      toast('Request sent — your instructor will decide.', 'success')
+      toast('Request sent, your instructor will decide.', 'success')
       setConfirming(false)
       setNote('')
       setPoints(5)
@@ -226,7 +226,7 @@ export function UsePoints() {
           </div>
           <p className="mt-1.5 text-xs text-muted">
             {spent === 0
-              ? 'Nothing spent yet — your points are all still on the board.'
+              ? 'Nothing spent yet, your points are all still on the board.'
               : `You've cashed in ${spent} of the ${spent + balance} points you've earned.`}
           </p>
           <Link
@@ -276,7 +276,7 @@ export function UsePoints() {
             <span className="font-semibold text-danger">
               Spending lowers your XP, level and rank.
             </span>{' '}
-            It counts exactly like losing points — you’re trading leaderboard standing for a
+            It counts exactly like losing points, you’re trading leaderboard standing for a
             better grade, and it doesn’t come back.
           </p>
         </div>
@@ -314,6 +314,7 @@ export function UsePoints() {
               −
             </button>
             <input
+              aria-label="Points to use"
               type="number"
               inputMode="numeric"
               min={1}
@@ -351,7 +352,7 @@ export function UsePoints() {
           label={noteRequired ? 'Note (required)' : 'Note (optional)'}
           value={note}
           onChange={(e) => setNote(e.target.value.slice(0, 120))}
-          placeholder="e.g. Quiz 2 — missed the bonus"
+          placeholder="e.g. Quiz 2, missed the bonus"
           hint={
             noteRequired
               ? 'Tell your instructor what this is for.'
@@ -405,7 +406,7 @@ export function UsePoints() {
         ) : loadError ? (
           <ErrorState onRetry={() => void load()}>Couldn’t load your requests.</ErrorState>
         ) : decided.length === 0 ? (
-          <EmptyState>Nothing yet — your decided requests show up here.</EmptyState>
+          <EmptyState>Nothing yet, your decided requests show up here.</EmptyState>
         ) : (
           <Rows>
             {decided.map((r) => (
@@ -438,7 +439,7 @@ export function UsePoints() {
             approves it.
           </>
         }
-        detail={`If approved, your total drops to ${Math.max(0, balance - points)} — your level and leaderboard rank drop with it, and you climb the spend board.`}
+        detail={`If approved, your total drops to ${Math.max(0, balance - points)}, your level and leaderboard rank drop with it, and you climb the spend board.`}
         confirmLabel="Send request"
         busy={submitting}
         onConfirm={onSubmit}

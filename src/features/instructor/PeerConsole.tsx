@@ -294,7 +294,7 @@ function EvaluationCard({ item, now }: { item: PeerEvaluationListItem; now: numb
     key === 'open'
       ? item.closesAt
         ? `Closes in ${countdownTo(new Date(item.closesAt))}`
-        : 'No deadline — close it by hand'
+        : 'No deadline, close it by hand'
       : key === 'released'
         ? `Released ${timeAgo(item.resultsReleasedAt as string)}`
         : item.closedAt

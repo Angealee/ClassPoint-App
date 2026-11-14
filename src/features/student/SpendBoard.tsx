@@ -64,7 +64,7 @@ export function SpendBoard() {
 
         <p className="text-xs text-muted">
           Points cashed in this semester. Spending costs you places on the other
-          board — that&rsquo;s the trade.
+          board, that&rsquo;s the trade.
         </p>
 
         {loading ? (
@@ -85,7 +85,6 @@ export function SpendBoard() {
             showSection={isGlobal}
             metric="spent"
             rankSignals={false}
-            confetti={false}
             pinnedSelf={meEntry && meIdx >= TOP_N ? meEntry : null}
             onSelect={(entry) => setSelected(entry)}
           />
@@ -95,7 +94,7 @@ export function SpendBoard() {
           <Card className="text-center">
             <p className="text-sm font-semibold">You&rsquo;re not on this board yet</p>
             <p className="mt-1 text-xs text-muted">
-              Every point you spend puts you higher here — and lower on the other board. Pick your
+              Every point you spend puts you higher here, and lower on the other board. Pick your
               game.
             </p>
             <Link

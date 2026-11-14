@@ -299,7 +299,7 @@ export function Lounge() {
         )
       ) : (
         <p className="rounded-xl border border-warn-solid/30 bg-warn-solid/8 px-3 py-2 text-sm text-warn">
-          You&apos;re muted right now — you can still read everything.
+          You&apos;re muted right now, you can still read everything.
         </p>
       )}
 
@@ -346,7 +346,7 @@ export function Lounge() {
           onClick={() => void refresh()}
           className="w-full rounded-full bg-accent-solid/10 py-2 text-sm font-semibold text-accent transition-colors hover:bg-accent-solid/15"
         >
-          {pendingNew} new post{pendingNew === 1 ? '' : 's'} — tap to load
+          {pendingNew} new post{pendingNew === 1 ? '' : 's'}, tap to load
         </button>
       )}
 

@@ -66,7 +66,7 @@ export function useBoostRequest(onRequested?: () => void): {
     setSubmitting(true)
     try {
       await requestGradeBoost(target.column.item.id, target.points)
-      toast('Request sent — your instructor will decide.', 'success')
+      toast('Request sent, your instructor will decide.', 'success')
       setTarget(null)
       await reloadGrades()
       onRequested?.()

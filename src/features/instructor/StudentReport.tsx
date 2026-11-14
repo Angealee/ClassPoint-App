@@ -12,7 +12,7 @@ const longDate = (iso: string | Date) =>
 const shortDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 const clock = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '—'
+  iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '-'
 const STATUS_LABEL: Record<string, string> = {
   present: 'Present',
   late: 'Late',
@@ -85,7 +85,7 @@ export function StudentReport() {
     return (
       <div style={{ padding: 40, fontFamily: 'sans-serif' }}>
         {loadFailed
-          ? 'Could not load this record — check your connection and reload before printing.'
+          ? 'Could not load this record, check your connection and reload before printing.'
           : 'That student no longer exists.'}{' '}
         <button onClick={() => navigate(-1)} style={{ textDecoration: 'underline' }}>
           Back
@@ -167,11 +167,11 @@ export function StudentReport() {
       <div className="report-page">
         <div style={{ borderBottom: '2px solid #111', paddingBottom: 12, marginBottom: 16 }}>
           <h1>
-            Attendance Record — {student.sectionName}
+            Attendance Record, {student.sectionName}
             {subjectLabel ? ` · ${subjectLabel}` : ''}
           </h1>
           <p style={{ margin: '2px 0 0', fontSize: 12, fontWeight: 600, color: '#444' }}>
-            DCT — College of Computer Studies
+            DCT. College of Computer Studies
           </p>
           <p style={{ margin: '8px 0 0', fontSize: 15, fontWeight: 600 }}>{student.fullName}</p>
           <p className="report-muted" style={{ margin: '2px 0 0', fontSize: 12 }}>
@@ -202,7 +202,7 @@ export function StudentReport() {
           <span>Absent <strong>{stats.absent}</strong></span>
           {stats.excused > 0 && <span>Excused <strong>{stats.excused}</strong></span>}
           <span>
-            Attendance rate <strong>{stats.rate === null ? '—' : `${stats.rate}%`}</strong>
+            Attendance rate <strong>{stats.rate === null ? '-' : `${stats.rate}%`}</strong>
           </span>
           <span className="report-muted">
             This semester {student.semesterPoints} · Level {level} · All-time{' '}
@@ -237,8 +237,8 @@ export function StudentReport() {
                     .map((a) => (
                       <tr key={a.recordId}>
                         <td>{shortDate(a.startedAt)}</td>
-                        {!subjectFilter && subjects.length > 1 && <td>{a.subjectCode || '—'}</td>}
-                        <td>{a.topic || '—'}</td>
+                        {!subjectFilter && subjects.length > 1 && <td>{a.subjectCode || '-'}</td>}
+                        <td>{a.topic || '-'}</td>
                         <td>{STATUS_LABEL[a.status] ?? a.status}</td>
                         <td>{clock(a.scannedAt)}</td>
                       </tr>

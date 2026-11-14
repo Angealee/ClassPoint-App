@@ -33,6 +33,11 @@
 
   --color-plate: #14141c;
   --color-plate-2: #1e1e2b;
+  /* Signals that sit ON the plate. The plate never flips with the theme, so the
+     light-mode role colours (success/danger/streak) would be dark-on-dark here. */
+  --color-plate-up: #6ee7b7;
+  --color-plate-down: #fda4af;
+  --color-plate-hot: #fdba74;
 
   --radius-lg: 0.625rem;
   --radius-xl: 0.875rem;
@@ -40,7 +45,7 @@
   --radius-3xl: 1.5rem;
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
@@ -48,7 +53,7 @@
   --card: #ffffff;
   --card-2: #fafafb;
   --ink: #18181b;
-  --muted: #6b7280;
+  --muted: #616774;
   --line: #e7e7ec;
   --ring: #e11d2a;
 
@@ -335,29 +340,27 @@ body::after {
 .cp-silent-2 { animation: cp-silent 4.4s ease-in-out 0.5s infinite; }
 .cp-silent-3 { animation: cp-silent 4.4s ease-in-out 1s infinite; }
 
+/* Reduced motion keeps STATE CHANGES legible: loops and one-shot animations
+   resolve instantly, transforms stop travelling, and only a short
+   opacity/colour fade remains so a toggle, tab or hover still registers. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 120ms !important;
+    transition-property: opacity, color, background-color, border-color, outline-color, fill, stroke !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
 }
 
-@keyframes cp-aurora-a {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50%      { transform: translate3d(6%, -8%, 0) scale(1.16); }
+/* The podium sun's corona: the ONE loop on the board, slow, and champion only. */
+@keyframes cp-corona {
+  to { transform: rotate(360deg); }
 }
-
-@keyframes cp-aurora-b {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1.12); }
-  50%      { transform: translate3d(-8%, 6%, 0) scale(0.94); }
-}
-
-.cp-aurora-a { animation: cp-aurora-a 26s ease-in-out infinite; }
-.cp-aurora-b { animation: cp-aurora-b 34s ease-in-out infinite; }
+.cp-corona { animation: cp-corona 90s linear infinite; }
 
 @keyframes cp-award-pop {
   0%      { opacity: 0; transform: translateY(6px) scale(0.9); }
@@ -378,6 +381,13 @@ body::after {
 }
 
 .cp-sheen { animation: cp-sheen 9s ease-in-out infinite; }
+
+/* XP-bar shimmer: a highlight that slides along the filled part. */
+@keyframes cp-shimmer {
+  0%        { transform: translateX(-120%); }
+  60%, 100% { transform: translateX(260%); }
+}
+.cp-shimmer { animation: cp-shimmer 4.5s ease-in-out infinite; }
 
 /* Native feel on phones: no visible scrollbars (real phones overlay them; DevTools
    device emulation and narrow desktop windows draw fat ones), and no sideways

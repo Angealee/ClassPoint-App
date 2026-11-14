@@ -220,7 +220,7 @@ export function StudentRecord() {
 
       {student.archivedAt && (
         <Card className="border-danger-solid/30 bg-danger-solid/8 p-3 text-center text-sm font-medium text-danger">
-          Archived — hidden from rosters and the leaderboard.
+          Archived, hidden from rosters and the leaderboard.
         </Card>
       )}
 
@@ -237,7 +237,7 @@ export function StudentRecord() {
             <Stat label="This sem" value={String(student.semesterPoints)} />
             <Stat label="All-time" value={String(student.lifetimePoints)} />
             <Stat label="Level" value={String(level)} />
-            <Stat label="Rank" value={rank ? `#${rank}` : '—'} />
+            <Stat label="Rank" value={rank ? `#${rank}` : '-'} />
           </div>
         </div>
       </Card>
@@ -288,7 +288,7 @@ export function StudentRecord() {
                     s.rate === null ? 'text-muted' : TONE[rateTone(s.rate)].text,
                   )}
                 >
-                  {s.rate === null ? '—' : `${s.rate}%`}
+                  {s.rate === null ? '-' : `${s.rate}%`}
                 </span>
               </div>
             ))}
@@ -454,7 +454,7 @@ export function StudentRecord() {
         message={
           <>
             <span className="font-semibold text-ink">{student.fullName}</span> disappears from the
-            roster, leaderboard and attendance-taking — everything is kept and restorable.
+            roster, leaderboard and attendance-taking, everything is kept and restorable.
           </>
         }
         confirmLabel="Archive"

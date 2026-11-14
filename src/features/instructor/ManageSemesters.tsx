@@ -98,7 +98,7 @@ export function ManageSemesters() {
       setNewName('')
       toast(`${code} added.`, 'success')
     } catch {
-      toast('Could not add — is that code already used this semester?', 'error')
+      toast('Could not add, is that code already used this semester?', 'error')
     } finally {
       setBusy(false)
     }
@@ -114,7 +114,7 @@ export function ManageSemesters() {
       await refreshSemester()
       setEditingId(undefined)
     } catch {
-      toast('Could not save — is that code already used?', 'error')
+      toast('Could not save, is that code already used?', 'error')
     } finally {
       setBusy(false)
     }
@@ -174,7 +174,7 @@ export function ManageSemesters() {
         <h2 className="font-display text-base font-bold">Term dates</h2>
         <p className="mt-0.5 text-sm text-muted">
           Six weeks each by default. Move them when a holiday or suspension shifts the
-          calendar — attendance re-tags itself.
+          calendar, attendance re-tags itself.
         </p>
         <div className="mt-3 space-y-3">
           {TERM_ORDER.map((term) => {
@@ -292,7 +292,7 @@ export function ManageSemesters() {
           ))}
           {subjects.length === 0 && (
             <li className="rounded-xl border border-dashed border-line p-3 text-sm text-muted">
-              No subjects yet — add one below.
+              No subjects yet, add one below.
             </li>
           )}
         </ul>
@@ -419,7 +419,7 @@ function RolloverPanel() {
       await load()
       setBuilding(created)
     } catch {
-      toast('Could not create that semester — is the name already used?', 'error')
+      toast('Could not create that semester, is the name already used?', 'error')
     } finally {
       setBusy(false)
     }
@@ -484,7 +484,7 @@ function RolloverPanel() {
             type="date"
             value={startsOn}
             onChange={(e) => setStartsOn(e.target.value)}
-            hint="A Monday — week 1 is anchored here. Terms are seeded six weeks apart and stay editable."
+            hint="A Monday, week 1 is anchored here. Terms are seeded six weeks apart and stay editable."
             required
           />
           <div className="flex gap-2">

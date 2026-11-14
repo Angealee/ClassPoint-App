@@ -323,17 +323,17 @@ describe('the silent board (0060)', () => {
     expect(frames![0]).not.toMatch(/transform/)
   })
 
-  it('uses semantic tokens rather than a raw palette', () => {
+  it('has no hardcoded hex', () => {
     const code = stripComments(readFileSync(join(process.cwd(), SRC), 'utf8'))
     expect(code, 'no hardcoded hex in SilentBoard').not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
-    expect(code).toMatch(/var\(--color-/)
   })
 
-  it('outlines the stands with --muted, never --line', () => {
+  it('is the same night sky and risers as the live podium, with visible dashed outlines', () => {
     const code = stripComments(readFileSync(join(process.cwd(), SRC), 'utf8'))
-    expect(code, 'SilentBoard must not stroke with --color-line').not.toMatch(
-      /stroke="var\(--color-line\)"/,
+    expect(code, 'the sky comes from the shared palette').toMatch(/\bSKY\b.*podiumPalette/s)
+    expect(code, 'the risers come from the shared palette').toMatch(/\bRISER_H\b/)
+    expect(code, 'the ghost outlines must stay visible on the sky').toMatch(
+      /border-dashed border-white\/35/,
     )
-    expect(code).toMatch(/stroke="var\(--color-muted\)"/)
   })
 })

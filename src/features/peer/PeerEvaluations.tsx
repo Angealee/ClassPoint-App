@@ -49,7 +49,7 @@ export function PeerEvaluations() {
       ) : loadError ? (
         <ErrorState
           onRetry={() => void load()}
-          detail="Nothing you have filled in is lost — this is just the connection."
+          detail="Nothing you have filled in is lost, this is just the connection."
         >
           {loadError}
         </ErrorState>

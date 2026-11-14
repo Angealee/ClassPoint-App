@@ -444,7 +444,7 @@ export function RoomRail({
             <ErrorState
               inline
               onRetry={onRetryPeople}
-              detail="Everyone is still in the room — this is the list that did not load."
+              detail="Everyone is still in the room, this is the list that did not load."
             >
               {peopleError}
             </ErrorState>

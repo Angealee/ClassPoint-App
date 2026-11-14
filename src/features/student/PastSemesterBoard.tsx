@@ -51,7 +51,7 @@ export function PastSemesterBoard({ open, onClose }: { open: boolean; onClose: (
   return (
     <Sheet open={open} onClose={onClose} title="Past semesters">
       {semesters.length === 0 ? (
-        <EmptyState compact>No past semesters yet — this is the first one.</EmptyState>
+        <EmptyState compact>No past semesters yet, this is the first one.</EmptyState>
       ) : (
         <div className="space-y-4">
           <Select

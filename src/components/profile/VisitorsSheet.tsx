@@ -72,7 +72,7 @@ export function VisitorsSheet({
       {loading ? (
         <ListSkeleton rows={5} />
       ) : rows.length === 0 ? (
-        <EmptyState compact>Nobody yet — go climb the leaderboard.</EmptyState>
+        <EmptyState compact>Nobody yet, go climb the leaderboard.</EmptyState>
       ) : (
         <div className="space-y-3">
           <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">

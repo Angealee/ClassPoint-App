@@ -286,7 +286,7 @@ export async function deleteSection(id: string): Promise<void> {
   if (countError) throw countError
   if ((count ?? 0) > 0) {
     throw new Error(
-      'Section is not empty — it still has students (archived ones count too).',
+      'Section is not empty, it still has students (archived ones count too).',
     )
   }
   const { error } = await supabase.from('sections').delete().eq('id', id)

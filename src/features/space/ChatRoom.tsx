@@ -417,7 +417,7 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
   function jumpToParent(id: string) {
     const el = document.getElementById(`msg-${id}`)
     if (!el) {
-      toast('That message is further back — load older to reach it.', 'info')
+      toast('That message is further back, load older to reach it.', 'info')
       return
     }
     setPanelOpen(false)
@@ -567,7 +567,7 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
 
       {room?.announceOnly && (
         <p className="rounded-xl border border-warn-solid/30 bg-warn-solid/8 px-3 py-2 text-xs font-medium text-warn">
-          Announcements only — the instructor is the only one posting here right now.
+          Announcements only, the instructor is the only one posting here right now.
         </p>
       )}
 
@@ -599,7 +599,7 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
             <EmptyState
               className="flex-1"
               icon={<AstronautArt variant="space" size="md" />}
-              description="Say something first — somebody has to."
+              description="Say something first, somebody has to."
             >
               Nobody has said anything yet.
             </EmptyState>
@@ -775,6 +775,7 @@ export function ChatRoom({ basePath = '/app/space' }: { basePath?: string }) {
               ) : (
                 <div className="flex items-end gap-2">
                   <textarea
+                    aria-label="Message"
                     ref={areaRef}
                     value={body}
                     onChange={(e) => {

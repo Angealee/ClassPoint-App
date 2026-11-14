@@ -138,7 +138,7 @@ export function AwardHistory({ embedded = false }: { embedded?: boolean } = {}) 
       ) : records.length === 0 ? (
         <EmptyState>{sectionFilter || categoryFilter
             ? 'Nothing matches those filters.'
-            : 'No awards yet — points you give will appear here.'}</EmptyState>
+            : 'No awards yet, points you give will appear here.'}</EmptyState>
       ) : (
         <Rows>
           {records.map((r) => {

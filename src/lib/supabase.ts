@@ -8,7 +8,7 @@ export const isSupabaseConfigured = Boolean(url && anonKey)
 
 if (!isSupabaseConfigured) {
   const message =
-    '[ClassPoint] Supabase env not set — VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY ' +
+    '[ClassPoint] Supabase env not set. VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY ' +
     'are required. Copy .env.example to .env locally, or set them in the Vercel ' +
     'project settings and redeploy.'
   if (import.meta.env.PROD) throw new Error(message)

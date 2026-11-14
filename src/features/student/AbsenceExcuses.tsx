@@ -191,7 +191,7 @@ export function AbsenceExcuses({
           ))}
         </ol>
         <p className="mt-5 rounded-xl bg-card-2 px-4 py-3 text-sm text-muted">
-          File your request here so your instructor is ready — you have{' '}
+          File your request here so your instructor is ready, you have{' '}
           {EXCUSE_DEADLINE_DAYS} days from the class.
         </p>
         <Button size="lg" className="mt-5 w-full" onClick={() => setGuideOpen(false)}>

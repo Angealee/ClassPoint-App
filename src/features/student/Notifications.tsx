@@ -474,7 +474,7 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.16 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
             onClick={() => { if (!draggingRef.current) onClose() }}
           >
             {/* Card — scales up from center */}
@@ -530,7 +530,7 @@ export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: 
                   <div className="flex flex-col items-center gap-3 py-12 text-center">
                     <EmptyIllustration />
                     <p className="text-sm text-muted">
-                      Nothing yet — points, level-ups
+                      Nothing yet, points, level-ups
                       <br />
                       and rank moves land here.
                     </p>

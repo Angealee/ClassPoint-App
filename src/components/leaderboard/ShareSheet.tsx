@@ -155,7 +155,7 @@ export function ShareSheet({
             </div>
           </div>
         ) : (
-          <EmptyState compact>Nothing to share yet — the board settles twice a day.</EmptyState>
+          <EmptyState compact>Nothing to share yet, the board settles twice a day.</EmptyState>
         )}
 
         <Button size="lg" className="w-full" onClick={onShare} disabled={busy || !hasEntries}>
@@ -168,7 +168,7 @@ export function ShareSheet({
           )}
         </Button>
         <p className="text-center text-xs text-muted">
-          Exports at 1080×1350 — sized for a story or a post.
+          Exports at 1080×1350, sized for a story or a post.
         </p>
       </div>
     </Sheet>

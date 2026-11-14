@@ -97,7 +97,7 @@ export function AttendanceStats() {
               <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
                 {excused > 0 && `${excused} excused`}
                 {excused > 0 && irregular > 0 && ' · '}
-                {irregular > 0 && `${irregular} irregular`} — those classes don't count for or
+                {irregular > 0 && `${irregular} irregular`}, those classes don't count for or
                 against you.
               </p>
             )}
@@ -225,7 +225,7 @@ export function AttendanceStats() {
                 <p className="border-t border-line px-4 py-3 text-sm text-muted">
                   Measured from {punctuality.total} scan
                   {punctuality.total === 1 ? '' : 's'}. Classes your instructor marked by hand are
-                  not counted — there is no scan time to measure.
+                  not counted, there is no scan time to measure.
                 </p>
               </Card>
             </div>

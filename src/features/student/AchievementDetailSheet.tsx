@@ -103,7 +103,7 @@ export function AchievementDetailSheet({
           )}
 
           <p className="text-sm text-muted">
-            {hidden ? 'Secret — keep playing to discover what unlocks it.' : a.description}
+            {hidden ? 'Secret, keep playing to discover what unlocks it.' : a.description}
           </p>
 
           {flavor && (

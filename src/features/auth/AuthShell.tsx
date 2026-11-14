@@ -4,7 +4,6 @@ import type { ReactNode } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Logo } from '@/components/ui/Logo'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
-import { Aurora } from '@/components/landing/Aurora'
 
 interface AuthShellProps {
   title: string
@@ -17,9 +16,7 @@ interface AuthShellProps {
 
 export function AuthShell({ title, subtitle, icon, children, below, footer }: AuthShellProps) {
   return (
-    <div className="relative min-h-[100dvh] overflow-hidden">
-      <Aurora />
-
+    <div className="min-h-[100dvh]">
       <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-5">
         <header className="flex items-center justify-between py-4">
           <Link to="/" className="flex items-center gap-2">

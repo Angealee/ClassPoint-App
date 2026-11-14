@@ -255,7 +255,7 @@ describe('orderedItems', () => {
 
 describe('displayGrade', () => {
   it('renders a dash for no grade', () => {
-    expect(displayGrade(null)).toBe('—')
+    expect(displayGrade(null)).toBe('-')
   })
 
   it('always shows two decimals', () => {

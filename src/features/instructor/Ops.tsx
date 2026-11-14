@@ -104,7 +104,7 @@ function BackupHealthCard() {
         <ErrorLine text={error} onRetry={() => void load()} />
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted">
-          No backup tables yet — the nightly job creates them on its first run.
+          No backup tables yet, the nightly job creates them on its first run.
         </p>
       ) : (
         <>
@@ -188,7 +188,7 @@ function LeaderboardCard() {
         variant="default"
         title="Rebuild the leaderboard?"
         message="Every student's rank is recalculated and republished immediately."
-        detail="Anyone who climbed since the last freeze will see their new rank — and anyone who slipped will see that too."
+        detail="Anyone who climbed since the last freeze will see their new rank, and anyone who slipped will see that too."
         confirmLabel="Rebuild"
       />
     </Card>
@@ -239,7 +239,7 @@ function AuthEventsCard() {
       {hot.length > 0 && (
         <p className="mb-3 rounded-xl bg-warn-solid/10 px-3 py-2 text-xs text-warn">
           {hot.map(([ip, n]) => `${ip}: ${n} failures`).join(' · ')} in the last 15
-          minutes. The limiter blocks at 30 — a whole class shares one network
+          minutes. The limiter blocks at 30, a whole class shares one network
           address, so this is usually a shared wifi, not an attack.
         </p>
       )}
@@ -270,7 +270,7 @@ function AuthEventsCard() {
                 {r.kind === 'pin_reset' ? 'PIN reset' : 'Claim'}
                 {r.detail && <span className="text-muted"> · {r.detail}</span>}
               </span>
-              <span className="shrink-0 font-mono text-2xs text-muted">{r.ip ?? '—'}</span>
+              <span className="shrink-0 font-mono text-2xs text-muted">{r.ip ?? '-'}</span>
               <span className="shrink-0 text-2xs text-muted">{timeAgo(r.at)}</span>
             </div>
           ))}
@@ -446,9 +446,9 @@ function StudentGradesCard() {
       toast(
         next
           ? result.notified > 0
-            ? `Students can now see their grades — ${result.notified} notified.`
+            ? `Students can now see their grades, ${result.notified} notified.`
             : 'Students can now see their grades.'
-          : 'Grades are hidden again — students still see their scores.',
+          : 'Grades are hidden again, students still see their scores.',
         'success',
       )
     } catch (e) {
@@ -471,7 +471,7 @@ function StudentGradesCard() {
               ? 'Couldn’t read the setting. This needs migration 0062 applied.'
               : on
                 ? 'Students see their scores AND their grade (the term figure and the part scores).'
-                : 'Grades hidden. Students still see their scores and can use points assist — just not the grade.'}
+                : 'Grades hidden. Students still see their scores and can use points assist, just not the grade.'}
           </span>
           {failed && (
             <button type="button" onClick={load} className="mt-1 text-xs font-semibold text-accent">

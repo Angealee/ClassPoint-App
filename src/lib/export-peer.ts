@@ -34,5 +34,5 @@ export async function exportPeerScores(
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheet), 'Scores')
 
   const safe = evaluation.title.replace(/[^\w\s-]/g, '').trim() || 'peer-evaluation'
-  XLSX.writeFile(wb, `${safe} — scores.xlsx`)
+  XLSX.writeFile(wb, `${safe}, scores.xlsx`)
 }

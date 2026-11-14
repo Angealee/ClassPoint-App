@@ -17,7 +17,7 @@ export async function exportSessionAttendance(
   const XLSX = await import('xlsx')
   const data = rows.map((r) => ({
     Student: r.fullName,
-    Status: r.status ? STATUS_LABEL[r.status] : '—',
+    Status: r.status ? STATUS_LABEL[r.status] : '-',
     'Checked in': r.scannedAt ? new Date(r.scannedAt).toLocaleString() : '',
   }))
   const sheet = XLSX.utils.json_to_sheet(data)
@@ -43,7 +43,7 @@ export async function exportAttendanceSummary(
     Excused: s.excused,
     Irregular: s.irregular,
     'Sessions counted': s.counted,
-    'Attendance %': s.rate === null ? '—' : Math.round(s.rate * 100),
+    'Attendance %': s.rate === null ? '-' : Math.round(s.rate * 100),
   }))
   const sheet = XLSX.utils.json_to_sheet(data)
   const wb = XLSX.utils.book_new()
@@ -87,13 +87,13 @@ export async function exportSectionRegister(
       if (st === 'absent') a++
       if (st === 'present' || st === 'late' || st === 'absent') counted++
     }
-    row.push(p, l, a, counted ? `${Math.round(((p + l) / counted) * 100)}%` : '—')
+    row.push(p, l, a, counted ? `${Math.round(((p + l) / counted) * 100)}%` : '-')
     return row
   })
 
   const mixed = new Set(sessions.map((s) => s.subjectCode ?? '')).size > 1
   const subjectRow = mixed
-    ? [['', ...sessions.map((s) => s.subjectCode ?? '—'), '', '', '', '']]
+    ? [['', ...sessions.map((s) => s.subjectCode ?? '-'), '', '', '', '']]
     : []
 
   const sheet = XLSX.utils.aoa_to_sheet([dateRow, ...subjectRow, topicRow, ...body])

@@ -188,7 +188,7 @@ export function GradeGrid({
     return (
       <EmptyState
         icon={<TableIcon className="h-6 w-6" />}
-        description="A column is one quiz, one activity or the exam — add the first and the roster appears underneath it."
+        description="A column is one quiz, one activity or the exam, add the first and the roster appears underneath it."
         action={
           onAddColumn ? (
             <Button size="sm" onClick={onAddColumn}>
@@ -346,7 +346,7 @@ export function GradeGrid({
                   className="sticky bottom-0 z-20 border-t border-r border-line border-r-line/40 bg-card px-2 py-1 text-center tabular-nums leading-tight"
                 >
                   <span className="block text-xs font-semibold">
-                    {average === null ? '—' : String(Math.round(average * 100) / 100)}
+                    {average === null ? '-' : String(Math.round(average * 100) / 100)}
                   </span>
                   <span
                     className={cn(
@@ -372,7 +372,7 @@ export function GradeGrid({
               )}
             >
               <span className="block text-xs font-semibold">
-                {termAverage.average === null ? '—' : displayGrade(termAverage.average)}
+                {termAverage.average === null ? '-' : displayGrade(termAverage.average)}
               </span>
               <span className="block text-2xs text-muted">
                 {termAverage.graded}/{students.length}
@@ -591,8 +591,8 @@ const GradeRow = memo(function GradeRow({
                     ? `Above the maximum of ${item.maxScore}`
                     : isA
                       ? absentSource === 'auto'
-                        ? 'Absent — recorded absent or excused in the class this column was held in. Points can’t be used on it.'
-                        : 'Absent — you marked this student absent. Points can’t be used on it.'
+                        ? 'Absent, recorded absent or excused in the class this column was held in. Points can’t be used on it.'
+                        : 'Absent, you marked this student absent. Points can’t be used on it.'
                       : (boostNote ??
                         (absentSource === 'auto'
                           ? 'Recorded absent or excused in the class this column was held in. Points can’t be used on it.'
@@ -646,7 +646,7 @@ const GradeRow = memo(function GradeRow({
             i === 0 && 'border-l-2 border-l-line',
           )}
         >
-          {figures.unmarked[c] ? <span className="text-muted/50">—</span> : displayGrade(figures.comps[c])}
+          {figures.unmarked[c] ? <span className="text-muted/50">-</span> : displayGrade(figures.comps[c])}
         </td>
       ))}
       {showCs && (
@@ -657,7 +657,7 @@ const GradeRow = memo(function GradeRow({
             visibleComps.length === 0 && 'border-l-2 border-l-line',
           )}
         >
-          {figures.csUnmarked ? <span className="text-muted/50">—</span> : displayGrade(figures.cs)}
+          {figures.csUnmarked ? <span className="text-muted/50">-</span> : displayGrade(figures.cs)}
         </td>
       )}
       <td

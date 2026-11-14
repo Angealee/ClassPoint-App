@@ -41,7 +41,7 @@ export function EventStartingBanner() {
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-ink">
           {liveEventChecked
-            ? `You're in — ${liveEvent.name}`
+            ? `You're in, ${liveEvent.name}`
             : `Event is starting: ${liveEvent.name}`}
         </p>
         <p className="truncate text-xs text-muted">

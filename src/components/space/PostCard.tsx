@@ -216,7 +216,7 @@ export function PostCard({
           </div>
 
           {hidden ? (
-            <p className="mt-3 text-sm font-medium text-danger">Hidden — reported</p>
+            <p className="mt-3 text-sm font-medium text-danger">Hidden, reported</p>
           ) : (
             <p className="mt-3 whitespace-pre-wrap break-words text-base leading-relaxed text-ink">
               {body}

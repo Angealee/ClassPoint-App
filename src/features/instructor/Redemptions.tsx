@@ -137,7 +137,7 @@ export function Redemptions() {
       await decideRedemption(decision.req.id, decision.approve, note)
       toast(
         decision.approve
-          ? `Approved — ${decision.req.points} points used.`
+          ? `Approved, ${decision.req.points} points used.`
           : 'Request declined.',
         decision.approve ? 'success' : 'info',
       )
@@ -159,7 +159,7 @@ export function Redemptions() {
       const result = await reverseGradeBoost(reversing.gradeItemId, reversing.studentId)
       toast(
         result.markRestored
-          ? `Points assist reversed — ${result.pointsRefunded} points returned.`
+          ? `Points assist reversed, ${result.pointsRefunded} points returned.`
           : `${result.pointsRefunded} points returned. The mark had been edited since, so it was left as typed.`,
         'success',
       )
@@ -244,7 +244,7 @@ export function Redemptions() {
 
                     {r.points > r.semesterPoints && (
                       <p className="mt-2 text-xs font-semibold text-accent">
-                        They only have {r.semesterPoints} points now — approving will fail.
+                        They only have {r.semesterPoints} points now, approving will fail.
                       </p>
                     )}
 
@@ -392,8 +392,8 @@ export function Redemptions() {
         detail={
           decision?.approve
             ? decision.req.grade
-              ? 'This deducts the points AND rewrites their mark — their level and rank drop with it. You can reverse it afterwards from Recent decisions.'
-              : 'This deducts the points for real — their level and rank drop with it.'
+              ? 'This deducts the points AND rewrites their mark, their level and rank drop with it. You can reverse it afterwards from Recent decisions.'
+              : 'This deducts the points for real, their level and rank drop with it.'
             : undefined
         }
         confirmLabel={decision?.approve ? 'Approve & deduct' : 'Decline'}
@@ -419,7 +419,7 @@ export function Redemptions() {
               <span className="font-semibold text-ink">{reversing.studentName}</span> gets{' '}
               <span className="font-semibold text-ink">{reversing.points} points</span> back, and
               {reversing.grade ? <> {reversing.grade.itemName}</> : ' the column'} goes back to the
-              mark it had before — unless you have edited it since, in which case your edit stays.
+              mark it had before, unless you have edited it since, in which case your edit stays.
             </>
           ) : null
         }
@@ -547,11 +547,11 @@ function BoostDetail({ r }: { r: RedemptionRequest }) {
       </p>
       {g.currentScore === null ? (
         <p className="text-xs font-semibold text-warn">
-          Their mark has been cleared — approving will fail until it is back.
+          Their mark has been cleared, approving will fail until it is back.
         </p>
       ) : gain <= 0 ? (
         <p className="text-xs font-semibold text-warn">
-          They already have full marks ({formatMarks(g.currentScore)} / {formatMarks(g.maxScore)}) —
+          They already have full marks ({formatMarks(g.currentScore)} / {formatMarks(g.maxScore)}).
           approving will fail. Decline it.
         </p>
       ) : (

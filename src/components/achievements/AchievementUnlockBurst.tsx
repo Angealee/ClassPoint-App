@@ -36,7 +36,7 @@ export function AchievementUnlockBurst({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={() => armed && onDone()}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6"
           role="alertdialog"
           aria-label={`Achievement unlocked: ${achievement.name}. Tap to continue.`}
         >

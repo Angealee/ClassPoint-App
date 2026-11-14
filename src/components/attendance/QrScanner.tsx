@@ -177,7 +177,7 @@ export function QrScanner({ onDetect }: { onDetect: (text: string) => void }) {
           onClick={() => void toggleTorch()}
           aria-pressed={torchOn}
           aria-label={torchOn ? 'Turn off flashlight' : 'Turn on flashlight'}
-          className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/60 px-4 py-2 text-xs font-semibold text-white backdrop-blur"
+          className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/75 px-4 py-2 text-xs font-semibold text-white"
         >
           <BoltIcon className="h-4 w-4" />
           {torchOn ? 'Light on' : 'Light'}

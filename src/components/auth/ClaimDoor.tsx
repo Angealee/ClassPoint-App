@@ -13,7 +13,7 @@ export function ClaimDoor({ className }: { className?: string }) {
         className,
       )}
     >
-      <span className="flex w-14 shrink-0 items-center justify-center bg-reward-solid/10 text-reward">
+      <span className="flex w-14 shrink-0 items-center justify-center bg-reward-solid/10 text-warn">
         <TicketIcon className="h-6 w-6" />
       </span>
 
@@ -22,13 +22,13 @@ export function ClaimDoor({ className }: { className?: string }) {
       <span className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3.5">
         <span className="min-w-0">
           <span className="block text-sm text-muted">First time here?</span>
-          <span className="block font-display text-sm font-bold text-reward">
+          <span className="block font-display text-sm font-bold text-ink">
             Claim your account
           </span>
         </span>
         <ChevronDownIcon
           aria-hidden
-          className="ml-auto h-4 w-4 shrink-0 -rotate-90 text-reward transition-transform group-hover:translate-x-0.5"
+          className="ml-auto h-4 w-4 shrink-0 -rotate-90 text-warn transition-transform group-hover:translate-x-0.5"
         />
       </span>
     </Link>

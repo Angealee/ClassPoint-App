@@ -141,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (!data?.ok) return { error: (data?.error as string) ?? 'Something went wrong.' }
       const username = data.username as string | undefined
-      if (!username) return { error: 'Reset succeeded — please sign in with your new PIN.' }
+      if (!username) return { error: 'Reset succeeded, please sign in with your new PIN.' }
       return signInStudent(username, pin)
     },
     [signInStudent],

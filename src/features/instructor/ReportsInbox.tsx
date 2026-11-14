@@ -159,7 +159,7 @@ export function ReportsInbox() {
 
             {item.isDm ? (
               <p className="mt-2 rounded-xl border border-line bg-card-2 px-3 py-2 text-sm text-muted">
-                This is a direct message. Its text is not shown here — opening the thread is
+                This is a direct message. Its text is not shown here, opening the thread is
                 recorded in the audit log.
               </p>
             ) : (
@@ -245,6 +245,7 @@ export function ReportsInbox() {
           </div>
           <div className="flex items-end gap-2">
             <input
+              aria-label="Timeout length in hours"
               type="number"
               min={1}
               max={2160}

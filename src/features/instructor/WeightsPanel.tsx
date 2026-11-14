@@ -193,7 +193,7 @@ export function WeightsPanel({
     <>
       <div className="space-y-5">
         <p className="text-xs text-muted">
-          These apply to <b className="text-ink">every section</b> taking {subject.code} —{' '}
+          These apply to <b className="text-ink">every section</b> taking {subject.code}, {' '}
           {sectionIds.length} right now. Points never feed any of this.
         </p>
 
@@ -206,7 +206,7 @@ export function WeightsPanel({
 
         {!draft || !policy ? (
           <Card pad="tight" className="text-sm text-warn">
-            {TERM_LABEL[term]} has no weights row. Re-run migration 0057 — it seeds all three.
+            {TERM_LABEL[term]} has no weights row. Re-run migration 0057, it seeds all three.
           </Card>
         ) : (
           <>
@@ -214,7 +214,7 @@ export function WeightsPanel({
               <SectionLabel
                 action={
                   <Chip tone={Math.abs(csTotal - 100) < 0.01 ? 'success' : 'danger'}>
-                    {Number.isFinite(csTotal) ? `${Math.round(csTotal * 100) / 100}%` : '—'}
+                    {Number.isFinite(csTotal) ? `${Math.round(csTotal * 100) / 100}%` : '-'}
                   </Chip>
                 }
               >
@@ -255,7 +255,7 @@ export function WeightsPanel({
           <SectionLabel
             action={
               <Chip tone={Math.abs(finalTotal - 100) < 0.01 ? 'success' : 'danger'}>
-                {Number.isFinite(finalTotal) ? `${Math.round(finalTotal * 100) / 100}%` : '—'}
+                {Number.isFinite(finalTotal) ? `${Math.round(finalTotal * 100) / 100}%` : '-'}
               </Chip>
             }
           >
@@ -327,7 +327,7 @@ export function WeightsPanel({
         message={
           impact
             ? impact.changed === 0
-              ? `No grade changes — all ${impact.total} students land on the same figure.`
+              ? `No grade changes, all ${impact.total} students land on the same figure.`
               : `${impact.changed} of ${impact.total} grades change across ${sectionIds.length} section${
                   sectionIds.length === 1 ? '' : 's'
                 }.`

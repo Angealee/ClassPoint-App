@@ -252,7 +252,7 @@ export function InstructorSpace() {
         open={pauseOpen}
         title="Pause Student Space?"
         message="Every beta section loses the Lounge and chats immediately."
-        detail="Nothing is deleted and nobody leaves the beta — flip this back on and it all returns."
+        detail="Nothing is deleted and nobody leaves the beta, flip this back on and it all returns."
         confirmLabel="Pause it"
         busy={busyKey === 'flag'}
         onConfirm={() => void applyFlag(false)}

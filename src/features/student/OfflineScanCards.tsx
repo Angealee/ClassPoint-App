@@ -60,7 +60,7 @@ export function OfflineScanCards({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-success">
-                  {already ? `Already recorded — ${status}` : `Recorded — ${status}`}
+                  {already ? `Already recorded, ${status}` : `Recorded, ${status}`}
                 </p>
                 <p className="truncate text-xs text-muted">
                   {e.topic || 'Class'} · scanned {time(e.capturedAt)}

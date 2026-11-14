@@ -65,7 +65,7 @@ export function ArchivedStudentsSheet({
     try {
       await restoreStudent(s.id);
       setRows((r) => r.filter((x) => x.id !== s.id));
-      toast(`${s.fullName} restored — back everywhere.`, "success");
+      toast(`${s.fullName} restored, back everywhere.`, "success");
       onChanged();
     } catch {
       toast("Could not restore. Try again.", "error");
@@ -139,8 +139,8 @@ export function ArchivedStudentsSheet({
       <Sheet open={open} onClose={onClose} title="Archived students">
         <p className="mb-3 text-sm text-muted">
           {sectionId
-            ? "Hidden from rosters, the leaderboard and attendance — but nothing is lost. Restore brings everything back instantly."
-            : "Everyone archived, across every semester. Restoring asks which section they are rejoining — a student put back into a finished semester cannot attend a class."}
+            ? "Hidden from rosters, the leaderboard and attendance, but nothing is lost. Restore brings everything back instantly."
+            : "Everyone archived, across every semester. Restoring asks which section they are rejoining, a student put back into a finished semester cannot attend a class."}
         </p>
 
         {placing ? (
@@ -159,7 +159,7 @@ export function ArchivedStudentsSheet({
             {sections.length === 0 ? (
               <p className="mt-3 text-sm text-warn">
                 This semester has no sections yet. Create one in Semesters first
-                — there is nowhere to put them.
+               , there is nowhere to put them.
               </p>
             ) : (
               <Select
@@ -310,8 +310,8 @@ export function ArchivedStudentsSheet({
             <span className="font-semibold text-ink">
               {deleteTarget?.fullName}
             </span>{" "}
-            and their ENTIRE history — every point, every attendance record,
-            every achievement — will be permanently erased.
+            and their ENTIRE history, every point, every attendance record,
+            every achievement, will be permanently erased.
           </>
         }
         detail="Restore is free and loses nothing. Deletion cannot be undone from the app (a JSON copy lands in the audit log, recoverable only by hand in SQL)."

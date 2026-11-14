@@ -126,7 +126,7 @@ export function SemesterClosePanel() {
       <h2 className="font-display text-base font-bold">Close a semester</h2>
       <p className="mt-0.5 text-sm text-muted">
         Archive everyone who was in it, and leave them a message. Their record, points
-        and badges are kept — nothing is deleted.
+        and badges are kept, nothing is deleted.
       </p>
 
       {loading ? (
@@ -213,7 +213,7 @@ export function SemesterClosePanel() {
               </Button>
             ) : rows.length === 0 ? (
               <p className="mt-3 text-sm text-muted">
-                Nobody to archive — every student in that semester is already archived, or
+                Nobody to archive, every student in that semester is already archived, or
                 it has no sections with students in them.
               </p>
             ) : (

@@ -130,7 +130,7 @@ export function StudentGrades() {
 
         {gradesError && (
           <p className="rounded-lg bg-card-2 px-3 py-2 text-xs text-muted">
-            Couldn’t refresh just now — these are the marks from a moment ago.{' '}
+            Couldn’t refresh just now, these are the marks from a moment ago.{' '}
             <button
               type="button"
               onClick={() => void reloadGrades()}
@@ -278,7 +278,7 @@ export function StudentGrades() {
                   <h2 className="text-sm font-semibold">{c.label}</h2>
                   {figures && (
                     <span className="text-xs tabular-nums text-muted">
-                      {c.score === null ? '—' : mask(displayGrade(c.score))}
+                      {c.score === null ? '-' : mask(displayGrade(c.score))}
                     </span>
                   )}
                 </div>
@@ -286,7 +286,7 @@ export function StudentGrades() {
                   <div className="p-3.5">
                     <p className="text-sm font-medium">Attendance</p>
                     <p className="text-xs tabular-nums text-muted">
-                      {c.earned} of {c.possible} class{c.possible === 1 ? '' : 'es'} attended —
+                      {c.earned} of {c.possible} class{c.possible === 1 ? '' : 'es'} attended.
                       your attendance rate is your Recitation grade.
                     </p>
                   </div>
@@ -298,7 +298,7 @@ export function StudentGrades() {
                 <h2 className="text-sm font-semibold">{c.label}</h2>
                 {figures && (
                   <span className="text-xs tabular-nums text-muted">
-                    {c.score === null ? '—' : mask(displayGrade(c.score))}
+                    {c.score === null ? '-' : mask(displayGrade(c.score))}
                   </span>
                 )}
               </div>

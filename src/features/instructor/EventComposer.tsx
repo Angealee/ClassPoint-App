@@ -198,7 +198,7 @@ export function EventComposer() {
             </Select>
             <p className="text-xs text-muted">
               {key.trim()
-                ? 'Correct answers are paid automatically when it closes — by the deadline, or when you close it.'
+                ? 'Correct answers are paid automatically when it closes, by the deadline, or when you close it.'
                 : 'Open-ended: answers reveal on close and you award the ones you like.'}
             </p>
             <Button
@@ -268,7 +268,7 @@ export function EventComposer() {
               value={answerKeyEcho}
               onChange={(e) => setAnswerKeyEcho(e.target.value)}
               placeholder="Type the answer key to see who would win"
-              hint="A preview only — the database decides when you close it."
+              hint="A preview only, the database decides when you close it."
             />
           )}
 

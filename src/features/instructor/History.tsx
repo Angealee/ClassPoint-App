@@ -23,7 +23,7 @@ export function History() {
         title="History"
         subtitle={
           tab === 'points'
-            ? 'Every award and penalty, newest first — undo any mistake.'
+            ? 'Every award and penalty, newest first, undo any mistake.'
             : 'Every session, and who’s actually showing up.'
         }
       />

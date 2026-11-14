@@ -260,7 +260,7 @@ export function MessageRow({
           <button
             type="button"
             onClick={() => onOpenPerson?.(message)}
-            aria-label={`${message.displayName} — options`}
+            aria-label={`${message.displayName}, options`}
             className="block rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           >
             <RingAvatar person={person} name={message.displayName} url={message.avatarUrl} />
@@ -366,7 +366,7 @@ export function MessageRow({
           {removed ? (
             <span className="text-sm italic text-muted">Message removed</span>
           ) : hidden ? (
-            <span className="text-sm font-medium text-danger">Hidden — reported</span>
+            <span className="text-sm font-medium text-danger">Hidden, reported</span>
           ) : (
             <Body body={message.body ?? ''} names={mentionNames} />
           )}

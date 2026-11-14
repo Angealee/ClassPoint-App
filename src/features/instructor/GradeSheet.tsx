@@ -620,7 +620,7 @@ export function GradeSheet() {
                 <span key={t} className={cn(t === term && !isOverall && 'text-ink')}>
                   {TERM_LABEL[t]}{' '}
                   <span className="font-semibold tabular-nums">
-                    {pct === null ? '—' : pct + '%'}
+                    {pct === null ? '-' : pct + '%'}
                   </span>
                 </span>
               )
@@ -634,7 +634,7 @@ export function GradeSheet() {
           {isOverall ? (
             <>
               The <b className="text-ink">final computed grade</b> weighs the three terms
-              against each other. A term with no marks is never treated as a zero — the grade
+              against each other. A term with no marks is never treated as a zero, the grade
               is withheld and the missing term is named instead.
             </>
           ) : view === 'soFar' ? (
@@ -642,12 +642,12 @@ export function GradeSheet() {
               <b className="text-ink">So far</b> counts only what you have marked, so two
               students&rsquo; figures are not comparable with each other. A dash means nothing
               is marked in that component yet; an empty cell means &ldquo;not marked
-              yet&rdquo; — type <b className="text-ink">0</b> for a student who scored nothing.
+              yet&rdquo;, type <b className="text-ink">0</b> for a student who scored nothing.
             </>
           ) : (
             <>
               <b className="text-ink">Official</b> counts every column, so anything unmarked
-              scores zero — this is the figure that matches your spreadsheet, and it only means
+              scores zero, this is the figure that matches your spreadsheet, and it only means
               what it says once the term is fully entered.
             </>
           )}

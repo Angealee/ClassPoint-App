@@ -43,7 +43,7 @@ export function AchievementCard({
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold">{hideDetails ? '???' : a.name}</p>
         <p className="truncate text-xs text-muted">
-          {hideDetails ? 'Secret — keep playing to discover it.' : a.description}
+          {hideDetails ? 'Secret, keep playing to discover it.' : a.description}
         </p>
         {a.titleText && !hideDetails && (
           <p className="mt-0.5 truncate text-xs font-medium text-reward">

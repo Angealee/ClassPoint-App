@@ -90,6 +90,7 @@ export function EventCard({
       ) : editing ? (
         <div className="mt-3">
           <textarea
+            aria-label="Your answer"
             value={body}
             onChange={(e) => setBody(e.target.value)}
             onKeyDown={(e) => {

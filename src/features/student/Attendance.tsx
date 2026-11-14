@@ -49,7 +49,7 @@ const clockTime = (iso: string) =>
 function errorText(e: unknown): string {
   const m = (e as { message?: string } | null)?.message
   if (m && m.length <= 160) return m
-  return 'Could not record your attendance — scan the current QR and try again.'
+  return 'Could not record your attendance, scan the current QR and try again.'
 }
 
 function isOffline(e: unknown): boolean {
@@ -263,7 +263,7 @@ export function Attendance() {
                   TONE[rateTone(stats.rate)].text,
                 )}
               >
-                {stats.counted === 0 ? <span className="text-muted/50">—</span> : `${stats.rate}%`}
+                {stats.counted === 0 ? <span className="text-muted/50">-</span> : `${stats.rate}%`}
               </span>
               <span className="text-sm font-semibold text-accent">Stats ›</span>
             </span>
@@ -281,7 +281,7 @@ export function Attendance() {
       ) : loadError ? (
         <ErrorState
           onRetry={() => void load()}
-          detail="Your record is safe — this is just the connection."
+          detail="Your record is safe, this is just the connection."
         >
           Couldn’t load your attendance.
         </ErrorState>
@@ -346,9 +346,9 @@ export function Attendance() {
               <CheckIcon className="h-10 w-10" />
             </motion.div>
             <div className="space-y-1">
-              <p className="font-display text-xl font-bold">Saved — your attendance is recorded</p>
+              <p className="font-display text-xl font-bold">Saved, your attendance is recorded</p>
               <p className="mx-auto max-w-xs text-sm text-muted">
-                You scanned at {savedOffline}. It'll sync automatically when you're back online —
+                You scanned at {savedOffline}. It'll sync automatically when you're back online.
                 and your status counts from when you scanned, not when it syncs.
               </p>
             </div>
@@ -390,7 +390,7 @@ function ResultView({ result, onDone }: { result: ScanResult; onDone: () => void
     result.status === 'present'
       ? 'Attendance recorded'
       : result.status === 'late'
-        ? 'Recorded — a bit late'
+        ? 'Recorded, a bit late'
         : 'Marked absent'
   return (
     <div className="space-y-5 py-2 text-center">

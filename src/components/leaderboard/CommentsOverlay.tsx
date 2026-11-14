@@ -311,6 +311,7 @@ export function CommentsOverlay({
 
         <div className="flex items-center gap-2">
           <input
+            aria-label="Comment for the leaderboard"
             value={draft}
             maxLength={MAX_COMMENT_LENGTH}
             onChange={(e) => setDraft(e.target.value.slice(0, MAX_COMMENT_LENGTH))}

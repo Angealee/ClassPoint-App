@@ -318,7 +318,7 @@ export function ColumnsPanel({
           archiveTarget
             ? `Its ${archiveTarget.maxScore} marks leave the total, so EVERY student's ${COMPONENT_LABEL[
                 archiveTarget.component
-              ].toLowerCase()} score changes — the same as editing a weight. The ${
+              ].toLowerCase()} score changes, the same as editing a weight. The ${
                 markedCounts.get(archiveTarget.id) ?? 0
               } marks already entered are kept, and restoring it puts everything back.`
             : ''

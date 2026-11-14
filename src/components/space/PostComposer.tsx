@@ -100,6 +100,7 @@ export function PostComposer({
       )}
 
       <textarea
+        aria-label="Write a post"
         ref={areaRef}
         value={body}
         onChange={(e) => setBody(e.target.value)}

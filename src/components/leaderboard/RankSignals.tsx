@@ -29,27 +29,32 @@ export function biggestClimber(
 export function RankDelta({
   entry,
   className,
+  onPlate = false,
 }: {
   entry: LeaderboardEntry
   className?: string
+  /** Colours for the fixed dark scoreboard plate instead of the themed roles. */
+  onPlate?: boolean
 }) {
-  return <RankDeltaValue delta={rankDelta(entry)} className={className} />
+  return <RankDeltaValue delta={rankDelta(entry)} className={className} onPlate={onPlate} />
 }
 
 export function RankDeltaValue({
   delta,
   verbose = false,
   className,
+  onPlate = false,
 }: {
   delta: number | null
   /** Show "new" / "— same" instead of rendering nothing. */
   verbose?: boolean
   className?: string
+  onPlate?: boolean
 }) {
   if (delta === null)
     return verbose ? <p className="text-2xs font-medium text-muted">new</p> : null
   if (delta === 0)
-    return verbose ? <p className="text-2xs font-medium text-muted">— same</p> : null
+    return verbose ? <p className="text-2xs font-medium text-muted">- same</p> : null
 
   const up = delta > 0
   return (
@@ -57,9 +62,13 @@ export function RankDeltaValue({
       title={`${up ? 'Up' : 'Down'} ${Math.abs(delta)} since the last update`}
       className={cn(
         'inline-flex shrink-0 items-center gap-0.5 rounded-lg px-1.5 py-0.5 text-xs font-bold tabular-nums',
-        up
-          ? 'bg-success-solid/10 text-success'
-          : 'bg-danger-solid/10 text-danger',
+        onPlate
+          ? up
+            ? 'bg-plate-up/15 text-plate-up'
+            : 'bg-plate-down/15 text-plate-down'
+          : up
+            ? 'bg-success-solid/10 text-success'
+            : 'bg-danger-solid/10 text-danger',
         className,
       )}
     >
@@ -72,9 +81,11 @@ export function RankDeltaValue({
 export function RankTenure({
   entry,
   className,
+  onPlate = false,
 }: {
   entry: LeaderboardEntry
   className?: string
+  onPlate?: boolean
 }) {
   const days = daysHeld(entry.rank_since)
   if (days < 1) return null
@@ -85,9 +96,13 @@ export function RankTenure({
       title={`Holding rank ${entry.rank} or better for ${days} day${days === 1 ? '' : 's'}`}
       className={cn(
         'inline-flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-0.5 text-xs font-bold tabular-nums',
-        hot
-          ? 'bg-streak-solid/15 text-streak'
-          : 'bg-card-2 text-muted',
+        onPlate
+          ? hot
+            ? 'bg-plate-hot/15 text-plate-hot'
+            : 'bg-white/10 text-white/65'
+          : hot
+            ? 'bg-streak-solid/15 text-streak'
+            : 'bg-card-2 text-muted',
         className,
       )}
     >

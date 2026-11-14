@@ -42,7 +42,7 @@ export function LiveClassBanner({ onScan }: { onScan?: () => void }) {
           {checkedIn
             ? neutral
               ? `${subject} is in session`
-              : `You're in — ${subject}`
+              : `You're in, ${subject}`
             : `${subject} is live now`}
         </p>
         <p className="truncate text-xs text-muted">

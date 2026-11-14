@@ -1,12 +1,12 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import type { CSSProperties } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Card, Rows } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
-import { CrownIcon, TicketIcon } from '@/components/ui/icons'
-import { ConfettiBurst } from '@/components/leaderboard/ConfettiBurst'
+import { TicketIcon } from '@/components/ui/icons'
 import { RankDelta, RankTenure, biggestClimber } from '@/components/leaderboard/RankSignals'
+import { SpacePodium } from '@/components/leaderboard/SpacePodium'
 import { sectionColor } from '@/lib/sectionColor'
 import { getLevelProgress } from '@/lib/leveling'
+import { glide } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 import type { LeaderboardEntry } from '@/lib/types'
 
@@ -19,77 +19,24 @@ interface PodiumBoardProps {
   showSection?: boolean
   pinnedSelf?: LeaderboardEntry | null
   onSelect?: (entry: LeaderboardEntry) => void
-  /** Soft gold spotlight behind the podium (on by default). */
-  glow?: boolean
-  confetti?: boolean
   rankSignals?: boolean
   metric?: 'points' | 'spent'
 }
 
-type Place = 1 | 2 | 3
+type Metric = 'points' | 'spent'
 
-/** Per-tier metal treatment for the top three. */
-const TIER: Record<
-  Place,
-  { border: string; tint: string; pedestal: string; pedestalBorder: string; pedestalInk: string }
-> = {
-  1: {
-    border: 'border-gold-400/70!',
-    tint: 'from-gold-400/25 via-gold-500/5',
-    pedestal: 'from-gold-300 to-gold-600',
-    pedestalBorder: 'border-gold-600/50',
-    pedestalInk: 'text-brand-950',
-  },
-  2: {
-    border: 'border-zinc-400/60!',
-    tint: 'from-zinc-300/20 via-zinc-400/5',
-    pedestal: 'from-zinc-200 to-zinc-500',
-    pedestalBorder: 'border-zinc-500/50',
-    pedestalInk: 'text-zinc-800',
-  },
-  3: {
-    border: 'border-amber-700/60!',
-    tint: 'from-amber-600/25 via-amber-700/5',
-    pedestal: 'from-amber-400 to-amber-700',
-    pedestalBorder: 'border-amber-800/50',
-    pedestalInk: 'text-amber-950',
-  },
-}
-
-const TIER_SPEND: typeof TIER = {
-  1: {
-    border: 'border-violet-400/70!',
-    tint: 'from-violet-400/25 via-violet-500/5',
-    pedestal: 'from-violet-300 to-violet-600',
-    pedestalBorder: 'border-violet-600/50',
-    pedestalInk: 'text-violet-950',
-  },
-  2: {
-    border: 'border-indigo-400/60!',
-    tint: 'from-indigo-300/20 via-indigo-400/5',
-    pedestal: 'from-indigo-200 to-indigo-500',
-    pedestalBorder: 'border-indigo-500/50',
-    pedestalInk: 'text-indigo-900',
-  },
-  3: {
-    border: 'border-slate-400/60!',
-    tint: 'from-slate-400/20 via-slate-500/5',
-    pedestal: 'from-slate-300 to-slate-500',
-    pedestalBorder: 'border-slate-500/50',
-    pedestalInk: 'text-slate-800',
-  },
-}
-
+/*
+ * Ranks 1-3 are the space podium (SpacePodium.tsx): a night sky, three collectible cards on
+ * launch-pad risers. Ranks 4-10 are a quiet crew manifest on the same fixed dark plate the
+ * home scoreboard uses: rank, face, name, points, and a dotted divider. No bars and no gap
+ * figures (the instructor's call): the numbers say how close it is.
+ */
 function spentSharePct(entry: LeaderboardEntry): number {
   const earned = entry.spent_points + entry.points
   return earned > 0 ? (entry.spent_points / earned) * 100 : 0
 }
 
-const PEDESTAL_H: Record<Place, string> = {
-  1: 'h-14 sm:h-20',
-  2: 'h-10 sm:h-12',
-  3: 'h-7 sm:h-8',
-}
+const valueOf = (e: LeaderboardEntry, m: Metric) => (m === 'spent' ? e.spent_points : e.points)
 
 export function PodiumBoard({
   entries,
@@ -98,71 +45,87 @@ export function PodiumBoard({
   showSection = false,
   pinnedSelf = null,
   onSelect,
-  glow = true,
-  confetti = true,
   rankSignals = false,
   metric = 'points',
 }: PodiumBoardProps) {
   const reduced = useReducedMotion() ?? false
-  const [showConfetti, setShowConfetti] = useState(confetti)
-  useEffect(() => {
-    if (!confetti) return
-    const t = setTimeout(() => setShowConfetti(false), 2200)
-    return () => clearTimeout(t)
-  }, [confetti])
 
   if (entries.length === 0) return null
 
-  const label = (id: string) => (showSection ? sectionName?.(id) ?? '' : '')
+  const label = (id: string) => (showSection ? (sectionName?.(id) ?? '') : '')
   const pick = onSelect ? (entry: LeaderboardEntry) => () => onSelect(entry) : undefined
-  const top3 = entries.slice(0, 3).map((entry, i) => ({ entry, place: (i + 1) as Place }))
-  const rest = entries.slice(3)
   const climber = biggestClimber(entries)
-
-  const podiumSlots: Array<{ entry: LeaderboardEntry; place: Place } | null> = [
-    top3[1] ?? null,
-    top3[0] ?? null,
-    top3[2] ?? null,
-  ]
+  const spend = metric === 'spent'
+  const rest = entries.slice(3)
 
   return (
     <div className="space-y-3">
-      <div className="relative overflow-x-clip">
-        {glow && (
-          <div
-            className="pointer-events-none absolute left-1/2 top-6 h-44 w-[130%] -translate-x-1/2 rounded-[50%]"
-            style={{
-              background:
-                metric === 'spent'
-                  ? 'radial-gradient(ellipse at center, rgba(167,139,250,0.16), rgba(167,139,250,0) 70%)'
-                  : 'radial-gradient(ellipse at center, rgba(255,186,31,0.16), rgba(255,186,31,0) 70%)',
-            }}
-          />
-        )}
-        {showConfetti && <ConfettiBurst />}
+      <SpacePodium
+        entries={entries.slice(0, 3)}
+        meId={meId}
+        metric={metric}
+        rankSignals={rankSignals}
+        reduced={reduced}
+        revealKey={meId ?? 'guest'}
+        onSelect={onSelect}
+      />
 
-        <div className="relative grid grid-cols-3 items-end gap-2.5 px-0.5 pt-12 sm:gap-3 sm:px-1">
-          {podiumSlots.map((slot, i) =>
-            slot ? (
-              <PodiumCard
-                key={slot.entry.student_id}
-                entry={slot.entry}
-                place={slot.place}
-                isMe={meId === slot.entry.student_id}
-                sectionLabel={label(slot.entry.section_id)}
+      {(rest.length > 0 || pinnedSelf) && (
+        <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-plate-2 to-plate text-white shadow-lg shadow-black/25 ring-1 ring-white/10">
+          <div
+            className={cn(
+              'flex items-center justify-between px-3.5 py-2 text-2xs font-semibold uppercase tracking-widest text-white/55',
+              spend ? 'border-b border-dashed border-white/25' : 'border-b border-white/10',
+            )}
+          >
+            <span>Rank</span>
+            {spend && <TicketIcon aria-hidden className="h-3.5 w-3.5 text-white/45" />}
+            <span>{spend ? 'Points used' : 'Points'}</span>
+          </div>
+
+          {rest.length > 0 && (
+            <ol className="divide-y divide-dotted divide-white/20">
+              {rest.map((entry, i) => (
+                <li key={entry.student_id}>
+                  <CompactRow
+                    entry={entry}
+                    place={i + 4}
+                    isMe={meId === entry.student_id}
+                    sectionLabel={label(entry.section_id)}
+                    index={i}
+                    reduced={reduced}
+                    rankSignals={rankSignals}
+                    metric={metric}
+                    onClick={pick?.(entry)}
+                  />
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {pinnedSelf && (
+            <div>
+              <p
+                aria-hidden
+                className="border-t border-dashed border-white/25 px-3.5 py-1.5 text-2xs font-semibold uppercase tracking-widest text-white/55"
+              >
+                Your standing
+              </p>
+              <CompactRow
+                entry={pinnedSelf}
+                place={pinnedSelf.rank}
+                isMe
+                sectionLabel={label(pinnedSelf.section_id)}
+                index={0}
                 reduced={reduced}
-                rankSignals={rankSignals}
+                rankSignals
                 metric={metric}
-                onClick={pick?.(slot.entry)}
+                onClick={pick?.(pinnedSelf)}
               />
-            ) : (
-              <div key={`empty-${i}`} aria-hidden />
-            ),
+            </div>
           )}
         </div>
-
-        <div className="relative z-[1] -mt-px h-2.5 rounded-b-lg border border-t-0 border-line bg-gradient-to-b from-card-2 to-card shadow-sm" />
-      </div>
+      )}
 
       {rankSignals && climber && (
         <div className="flex items-center gap-2.5 rounded-xl bg-success-solid/10 px-3 py-2">
@@ -181,235 +144,74 @@ export function PodiumBoard({
           </span>
         </div>
       )}
-
-      {rest.length > 0 && (
-        <Rows>
-          {rest.map((entry, i) => (
-            <RestRow
-              key={entry.student_id}
-              entry={entry}
-              place={i + 4}
-              isMe={meId === entry.student_id}
-              sectionLabel={label(entry.section_id)}
-              index={i}
-              reduced={reduced}
-              rankSignals={rankSignals}
-              metric={metric}
-              onClick={pick?.(entry)}
-              gapToAbove={
-                meId === entry.student_id
-                  ? Math.max(0, entries[i + 2].points - entry.points)
-                  : null
-              }
-            />
-          ))}
-        </Rows>
-      )}
-
-      {pinnedSelf && (
-        <div className="space-y-1 pt-1">
-          <p className="text-center text-2xs uppercase tracking-wider text-muted">
-            your standing
-          </p>
-          <Rows>
-          <RestRow
-            entry={pinnedSelf}
-            place={pinnedSelf.rank}
-            isMe
-            sectionLabel={label(pinnedSelf.section_id)}
-            index={0}
-            reduced={reduced}
-            metric={metric}
-            rankSignals
-            onClick={pick?.(pinnedSelf)}
-          />
-          </Rows>
-        </div>
-      )}
     </div>
   )
 }
 
-function PodiumCard({
-  entry,
-  place,
-  isMe,
-  sectionLabel,
-  reduced,
-  rankSignals,
-  metric,
-  onClick,
-}: {
-  entry: LeaderboardEntry
-  place: Place
-  isMe: boolean
-  sectionLabel: string
-  reduced: boolean
-  rankSignals?: boolean
-  metric: 'points' | 'spent'
-  onClick?: () => void
-}) {
-  const spend = metric === 'spent'
-  const tier = spend ? TIER_SPEND[place] : TIER[place]
-  const progress = spend ? null : getLevelProgress(entry.points)
-  const value = spend ? entry.spent_points : entry.points
-  const ringPct = spend ? spentSharePct(entry) : (progress?.progressPct ?? 0)
-  const ringColor = spend ? '#a78bfa' : '#ffba1f'
-  const champ = place === 1
-
-  const [spot, setSpot] = useState(false)
-  const activate = onClick
-    ? () => {
-        if (reduced) return onClick()
-        setSpot(true)
-        window.setTimeout(() => {
-          setSpot(false)
-          onClick()
-        }, 450)
-      }
-    : undefined
-
+function SectionDot({ sectionId }: { sectionId: string }) {
   return (
-    <motion.div
-      layout={!reduced}
-      initial={reduced ? false : { y: 44, opacity: 0, scale: 0.92 }}
-      animate={{ y: 0, opacity: 1, scale: spot ? 1.08 : 1 }}
-      transition={{ type: 'spring', stiffness: 260, damping: 22, delay: spot ? 0 : 0.08 * place }}
-      whileHover={activate ? { y: -3 } : undefined}
-      whileTap={activate ? { scale: 0.97 } : undefined}
-      onClick={activate}
-      role={activate ? 'button' : undefined}
-      tabIndex={activate ? 0 : undefined}
-      aria-label={activate ? `View ${entry.display_name}'s profile, rank ${place}` : undefined}
-      onKeyDown={(e) => {
-        if (activate && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault()
-          activate()
-        }
-      }}
-      className={cn(
-        'relative flex min-w-0 flex-col',
-        activate &&
-          'cursor-pointer rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
-      )}
-    >
-      {champ && (
-        <div className="pointer-events-none absolute -top-9 left-1/2 z-20 -translate-x-1/2">
-          {spend ? (
-            <TicketIcon
-              className={cn('h-9 w-9 text-violet-400 drop-shadow-md', !reduced && 'cp-bob')}
-            />
-          ) : (
-            <CrownIcon
-              className={cn('h-9 w-9 text-gold-400 drop-shadow-md', !reduced && 'cp-bob')}
-            />
-          )}
-        </div>
-      )}
-
-      <Card pad="none"
-        className={cn(
-          'relative flex flex-col items-center gap-2 overflow-hidden border px-3 text-center sm:gap-2.5 sm:px-3.5',
-          tier.border,
-          champ ? 'pb-3.5 pt-8 sm:pb-4 sm:pt-8' : 'pb-3.5 pt-6 sm:pb-3.5 sm:pt-6',
-          champ && 'ring-1 ring-gold-400/40',
-        )}
-      >
-        {/* Metal tint wash. */}
-        <div
-          className={cn('pointer-events-none absolute inset-0 bg-gradient-to-b to-transparent', tier.tint)}
-        />
-        {/* "You" tint. */}
-        {isMe && <div className="pointer-events-none absolute inset-0 bg-accent-solid/10" />}
-
-        <div
-          className="relative z-[1] rounded-full p-[3px]"
-          style={{
-            background: `conic-gradient(${ringColor} ${ringPct}%, rgba(160,160,160,0.25) ${ringPct}%)`,
-          }}
-        >
-          <div className="rounded-full bg-card p-[2px]">
-            <Avatar
-              name={entry.display_name}
-              url={entry.avatar_url}
-              className={cn(
-                'block',
-                champ ? 'h-14! w-14! sm:h-20! sm:w-20!' : 'h-11! w-11! sm:h-16! sm:w-16!',
-              )}
-              textClassName={champ ? 'text-base sm:text-xl' : 'text-sm sm:text-lg'}
-            />
-          </div>
-        </div>
-
-        <div className="relative z-[1] w-full min-w-0">
-          <p className="truncate text-xs font-semibold sm:text-sm">
-            {entry.display_name}
-            {isMe && <span className="text-accent"> (you)</span>}
-          </p>
-          <p className="truncate text-2xs text-muted sm:text-xs">
-            {sectionLabel}
-            {sectionLabel ? ' · ' : ''}
-            {spend ? `${Math.round(ringPct)}% cashed in` : `Lv ${progress?.level ?? 1}`}
-          </p>
-        </div>
-
-        <div className="relative z-[1] flex items-baseline gap-1">
-          <CountUp
-            value={value}
-            reduced={reduced}
-            className="font-display text-xl font-bold text-gold-400 sm:text-2xl"
-          />
-          <span className="text-xs font-medium text-muted">
-            {metric === 'spent' ? 'used' : 'pts'}
-          </span>
-        </div>
-
-        {rankSignals && (
-          <div className="relative z-[1] flex flex-wrap items-center justify-center gap-1">
-            <RankDelta entry={entry} />
-            <RankTenure entry={entry} />
-          </div>
-        )}
-      </Card>
-
-      <motion.div
-        initial={reduced ? false : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 220, damping: 24, delay: 0.1 + 0.08 * place }}
-        className={cn(
-          'relative -mt-1 w-full overflow-hidden rounded-t-md border border-b-0 bg-gradient-to-b',
-          PEDESTAL_H[place],
-          tier.pedestal,
-          tier.pedestalBorder,
-        )}
-      >
-        <div className="absolute inset-x-0 top-0 h-1 bg-white/30" />
-        {spend && (
-          <>
-            <span
-              aria-hidden
-              className="absolute -left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-canvas"
-            />
-            <span
-              aria-hidden
-              className="absolute -right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-canvas"
-            />
-          </>
-        )}
-        <span
-          className={cn(
-            'absolute inset-0 flex items-center justify-center font-display text-2xl font-bold sm:text-3xl',
-            tier.pedestalInk,
-          )}
-        >
-          {place}
-        </span>
-      </motion.div>
-    </motion.div>
+    <span
+      aria-hidden
+      className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--dot)]"
+      style={{ '--dot': sectionColor(sectionId, true) } as CSSProperties}
+    />
   )
 }
 
-function RestRow({
+function Meta({
+  entry,
+  sectionLabel,
+  metric,
+  rankSignals,
+}: {
+  entry: LeaderboardEntry
+  sectionLabel: string
+  metric: Metric
+  rankSignals?: boolean
+}) {
+  const spend = metric === 'spent'
+  return (
+    <p className="flex min-w-0 items-center gap-1.5 text-2xs text-white/60 sm:text-xs">
+      {sectionLabel && <SectionDot sectionId={entry.section_id} />}
+      <span className="min-w-0 truncate">
+        {sectionLabel}
+        {sectionLabel ? ' · ' : ''}
+        {spend ? `${Math.round(spentSharePct(entry))}% cashed in` : `Lv ${getLevelProgress(entry.points).level}`}
+      </span>
+      {rankSignals && (
+        <>
+          <RankDelta entry={entry} onPlate />
+          <RankTenure entry={entry} onPlate />
+        </>
+      )}
+    </p>
+  )
+}
+
+const rowChrome = (onClick?: () => void, isMe?: boolean) =>
+  cn(
+    'relative flex items-center transition-colors',
+    isMe && 'bg-white/[0.07]',
+    onClick &&
+      'cursor-pointer hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold-300/70',
+  )
+
+function rowProps(entry: LeaderboardEntry, place: number, onClick?: () => void) {
+  return {
+    onClick,
+    role: onClick ? ('button' as const) : undefined,
+    tabIndex: onClick ? 0 : undefined,
+    'aria-label': onClick ? `View ${entry.display_name}'s profile, rank ${place}` : undefined,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault()
+        onClick()
+      }
+    },
+  }
+}
+
+function CompactRow({
   entry,
   place,
   isMe,
@@ -419,7 +221,6 @@ function RestRow({
   rankSignals,
   metric,
   onClick,
-  gapToAbove,
 }: {
   entry: LeaderboardEntry
   place: number
@@ -428,124 +229,36 @@ function RestRow({
   index: number
   reduced: boolean
   rankSignals?: boolean
-  metric: 'points' | 'spent'
+  metric: Metric
   onClick?: () => void
-  gapToAbove?: number | null
 }) {
-  const spend = metric === 'spent'
-  const level = spend ? null : getLevelProgress(entry.points).level
-  const value = spend ? entry.spent_points : entry.points
   return (
     <motion.div
       layout={!reduced}
       initial={reduced ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: Math.min(index * 0.03, 0.3) }}
+      transition={{ ...glide, delay: 0.2 + Math.min(index * 0.03, 0.3) }}
       whileTap={onClick ? { scale: 0.99 } : undefined}
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      aria-label={onClick ? `View ${entry.display_name}'s profile` : undefined}
-      onKeyDown={(e) => {
-        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault()
-          onClick()
-        }
-      }}
-      className={cn(
-        'relative',
-        onClick &&
-          'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50',
-      )}
+      {...rowProps(entry, place, onClick)}
+      className={cn(rowChrome(onClick, isMe), 'gap-3 px-3.5 py-3')}
     >
-      <div
-        className={cn(
-          'relative flex items-center gap-3 overflow-hidden p-3 transition-colors',
-          onClick && 'hover:bg-card-2',
-        )}
-      >
-        {isMe && <div className="pointer-events-none absolute inset-0 bg-accent-solid/10" />}
-        <span className="relative z-[1] w-7 shrink-0 text-center font-display text-lg font-bold tabular-nums">
-          {place}
-        </span>
-        <Avatar name={entry.display_name} url={entry.avatar_url} className="relative z-[1] h-9! w-9!" />
-        <div className="relative z-[1] min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">
-            {entry.display_name}
-            {isMe && <span className="text-accent"> (you)</span>}
-          </p>
-          <p className="flex items-center gap-1.5 text-xs text-muted">
-            {sectionLabel && (
-              <span
-                aria-hidden
-                className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--dot)] dark:bg-[var(--dot-dark)]"
-                style={
-                  {
-                    '--dot': sectionColor(entry.section_id, false),
-                    '--dot-dark': sectionColor(entry.section_id, true),
-                  } as CSSProperties
-                }
-              />
-            )}
-            <span className="min-w-0 truncate">
-              {sectionLabel}
-              {sectionLabel ? ' · ' : ''}
-              {spend
-                ? `${Math.round(spentSharePct(entry))}% cashed in`
-                : `Lv ${level ?? 1}`}
-            </span>
-            {rankSignals && (
-              <>
-                <RankDelta entry={entry} />
-                <RankTenure entry={entry} />
-              </>
-            )}
-          </p>
-        </div>
-        <span className="relative z-[1] shrink-0 text-right">
-          <span className="block font-display text-base font-bold tabular-nums text-reward">
-            {value}
-          </span>
-          {gapToAbove !== null && gapToAbove !== undefined && (
-            <span className="block text-2xs tabular-nums text-muted">
-              {gapToAbove === 0 ? `tied with #${place - 1}` : `${gapToAbove} to #${place - 1}`}
-            </span>
-          )}
-        </span>
+      <span className="w-7 shrink-0 text-center font-display text-lg font-bold tabular-nums text-white/60">
+        {place}
+      </span>
+      <Avatar name={entry.display_name} url={entry.avatar_url} className="h-8! w-8!" textClassName="text-xs" />
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <p className="truncate text-sm font-semibold">
+          {entry.display_name}
+          {isMe && <span className="text-gold-300"> (you)</span>}
+        </p>
+        <Meta entry={entry} sectionLabel={sectionLabel} metric={metric} rankSignals={rankSignals} />
       </div>
+      <span className="shrink-0 text-right">
+        <span className="block font-display text-lg font-bold leading-none tabular-nums text-gold-300">
+          {valueOf(entry, metric)}
+        </span>
+      </span>
     </motion.div>
   )
 }
 
-/** Eases a number from 0 up to `value` once on mount. */
-function CountUp({
-  value,
-  reduced,
-  className,
-}: {
-  value: number
-  reduced: boolean
-  className?: string
-}) {
-  const [n, setN] = useState(reduced ? value : 0)
-
-  useEffect(() => {
-    if (reduced) {
-      setN(value)
-      return
-    }
-    let raf = 0
-    const start = performance.now()
-    const duration = 900
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - start) / duration)
-      const eased = 1 - Math.pow(1 - p, 3)
-      setN(Math.round(value * eased))
-      if (p < 1) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [value, reduced])
-
-  return <span className={className}>{n}</span>
-}

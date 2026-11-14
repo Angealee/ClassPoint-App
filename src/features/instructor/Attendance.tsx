@@ -134,7 +134,7 @@ export function Attendance() {
         }
       })
       .catch(() => {
-        if (!cancelled) toast('Could not check for a live class — pull to retry.', 'error')
+        if (!cancelled) toast('Could not check for a live class, pull to retry.', 'error')
       })
       .finally(() => !cancelled && setChecking(false))
     void loadHistory()
@@ -277,7 +277,7 @@ export function Attendance() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">Global event attendance</p>
           <p className="text-xs text-muted">
-            A school-wide QR any section can scan — for a special event.
+            A school-wide QR any section can scan, for a special event.
           </p>
         </div>
         <span className="shrink-0 text-xs font-semibold text-accent">Open →</span>
@@ -355,7 +355,7 @@ export function Attendance() {
 
           {presets.length === 0 ? (
             <p className="text-xs text-muted">
-              None yet — set your thresholds below, then tap Save current.
+              None yet, set your thresholds below, then tap Save current.
             </p>
           ) : (
             <div className="flex flex-wrap gap-1.5">

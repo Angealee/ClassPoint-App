@@ -237,7 +237,7 @@ export function Students() {
       await navigator.clipboard.writeText(text)
       toast(label, 'success')
     } catch {
-      toast('Copy failed — long-press to copy.', 'error')
+      toast('Copy failed, long-press to copy.', 'error')
     }
   }
 
@@ -247,7 +247,7 @@ export function Students() {
       toast('Everyone has already claimed their account.', 'info')
       return
     }
-    const text = unclaimed.map((s) => `${s.full_name} — ${s.claim_token}`).join('\n')
+    const text = unclaimed.map((s) => `${s.full_name}, ${s.claim_token}`).join('\n')
     void copy(text, `Copied ${unclaimed.length} token(s)`)
   }
 
@@ -326,7 +326,7 @@ export function Students() {
 
   function copyImportTokens() {
     if (!importResults) return
-    const text = importResults.map((r) => `${r.fullName} — ${r.claimToken}`).join('\n')
+    const text = importResults.map((r) => `${r.fullName}, ${r.claimToken}`).join('\n')
     void copy(text, `Copied ${importResults.length} token(s)`)
   }
 
@@ -367,7 +367,7 @@ export function Students() {
     setDeleting(true)
     try {
       await archiveStudent(deleteTarget.id)
-      toast(`${deleteTarget.full_name} archived — restorable any time.`, 'success')
+      toast(`${deleteTarget.full_name} archived, restorable any time.`, 'success')
       setDeleteTarget(undefined)
       await refresh()
     } catch {
@@ -884,7 +884,7 @@ export function Students() {
       <Sheet
         open={!!editTarget}
         onClose={() => setEditTarget(undefined)}
-        title={`Edit name — ${editTarget?.full_name ?? ''}`}
+        title={`Edit name, ${editTarget?.full_name ?? ''}`}
       >
         <div className="space-y-4">
           <Input
@@ -944,7 +944,7 @@ export function Students() {
         message={
           <>
             This updates <span className="font-semibold text-ink">{editTarget?.full_name}</span>'s
-            name everywhere in the app — leaderboard, attendance, records and all history.
+            name everywhere in the app, leaderboard, attendance, records and all history.
           </>
         }
         confirmLabel="Save"
@@ -1123,7 +1123,7 @@ export function Students() {
         message={
           <>
             <span className="font-semibold text-ink">{deleteTarget?.full_name}</span> disappears
-            from the roster, leaderboard and attendance-taking — but every record is kept, and you
+            from the roster, leaderboard and attendance-taking, but every record is kept, and you
             can restore them any time from the Archived list.
           </>
         }

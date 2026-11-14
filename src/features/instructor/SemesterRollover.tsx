@@ -46,7 +46,7 @@ export function SemesterRollover({
       <div>
         <h2 className="font-display text-lg font-bold">Set up {semester.name}</h2>
         <p className="text-sm text-muted">
-          Each step saves as you go — you can leave and come back.
+          Each step saves as you go, you can leave and come back.
         </p>
       </div>
 
@@ -154,7 +154,7 @@ function SectionsStep({ semester, onNext }: { semester: Semester; onNext: () => 
       )}
 
       <Button variant="outline" className="mt-4 w-full" disabled={sections.length === 0} onClick={onNext}>
-        Next — subjects
+        Next, subjects
       </Button>
     </Card>
   )
@@ -301,7 +301,7 @@ function SubjectsStep({ semester, onNext }: { semester: Semester; onNext: () => 
       )}
 
       <Button variant="outline" className="mt-4 w-full" onClick={onNext}>
-        Next — students
+        Next, students
       </Button>
     </Card>
   )
@@ -432,7 +432,7 @@ function PromoteStep({ semester, onNext }: { semester: Semester; onNext: () => v
         <ListSkeleton rows={4} />
       ) : roster.length === 0 ? (
         <p className="text-sm text-muted">
-          Nobody left in this section — they've all been moved or archived.
+          Nobody left in this section, they've all been moved or archived.
         </p>
       ) : (
         <>
@@ -492,7 +492,7 @@ function PromoteStep({ semester, onNext }: { semester: Semester; onNext: () => v
             disabled={busy || picked.size === 0 || !targetId}
             onClick={() => void promote()}
           >
-            {busy ? 'Moving…' : `Move ${picked.size} to ${newSections.find((s) => s.id === targetId)?.name ?? '—'}`}
+            {busy ? 'Moving…' : `Move ${picked.size} to ${newSections.find((s) => s.id === targetId)?.name ?? '-'}`}
           </Button>
 
           {unpickedCount > 0 && (
@@ -510,7 +510,7 @@ function PromoteStep({ semester, onNext }: { semester: Semester; onNext: () => v
       )}
 
       <Button variant="outline" className="mt-4 w-full" onClick={onNext}>
-        Next — activate
+        Next, activate
       </Button>
 
       <ConfirmDialog
@@ -630,7 +630,7 @@ function ActivateStep({ semester, onDone }: { semester: Semester; onDone: () => 
         message="Every student's points, level and rank reset to zero for the new semester. Their all-time totals, achievements, usernames and PINs are untouched."
         detail={
           warnings.find((w) => w.code === 'unplaced')
-            ? `${warnings.find((w) => w.code === 'unplaced')?.count} student(s) are not in this semester — they become read-only. This cannot be undone from the app.`
+            ? `${warnings.find((w) => w.code === 'unplaced')?.count} student(s) are not in this semester, they become read-only. This cannot be undone from the app.`
             : 'This cannot be undone from the app.'
         }
         challengeText={semester.name}

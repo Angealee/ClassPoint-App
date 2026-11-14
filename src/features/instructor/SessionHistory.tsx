@@ -31,7 +31,7 @@ const AT_RISK_ABSENCES = 3
 const shortDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
-const pct = (rate: number | null) => (rate === null ? '—' : `${Math.round(rate * 100)}%`)
+const pct = (rate: number | null) => (rate === null ? '-' : `${Math.round(rate * 100)}%`)
 
 function rateClass(rate: number | null): string {
   return rate === null ? 'text-muted' : TONE[rateTone(rate * 100)].text

@@ -58,6 +58,15 @@ export function MenuIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function ReplayIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" />
+      <path d="M3.5 4v4.6h4.6" />
+    </svg>
+  )
+}
+
 export function SaturnIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>

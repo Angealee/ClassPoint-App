@@ -124,7 +124,7 @@ export function PeerGroups({ embedded = false }: { embedded?: boolean } = {}) {
         ) : loadError ? (
           <ErrorState
             onRetry={() => void load()}
-            detail="Nothing was changed — this is just the connection."
+            detail="Nothing was changed, this is just the connection."
           >
             {loadError}
           </ErrorState>
@@ -279,7 +279,7 @@ function UnassignedCard({
             {people.length} student{people.length === 1 ? ' is' : 's are'} not on a team
           </span>
           <span className="block text-xs text-muted">
-            That is fine — a group evaluation simply skips them.
+            That is fine, a group evaluation simply skips them.
           </span>
         </span>
         <span className="shrink-0 text-xs font-medium text-muted">{open ? 'Hide' : 'Show'}</span>

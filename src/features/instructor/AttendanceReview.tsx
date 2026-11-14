@@ -101,7 +101,7 @@ export function AttendanceReview({
       const { applied, deducted } = await commitAttendancePenalties(session.id)
       toast(
         applied > 0
-          ? `Finalised — ${deducted} points deducted across ${applied} student${applied === 1 ? '' : 's'}.`
+          ? `Finalised, ${deducted} points deducted across ${applied} student${applied === 1 ? '' : 's'}.`
           : 'Attendance saved. No penalties applied.',
         'success',
       )
@@ -149,7 +149,7 @@ export function AttendanceReview({
         <p className="px-1 text-xs text-muted">
           {counts.excused > 0 && `${counts.excused} excused`}
           {counts.excused > 0 && counts.irregular > 0 && ' · '}
-          {counts.irregular > 0 && `${counts.irregular} irregular`} — this class doesn’t count for
+          {counts.irregular > 0 && `${counts.irregular} irregular`}, this class doesn’t count for
           {neutral === 1 ? ' them' : ' them'}, and no points are deducted.
         </p>
       )}

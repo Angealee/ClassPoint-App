@@ -55,7 +55,7 @@ export function Settings() {
       setPushState(next)
       if (next === 'subscribed') toast('Push notifications on.', 'success')
       else if (next === 'denied')
-        toast('Notifications are blocked — enable them in your browser settings.', 'error')
+        toast('Notifications are blocked, enable them in your browser settings.', 'error')
       else if (pushState === 'subscribed') toast('Push notifications off.', 'info')
     } catch {
       toast('Could not update notifications. Try again.', 'error')
@@ -68,7 +68,7 @@ export function Settings() {
     setTestBusy(true)
     try {
       await sendTestPush()
-      toast('Test sent — check your lock screen.', 'success')
+      toast('Test sent, check your lock screen.', 'success')
     } catch {
       toast('Could not send the test. Try again.', 'error')
     } finally {
@@ -187,7 +187,7 @@ export function Settings() {
               <div className="min-w-0">
                 <p className="text-sm font-medium">Test it</p>
                 <p className="text-xs text-muted">
-                  Lock your phone, then tap — it should buzz within a few seconds.
+                  Lock your phone, then tap, it should buzz within a few seconds.
                 </p>
               </div>
               <Button
@@ -311,7 +311,7 @@ export function Settings() {
 function pushHint(state: PushState): string {
   switch (state) {
     case 'subscribed':
-      return 'On — alerts arrive even when the app is closed.'
+      return 'On, alerts arrive even when the app is closed.'
     case 'denied':
       return 'Blocked. Allow notifications in your browser settings.'
     case 'unsupported':

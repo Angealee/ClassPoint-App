@@ -204,7 +204,7 @@ export function GradeItemEntry({
                   cell.absent === 'auto'
                     ? 'Recorded absent or excused in the class this column was held in.'
                     : isA
-                      ? 'Marked absent — tap to undo'
+                      ? 'Marked absent, tap to undo'
                       : 'Mark absent'
                 }
                 onClick={() => {

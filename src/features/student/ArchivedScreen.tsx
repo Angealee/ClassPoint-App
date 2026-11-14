@@ -169,7 +169,7 @@ export function ArchivedScreen() {
             />
           ) : (
             <div className="mt-2">
-              <PodiumBoard entries={top} showSection rankSignals confetti={false} />
+              <PodiumBoard entries={top} showSection rankSignals />
             </div>
           )}
 

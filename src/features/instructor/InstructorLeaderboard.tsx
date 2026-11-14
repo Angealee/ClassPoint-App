@@ -107,7 +107,7 @@ export function InstructorLeaderboard() {
         <ListSkeleton rows={8} />
       ) : visible.length === 0 ? (
         <EmptyState>{entries.length === 0
-            ? 'No rankings yet — the board settles at 12:30 PM and 7:30 PM.'
+            ? 'No rankings yet, the board settles at 12:30 PM and 7:30 PM.'
             : 'No students in this section yet.'}</EmptyState>
       ) : (
         <CommentsOverlay isInstructor onOpenProfile={openCommenter}>
@@ -118,7 +118,6 @@ export function InstructorLeaderboard() {
             // Same rule as the student board: only truthful unfiltered.
             rankSignals={filter === 'all'}
             onSelect={(entry) => setSelected(entry)}
-            confetti={false}
           />
         </CommentsOverlay>
       )}

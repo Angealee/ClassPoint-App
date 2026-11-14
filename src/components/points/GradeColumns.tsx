@@ -92,7 +92,7 @@ export function GradeColumns({
           {actionable.length === 0 ? (
             <EmptyState
               icon={<TableIcon />}
-              description="A quiz, task or exam appears here as soon as your mark is in — 1 point adds 1 mark, up to the maximum. A column you were absent for can’t be assisted."
+              description="A quiz, task or exam appears here as soon as your mark is in, 1 point adds 1 mark, up to the maximum. A column you were absent for can’t be assisted."
             >
               None of your columns can use points right now.
             </EmptyState>

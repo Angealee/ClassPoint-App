@@ -68,7 +68,7 @@ export function OverallTable({ rows, policies }: OverallTableProps) {
       <p className="text-xs text-muted">
         {complete} of {lines.length} students have a final grade.{' '}
         {complete < lines.length && (
-          <>A dash means a term that still counts has no marks in it — the grade is withheld
+          <>A dash means a term that still counts has no marks in it, the grade is withheld
           rather than computed as if that term were a zero.</>
         )}
       </p>

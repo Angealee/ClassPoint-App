@@ -250,7 +250,7 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder={
-              penalty ? 'Reason — e.g. late, disruptive' : 'e.g. answered the bonus question'
+              penalty ? 'Reason, e.g. late, disruptive' : 'e.g. answered the bonus question'
             }
           />
           <Button className="w-full" onClick={() => setMoreOpen(false)}>
@@ -270,7 +270,7 @@ export function AwardBar({ selectedIds, onClear, onAwarded }: Props) {
         detail={
           note.trim()
             ? `Reason: ${note.trim()}`
-            : 'No reason noted — students see the deduction in their feed either way.'
+            : 'No reason noted, students see the deduction in their feed either way.'
         }
         confirmLabel={`Deduct −${points}`}
         busy={submitting}

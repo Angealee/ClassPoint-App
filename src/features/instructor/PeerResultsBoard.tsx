@@ -271,7 +271,7 @@ export function PeerResultsBoard() {
               <p className="mb-3 text-xs text-muted">
                 {meta.closesAt
                   ? `Closes in ${countdownTo(new Date(meta.closesAt))}.`
-                  : 'No deadline set — it stays open until you close it.'}
+                  : 'No deadline set, it stays open until you close it.'}
               </p>
               <div className="flex items-end gap-2">
                 <Input
@@ -304,7 +304,7 @@ export function PeerResultsBoard() {
                 disabled={meta.resultsReleasedAt !== null}
                 onClick={() => setConfirming('reopen')}
               >
-                {meta.resultsReleasedAt !== null ? 'Released — cannot reopen' : 'Reopen'}
+                {meta.resultsReleasedAt !== null ? 'Released, cannot reopen' : 'Reopen'}
               </Button>
             )}
           </div>

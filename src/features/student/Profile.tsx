@@ -392,7 +392,7 @@ export function Profile() {
               label="Bio"
               value={bio}
               onChange={(e) => setBio(e.target.value.slice(0, 160))}
-              placeholder="A short line about you — classmates see this on your profile."
+              placeholder="A short line about you, classmates see this on your profile."
               rows={3}
             />
             <p className="mt-1.5 text-right text-xs text-muted">{bio.length}/160</p>
@@ -439,7 +439,7 @@ export function Profile() {
       <ConfirmDialog
         open={confirmHeader}
         title="Remove cover photo?"
-        message="Your profile goes back to the plain header — classmates won't see this picture anymore."
+        message="Your profile goes back to the plain header, classmates won't see this picture anymore."
         confirmLabel="Remove cover"
         busy={headerBusy}
         onConfirm={onRemoveHeader}
@@ -449,7 +449,7 @@ export function Profile() {
       <ConfirmDialog
         open={confirmPhoto}
         title="Remove profile picture?"
-        message="Your photo is removed everywhere — classmates will see your initials instead."
+        message="Your photo is removed everywhere, classmates will see your initials instead."
         confirmLabel="Remove photo"
         busy={uploading}
         onConfirm={onRemovePhoto}
@@ -459,7 +459,7 @@ export function Profile() {
       <ConfirmDialog
         open={!!confirmBannerUrl}
         title="Remove this photo?"
-        message="It disappears from your showcase — classmates won't see it anymore."
+        message="It disappears from your showcase, classmates won't see it anymore."
         confirmLabel="Remove photo"
         busy={bannerBusy}
         onConfirm={() => confirmBannerUrl && void onRemoveBanner(confirmBannerUrl)}

@@ -343,7 +343,7 @@ export function SessionDetail() {
                 onClick={() => setEditingSubject(true)}
                 className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted transition-colors hover:border-accent-solid hover:text-accent"
               >
-                {session.subjectCode ? `Subject: ${session.subjectCode}` : 'No subject — tag it'}
+                {session.subjectCode ? `Subject: ${session.subjectCode}` : 'No subject, tag it'}
               </button>
             )}
           </div>
@@ -512,7 +512,7 @@ export function SessionDetail() {
               }}
             />
             <p className="pt-1 text-xs text-muted">
-              Excused and Irregular don’t count for this student — no penalty, and the class is left
+              Excused and Irregular don’t count for this student, no penalty, and the class is left
               out of their attendance rate and streaks.
             </p>
             {picker.recordId ? (
@@ -541,7 +541,7 @@ export function SessionDetail() {
           removeTarget ? (
             <>
               <span className="font-semibold text-ink">{removeTarget.fullName}</span> goes back to
-              having no record for this class — it leaves their attendance rate entirely.
+              having no record for this class, it leaves their attendance rate entirely.
             </>
           ) : (
             ''
@@ -571,7 +571,7 @@ export function SessionDetail() {
         }
         detail={
           session.penaltiesCommitted
-            ? 'Any penalties this session applied are reversed — student points recompute automatically.'
+            ? 'Any penalties this session applied are reversed, student points recompute automatically.'
             : undefined
         }
         confirmLabel="Delete session"

@@ -1,23 +1,18 @@
 import { LATEST_VERSION } from '@/lib/changelog'
 import { useRef, useState } from 'react'
-import { AnimatePresence, motion, useMotionValueEvent, useTransform } from 'framer-motion'
+import { AnimatePresence, motion, useMotionValueEvent } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/ui/Logo'
 import { Button } from '@/components/ui/Button'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { InstallButton } from '@/components/pwa/InstallButton'
-import { Aurora } from '@/components/landing/Aurora'
-import { Reveal, revealIconVariants } from '@/components/landing/Reveal'
+import { ClaimDoor } from '@/components/auth/ClaimDoor'
+import { Reveal } from '@/components/landing/Reveal'
 import { ScoreboardDemo } from '@/components/landing/ScoreboardDemo'
 import { BoardPreview } from '@/components/landing/BoardPreview'
 import { LandingScrollProvider, useLandingScroll } from '@/components/landing/scroll'
-import {
-  ChevronDownIcon,
-  FlameIcon,
-  ScanIcon,
-  StarIcon,
-  TicketIcon,
-} from '@/components/ui/icons'
+import { ChevronDownIcon } from '@/components/ui/icons'
+import { usePwaInstall } from '@/lib/pwa'
 import { spring } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
@@ -34,34 +29,11 @@ const STEPS = [
   },
   {
     title: 'Grind kang points sa class yah',
-    body: 'Recitations and activities can gain you points, it can beawarded live while class is running.',
+    body: 'Recitations and activities can gain you points, it can be awarded live while class is running.',
   },
   {
     title: 'Tignan mo sa leaderboard kung gaano ka kalakas',
     body: 'Points are XP. Fill the bar, level up, and watch your rank move on the rankings.',
-  },
-]
-
-const FEATURES = [
-  {
-    Icon: ScanIcon,
-    title: 'Offline QR attendance-in',
-    body: 'Point your camera. Works offline and syncs when you are back.',
-  },
-  {
-    Icon: StarIcon,
-    title: 'Badges',
-    body: 'Be active to unlock certain hidden achievements.',
-  },
-  {
-    Icon: FlameIcon,
-    title: 'Streaks',
-    body: 'Consistency. Turn up on time, and keep the flame lit.',
-  },
-  {
-    Icon: TicketIcon,
-    title: 'Points',
-    body: 'Gain points then spend points on certain quizzes and activities.',
   },
 ]
 
@@ -76,12 +48,12 @@ export function Landing() {
 function LandingPage() {
   const navigate = useNavigate()
   const { scrollY, progress } = useLandingScroll()
+  const { state: installState } = usePwaInstall()
+  const canInstall = installState === 'installable' || installState === 'ios' || installState === 'inapp'
   const [scrolled, setScrolled] = useState(false)
   useMotionValueEvent(scrollY, 'change', (y) => {
     setScrolled(y > window.innerHeight * 0.6)
   })
-
-  const auroraY = useTransform(scrollY, [0, 900], [0, 180])
 
   const taps = useRef(0)
   const firstTapAt = useRef(0)
@@ -147,8 +119,6 @@ function LandingPage() {
           className="relative flex min-h-dvh flex-col"
           style={{ paddingTop: HEADER_H }}
         >
-          <Aurora offset={auroraY} />
-
           <div className="relative mx-auto flex w-full max-w-5xl flex-1 items-center px-5 py-6">
             <div className="grid w-full gap-8 lg:grid-cols-2 lg:gap-14">
               <motion.div
@@ -175,14 +145,7 @@ function LandingPage() {
                   <Button size="lg" className="w-full" onClick={() => navigate('/signin')}>
                     Sign in
                   </Button>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/claim')}
-                    className="cp-tap-y rounded-lg px-1 py-1 text-sm text-muted transition-colors hover:text-ink"
-                  >
-                    First time here?{' '}
-                    <span className="font-semibold text-accent">Claim your account</span>
-                  </button>
+                  <ClaimDoor className="w-full text-left" />
                 </div>
               </motion.div>
 
@@ -209,66 +172,33 @@ function LandingPage() {
         </section>
 
         <section id="how" className="border-t border-line bg-card-2" style={{ scrollMarginTop: HEADER_H }}>
-          <div className="mx-auto max-w-5xl px-5 py-16">
+          <div className="mx-auto max-w-2xl px-5 py-14">
             <Reveal>
               <h2 className="text-center font-display text-2xl font-bold sm:text-3xl">
                 Bago pumasok? Note mo to yah
               </h2>
             </Reveal>
 
-            <ol className="mt-10 grid gap-4 sm:grid-cols-3">
+            <ol className="mt-8 divide-y divide-line border-y border-line">
               {STEPS.map(({ title, body }, i) => (
-                <Reveal key={title} delay={i * 0.08} className="h-full">
-                  <motion.li
-                    whileHover={{ y: -4 }}
-                    whileTap={{ y: -2, scale: 0.99 }}
-                    transition={spring}
-                    className="h-full rounded-xl border border-line bg-card p-5"
+                <li key={title} className="flex gap-4 py-4">
+                  <span
+                    aria-hidden
+                    className="w-6 shrink-0 pt-0.5 text-right font-display text-xl font-bold tabular-nums text-accent"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-solid text-sm font-bold text-white">
-                        {i + 1}
-                      </span>
-                    </div>
-                    <p className="mt-3 font-display font-semibold">{title}</p>
-                    <p className="mt-1 text-sm text-muted">{body}</p>
-                  </motion.li>
-                </Reveal>
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-display font-semibold">{title}</p>
+                    <p className="mt-0.5 text-sm text-muted">{body}</p>
+                  </div>
+                </li>
               ))}
             </ol>
-          </div>
-        </section>
 
-        {/* what you get */}
-        <section className="border-t border-line">
-          <div className="mx-auto max-w-5xl px-5 py-16">
-            <Reveal>
-              <h2 className="text-center font-display text-2xl font-bold sm:text-3xl">
-                What is in it for you
-              </h2>
-            </Reveal>
-
-            <div className="mt-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {FEATURES.map(({ Icon, title, body }, i) => (
-                <Reveal key={title} delay={i * 0.06} className="h-full">
-                  <motion.div
-                    whileHover={{ y: -4 }}
-                    whileTap={{ y: -2, scale: 0.99 }}
-                    transition={spring}
-                    className="h-full rounded-xl border border-line bg-card p-4"
-                  >
-                    <motion.div
-                      variants={revealIconVariants}
-                      className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-reward-solid/15 text-reward"
-                    >
-                      <Icon className="h-5 w-5" />
-                    </motion.div>
-                    <p className="font-display font-semibold">{title}</p>
-                    <p className="mt-1 text-sm text-muted">{body}</p>
-                  </motion.div>
-                </Reveal>
-              ))}
-            </div>
+            <p className="mt-6 text-center text-sm text-ink">
+              Points reset every semester and never become your grade.
+            </p>
           </div>
         </section>
 
@@ -278,7 +208,7 @@ function LandingPage() {
             <Reveal className="text-center">
               <h2 className="font-display text-2xl font-bold sm:text-3xl">Everyone can see it</h2>
               <p className="mx-auto mt-3 max-w-md text-muted">
-                Leaderboard settle per day. Will you be able to raeh the top?
+                Leaderboard settle per day. Will you be able to reach the top?
               </p>
             </Reveal>
 
@@ -286,21 +216,22 @@ function LandingPage() {
           </div>
         </section>
 
-        {/*install div*/}
-        <section className="border-t border-line">
-          <div className="mx-auto max-w-xl px-5 py-16">
-            <Reveal>
-              <div className="rounded-2xl border border-line bg-card p-6 text-center">
-                <Logo className="mx-auto h-12 w-12" />
-                <h2 className="mt-4 font-display text-xl font-bold">Put it on your home screen</h2>
-                <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
-                  Opens the app, checks you in without a signal/offline.
-                </p>
-                <InstallButton className="mx-auto mt-5 w-full max-w-xs" />
-              </div>
-            </Reveal>
-          </div>
-        </section>
+        {canInstall && (
+          <section className="border-t border-line">
+            <div className="mx-auto max-w-xl px-5 py-12">
+              <Reveal>
+                <div className="rounded-2xl border border-line bg-card p-6 text-center">
+                  <Logo className="mx-auto h-12 w-12" />
+                  <h2 className="mt-4 font-display text-xl font-bold">Put it on your home screen</h2>
+                  <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
+                    Opens like an app and records your attendance even without a signal.
+                  </p>
+                  <InstallButton className="mx-auto mt-5 w-full max-w-xs" />
+                </div>
+              </Reveal>
+            </div>
+          </section>
+        )}
       </main>
 
       <footer className="border-t border-line py-6 text-center text-xs text-muted">

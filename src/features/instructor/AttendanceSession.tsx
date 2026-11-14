@@ -580,7 +580,7 @@ export function AttendanceSession({
 
       {/* Roster */}
       {roster.length === 0 ? (
-        <EmptyState>No students in {sectionName} yet — add some in the Students tab.</EmptyState>
+        <EmptyState>No students in {sectionName} yet, add some in the Students tab.</EmptyState>
       ) : visible.length === 0 ? (
         <EmptyState>No students match that filter.</EmptyState>
       ) : (

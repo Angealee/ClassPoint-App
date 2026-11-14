@@ -93,7 +93,7 @@ export function Broadcast({ counts }: { counts: Record<string, number> }) {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Class cancelled tomorrow"
           maxLength={TITLE_MAX}
-          hint={`${title.length}/${TITLE_MAX} — this is the bold line on the lock screen.`}
+          hint={`${title.length}/${TITLE_MAX}, this is the bold line on the lock screen.`}
           required
         />
 
@@ -105,7 +105,7 @@ export function Broadcast({ counts }: { counts: Record<string, number> }) {
             onChange={(e) => setBody(e.target.value)}
             rows={3}
             maxLength={BODY_MAX}
-            placeholder="No IT 32 tomorrow — we'll cover the missed topic on Friday."
+            placeholder="No IT 32 tomorrow, we'll cover the missed topic on Friday."
           />
           <p className="mt-1 text-xs text-muted">
             {body.length}/{BODY_MAX}
@@ -120,7 +120,7 @@ export function Broadcast({ counts }: { counts: Record<string, number> }) {
         >
           {recipients === 0
             ? 'No students to send to'
-            : `Review — ${recipients} recipient${recipients === 1 ? '' : 's'}`}
+            : `Review, ${recipients} recipient${recipients === 1 ? '' : 's'}`}
         </Button>
       </form>
 

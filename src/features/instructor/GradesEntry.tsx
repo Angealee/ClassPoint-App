@@ -37,7 +37,7 @@ export function GradesEntry() {
           title="Grades"
           subtitle={`Prelim, Midterm and Finals for ${semester.name}. Points never feed a grade.`}
         />
-        <EmptyState description="Assign a subject to a section in Semesters first — a grade sheet belongs to one section and one subject.">
+        <EmptyState description="Assign a subject to a section in Semesters first, a grade sheet belongs to one section and one subject.">
           No section has a subject yet.
         </EmptyState>
       </div>

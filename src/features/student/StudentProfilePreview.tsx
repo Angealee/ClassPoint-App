@@ -148,7 +148,7 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
             <StatTile
               icon={<TrophyIcon className="h-4 w-4" />}
               label="Rank"
-              value={target.rank != null ? `#${target.rank}` : '—'}
+              value={target.rank != null ? `#${target.rank}` : '-'}
               tone="accent"
             />
           </div>

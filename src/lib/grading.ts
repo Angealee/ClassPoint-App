@@ -259,7 +259,7 @@ export function orderedItems<T extends { component: GradeComponent; position: nu
 }
 
 export function displayGrade(value: number | null): string {
-  return value === null ? '—' : roundTo(value, 2).toFixed(2)
+  return value === null ? '-' : roundTo(value, 2).toFixed(2)
 }
 
 export function cellKey(itemId: string, studentId: string): string {

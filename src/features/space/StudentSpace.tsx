@@ -72,7 +72,7 @@ function WhatsComing() {
               classmate.
             </li>
             <li>Group chats for your section and the whole class.</li>
-            <li>Random Events — answer the question, grind the points.</li>
+            <li>Random Events, answer the question, grind the points.</li>
           </ul>
         </div>
       </div>
@@ -96,7 +96,7 @@ function LockedView() {
               testers access only muna. You&apos;ll see it here the moment it
               opens.
             </p>
-            <p className="mx-auto max-w-sm text-sm text-muted">— CEO</p>
+            <p className="mx-auto max-w-sm text-sm text-muted">- CEO</p>
           </div>
         </div>
       </Card>
@@ -117,14 +117,14 @@ function PausedView() {
           <AstronautArt variant="space" size="lg" className="opacity-50" />
           <div className="space-y-1.5">
             <p className="font-display text-lg font-bold">
-              Sandali lang — paused muna
+              Sandali lang, paused muna
             </p>
             <p className="mx-auto max-w-sm text-sm text-muted">
               Student Space is temporarily closed while I sort something out.
-              Nothing is deleted — your posts and chats will be here when it
+              Nothing is deleted, your posts and chats will be here when it
               reopens.
             </p>
-            <p className="mx-auto max-w-sm text-sm text-muted">— CEO</p>
+            <p className="mx-auto max-w-sm text-sm text-muted">- CEO</p>
           </div>
         </div>
       </Card>
@@ -158,7 +158,7 @@ const RECENT_ROOM_MS = 10 * 60 * 1000;
 
 function StatPill({ value, label }: { value: string | number; label: string }) {
   return (
-    <span className="flex items-baseline gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs backdrop-blur-sm">
+    <span className="flex items-baseline gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
       <span className="font-display text-sm font-bold tabular-nums text-ink">
         {value}
       </span>
@@ -448,7 +448,7 @@ function FeedRow({ item }: { item: FeedItem }) {
             </span>
           </p>
           <p className="line-clamp-2 text-sm text-ink">
-            {p.body ?? "Hidden — reported"}
+            {p.body ?? "Hidden, reported"}
           </p>
           <p className="mt-1 text-2xs text-muted">
             {p.wCount} W · {p.replyCount}{" "}
@@ -555,7 +555,7 @@ function OpenView() {
         value: active,
         label: active === 1 ? "room active now" : "rooms active now",
       },
-      { value: people?.length ?? "—", label: "in Space" },
+      { value: people?.length ?? "-", label: "in Space" },
     ];
   }, [posts, rooms, people, now]);
 

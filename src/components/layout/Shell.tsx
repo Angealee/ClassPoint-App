@@ -176,7 +176,7 @@ export function Shell({
       )}
     >
       <aside className={cn(
-          'theme-transition sticky top-0 hidden h-[100dvh] shrink-0 flex-col border-r border-line bg-canvas/60 py-5 backdrop-blur-md md:flex',
+          'theme-transition sticky top-0 hidden h-[100dvh] shrink-0 flex-col border-r border-line bg-canvas py-5 md:flex',
           full ? 'w-16 px-2' : 'w-64 px-4',
         )}>
         <div

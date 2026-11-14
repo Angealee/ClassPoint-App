@@ -42,7 +42,7 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
     const name = newName.trim()
     if (!name) return
     if (!semester) {
-      toast('No active semester — set one up first.', 'error')
+      toast('No active semester, set one up first.', 'error')
       return
     }
     setBusy(true)
@@ -54,7 +54,7 @@ export function SectionGrid({ onOpen }: { onOpen: (sectionId: string) => void })
       setAdding(false)
       toast(`Section ${name} added.`, 'success')
     } catch {
-      toast('Could not add — is that name already taken?', 'error')
+      toast('Could not add, is that name already taken?', 'error')
     } finally {
       setBusy(false)
     }
