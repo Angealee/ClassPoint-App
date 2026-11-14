@@ -15,6 +15,8 @@ interface Props {
   /** Rendered top-right, over the image. */
   action?: React.ReactNode
   busy?: boolean
+  /** 'plate' for a cover that sits on the fixed dark plate (the player card). */
+  tone?: 'themed' | 'plate'
 }
 
 const DRAG_SLOP = 4
@@ -28,6 +30,7 @@ export function CoverPhoto({
   onPick,
   action,
   busy = false,
+  tone = 'themed',
 }: Props) {
   const boxRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{
@@ -79,7 +82,8 @@ export function CoverPhoto({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       className={cn(
-        'group relative w-full overflow-hidden bg-gradient-to-br from-card-2 via-card to-card-2',
+        'group relative w-full overflow-hidden bg-gradient-to-br',
+        tone === 'plate' ? 'from-plate-2 via-plate to-plate-2' : 'from-card-2 via-card to-card-2',
         interactive && url && 'cursor-grab touch-none active:cursor-grabbing',
         interactive && !url && 'cursor-pointer',
         className,
@@ -99,7 +103,10 @@ export function CoverPhoto({
             type="button"
             onClick={onPick}
             disabled={busy}
-            className="flex h-full w-full items-center justify-center text-xs font-medium text-muted transition-colors hover:text-ink"
+            className={cn(
+              'flex h-full w-full items-center justify-center text-xs font-medium transition-colors',
+              tone === 'plate' ? 'text-white/70 hover:text-white' : 'text-muted hover:text-ink',
+            )}
           >
             {busy ? 'Uploading…' : 'Add a cover photo'}
           </button>
@@ -107,7 +114,7 @@ export function CoverPhoto({
       )}
 
       {interactive && url && (
-        <span className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/45 to-transparent pb-1.5 pt-6 text-2xs font-medium text-white/85 opacity-0 transition-opacity group-hover:opacity-100">
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/45 to-transparent pb-1.5 pt-6 text-2xs font-medium text-white/85">
           Drag to reposition · tap to change
         </span>
       )}

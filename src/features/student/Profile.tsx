@@ -2,26 +2,30 @@ import { Textarea } from '@/components/ui/Textarea'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useReducedMotion } from 'framer-motion'
 import { Card } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ScreenTitle } from '@/components/ui/ScreenTitle'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
 import { Input } from '@/components/ui/Input'
 import { Sheet } from '@/components/ui/Sheet'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { SuccessTick } from '@/components/ui/SuccessTick'
-import { Avatar } from '@/components/ui/Avatar'
 import { useToast } from '@/components/ui/Toast'
-import { getLevelProgress } from '@/lib/leveling'
+import { GearIcon } from '@/components/ui/icons'
+import { PlayerCard } from '@/components/profile/PlayerCard'
 import { ProfileBanner } from '@/components/profile/ProfileBanner'
-import { CoverPhoto } from '@/components/profile/CoverPhoto'
 import { SectionLabel } from '@/components/ui/SectionLabel'
-import { PencilIcon, XIcon } from '@/components/ui/icons'
 import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
 import { PinnedBadges } from '@/components/achievements/PinnedBadges'
 import { InterestTags, parseInterests } from '@/components/profile/InterestTags'
 import { useStudentData } from './StudentData'
 import { StudentProfilePreview, type PreviewTarget } from './StudentProfilePreview'
+
+const NAME_MAX = 40
+const BIO_MAX = 160
+const INTERESTS_MAX = 120
 
 export function Profile() {
   const {
@@ -43,6 +47,7 @@ export function Profile() {
   } = useStudentData()
   const { toast } = useToast()
   const navigate = useNavigate()
+  const reduced = useReducedMotion() ?? false
   const fileRef = useRef<HTMLInputElement>(null)
   const headerRef = useRef<HTMLInputElement>(null)
   const [headerBusy, setHeaderBusy] = useState(false)
@@ -150,39 +155,71 @@ export function Profile() {
     if (error) toast(error, 'error')
   }
 
+  const hasAbout = !!me?.bio || parseInterests(me?.interests).length > 0
+  const earned = achievements.filter((a) => a.unlockedAt).length
+
   return (
-    <div className="space-y-4">
-      <ScreenTitle title="Profile" />
+    <div className="space-y-5">
+      <ScreenTitle
+        title="Profile"
+        actions={
+          <IconButton
+            label="Settings"
+            variant="outline"
+            round
+            icon={<GearIcon className="h-5 w-5" />}
+            onClick={() => navigate('/app/settings')}
+          />
+        }
+      />
 
       {loading ? (
-        <Skeleton className="h-44 rounded-2xl" />
+        <Skeleton className="h-72 rounded-2xl" />
       ) : !me ? (
-        <EmptyState>We couldn't find your student record.</EmptyState>
+        <EmptyState>We couldn&rsquo;t find your student record.</EmptyState>
       ) : (
         <>
-        <Card pad="none" className="overflow-hidden">
-          <CoverPhoto
-            url={me.header_url}
-            pos={me.header_pos}
-            className="h-36"
+          <PlayerCard
+            name={me.display_name}
+            title={me.display_title}
+            sectionLabel={sectionName(me.section_id)}
+            avatarUrl={me.avatar_url}
+            coverUrl={me.header_url}
+            coverPos={me.header_pos}
+            points={me.semester_points}
+            rank={rank}
+            third={{ label: 'All-time', value: String(me.all_time_points) }}
             editable
-            busy={headerBusy}
-            onPick={() => headerRef.current?.click()}
-            onReposition={onRepositionHeader}
-            action={
-              me.header_url ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirmHeader(true)}
-                  disabled={headerBusy}
-                  aria-label="Remove cover photo"
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white transition-colors hover:bg-black/75"
-                >
-                  <XIcon className="h-4 w-4" />
-                </button>
-              ) : undefined
-            }
-          />
+            reduced={reduced}
+            coverBusy={headerBusy}
+            avatarBusy={uploading}
+            onPickCover={() => headerRef.current?.click()}
+            onRepositionCover={onRepositionHeader}
+            onRemoveCover={() => setConfirmHeader(true)}
+            onPickAvatar={() => fileRef.current?.click()}
+            onRemoveAvatar={() => setConfirmPhoto(true)}
+          >
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={openEdit}
+                className="cp-tap-y h-11 flex-1 rounded-xl bg-white/10 text-sm font-semibold text-white transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              >
+                Edit profile
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(true)}
+                className="cp-tap-y h-11 flex-1 rounded-xl border border-white/20 text-sm font-semibold text-white/85 transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              >
+                Preview
+              </button>
+            </div>
+            <p className="mt-2 text-center text-2xs text-white/60">
+              Preview shows what classmates see when they tap you.
+            </p>
+          </PlayerCard>
+
           <input
             ref={headerRef}
             type="file"
@@ -190,7 +227,6 @@ export function Profile() {
             className="hidden"
             onChange={onPickHeader}
           />
-
           <input
             ref={fileRef}
             type="file"
@@ -199,126 +235,15 @@ export function Profile() {
             onChange={onPickFile}
           />
 
-          <div className="relative z-[1] px-5 pb-5 pt-3">
-            <div className="absolute -top-10 left-5 z-[1]">
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  aria-label={me.avatar_url ? 'Change profile picture' : 'Add a profile picture'}
-                  className="group relative block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
-                >
-                  <Avatar
-                    name={me.display_name}
-                    url={me.avatar_url}
-                    className="h-20 w-20 rounded-2xl ring-4 ring-card"
-                    textClassName="text-3xl"
-                  />
-                  <span className="absolute -bottom-0.5 -right-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-accent-solid text-white ring-2 ring-card">
-                    {uploading ? (
-                      <span className="text-2xs">…</span>
-                    ) : (
-                      <PencilIcon className="h-3.5 w-3.5" />
-                    )}
-                  </span>
-                </button>
-                {me.avatar_url && (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmPhoto(true)}
-                    disabled={uploading}
-                    aria-label="Remove profile picture"
-                    className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-danger-solid"
-                  >
-                    <XIcon className="h-3 w-3" />
-                  </button>
-                )}
-            </div>
-
-            <div className="min-h-11 min-w-0 pl-23">
-              <p className="truncate font-display text-2xl font-bold leading-tight">
-                {me.display_name}
-              </p>
-              {me.display_title && (
-                <p className="truncate text-xs font-semibold text-reward">{me.display_title}</p>
-              )}
-              <p className="truncate text-sm text-muted">
-                {sectionName(me.section_id)} · Level {getLevelProgress(me.semester_points).level}
-              </p>
-            </div>
-
-            <div className="mt-4 flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={openEdit}>
-                Edit profile
-              </Button>
-              <Button variant="ghost" className="flex-1" onClick={() => setPreviewOpen(true)}>
-                Preview
-              </Button>
-            </div>
-            <p className="mt-2 text-center text-xs text-muted">
-              Preview is exactly what classmates see when they tap you on the leaderboard.
-            </p>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="space-y-3">
-            <Field label="Display name" value={me.display_name} />
-            <Field label="Full name" value={me.full_name} />
-            <Field label="Section" value={sectionName(me.section_id)} />
-            <Field label="This semester" value={String(me.semester_points)} />
-            <Field label="All-time" value={String(me.all_time_points)} />
-          </div>
-
-          {me.bio && (
-            <div className="mt-4">
-              <SectionLabel>Bio</SectionLabel>
-              <p className="rounded-xl bg-card-2 px-4 py-3 text-sm leading-relaxed text-ink">
-                {me.bio}
-              </p>
-            </div>
-          )}
-
-          {parseInterests(me.interests).length > 0 && (
-            <div className="mt-4">
-              <SectionLabel>Interests</SectionLabel>
-              <InterestTags raw={me.interests} />
-            </div>
-          )}
-        </Card>
-
-        <Card>
-          <div>
-            <SectionLabel>Photos</SectionLabel>
-            <ProfileBanner
-              urls={me.banner_urls ?? []}
-              editable
-              onAdd={() => bannerRef.current?.click()}
-              onRemove={(url) => setConfirmBannerUrl(url)}
-              busy={bannerBusy}
-            />
-            <p className="mt-2 text-xs text-muted">
-              Up to 3 · classmates see these on your profile. JPG, PNG, WebP or GIF · ≤ 5 MB.
-            </p>
-            <input
-              ref={bannerRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              className="hidden"
-              onChange={onPickBanner}
-            />
-          </div>
-
-          <div className="mt-5">
+          <section>
             <SectionLabel
               action={
                 <button
                   type="button"
                   onClick={() => navigate('/app/achievements')}
-                  className="text-xs font-semibold text-accent transition-opacity hover:opacity-80"
+                  className="cp-tap-y text-sm font-semibold text-accent transition-opacity hover:opacity-80"
                 >
-                  {achievements.filter((a) => a.unlockedAt).length}/{achievements.length} · View all
-                  →
+                  {earned}/{achievements.length} · View all
                 </button>
               }
             >
@@ -329,84 +254,126 @@ export function Profile() {
                 )}
               </span>
             </SectionLabel>
-            <PinnedBadges
-              achievements={achievements}
-              pinnedCodes={me.pinned_achievements ?? []}
-              editable
-              onChange={onPinChange}
-              busy={pinBusy}
-            />
-          </div>
+            <Card pad="tight">
+              <PinnedBadges
+                achievements={achievements}
+                pinnedCodes={me.pinned_achievements ?? []}
+                editable
+                onChange={onPinChange}
+                busy={pinBusy}
+              />
+            </Card>
+          </section>
 
-          <div className="mt-5">
-            <ProfileVisitors
-              studentId={me.id}
-              onOpenViewer={(row) =>
-                setViewerTarget({
-                  student_id: row.studentId,
-                  display_name: row.displayName,
-                  section_id: row.sectionId,
-                  points: row.lifetimePoints,
-                  avatar_url: row.avatarUrl,
-                  rank: row.rank,
-                })
+          <section>
+            <SectionLabel
+              action={
+                <button
+                  type="button"
+                  onClick={openEdit}
+                  className="cp-tap-y text-sm font-semibold text-accent transition-opacity hover:opacity-80"
+                >
+                  {hasAbout ? 'Edit' : 'Add'}
+                </button>
               }
-            />
-          </div>
-        </Card>
+            >
+              About
+            </SectionLabel>
+            <Card className="space-y-3">
+              {me.bio ? (
+                <p className="text-sm leading-relaxed text-ink">{me.bio}</p>
+              ) : (
+                <p className="text-sm text-muted">
+                  No bio yet. A line about you helps classmates know who they are looking at.
+                </p>
+              )}
+              <InterestTags raw={me.interests} />
+            </Card>
+          </section>
+
+          <section>
+            <SectionLabel>Photos</SectionLabel>
+            <Card pad="tight">
+              <ProfileBanner
+                urls={me.banner_urls ?? []}
+                editable
+                onAdd={() => bannerRef.current?.click()}
+                onRemove={(url) => setConfirmBannerUrl(url)}
+                busy={bannerBusy}
+              />
+              <p className="mt-2 text-xs text-muted">
+                Up to 3, shown on your profile. JPG, PNG, WebP or GIF, up to 5 MB.
+              </p>
+              <input
+                ref={bannerRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={onPickBanner}
+              />
+            </Card>
+          </section>
+
+          <ProfileVisitors
+            studentId={me.id}
+            onOpenViewer={(row) =>
+              setViewerTarget({
+                student_id: row.studentId,
+                display_name: row.displayName,
+                section_id: row.sectionId,
+                points: row.lifetimePoints,
+                avatar_url: row.avatarUrl,
+                rank: row.rank,
+              })
+            }
+          />
         </>
       )}
 
-      <button
-        type="button"
-        onClick={() => navigate('/app/settings')}
-        className="block w-full text-left"
-      >
-        <Card interactive pad="roomy">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Settings</p>
-              <p className="text-xs text-muted">
-                Notifications, sounds, PIN and sign out.
-              </p>
-            </div>
-            <span className="shrink-0 text-lg text-muted">›</span>
-          </div>
-        </Card>
-      </button>
-
-      <Sheet open={editOpen} onClose={() => setEditOpen(false)} title="Edit profile">
-        <form onSubmit={onSave} className="space-y-4">
+      <Sheet open={editOpen} onClose={() => setEditOpen(false)} variant="screen" title="Edit profile">
+        <form onSubmit={onSave} className="space-y-4 pb-2">
+          <h2 className="font-display text-xl font-bold">Edit profile</h2>
           <Input
             label="Display name"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => setName(e.target.value.slice(0, NAME_MAX))}
             placeholder="How you appear on the leaderboard"
-            hint="2–40 characters. Your full name stays private."
+            hint={`${name.length}/${NAME_MAX} · 2 to ${NAME_MAX} characters, shown on the leaderboard.`}
             autoFocus
             required
           />
+          <div>
+            <p className="mb-1.5 text-sm font-medium">Full name</p>
+            <p className="rounded-xl bg-card-2 px-4 py-3 text-sm">{me?.full_name}</p>
+            <p className="mt-1.5 text-xs text-muted">
+              Private. Only you and your instructor can see this.
+            </p>
+          </div>
           <div className="w-full">
             <Textarea
               id="profile-bio"
               label="Bio"
               value={bio}
-              onChange={(e) => setBio(e.target.value.slice(0, 160))}
-              placeholder="A short line about you, classmates see this on your profile."
+              onChange={(e) => setBio(e.target.value.slice(0, BIO_MAX))}
+              placeholder="A short line about you. Classmates see it on your profile."
               rows={3}
             />
-            <p className="mt-1.5 text-right text-xs text-muted">{bio.length}/160</p>
+            <p className="mt-1.5 text-right text-xs tabular-nums text-muted">
+              {bio.length}/{BIO_MAX}
+            </p>
           </div>
           <Input
             label="Interests"
             value={interests}
-            onChange={(e) => setInterests(e.target.value.slice(0, 120))}
+            onChange={(e) => setInterests(e.target.value.slice(0, INTERESTS_MAX))}
             placeholder="anime, basketball, coding"
-            hint="Optional · separate with commas."
+            hint={`${interests.length}/${INTERESTS_MAX} · optional, separate with commas.`}
           />
-          <Button type="submit" size="lg" className="w-full" disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
-          </Button>
+          <div className="sticky bottom-0 bg-canvas/95 pb-1 pt-3">
+            <Button type="submit" size="lg" className="w-full" disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
         </form>
       </Sheet>
 
@@ -439,7 +406,7 @@ export function Profile() {
       <ConfirmDialog
         open={confirmHeader}
         title="Remove cover photo?"
-        message="Your profile goes back to the plain header, classmates won't see this picture anymore."
+        message="Your profile goes back to the plain header. Classmates won't see this picture anymore."
         confirmLabel="Remove cover"
         busy={headerBusy}
         onConfirm={onRemoveHeader}
@@ -449,7 +416,7 @@ export function Profile() {
       <ConfirmDialog
         open={confirmPhoto}
         title="Remove profile picture?"
-        message="Your photo is removed everywhere, classmates will see your initials instead."
+        message="Your photo is removed everywhere. Classmates will see your initials instead."
         confirmLabel="Remove photo"
         busy={uploading}
         onConfirm={onRemovePhoto}
@@ -459,7 +426,7 @@ export function Profile() {
       <ConfirmDialog
         open={!!confirmBannerUrl}
         title="Remove this photo?"
-        message="It disappears from your showcase, classmates won't see it anymore."
+        message="It disappears from your showcase. Classmates won't see it anymore."
         confirmLabel="Remove photo"
         busy={bannerBusy}
         onConfirm={() => confirmBannerUrl && void onRemoveBanner(confirmBannerUrl)}
@@ -467,15 +434,6 @@ export function Profile() {
       />
 
       <SuccessTick show={tick} onDone={() => setTick(false)} />
-    </div>
-  )
-}
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-card-2 px-4 py-3">
-      <span className="shrink-0 text-sm text-muted">{label}</span>
-      <span className="truncate text-sm font-medium">{value}</span>
     </div>
   )
 }

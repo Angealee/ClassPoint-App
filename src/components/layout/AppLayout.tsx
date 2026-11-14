@@ -10,6 +10,7 @@ import { StudentDataProvider, useStudentData } from '@/features/student/StudentD
 import { LevelUpBurst } from '@/components/ui/LevelUpBurst'
 import { AchievementUnlockBurst } from '@/components/achievements/AchievementUnlockBurst'
 import { WhatsNew } from '@/features/WhatsNew'
+import { IdentityHost } from '@/components/identity/IdentityHost'
 import { AwayRecap } from '@/features/student/AwayRecap'
 import { NotificationsSheet } from '@/features/student/Notifications'
 import { Tour } from '@/features/student/Tour'
@@ -248,6 +249,7 @@ function StudentOrArchived() {
   return (
     <>
       <StudentShell />
+      <IdentityHost />
       <LevelUpOverlay />
       <AchievementUnlockOverlay />
       <IntroLayer />

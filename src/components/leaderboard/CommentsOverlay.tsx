@@ -1,6 +1,9 @@
 import { Button } from '@/components/ui/Button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Avatar } from '@/components/ui/Avatar'
+import { InstructorAvatar } from '@/components/identity/InstructorAvatar'
+import { instructorName } from '@/lib/instructor-identity'
+import { useInstructorProfile } from '@/lib/useInstructorProfile'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import {
@@ -60,6 +63,7 @@ export function CommentsOverlay({
   onOpenProfile,
   children,
 }: CommentsOverlayProps) {
+  const instructorProfile = useInstructorProfile()
   const { toast } = useToast()
   const [flying, setFlying] = useState<FlyingPill[]>([])
   const [recent, setRecent] = useState<LeaderboardComment[]>([])
@@ -269,9 +273,7 @@ export function CommentsOverlay({
                       onClick={tappable ? () => onOpenProfile!(p) : undefined}
                     >
                       {p.studentId === null ? (
-                        <span className="mt-0.5 shrink-0 text-2xs font-bold uppercase tracking-wide">
-                          Instructor
-                        </span>
+                        <InstructorAvatar interactive={false} className="mt-0.5 h-5 w-5" />
                       ) : (
                         <Avatar
                           name={p.displayName}
@@ -280,7 +282,9 @@ export function CommentsOverlay({
                         />
                       )}
                       <span className="line-clamp-3 min-w-0 [overflow-wrap:anywhere]">
-                        <span className="font-semibold">{p.displayName}</span>{' '}
+                        <span className="font-semibold">
+                          {p.studentId === null ? instructorName(instructorProfile) : p.displayName}
+                        </span>{' '}
                         <span className="text-muted">{p.body}</span>
                       </span>
                     </span>

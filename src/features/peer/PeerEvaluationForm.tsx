@@ -1,22 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Card } from '@/components/ui/Card'
+import { motion } from 'framer-motion'
+import { Card, Rows } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
-import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { StickyBar } from '@/components/ui/StickyBar'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { CheckIcon } from '@/components/ui/icons'
-import { PeerCard, peerCardId } from '@/components/peer/PeerCard'
+import { PeerCard, PEER_FOCUS_ID } from '@/components/peer/PeerCard'
 import { PeerReviewSheet } from '@/components/peer/PeerReviewSheet'
+import { PeerStrip } from '@/components/peer/PeerStrip'
 import { getPeerEvaluation, submitPeerEvaluation } from '@/lib/api'
 import { useStudentData } from '@/features/student/StudentData'
 import { errorText } from '@/lib/errors'
-import { countdownTo } from '@/lib/time'
+import { deadlineLabel } from '@/lib/peer-list'
+import { snap } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 import {
   PEER_COMMENT_MAX,
@@ -35,7 +36,14 @@ interface Draft {
   comments: Comments
 }
 
-const SCROLL_AFTER_MS = 260
+/** Which classmate is on screen, and which way the last move went (for the slide). */
+interface View {
+  id: string | null
+  dir: 1 | -1
+}
+
+/** Long enough for the new card to mount before the page is scrolled to it. */
+const SCROLL_AFTER_MS = 60
 
 function draftKey(studentId: string, evaluationId: string): string {
   return `cp_peer_draft_${studentId}_${evaluationId}_v1`
@@ -53,10 +61,11 @@ export function PeerEvaluationForm() {
 
   const [scores, setScores] = useState<Scores>({})
   const [comments, setComments] = useState<Comments>({})
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [view, setView] = useState<View>({ id: null, dir: 1 })
   const [reviewing, setReviewing] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [now] = useState(() => Date.now())
 
   const studentId = me?.id ?? ''
   const restored = useRef(false)
@@ -85,19 +94,28 @@ export function PeerEvaluationForm() {
     [],
   )
 
+  // Restore the draft ONCE, then land on the first classmate still waiting (or the first one).
   useEffect(() => {
     if (restored.current || !form || !studentId) return
     restored.current = true
+    let restoredScores: Scores = {}
     try {
       const raw = localStorage.getItem(draftKey(studentId, evaluationId))
-      if (!raw) return
-      const d = JSON.parse(raw) as Draft
-      if (d && typeof d === 'object') {
-        setScores(d.scores ?? {})
-        setComments(d.comments ?? {})
+      if (raw) {
+        const d = JSON.parse(raw) as Draft
+        if (d && typeof d === 'object') {
+          restoredScores = d.scores ?? {}
+          setScores(restoredScores)
+          setComments(d.comments ?? {})
+        }
       }
     } catch {
+      // A corrupt draft is the same as no draft.
     }
+    const waiting = form.peers.find(
+      (p) => !form.criteria.every((c) => restoredScores[p.id]?.[c.id] !== undefined),
+    )
+    setView({ id: (waiting ?? form.peers[0])?.id ?? null, dir: 1 })
   }, [form, studentId, evaluationId])
 
   const [savedOk, setSavedOk] = useState(true)
@@ -142,13 +160,14 @@ export function PeerEvaluationForm() {
   }
 
   function openPeer(peerId: string) {
+    if (!form) return
+    const from = form.peers.findIndex((p) => p.id === view.id)
+    const to = form.peers.findIndex((p) => p.id === peerId)
     setReviewing(false)
-    setOpenId(peerId)
+    setView({ id: peerId, dir: to < from ? -1 : 1 })
     if (scrollTimer.current !== null) window.clearTimeout(scrollTimer.current)
     scrollTimer.current = window.setTimeout(() => {
-      document
-        .getElementById(peerCardId(peerId))
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      document.getElementById(PEER_FOCUS_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, SCROLL_AFTER_MS)
   }
 
@@ -183,6 +202,7 @@ export function PeerEvaluationForm() {
       try {
         localStorage.removeItem(draftKey(studentId, evaluationId))
       } catch {
+        // The draft is already irrelevant once the server has the answers.
       }
       toast('Submitted. Thanks for being honest.', 'success')
       navigate('/app/peer', { replace: true })
@@ -204,25 +224,35 @@ export function PeerEvaluationForm() {
   }
   if (!form) return null
 
-  const firstWaiting = nextUnfinished(null)
+  const current = form.peers.find((p) => p.id === view.id) ?? null
+  const index = current ? form.peers.indexOf(current) : -1
   const allDone = totals.total > 0 && totals.done === totals.total
 
-  const primary = longComment
-    ? {
-        label: `Shorten your comment for ${longComment.displayName}`,
-        onClick: () => openPeer(longComment.id),
-      }
-    : allDone
-      ? { label: 'Review and submit', onClick: () => setReviewing(true) }
-      : firstWaiting
-        ? {
-            label:
-              totals.total - totals.done > 1
-                ? `Rate ${firstWaiting.displayName} · ${totals.total - totals.done} left`
-                : `Rate ${firstWaiting.displayName}`,
-            onClick: () => openPeer(firstWaiting.id),
-          }
-        : null
+  // What the footer under the comment offers, worked out in one place so it never contradicts the
+  // strip above it: Back is always there after the first; forward appears only once THIS classmate
+  // is finished (a greyed-out Next teaches nothing, a sentence about what is left does).
+  const currentDone = current ? isDone(current.id) : false
+  const currentOver = current ? (comments[current.id] ?? '').length > PEER_COMMENT_MAX : false
+  const blocker = longComment && longComment.id !== current?.id ? longComment : null
+  const after = current ? nextUnfinished(current.id) : null
+  const left = current ? form.criteria.filter((c) => scores[current.id]?.[c.id] === undefined).length : 0
+
+  const forward =
+    !current || !currentDone || currentOver
+      ? null
+      : blocker
+        ? { label: `Shorten ${blocker.displayName}'s comment`, onClick: () => openPeer(blocker.id) }
+        : allDone
+          ? { label: 'Review and submit', onClick: () => setReviewing(true) }
+          : after
+            ? { label: `Next: ${after.displayName}`, onClick: () => openPeer(after.id) }
+            : null
+  const hint = forward
+    ? null
+    : current && !currentDone
+      ? `${left} question${left === 1 ? '' : 's'} left for ${current.displayName}`
+      : null
+  const back = index > 0 ? { label: 'Back', onClick: () => openPeer(form.peers[index - 1].id) } : null
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -254,7 +284,7 @@ export function PeerEvaluationForm() {
         ) : (
           form.closesAt && (
             <p className="px-1 text-xs text-muted">
-              Closes in {countdownTo(new Date(form.closesAt))}
+              {deadlineLabel(form.closesAt, now).replace(/^c/, 'C')}
             </p>
           )
         )}
@@ -263,6 +293,21 @@ export function PeerEvaluationForm() {
           <EmptyState description="Ask your instructor if that looks wrong.">
             You have not been placed in a group for this one.
           </EmptyState>
+        ) : locked ? (
+          <div>
+            <h2 className="px-1 text-sm font-semibold text-muted">Your classmates</h2>
+            <Rows className="mt-2">
+              {form.peers.map((p) => (
+                <div key={p.id} className="flex items-center gap-3 px-4 py-3">
+                  <Avatar name={p.displayName} url={p.avatarUrl} className="h-9 w-9 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{p.displayName}</span>
+                </div>
+              ))}
+            </Rows>
+          </div>
+        ) : !current ? (
+          // The draft is still being read; a frame of the wrong classmate would be worse than this.
+          <ListSkeleton rows={3} />
         ) : (
           <>
             <div>
@@ -272,54 +317,11 @@ export function PeerEvaluationForm() {
                   {totals.done} of {totals.total} done
                 </Chip>
               </div>
+              <div className="mt-3">
+                <PeerStrip peers={form.peers} activeId={current.id} isDone={isDone} onPick={openPeer} />
+              </div>
 
-              {!locked && (
-                <div
-                  className="mt-3 flex flex-wrap gap-x-3 gap-y-2 px-1"
-                  role="group"
-                  aria-label="Jump to a classmate"
-                >
-                  {form.peers.map((p) => {
-                    const done = isDone(p.id)
-                    const active = openId === p.id
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => openPeer(p.id)}
-                        aria-label={`${p.displayName}${done ? ', done' : ''}`}
-                        className="flex w-14 shrink-0 flex-col items-center gap-1"
-                      >
-                        <span className="relative">
-                          <Avatar
-                            name={p.displayName}
-                            url={p.avatarUrl}
-                            className={cn(
-                              'h-11 w-11 ring-2 ring-offset-2 ring-offset-canvas',
-                              active ? 'ring-accent-solid' : done ? 'ring-success-solid' : 'ring-transparent',
-                            )}
-                          />
-                          {done && (
-                            <span className="absolute -bottom-0.5 -right-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-success-solid text-white ring-2 ring-canvas">
-                              <CheckIcon className="h-3 w-3" />
-                            </span>
-                          )}
-                        </span>
-                        <span
-                          className={cn(
-                            'w-full truncate text-center text-2xs',
-                            done ? 'text-ink' : 'text-muted',
-                          )}
-                        >
-                          {p.displayName}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-
-              {!locked && hasAnswers && (
+              {hasAnswers && (
                 <p
                   className={cn(
                     'mt-2 flex items-center gap-1.5 px-1 text-xs',
@@ -339,44 +341,27 @@ export function PeerEvaluationForm() {
               )}
             </div>
 
-            <div className="space-y-3">
-              {form.peers.map((p) => {
-                const after = nextUnfinished(p.id)
-                return (
-                  <PeerCard
-                    key={p.id}
-                    peer={p}
-                    criteria={form.criteria}
-                    scores={scores[p.id] ?? {}}
-                    comment={comments[p.id] ?? ''}
-                    open={openId === p.id}
-                    disabled={locked}
-                    next={
-                      after
-                        ? { label: `Next: ${after.displayName}`, onClick: () => openPeer(after.id) }
-                        : {
-                            label: 'Review and submit',
-                            onClick: () => {
-                              setOpenId(null)
-                              setReviewing(true)
-                            },
-                          }
-                    }
-                    onToggle={() => setOpenId((cur) => (cur === p.id ? null : p.id))}
-                    onScore={(cid, v) => setScore(p.id, cid, v)}
-                    onComment={(body) => setComments((prev) => ({ ...prev, [p.id]: body }))}
-                  />
-                )
-              })}
-            </div>
-
-            {!locked && primary && (
-              <StickyBar>
-                <Button className="w-full truncate" onClick={primary.onClick}>
-                  {primary.label}
-                </Button>
-              </StickyBar>
-            )}
+            {/* Keyed so each classmate arrives fresh; enter-only, since a leaving card would hold
+                the layout open for the length of its exit. */}
+            <motion.div
+              key={current.id}
+              initial={{ opacity: 0, x: view.dir * 28 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={snap}
+            >
+              <PeerCard
+                peer={current}
+                position={{ index, total: form.peers.length }}
+                criteria={form.criteria}
+                scores={scores[current.id] ?? {}}
+                comment={comments[current.id] ?? ''}
+                back={back}
+                forward={forward}
+                hint={hint}
+                onScore={(cid, v) => setScore(current.id, cid, v)}
+                onComment={(body) => setComments((prev) => ({ ...prev, [current.id]: body }))}
+              />
+            </motion.div>
           </>
         )}
       </div>

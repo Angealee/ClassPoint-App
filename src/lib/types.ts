@@ -1273,3 +1273,11 @@ export interface GradeSumsRow {
   term: TermKey
   sums: TermSums
 }
+
+/** The instructor as a person (0071). Every field is optional: unset falls back to the role. */
+export interface InstructorProfile {
+  displayName: string | null
+  title: string | null
+  bio: string | null
+  avatarUrl: string | null
+}

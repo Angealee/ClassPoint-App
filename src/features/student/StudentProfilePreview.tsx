@@ -1,19 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Sheet } from '@/components/ui/Sheet'
-import { CoverPhoto } from '@/components/profile/CoverPhoto'
-import { Avatar } from '@/components/ui/Avatar'
+import { PlayerCard } from '@/components/profile/PlayerCard'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { XpBar } from '@/components/ui/XpBar'
-import { BoltIcon, StarIcon, TrophyIcon } from '@/components/ui/icons'
 import { ProfileBanner } from '@/components/profile/ProfileBanner'
 import { ProfileVisitors } from '@/components/profile/ProfileVisitors'
 import { PinnedBadges } from '@/components/achievements/PinnedBadges'
 import { InterestTags, parseInterests } from '@/components/profile/InterestTags'
-import { Stat } from '@/components/ui/Stat'
 import { PointEventRow } from '@/components/points/PointEventRow'
 import { getPublicProfile, listAchievements, recordProfileView } from '@/lib/api'
 import { getLevelProgress } from '@/lib/leveling'
-import { cn } from '@/lib/cn'
 import type { AchievementState, PublicProfile } from '@/lib/types'
 import { useStudentDataOptional } from './StudentData'
 
@@ -86,72 +81,18 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
     <Sheet open={open} onClose={onClose}>
       {target && (
         <div className="space-y-4">
-          <div className="relative">
-            <CoverPhoto
-              url={profile?.header_url ?? null}
-              pos={profile?.header_pos ?? 50}
-              className="h-28 rounded-2xl"
-            />
-            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-t from-canvas/85 via-canvas/25 to-transparent" />
-          </div>
-
-          <div className="relative z-[1] pt-3">
-            <div className="absolute -top-9 left-5 z-[1]">
-              <Avatar
-                name={target.display_name}
-                url={profile?.avatar_url ?? target.avatar_url}
-                className="h-20 w-20 rounded-2xl ring-4 ring-canvas"
-                textClassName="text-2xl"
-              />
-            </div>
-            <div className="min-h-10 min-w-0 pl-28">
-              <p className="truncate font-display text-xl font-bold leading-tight">
-                {target.display_name}
-                {isMe && <span className="ml-1 text-sm text-accent">(you)</span>}
-              </p>
-              {profile?.display_title && (
-                <p className="truncate text-xs font-semibold text-reward">
-                  {profile.display_title}
-                </p>
-              )}
-              <p className="truncate text-sm text-muted">
-                {[sectionLabel, `Level ${progress.level}`].filter(Boolean).join(' · ')}
-              </p>
-            </div>
-          </div>
-
-          {/* Level / XP */}
-          <div>
-            <div className="mb-1.5 flex items-center justify-between gap-3 text-xs text-muted">
-              <span className="min-w-0 truncate">
-                {progress.expIntoLevel} / {progress.expForLevel} XP
-              </span>
-              <span className="shrink-0">{progress.expToNext} to next</span>
-            </div>
-            <XpBar value={progress.progressPct} />
-          </div>
-
-          {/* Stat tiles */}
-          <div className="grid grid-cols-3 gap-2.5">
-            <StatTile
-              icon={<BoltIcon className="h-4 w-4" />}
-              label="Points"
-              value={String(points)}
-              tone="reward"
-            />
-            <StatTile
-              icon={<StarIcon className="h-4 w-4" />}
-              label="Level"
-              value={String(progress.level)}
-              tone="accent"
-            />
-            <StatTile
-              icon={<TrophyIcon className="h-4 w-4" />}
-              label="Rank"
-              value={target.rank != null ? `#${target.rank}` : '-'}
-              tone="accent"
-            />
-          </div>
+          <PlayerCard
+            name={target.display_name}
+            title={profile?.display_title}
+            sectionLabel={sectionLabel}
+            avatarUrl={profile?.avatar_url ?? target.avatar_url}
+            coverUrl={profile?.header_url ?? null}
+            coverPos={profile?.header_pos ?? 50}
+            points={points}
+            rank={target.rank}
+            third={{ label: 'Level', value: String(progress.level) }}
+            isMe={isMe}
+          />
 
           {/* Who viewed you (own profile only) */}
           {isMe && (
@@ -241,32 +182,6 @@ export function StudentProfilePreview({ target, open, onClose, isMe, sectionLabe
         </div>
       )}
     </Sheet>
-  )
-}
-
-function StatTile({
-  icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string
-  tone: 'reward' | 'accent'
-}) {
-  return (
-    <div className="min-w-0 rounded-xl bg-card-2 p-3">
-      <div
-        className={cn(
-          'mx-auto mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg',
-          tone === 'reward' ? 'bg-gold-400/15 text-reward' : 'bg-accent-solid/10 text-accent',
-        )}
-      >
-        {icon}
-      </div>
-      <Stat value={value} label={label} />
-    </div>
   )
 }
 

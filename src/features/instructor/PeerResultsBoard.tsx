@@ -14,6 +14,7 @@ import { ListSkeleton } from '@/components/ui/Skeleton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/Toast'
 import { DownloadIcon } from '@/components/ui/icons'
+import { PeerPlate } from '@/components/peer/PeerPlate'
 import { PeerResultCard } from '@/components/peer/PeerResultCard'
 import {
   closePeerEvaluation,
@@ -26,7 +27,9 @@ import {
   reopenPeerEvaluation,
   setPeerCommentHidden,
 } from '@/lib/api'
+import { cn } from '@/lib/cn'
 import { exportPeerScores } from '@/lib/export-peer'
+import { deadlineLabel } from '@/lib/peer-list'
 import { byTeam, classSummary } from '@/lib/peer-summary'
 import { errorText } from '@/lib/errors'
 import { countdownTo, timeAgo } from '@/lib/time'
@@ -43,6 +46,7 @@ export function PeerResultsBoard() {
   const [rows, setRows] = useState<PeerCompletionRow[]>([])
   const [results, setResults] = useState<PeerResultRow[]>([])
   const [tab, setTab] = useState<BoardTab>('completion')
+  const [now] = useState(() => Date.now())
   const [exporting, setExporting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -234,35 +238,59 @@ export function PeerResultsBoard() {
           .join(' · ')}
         fallback="/teach/peer"
         actions={
-          <div className="flex items-center gap-2">
-            <Chip tone={open ? 'accent' : 'neutral'} size="sm">
-              {open ? 'Open' : 'Closed'}
-            </Chip>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => navigate(`/teach/peer?duplicate=${meta.id}`)}
-            >
-              Duplicate
-            </Button>
-          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => navigate(`/teach/peer?duplicate=${meta.id}`)}
+          >
+            Duplicate
+          </Button>
         }
       />
 
       <div className="space-y-4">
-        <Card>
-          <div className="mb-1 flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold">Submitted</h2>
-            <span className="text-sm font-semibold tabular-nums">
-              {meta.submittedCount} / {meta.expectedCount}
+        <PeerPlate
+          eyebrow="Submitted"
+          figure={`${meta.submittedCount}/${meta.expectedCount}`}
+          unit="students"
+          progress={meta.submittedCount / expected}
+          progressLabel={`${meta.submittedCount} of ${meta.expectedCount} submitted`}
+          right={
+            <span
+              className={cn(
+                'inline-flex shrink-0 items-center rounded-lg px-2 py-0.5 text-2xs font-bold uppercase tracking-wide',
+                released
+                  ? 'bg-gold-300/20 text-gold-300'
+                  : open
+                    ? 'bg-plate-up/15 text-plate-up'
+                    : 'bg-white/10 text-white/80',
+              )}
+            >
+              {released ? 'Released' : open ? 'Open' : 'Closed'}
             </span>
-          </div>
-          <Meter value={meta.submittedCount} max={expected} />
-          <p className="mt-2 text-xs text-muted">
-            Drafts stay on each student's own device, so this counts finished
-            submissions only. There is no partial progress to show.
+          }
+          meta={
+            <>
+              {open ? (
+                <span>
+                  {meta.closesAt
+                    ? deadlineLabel(meta.closesAt, now).replace(/^c/, 'C')
+                    : 'No deadline, open until you close it'}
+                </span>
+              ) : (
+                <span>Closed {meta.closedAt ? timeAgo(meta.closedAt) : ''}</span>
+              )}
+              {released && meta.resultsReleasedAt && (
+                <span>Released {timeAgo(meta.resultsReleasedAt)}</span>
+              )}
+            </>
+          }
+        >
+          <p className="text-xs text-white/55">
+            Drafts stay on each student's own device, so this counts finished submissions only. There is no
+            partial progress to show.
           </p>
-        </Card>
+        </PeerPlate>
 
         <Card>
           <SectionLabel>Deadline</SectionLabel>

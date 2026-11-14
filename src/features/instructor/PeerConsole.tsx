@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Card } from '@/components/ui/Card'
+import { Rows } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
 import { Meter } from '@/components/ui/Meter'
@@ -15,6 +15,7 @@ import { countdownTo, timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import type { ToneName } from '@/lib/tone'
 import type { PeerEvaluationListItem, PeerEvaluationTemplate } from '@/lib/types'
+import { PeerPlate } from '@/components/peer/PeerPlate'
 import { PeerComposer } from './PeerComposer'
 import { PeerGroups } from './PeerGroups'
 
@@ -184,6 +185,21 @@ function EvaluationList({ onOpenGroups }: { onOpenGroups: () => void }) {
   return (
     <div className="space-y-4">
       {!loading && !loadError && items.length > 0 && (
+        <PeerPlate
+          eyebrow="Peer evaluations"
+          figure={counts.open + counts.review > 0 ? String(counts.open + counts.review) : 'All clear'}
+          unit={counts.open + counts.review > 0 ? 'need you' : undefined}
+          meta={
+            <>
+              <span>{counts.open} open</span>
+              <span>{counts.review} to release</span>
+              <span>{counts.released} released</span>
+            </>
+          }
+        />
+      )}
+
+      {!loading && !loadError && items.length > 0 && (
         <div className="flex flex-wrap items-center gap-3">
           <div
             role="radiogroup"
@@ -260,11 +276,11 @@ function EvaluationList({ onOpenGroups }: { onOpenGroups: () => void }) {
           .
         </EmptyState>
       ) : (
-        <div className="space-y-3">
+        <Rows>
           {shown.map((e) => (
             <EvaluationCard key={e.id} item={e} now={now} />
           ))}
-        </div>
+        </Rows>
       )}
 
       <PeerComposer
@@ -302,11 +318,16 @@ function EvaluationCard({ item, now }: { item: PeerEvaluationListItem; now: numb
           : 'Closed'
 
   return (
-    <Link to={`/teach/peer/${item.id}`} className="block">
-      <Card interactive>
+    <Link
+      to={`/teach/peer/${item.id}`}
+      className="block px-4 py-3.5 transition-colors hover:bg-card-2 focus:outline-none focus-visible:bg-card-2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
+    >
+      <div>
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-semibold">{item.title}</h3>
+            <h3 className="truncate text-sm font-semibold" title={item.title}>
+              {item.title}
+            </h3>
             <p className="mt-0.5 truncate text-xs text-muted">
               {item.subjectCode} · {item.scope === 'group' ? 'Within teams' : 'Whole section'} ·{' '}
               {item.criteriaCount} criteri{item.criteriaCount === 1 ? 'on' : 'a'}
@@ -347,7 +368,7 @@ function EvaluationCard({ item, now }: { item: PeerEvaluationListItem; now: numb
           <Meter value={item.submittedCount} max={expected} />
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-2.5 text-xs">
+        <div className="mt-2.5 flex items-center justify-between gap-3 text-xs">
           <span
             className={cn('min-w-0 truncate', urgent ? 'font-semibold text-danger' : 'text-muted')}
           >
@@ -355,7 +376,7 @@ function EvaluationCard({ item, now }: { item: PeerEvaluationListItem; now: numb
           </span>
           <span className="shrink-0 font-semibold text-accent">{meta.action} ›</span>
         </div>
-      </Card>
+      </div>
     </Link>
   )
 }

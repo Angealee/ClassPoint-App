@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Avatar } from '@/components/ui/Avatar'
+import { InstructorAvatar } from '@/components/identity/InstructorAvatar'
+import { instructorName } from '@/lib/instructor-identity'
+import { useInstructorProfile } from '@/lib/useInstructorProfile'
 import { cn } from '@/lib/cn'
 import { getLevelProgress } from '@/lib/leveling'
 import { sectionColor } from '@/lib/sectionColor'
@@ -180,6 +183,7 @@ export function MessageRow({
   pinned?: boolean
   canReact: boolean
 }) {
+  const instructorProfile = useInstructorProfile()
   const [held, setHeld] = useState(false)
   const { done: copied, copy } = useCopy()
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -256,16 +260,19 @@ export function MessageRow({
       className={cn('group relative flex items-end gap-2', startsRun ? 'mt-2' : 'mt-0.5')}
     >
       <div className="w-7 shrink-0">
-        {endsRun && (
-          <button
-            type="button"
-            onClick={() => onOpenPerson?.(message)}
-            aria-label={`${message.displayName}, options`}
-            className="block rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-          >
-            <RingAvatar person={person} name={message.displayName} url={message.avatarUrl} />
-          </button>
-        )}
+        {endsRun &&
+          (isInstructor ? (
+            <InstructorAvatar />
+          ) : (
+            <button
+              type="button"
+              onClick={() => onOpenPerson?.(message)}
+              aria-label={`${message.displayName}, options`}
+              className="block rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              <RingAvatar person={person} name={message.displayName} url={message.avatarUrl} />
+            </button>
+          ))}
       </div>
 
       <div className="min-w-0 flex-1">
@@ -284,7 +291,7 @@ export function MessageRow({
               />
             )}
             <span className="min-w-0 truncate text-2xs font-semibold text-muted">
-              {message.displayName}
+              {isInstructor ? instructorName(instructorProfile) : message.displayName}
             </span>
             {person && (
               <span className="shrink-0 text-2xs font-semibold tabular-nums text-muted">

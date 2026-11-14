@@ -15,6 +15,8 @@ import { tap } from '@/lib/motion'
 import { Shell, type NavItem } from '@/components/layout/Shell'
 import { Splash } from '@/components/layout/Splash'
 import { WhatsNew } from '@/features/WhatsNew'
+import { IdentityHost } from '@/components/identity/IdentityHost'
+import { InstructorAvatar } from '@/components/identity/InstructorAvatar'
 import {
   ClipboardIcon,
   ClockIcon,
@@ -104,6 +106,21 @@ function OpsButton() {
       round
       onClick={() => navigate('/teach/ops')}
       icon={<ShieldIcon className="h-5 w-5" />}
+    />
+  )
+}
+
+/** The instructor's own face, leading to their profile. It replaces Sign out in the phone header
+ * (which is now on the profile screen), so the five-button row that overflowed stays at four. */
+function ProfileButton() {
+  const navigate = useNavigate()
+  return (
+    <IconButton
+      label="Your profile"
+      variant="outline"
+      round
+      onClick={() => navigate('/teach/profile')}
+      icon={<InstructorAvatar interactive={false} className="h-7 w-7" />}
     />
   )
 }
@@ -283,6 +300,7 @@ export function InstructorLayout() {
         }
         sidebarActions={
           <div className="flex items-center gap-2">
+            <ProfileButton />
             <OpsButton />
             <IconButton
               label="Sign out"
@@ -298,17 +316,12 @@ export function InstructorLayout() {
             <RedemptionInbox count={pendingRedemptions + pendingExcuses + pendingReports} />
             <PeerButton />
             <OpsButton />
-                        <IconButton
-              label="Sign out"
-              variant="outline"
-              round
-              onClick={onSignOut}
-              icon={<LogOutIcon className="h-5 w-5" />}
-            />
+            <ProfileButton />
           </div>
         }
       />
       <WhatsNew />
+      <IdentityHost />
     </InstructorContext.Provider>
   )
 }

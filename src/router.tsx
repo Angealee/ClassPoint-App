@@ -52,6 +52,9 @@ const InstructorChatRoom = lazy(() =>
     default: () => <m.ChatRoom basePath="/teach/space" />,
   })),
 )
+const InstructorProfile = lazy(() =>
+  import('@/features/instructor/InstructorProfile').then((m) => ({ default: m.InstructorProfile })),
+)
 const InstructorSpace = lazy(() =>
   import('@/features/instructor/InstructorSpace').then((m) => ({ default: m.InstructorSpace })),
 )
@@ -225,6 +228,7 @@ export const router = createBrowserRouter([
           { path: 'redemptions', element: <Redemptions /> },
           { path: 'semesters', element: <ManageSemesters /> },
           { path: 'ops', element: <Ops /> },
+          { path: 'profile', element: <InstructorProfile /> },
           { path: 'peer', element: <PeerConsole /> },
           { path: 'peer/:evaluationId', element: <PeerResultsBoard /> },
           { path: 'grades', element: <GradesEntry /> },

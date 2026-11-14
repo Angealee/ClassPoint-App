@@ -7,6 +7,9 @@ import { Rows } from '@/components/ui/Card'
 import { IconButton } from '@/components/ui/IconButton'
 import { PencilIcon } from '@/components/ui/icons'
 import { Avatar } from '@/components/ui/Avatar'
+import { InstructorAvatar } from '@/components/identity/InstructorAvatar'
+import { instructorName } from '@/lib/instructor-identity'
+import { useInstructorProfile } from '@/lib/useInstructorProfile'
 import { Chip } from '@/components/ui/Chip'
 import { Input } from '@/components/ui/Input'
 import { Sheet } from '@/components/ui/Sheet'
@@ -52,6 +55,7 @@ function TypingDots() {
 export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
   const navigate = useNavigate()
   const myStudentId = useStudentDataOptional()?.me?.id ?? null
+  const instructorProfile = useInstructorProfile()
   const { toast } = useToast()
 
   const [rooms, setRooms] = useState<SpaceRoom[]>([])
@@ -279,11 +283,9 @@ export function Chats({ basePath = '/app/space' }: { basePath?: string }) {
                 onClick={() => void openDm(null)}
                 className="flex w-full items-center gap-3 bg-accent-solid/5 px-4 py-3 text-left transition-colors hover:bg-card-2 disabled:opacity-60"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-solid/15 text-2xs font-bold text-accent">
-                  IN
-                </span>
+                <InstructorAvatar interactive={false} className="h-8 w-8" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">Instructor</span>
+                  <span className="block truncate text-sm font-semibold">{instructorName(instructorProfile)}</span>
                   <span className="block text-2xs text-muted">Private, always available</span>
                 </span>
               </button>

@@ -40,6 +40,7 @@ const MUST_BE_LINKED = [
   '/app/event',
   // Instructor
   '/teach/ops',
+  '/teach/profile',
   '/teach/peer',
   '/teach/space',
   '/teach/space/chats',

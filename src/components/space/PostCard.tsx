@@ -7,6 +7,7 @@ import { IconButton } from '@/components/ui/IconButton'
 import { Sheet } from '@/components/ui/Sheet'
 import { MoreIcon, TrashIcon, WarningIcon } from '@/components/ui/icons'
 import { WButton } from './WButton'
+import { ClassPointButton } from '@/components/identity/ClassPointMark'
 import { timeAgo } from '@/lib/time'
 import { cn } from '@/lib/cn'
 import type { LoungePost } from '@/lib/types'
@@ -150,6 +151,9 @@ export function PostCard({
       <>
         <Card pad="none" className="border-info-solid/25 bg-info-solid/5">
           <div className="flex items-start gap-3 px-4 pb-2 pt-3">
+            <span className="mt-0.5 shrink-0">
+              <ClassPointButton className="h-6 w-6" />
+            </span>
             <span className="mt-0.5 shrink-0">
               <Chip tone="info" size="sm">
                 {post.pulseKind === 'podium'
